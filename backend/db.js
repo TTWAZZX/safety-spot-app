@@ -1,26 +1,25 @@
-const mysql = require('mysql2/promise');
-
-// สร้าง Connection Pool เพื่อการเชื่อมต่อฐานข้อมูลที่มีประสิทธิภาพ
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_DATABASE || 'safety_spot_db',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  dateStrings: true // บังคับให้ return วันที่เป็น String เพื่อป้องกันปัญหา Timezone
-});
-
-// ทดสอบการเชื่อมต่อ
-pool.getConnection()
-    .then(conn => {
-        console.log('Successfully connected to the database.');
-        conn.release(); // คืน connection กลับเข้า pool
-    })
-    .catch(err => {
-        console.error('Failed to connect to the database:', err);
+    require('dotenv').config();
+    const { Pool } = require('pg');
+    
+    // สร้าง Connection Pool โดยใช้ DATABASE_URL จาก .env
+    // Render จะสร้างตัวแปรนี้ให้เราโดยอัตโนมัติ
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      // ตั้งค่า SSL สำหรับการเชื่อมต่อบน Production (จำเป็นสำหรับ Render)
+      ssl: {
+        rejectUnauthorized: false
+      }
     });
-
-module.exports = pool;
+    
+    // ทดสอบการเชื่อมต่อเมื่อเซิร์ฟเวอร์เริ่มทำงาน
+    pool.connect()
+        .then(() => console.log('Successfully connected to the PostgreSQL database.'))
+        .catch(err => console.error('Failed to connect to the database:', err));
+    
+    // Export ฟังก์ชันสำหรับ query ข้อมูล
+    module.exports = {
+      query: (text, params) => pool.query(text, params),
+      getClient: () => pool.connect(),
+    };
+    
 
