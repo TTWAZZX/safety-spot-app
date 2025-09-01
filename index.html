@@ -4,12 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Safety Spot</title>
-    <!-- CSS Libraries -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;700&display=swap" rel="stylesheet">
     
-    <!-- Custom Styles -->
     <style>
         body { 
             font-family: 'Kanit', sans-serif; 
@@ -100,11 +98,16 @@
             height: 100%;
             object-fit: cover;
         }
+
+        /* Styles for Admin tabs */
+        .admin-tab-btn.active {
+            border-bottom: 2px solid #0d6efd;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
-    <!-- Registration Page -->
     <div id="registration-page" class="container py-4">
         <div class="card shadow-sm border-0">
             <div class="card-body p-4">
@@ -125,10 +128,8 @@
         </div>
     </div>
 
-    <!-- Main App -->
     <div id="main-app">
         <main class="container py-3 pb-5 mb-5">
-            <!-- Home Page -->
             <div id="home-page" class="page active">
                  <div class="d-flex align-items-center p-3 mb-4 bg-white rounded-3 shadow-sm">
                     <img id="user-profile-pic" src="https://placehold.co/60x60" class="rounded-circle me-3" width="60" height="60" alt="Profile Picture">
@@ -148,12 +149,10 @@
                     <p class="text-center text-muted">กำลังโหลดกิจกรรม...</p>
                 </div>
             </div>
-            <!-- Activities Page -->
             <div id="activities-page" class="page">
                 <h4 class="mb-3 fw-bold">กิจกรรมทั้งหมด</h4>
                 <div id="all-activities-list"></div>
             </div>
-            <!-- Leaderboard Page -->
             <div id="leaderboard-page" class="page">
                 <h4 class="mb-3 fw-bold">กระดานผู้นำ</h4>
                 <div id="leaderboard-list"></div>
@@ -161,7 +160,6 @@
                     <div class="spinner-border" role="status"></div>
                 </div>
             </div>
-            <!-- Profile Page -->
             <div id="profile-page" class="page">
                  <div class="card shadow-sm border-0">
                     <div class="card-body text-center p-4">
@@ -175,18 +173,17 @@
                     </div>
                 </div>
             </div>
-            <!-- Admin Page -->
             <div id="admin-page" class="page">
                 <h4 class="fw-bold mb-3">Admin Panel</h4>
                 <div class="list-group">
                     <a href="#" id="view-stats-btn" class="list-group-item list-group-item-action"><i class="fas fa-chart-line me-2"></i> ดูข้อมูลสรุป (Dashboard)</a>
                     <a href="#" id="manage-reports-btn" class="list-group-item list-group-item-action"><i class="fas fa-inbox me-2"></i> จัดการรายงานที่ส่งเข้ามา</a>
                     <a href="#" id="manage-activities-btn" class="list-group-item list-group-item-action"><i class="fas fa-tasks me-2"></i> จัดการกิจกรรม</a>
+                    <a href="#" id="manage-badges-btn" class="list-group-item list-group-item-action"><i class="fas fa-certificate me-2"></i> จัดการผู้ใช้และป้ายรางวัล</a>
                 </div>
             </div>
         </main>
         
-        <!-- Bottom Navigation Bar -->
         <nav class="navbar navbar-light bg-white fixed-bottom bottom-nav">
             <div class="container-fluid d-flex justify-content-around">
                 <a href="#home" class="nav-link active text-center" data-page="home-page"><i class="fas fa-home fs-4"></i><div style="font-size:0.7rem;">หน้าหลัก</div></a>
@@ -198,28 +195,79 @@
         </nav>
     </div>
     
-    <!-- All Modals -->
-    <!-- Submission Modal -->
     <div class="modal fade" id="submission-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">เข้าร่วมกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="submission-form"><input type="hidden" id="activityId-input"><h5 id="activity-title-modal" class="fw-bold mb-3"></h5><div class="mb-3"><label class="form-label">รายละเอียดจุดเสี่ยง</label><textarea class="form-control" id="description-input" rows="4" required></textarea></div><div class="mb-3"><label class="form-label">รูปภาพ</label><input type="file" class="form-control" id="image-input" accept="image/*" required></div><div class="image-preview-container"><img id="submission-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview"></div><button type="submit" class="btn btn-primary w-100 fw-bold mt-3 py-2">ส่งรายงาน</button></form></div></div></div></div>
-    <!-- Admin: Reports Modal -->
     <div class="modal fade" id="admin-reports-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการรายงาน (<span id="pending-count-modal">0</span>)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="table-responsive"><table class="table table-striped table-hover mb-0"><thead class="table-dark"><tr><th>ผู้ส่ง</th><th>รายละเอียด</th><th>รูปภาพ</th><th>Actions</th></tr></thead><tbody id="submissions-table-body"></tbody></table></div><div id="reports-loading" class="text-center my-4"><div class="spinner-border"></div></div><div id="no-reports-message" class="text-center my-4" style="display:none;"><p class="text-muted">ไม่มีรายการที่รอตรวจสอบ</p></div></div></div></div></div>
-    <!-- Admin: Activities Modal -->
     <div class="modal fade" id="admin-activities-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><button id="create-activity-btn" class="btn btn-success mb-3"><i class="fas fa-plus"></i> สร้างกิจกรรมใหม่</button><div id="activities-list-admin"></div></div></div></div></div>
-    <!-- Admin: Activity Form Modal (Create/Edit) -->
     <div class="modal fade" id="activity-form-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-form-title">สร้างกิจกรรมใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="activity-form"><input type="hidden" id="form-activity-id"><div class="mb-3"><label class="form-label">หัวข้อ</label><input type="text" class="form-control" id="form-activity-title" required></div><div class="mb-3"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="form-activity-desc" rows="3" required></textarea></div><div class="mb-3"><label class="form-label">รูปภาพกิจกรรม</label><input type="file" class="form-control" id="form-activity-image-input" accept="image/*"><div class="image-preview-container mt-2"><img id="activity-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview"></div><input type="hidden" id="form-activity-image-url"></div><button type="submit" class="btn btn-primary w-100">บันทึก</button></form></div></div></div></div>
-    <!-- Activity Detail Modal -->
     <div class="modal fade" id="activity-detail-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-detail-title">...</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body bg-light"><div id="submissions-container" class="container-fluid"></div><div id="submissions-loading" class="text-center my-5"><div class="spinner-border"></div></div></div><div class="modal-footer"><button type="button" class="btn btn-primary w-100 fw-bold py-2 btn-join-from-detail"><i class="fas fa-plus-circle me-1"></i> รายงานจุดเสี่ยงในกิจกรรมนี้</button></div></div></div></div>
-    <!-- Admin: Stats Modal -->
     <div class="modal fade" id="admin-stats-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">ข้อมูลสรุป Dashboard</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3"><div class="col-12"><canvas id="reportsChart"></canvas></div></div><div id="stats-container" class="row g-3 mt-3"></div><div id="stats-loading" class="text-center my-4"><div class="spinner-border"></div></div></div></div></div></div>
 
-    <!-- JS Libraries -->
+    <div class="modal fade" id="admin-manage-badges-modal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">จัดการผู้ใช้และป้ายรางวัล</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-4">
+                        <li class="nav-item">
+                            <a class="nav-link active admin-tab-btn" data-tab="manageBadges" href="#">จัดการป้ายรางวัล</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link admin-tab-btn" data-tab="manageUsers" href="#">มอบป้ายรางวัลให้ผู้ใช้</a>
+                        </li>
+                    </ul>
+                    <div id="manageBadgesTab" class="admin-tab-content active">
+                        <button id="add-badge-btn" class="btn btn-success mb-3"><i class="fas fa-plus"></i> เพิ่มป้ายรางวัลใหม่</button>
+                        <div id="badges-list" class="row"></div>
+                    </div>
+                    <div id="manageUsersTab" class="admin-tab-content" style="display:none;">
+                        <div class="mb-3">
+                            <input type="text" id="user-search-input" class="form-control" placeholder="ค้นหาผู้ใช้ด้วยชื่อหรือรหัสพนักงาน...">
+                        </div>
+                        <div id="user-search-results"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="badge-form-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="badge-form-title">เพิ่มป้ายรางวัลใหม่</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="badge-form">
+                        <input type="hidden" id="badge-id-input">
+                        <div class="mb-3">
+                            <label class="form-label">ชื่อป้ายรางวัล</label>
+                            <input type="text" class="form-control" id="badge-name-input" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">คำอธิบาย</label>
+                            <textarea class="form-control" id="badge-desc-input" rows="3" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">URL รูปภาพ</label>
+                            <input type="text" class="form-control" id="badge-image-url-input" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">บันทึก</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- Main Application Logic -->
     <script>
         // ===============================================================
         //  APP CONFIGURATION
@@ -240,10 +288,11 @@
             initializeAllModals();
             initializeApp();
             bindStaticEventListeners();
+            bindAdminTabEventListeners(); // New
         });
 
         function initializeAllModals() {
-            const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats'];
+            const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form']; // New Modals
             modalIds.forEach(id => {
                 allModals[id] = new bootstrap.Modal(document.getElementById(`${id}-modal`));
             });
@@ -300,6 +349,9 @@
                 method,
                 headers: { 'Content-Type': 'application/json' },
             };
+            if (currentUser.lineUserId) {
+                 options.headers['X-Admin-User-ID'] = currentUser.lineUserId;
+            }
 
             if (method.toUpperCase() === 'GET') {
                 Object.keys(payload).forEach(key => url.searchParams.append(key, payload[key]));
@@ -536,15 +588,19 @@
             try {
                 const badges = await callApi('/api/user/badges', { lineUserId: lineProfile.userId });
                 container.empty();
-                badges.forEach(b => {
-                    const lockClass = b.isEarned ? '' : 'locked';
-                    const html = `
-                        <div class="text-center" title="${sanitizeHTML(b.name)}: ${sanitizeHTML(b.desc)}">
-                            <img src="${getFullImageUrl(b.img)}" class="badge-icon ${lockClass}" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';">
-                            <div class="small">${sanitizeHTML(b.name)}</div>
-                        </div>`;
-                    container.append(html);
-                });
+                if (badges.length === 0) {
+                    container.html('<p class="text-muted">ยังไม่มีป้ายรางวัล</p>');
+                } else {
+                    badges.forEach(b => {
+                        const lockClass = b.isEarned ? '' : 'locked';
+                        const html = `
+                            <div class="text-center" title="${sanitizeHTML(b.name)}: ${sanitizeHTML(b.desc)}">
+                                <img src="${getFullImageUrl(b.img)}" class="badge-icon ${lockClass}" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';">
+                                <div class="small">${sanitizeHTML(b.name)}</div>
+                            </div>`;
+                        container.append(html);
+                    });
+                }
             } catch (e) {
                 container.html('<p class="text-danger">ไม่สามารถโหลดป้ายรางวัลได้</p>');
             }
@@ -573,6 +629,7 @@
             $('#registration-form').on('submit', handleRegistration);
             $('#submission-form').on('submit', handleSubmitReport);
             $('#activity-form').on('submit', handleSaveActivity);
+            $('#badge-form').on('submit', handleSaveBadge);
 
             // --- Dynamic Buttons ---
             $(document).on('click', '.btn-view-activity', handleViewActivity);
@@ -581,6 +638,7 @@
             
             // --- Buttons in modals ---
             $('.btn-join-from-detail').on('click', handleJoinFromDetail);
+            $('#add-badge-btn').on('click', handleAddBadge);
 
             // Image Previews
             $('#image-input').on('change', function() { handleImagePreview(this, '#submission-image-preview'); });
@@ -591,10 +649,34 @@
             $('#view-stats-btn').on('click', handleViewStats);
             $('#manage-reports-btn').on('click', handleManageReports);
             $('#manage-activities-btn').on('click', handleManageActivities);
+            $('#manage-badges-btn').on('click', handleManageBadges); // New
             $('#create-activity-btn').on('click', handleCreateActivity);
             $(document).on('click', '.btn-approve, .btn-reject', handleApprovalAction);
             $(document).on('click', '.btn-edit-activity', handleEditActivity);
             $(document).on('click', '.btn-toggle-activity', handleToggleActivity);
+            $(document).on('click', '.delete-badge-btn', handleDeleteBadge);
+            $(document).on('click', '.award-badge-btn', handleAwardBadge);
+        }
+
+        function bindAdminTabEventListeners() {
+            $('.admin-tab-btn').on('click', function(e) {
+                e.preventDefault();
+                $('.admin-tab-btn').removeClass('active');
+                $(this).addClass('active');
+                $('.admin-tab-content').hide();
+                $('#' + $(this).data('tab') + 'Tab').show();
+                if ($(this).data('tab') === 'manageBadges') {
+                    loadBadgesForAdmin();
+                }
+            });
+            $('#user-search-input').on('input', function() {
+                const query = $(this).val();
+                if (query.length > 2) {
+                    searchUsersForAdmin(query);
+                } else {
+                    $('#user-search-results').empty();
+                }
+            });
         }
 
         // ===============================================================
@@ -711,7 +793,7 @@
                 reader.readAsDataURL(input.files[0]);
             }
         }
-
+        
         // --- Admin Handlers ---
         function handleViewStats() { loadAdminStats(); allModals['admin-stats'].show(); }
         function handleManageReports() { loadPendingSubmissions(); allModals['admin-reports'].show(); }
@@ -751,7 +833,6 @@
                 allModals['activity-form'].hide();
                 showSuccess('บันทึกกิจกรรมเรียบร้อย');
                 loadAllActivitiesForAdmin();
-                // Also reload main page activities
                 const activities = await callApi('/api/activities');
                 displayActivitiesUI(activities, 'latest-activities-list');
                 displayActivitiesUI(activities, 'all-activities-list');
@@ -768,7 +849,7 @@
             row.css('opacity', '0.5');
             btn.prop('disabled', true).parent().find('button').prop('disabled', true);
             try {
-                await callApi(`/api/admin/submissions/${action}`, { submissionId: id }, 'POST');
+                await callApi(`/api/admin/submissions/${action}`, { submissionId: id, adminUserId: currentUser.lineUserId }, 'POST');
                 row.fadeOut(500, function() { $(this).remove(); });
             } catch (e) {
                 showError('เกิดข้อผิดพลาด');
@@ -794,10 +875,70 @@
             const id = btn.data('id');
             btn.prop('disabled', true);
             try {
-                await callApi('/api/admin/activities/toggle', { activityId: id }, 'POST');
+                await callApi('/api/admin/activities/toggle', { activityId: id, adminUserId: currentUser.lineUserId }, 'POST');
                 loadAllActivitiesForAdmin();
             } catch (e) {
                 console.error("Toggle failed:", e);
+                btn.prop('disabled', false);
+            }
+        }
+        
+        // --- NEW ADMIN FUNCTIONS ---
+        function handleManageBadges() {
+            allModals['admin-manage-badges'].show();
+            loadBadgesForAdmin();
+        }
+
+        function handleAddBadge() {
+            $('#badge-form-title').text('เพิ่มป้ายรางวัลใหม่');
+            $('#badge-form')[0].reset();
+            allModals['badge-form'].show();
+        }
+
+        async function handleSaveBadge(e) {
+            e.preventDefault();
+            showLoading('กำลังบันทึก...');
+            const payload = {
+                badgeName: $('#badge-name-input').val(),
+                description: $('#badge-desc-input').val(),
+                imageUrl: $('#badge-image-url-input').val(),
+            };
+            try {
+                await callApi('/api/admin/badges', payload, 'POST');
+                allModals['badge-form'].hide();
+                showSuccess('เพิ่มป้ายรางวัลเรียบร้อย');
+                loadBadgesForAdmin();
+            } catch (e) {
+                showError(e.message);
+            }
+        }
+
+        async function handleDeleteBadge() {
+            const badgeId = $(this).data('badge-id');
+            if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบป้ายรางวัลนี้?')) {
+                showLoading('กำลังลบ...');
+                try {
+                    await callApi(`/api/admin/badges/${badgeId}/${currentUser.lineUserId}`, {}, 'DELETE');
+                    showSuccess('ลบป้ายรางวัลเรียบร้อย');
+                    loadBadgesForAdmin();
+                } catch (e) {
+                    showError(e.message);
+                }
+            }
+        }
+
+        async function handleAwardBadge() {
+            const btn = $(this);
+            const userId = btn.data('user-id');
+            const badgeId = btn.data('badge-id');
+            showLoading('กำลังมอบป้ายรางวัล...');
+            btn.prop('disabled', true);
+            try {
+                await callApi('/api/admin/award-badge', { lineUserId: userId, badgeId: badgeId, adminUserId: currentUser.lineUserId }, 'POST');
+                btn.text('มอบแล้ว').addClass('btn-success').removeClass('btn-outline-primary');
+                showSuccess('มอบป้ายรางวัลเรียบร้อย');
+            } catch (e) {
+                showError(e.message);
                 btn.prop('disabled', false);
             }
         }
@@ -886,6 +1027,65 @@
                 list.html('<p class="text-danger">ไม่สามารถโหลดกิจกรรมได้</p>');
             }
         }
+
+        async function loadBadgesForAdmin() {
+            const list = $('#badges-list');
+            list.html('<div class="text-center"><div class="spinner-border"></div></div>');
+            try {
+                const badges = await callApi('/api/admin/badges', { adminUserId: currentUser.lineUserId });
+                list.empty();
+                if (badges.length === 0) {
+                    list.html('<p class="text-center text-muted">ยังไม่มีป้ายรางวัล</p>');
+                } else {
+                    badges.forEach(b => {
+                        const html = `
+                            <div class="col-md-4 mb-3">
+                                <div class="card text-center shadow-sm">
+                                    <div class="card-body">
+                                        <img src="${getFullImageUrl(b.imageUrl)}" class="mb-2" style="width: 80px; height: 80px;">
+                                        <h5 class="card-title fw-bold">${sanitizeHTML(b.badgeName)}</h5>
+                                        <p class="card-text small text-muted">${sanitizeHTML(b.description)}</p>
+                                        <button class="btn btn-sm btn-danger delete-badge-btn" data-badge-id="${b.badgeId}"><i class="fas fa-trash-alt me-1"></i> ลบ</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        list.append(html);
+                    });
+                }
+            } catch (e) {
+                list.html('<p class="text-danger text-center">ไม่สามารถโหลดป้ายรางวัลได้</p>');
+            }
+        }
+
+        async function searchUsersForAdmin(query) {
+            const resultsDiv = $('#user-search-results');
+            resultsDiv.html('<div class="text-center"><div class="spinner-border"></div></div>');
+            try {
+                const users = await callApi('/api/admin/users', { search: query, adminUserId: currentUser.lineUserId });
+                resultsDiv.empty();
+                if (users.length === 0) {
+                    resultsDiv.html('<p class="text-center text-muted">ไม่พบผู้ใช้งานที่ตรงกับคำค้นหา</p>');
+                } else {
+                    users.forEach(u => {
+                        const html = `
+                            <div class="card mb-2">
+                                <div class="card-body d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-0 fw-bold">${sanitizeHTML(u.fullName)}</h6>
+                                        <small class="text-muted">รหัส: ${sanitizeHTML(u.employeeId)}</small>
+                                    </div>
+                                    <button class="btn btn-sm btn-primary award-badge-btn" data-user-id="${u.lineUserId}">มอบป้ายรางวัล</button>
+                                </div>
+                            </div>
+                        `;
+                        resultsDiv.append(html);
+                    });
+                }
+            } catch (e) {
+                resultsDiv.html('<p class="text-danger text-center">เกิดข้อผิดพลาดในการค้นหาผู้ใช้</p>');
+            }
+        }
         
         // ===============================================================
         //  UTILITY FUNCTIONS
@@ -895,6 +1095,7 @@
         function showError(title) { Swal.fire('เกิดข้อผิดพลาด', title, 'error'); }
         function showWarning(title) { Swal.fire('คำเตือน', title, 'warning'); }
         function sanitizeHTML(str) {
+            if (!str) return '';
             const temp = document.createElement('div');
             temp.textContent = str;
             return temp.innerHTML;
@@ -903,4 +1104,3 @@
     </script>
 </body>
 </html>
-
