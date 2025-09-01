@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const multer = require('multer');
-const fs = require('fs'); // เพิ่ม File System module
+const fs = require('fs');
 const db = require('./db');
 
 const app = express();
@@ -12,18 +12,15 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// --- 🪄 คาถาวิเศษ: สร้างโฟลเดอร์ uploads อัตโนมัติ ---
-// ตรวจสอบและสร้างโฟลเดอร์ uploads ถ้ายังไม่มี
+// --- สร้างโฟลเดอร์ uploads อัตโนมัติ ---
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir);
     console.log(`Created directory: ${uploadsDir}`);
 }
-// ----------------------------------------------------
 
-// ทำให้เข้าถึงไฟล์ในโฟลเดอร์ uploads และ public ได้
+// ทำให้เข้าถึงไฟล์ในโฟลเดอร์ uploads ได้
 app.use('/uploads', express.static(uploadsDir));
-app.use(express.static(path.join(__dirname, '../public')));
 
 // ================================= MULTER SETUP =================================
 const storage = multer.diskStorage({
@@ -52,11 +49,9 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
     if (!req.file) {
         return res.status(400).json({ status: 'error', message: 'No file uploaded.' });
     }
-    // ใช้ relative URL ซึ่งดีกว่าสำหรับ Production
     const imageUrl = `/uploads/${req.file.filename}`;
     res.status(200).json({ status: 'success', data: { imageUrl: imageUrl } });
 });
-
 
 // --- User & General Routes ---
 app.get('/api/user/profile', handleRequest(async (req) => {
@@ -232,7 +227,6 @@ app.get('/api/admin/stats', handleRequest(async () => {
     };
 }));
 
-// --- 📊 API ใหม่สำหรับกราฟ ---
 app.get('/api/admin/chart-data', handleRequest(async () => {
     const query = `
         SELECT 
@@ -253,7 +247,6 @@ app.get('/api/admin/chart-data', handleRequest(async () => {
         data: res.rows.map(r => r.count)
     };
 }));
-// ----------------------------
 
 app.get('/api/admin/submissions/pending', handleRequest(async () => {
     const res = await db.query(`
@@ -329,10 +322,13 @@ app.post('/api/admin/activities/toggle', handleRequest(async (req) => {
 
 
 // ================================= SERVER START =================================
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../public', 'index.html'));
+// Add a simple root route to check if the server is up
+app.get('/', (req, res) => {
+    res.send('Backend server is running!');
 });
+
 
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
+
