@@ -226,7 +226,7 @@
                 </div>
                 <div class="modal-footer d-flex justify-content-between">
                     <button type="button" class="btn btn-outline-primary fw-bold py-2 me-1 btn-view-report" data-bs-dismiss="modal"><i class="fas fa-eye me-1"></i> ดูรายงาน</button>
-                    <button type="button" class="btn btn-primary fw-bold py-2 ms-1 btn-join-activity" data-bs-dismiss="modal"><i class="fas fa-plus-circle me-1"></i> รายงานจุดเสี่ยง</button>
+                    <button type="button" class="btn btn-primary fw-bold py-2 ms-1 btn-join-activity" data-bs-dismiss="modal"><i class="fas fa-plus-circle me-1"></i> เข้าร่วม</button>
                 </div>
             </div>
         </div>
@@ -454,12 +454,7 @@
             if (path.startsWith('http://') || path.startsWith('https://')) {
                 return path;
             }
-            // If it's a relative path starting with /, prepend the backend URL
-            if (path.startsWith('/')) {
-                return API_BASE_URL + path;
-            }
-            return placeholder; // กรณีอื่นๆ ที่ไม่รู้จัก
-            // Otherwise, assume it's a relative path from the backend
+            // If it's a relative path, prepend the backend URL with the /uploads prefix
             return `${API_BASE_URL}/uploads/${path}`;
         }
 
