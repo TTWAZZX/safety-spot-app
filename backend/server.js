@@ -9,6 +9,7 @@ const db = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Use CORS middleware to allow cross-origin requests
 app.use(cors());
 app.use(express.json());
 
@@ -19,9 +20,10 @@ if (!fs.existsSync(uploadsDir)) {
     console.log(`Created directory: ${uploadsDir}`);
 }
 
+// Serve static files from the 'uploads' directory
 app.use('/uploads', express.static(uploadsDir));
 
-// Multer setup
+// Multer setup for file uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
     filename: (req, file, cb) => {
@@ -44,7 +46,6 @@ const handleRequest = (handler) => async (req, res) => {
 
 // Middleware to check for admin privileges
 const isAdmin = async (req, res, next) => {
-    // Accommodate lineUserId being in body, query, or headers
     const adminUserId = req.body.adminUserId || req.query.adminUserId || req.params.adminUserId || req.headers['x-admin-user-id'];
     
     if (!adminUserId) {
@@ -56,7 +57,6 @@ const isAdmin = async (req, res, next) => {
     }
     next();
 };
-
 
 // Image Upload Route
 app.post('/api/upload', upload.single('image'), (req, res) => {
@@ -137,7 +137,7 @@ app.post('/api/submissions/comment', handleRequest(async (req) => {
 }));
 
 // --- Admin Routes ---
-app.get('/api/admin/stats', handleRequest(async () => {
+app.get('/api/admin/stats', isAdmin, handleRequest(async () => {
     const [totalUsersRes, totalSubmissionsRes, submissionsTodayRes, mostReportedRes] = await Promise.all([
         db.query('SELECT COUNT(*) as "totalUsers" FROM users'),
         db.query('SELECT COUNT(*) as "totalSubmissions" FROM submissions'),
@@ -146,13 +146,13 @@ app.get('/api/admin/stats', handleRequest(async () => {
     ]);
     return { totalUsers: parseInt(totalUsersRes.rows[0].totalUsers), totalSubmissions: parseInt(totalSubmissionsRes.rows[0].totalSubmissions), submissionsToday: parseInt(submissionsTodayRes.rows[0].submissionsToday), mostReportedActivity: mostReportedRes.rows.length > 0 ? mostReportedRes.rows[0].title : "N/A" };
 }));
-app.get('/api/admin/chart-data', handleRequest(async () => {
+app.get('/api/admin/chart-data', isAdmin, handleRequest(async () => {
     const query = `SELECT TO_CHAR(d.day, 'YYYY-MM-DD') AS date, COUNT(s."submissionId")::int AS count FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day') AS d(day) LEFT JOIN submissions s ON DATE(s."createdAt") = d.day GROUP BY d.day ORDER BY d.day;`;
     const res = await db.query(query);
     return { labels: res.rows.map(r => new Date(r.date).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric' })), data: res.rows.map(r => r.count) };
 }));
-app.get('/api/admin/submissions/pending', handleRequest(async () => (await db.query(`SELECT s.*, u."fullName" FROM submissions s JOIN users u ON s."lineUserId" = u."lineUserId" WHERE s.status = 'pending' ORDER BY s."createdAt" ASC`)).rows.map(s => ({...s, submitter: { fullName: s.fullName }}))));
-app.post('/api/admin/submissions/approve', handleRequest(async (req) => {
+app.get('/api/admin/submissions/pending', isAdmin, handleRequest(async () => (await db.query(`SELECT s.*, u."fullName" FROM submissions s JOIN users u ON s."lineUserId" = u."lineUserId" WHERE s.status = 'pending' ORDER BY s."createdAt" ASC`)).rows.map(s => ({...s, submitter: { fullName: s.fullName }}))));
+app.post('/api/admin/submissions/approve', isAdmin, handleRequest(async (req) => {
     const { submissionId } = req.body;
     const client = await db.getClient();
     try {
@@ -166,23 +166,23 @@ app.post('/api/admin/submissions/approve', handleRequest(async (req) => {
         return { message: 'Submission approved.' };
     } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }));
-app.post('/api/admin/submissions/reject', handleRequest(async (req) => {
+app.post('/api/admin/submissions/reject', isAdmin, handleRequest(async (req) => {
     const { submissionId } = req.body;
     await db.query("UPDATE submissions SET status = 'rejected' WHERE \"submissionId\" = $1", [submissionId]);
     return { message: 'Submission rejected.' };
 }));
-app.get('/api/admin/activities', handleRequest(async () => (await db.query('SELECT * FROM activities ORDER BY "createdAt" DESC')).rows));
-app.post('/api/admin/activities', handleRequest(async (req) => {
+app.get('/api/admin/activities', isAdmin, handleRequest(async () => (await db.query('SELECT * FROM activities ORDER BY "createdAt" DESC')).rows));
+app.post('/api/admin/activities', isAdmin, handleRequest(async (req) => {
     const { title, description, imageUrl } = req.body;
     await db.query('INSERT INTO activities ("activityId", title, description, "imageUrl", status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6)', ["ACT" + Date.now(), title, description, imageUrl, 'active', new Date()]);
     return { message: 'Activity created' };
 }));
-app.put('/api/admin/activities', handleRequest(async (req) => {
+app.put('/api/admin/activities', isAdmin, handleRequest(async (req) => {
     const { activityId, title, description, imageUrl } = req.body;
     await db.query('UPDATE activities SET title = $1, description = $2, "imageUrl" = $3 WHERE "activityId" = $4', [title, description, imageUrl, activityId]);
     return { message: 'Activity updated' };
 }));
-app.post('/api/admin/activities/toggle', handleRequest(async (req) => {
+app.post('/api/admin/activities/toggle', isAdmin, handleRequest(async (req) => {
     const { activityId } = req.body;
     const activityRes = await db.query('SELECT status FROM activities WHERE "activityId" = $1', [activityId]);
     if (activityRes.rows.length === 0) throw new Error('Activity not found');
@@ -190,59 +190,48 @@ app.post('/api/admin/activities/toggle', handleRequest(async (req) => {
     await db.query('UPDATE activities SET status = $1 WHERE "activityId" = $2', [newStatus, activityId]);
     return { newStatus };
 }));
-
-
-// *** NEW: Admin User and Badge Management API Routes ***
+// --- Admin User and Badge Management API Routes ---
 app.get('/api/admin/users', isAdmin, handleRequest(async (req) => {
     const searchTerm = req.query.search || '';
     const query = 'SELECT "lineUserId", "fullName", "employeeId" FROM users WHERE "fullName" ILIKE $1 OR "employeeId" ILIKE $1 ORDER BY "fullName" LIMIT 50';
     const res = await db.query(query, [`%${searchTerm}%`]);
     return res.rows;
 }));
-
 app.get('/api/admin/user-details/:lineUserId', isAdmin, handleRequest(async (req) => {
     const { lineUserId } = req.params;
     const userRes = await db.query('SELECT "lineUserId", "fullName", "employeeId" FROM users WHERE "lineUserId" = $1', [lineUserId]);
     if (userRes.rows.length === 0) throw new Error('User not found');
-
     const allBadgesRes = await db.query('SELECT "badgeId", "badgeName" FROM badges ORDER BY "badgeName"');
     const userBadgesRes = await db.query('SELECT "badgeId" FROM user_badges WHERE "lineUserId" = $1', [lineUserId]);
     const earnedBadgeIds = new Set(userBadgesRes.rows.map(b => b.badgeId));
-
     return {
         user: userRes.rows[0],
         allBadges: allBadgesRes.rows,
         earnedBadgeIds: Array.from(earnedBadgeIds)
     };
 }));
-
 app.get('/api/admin/badges', isAdmin, handleRequest(async () => (await db.query('SELECT * FROM badges ORDER BY "badgeName"')).rows));
-
 app.post('/api/admin/badges', isAdmin, handleRequest(async (req) => {
     const { badgeName, description, imageUrl } = req.body;
     const badgeId = "BADGE" + Date.now();
     await db.query('INSERT INTO badges ("badgeId", "badgeName", description, "imageUrl") VALUES ($1, $2, $3, $4)', [badgeId, badgeName, description, imageUrl]);
     return { message: 'Badge created successfully' };
 }));
-
 app.delete('/api/admin/badges/:badgeId', isAdmin, handleRequest(async (req) => {
     const { badgeId } = req.params;
     await db.query('DELETE FROM badges WHERE "badgeId" = $1', [badgeId]);
     return { message: 'Badge deleted successfully' };
 }));
-
 app.post('/api/admin/award-badge', isAdmin, handleRequest(async (req) => {
     const { lineUserId, badgeId } = req.body;
     await db.query('INSERT INTO user_badges ("lineUserId", "badgeId") VALUES ($1, $2) ON CONFLICT ("lineUserId", "badgeId") DO NOTHING', [lineUserId, badgeId]);
     return { message: 'Badge awarded successfully' };
 }));
-
 app.post('/api/admin/revoke-badge', isAdmin, handleRequest(async (req) => {
     const { lineUserId, badgeId } = req.body;
     await db.query('DELETE FROM user_badges WHERE "lineUserId" = $1 AND "badgeId" = $2', [lineUserId, badgeId]);
     return { message: 'Badge revoked successfully' };
 }));
-
 
 // ================================= SERVER START =================================
 app.get('/', (req, res) => res.send('Backend server is running!'));
