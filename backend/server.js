@@ -60,7 +60,11 @@ const isAdmin = async (req, res, next) => {
 
 // Image Upload Route
 app.post('/api/upload', upload.single('image'), (req, res) => {
-    if (!req.file) return res.status(400).json({ status: 'error', message: 'No file uploaded.' });
+    if (!req.file) {
+        console.error('No file uploaded.');
+        return res.status(400).json({ status: 'error', message: 'No file uploaded.' });
+    }
+    console.log('File uploaded:', req.file.filename);
     res.status(200).json({ status: 'success', data: { imageUrl: req.file.filename } });
 });
 
