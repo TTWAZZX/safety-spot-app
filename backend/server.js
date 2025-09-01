@@ -45,8 +45,8 @@ const handleRequest = (handler) => async (req, res) => {
 // Middleware to check for admin privileges
 const isAdmin = async (req, res, next) => {
     // Accommodate lineUserId being in body for POST/DELETE or query for GET
-    const adminUserId = req.body.adminUserId || req.query.adminUserId || (req.params.adminUserId);
-    
+    const adminUserId = req.body.adminUserId || req.query.adminUserId || (req.params.adminUserId) || req.headers['x-admin-user-id'];
+
     if (!adminUserId) {
         return res.status(401).json({ status: 'error', message: 'Unauthorized: Missing Admin User ID' });
     }
