@@ -450,13 +450,17 @@
             if (!path) {
                 return placeholder;
             }
-            if (path.startsWith('http')) {
-                return path; // เป็น URL เต็มอยู่แล้ว
+            // Check if the path is already a full URL
+            if (path.startsWith('http://') || path.startsWith('https://')) {
+                return path;
             }
+            // If it's a relative path starting with /, prepend the backend URL
             if (path.startsWith('/')) {
-                return API_BASE_URL + path; // เป็น path จากหลังบ้านเรา
+                return API_BASE_URL + path;
             }
             return placeholder; // กรณีอื่นๆ ที่ไม่รู้จัก
+            // Otherwise, assume it's a relative path from the backend
+            return `${API_BASE_URL}/uploads/${path}`;
         }
 
         function updateUserInfoUI(user) {
