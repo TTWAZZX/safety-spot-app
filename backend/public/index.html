@@ -4,252 +4,882 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Safety Spot</title>
+    <!-- CSS Libraries -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
+    
+    <!-- Custom Styles -->
     <style>
-        body { font-family: 'Kanit', sans-serif; background-color: #f0f2f5; }
-        #main-app, #registration-page { display: none; }
-        .page { display: none; }
-        .page.active { display: block; }
-        .bottom-nav { box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
-        .nav-link { color: #6c757d; }
-        .nav-link.active { color: #0d6efd; }
-        #admin-nav-item { color: #dc3545; }
-        #admin-nav-item.active { color: #a1232e; }
-        .badge-icon { width: 60px; height: 60px; }
-        .badge-icon.locked { filter: grayscale(100%); opacity: 0.5; }
-        .leaderboard-rank { font-size: 1.2rem; font-weight: bold; min-width: 40px; text-align: center; }
-        .leaderboard-item .fa-trophy { color: #ffc107; }
-        .table-responsive { max-height: 75vh; }
-        .submission-card { background-color: #fff; border: 1px solid #e9ecef; }
-        .like-btn .fa-heart { transition: color 0.2s, transform 0.2s; }
-        .like-btn.liked .fa-heart { color: #dc3545; transform: scale(1.2); }
-        .comment-list { max-height: 200px; overflow-y: auto; }
-        .comment-item { background-color: #f8f9fa; font-size: 0.9rem; }
-        .stat-card { border-left: 5px solid #0d6efd; }
+        body { 
+            font-family: 'Kanit', sans-serif; 
+            background-color: #f0f2f5; 
+        }
+        #main-app, #registration-page { 
+            display: none; 
+        }
+        .page { 
+            display: none; 
+        }
+        .page.active { 
+            display: block; 
+        }
+        .bottom-nav { 
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.08); 
+            border-top: 1px solid #dee2e6;
+        }
+        .nav-link { 
+            color: #6c757d; 
+        }
+        .nav-link.active { 
+            color: #0d6efd; 
+            font-weight: 500;
+        }
+        #admin-nav-item { 
+            color: #dc3545; 
+        }
+        #admin-nav-item.active { 
+            color: #a1232e; 
+        }
+        .badge-icon { 
+            width: 60px; 
+            height: 60px; 
+        }
+        .badge-icon.locked { 
+            filter: grayscale(100%); 
+            opacity: 0.5; 
+        }
+        .leaderboard-rank { 
+            font-size: 1.2rem; 
+            font-weight: bold; 
+            min-width: 40px; 
+            text-align: center; 
+        }
+        .leaderboard-item .fa-trophy, .leaderboard-item .fa-medal {
+            font-size: 1.5rem;
+        }
+        .fa-trophy { color: #ffc107; }
+        .fa-medal.text-secondary { color: #adb5bd; }
+        .fa-medal.text-bronze { color: #cd7f32; }
+        
+        .table-responsive { 
+            max-height: 75vh; 
+        }
+        .card {
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border-radius: 0.75rem;
+        }
+        .submission-card { 
+            background-color: #fff; 
+        }
+        .like-btn .fa-heart { 
+            transition: color 0.2s, transform 0.2s; 
+        }
+        .like-btn.liked .fa-heart { 
+            color: #dc3545; 
+            transform: scale(1.2); 
+        }
+        .comment-list { 
+            max-height: 200px; 
+            overflow-y: auto; 
+        }
+        .comment-item { 
+            background-color: #f8f9fa; 
+            font-size: 0.9rem; 
+            border-radius: 0.5rem;
+        }
+        .stat-card { 
+            border-left: 5px solid #0d6efd; 
+            background-color: #fff;
+        }
+        /* Loading Spinner Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 1rem;
+        }
     </style>
 </head>
 <body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+        <p id="loading-text" class="mt-2 text-muted fw-bold">กำลังเริ่มต้น...</p>
+    </div>
+
     <!-- Registration Page -->
-    <div id="registration-page" class="container py-4"><div class="card shadow-sm border-0"><div class="card-body p-4"><h4 class="card-title text-center fw-bold mb-1">ลงทะเบียนใช้งาน</h4><p class="text-center text-muted mb-4">กรุณากรอกข้อมูลเพื่อเริ่มต้นใช้งาน</p><form id="registration-form"><div class="mb-3"><label for="fullName" class="form-label">ชื่อ-นามสกุล</label><input type="text" class="form-control" id="fullName" required placeholder="เช่น สมชาย ใจดี"></div><div class="mb-3"><label for="employeeId" class="form-label">รหัสพนักงาน</label><input type="text" class="form-control" id="employeeId" required placeholder="เช่น 12345"></div><button type="submit" class="btn btn-primary w-100 fw-bold mt-3 py-2">ยืนยันและเริ่มต้นใช้งาน</button></form></div></div></div>
+    <div id="registration-page" class="container py-4">
+        <div class="card p-2">
+            <div class="card-body p-4">
+                <h4 class="card-title text-center fw-bold mb-1">ลงทะเบียนใช้งาน</h4>
+                <p class="text-center text-muted mb-4">กรุณากรอกข้อมูลเพื่อเริ่มต้นใช้งาน</p>
+                <form id="registration-form">
+                    <div class="mb-3">
+                        <label for="fullName" class="form-label">ชื่อ-นามสกุล</label>
+                        <input type="text" class="form-control" id="fullName" required placeholder="เช่น สมชาย ใจดี">
+                    </div>
+                    <div class="mb-3">
+                        <label for="employeeId" class="form-label">รหัสพนักงาน</label>
+                        <input type="text" class="form-control" id="employeeId" required placeholder="เช่น 12345">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold mt-3 py-2">ยืนยันและเริ่มต้นใช้งาน</button>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <!-- Main App -->
     <div id="main-app">
         <main class="container py-3 pb-5 mb-5">
             <!-- Home Page -->
-            <div id="home-page" class="page active"><div class="d-flex align-items-center p-3 mb-4 bg-white rounded-3 shadow-sm"><img id="user-profile-pic" src="https://placehold.co/60x60" class="rounded-circle me-3" width="60" height="60"><div><p class="mb-0 text-muted small" id="user-employee-id">รหัส: ...</p><h5 class="mb-0 fw-bold" id="user-display-name">...</h5></div><div class="ms-auto text-end"><div class="fw-bold text-primary"><h4 class="mb-0" id="user-score">0</h4><small>คะแนน</small></div></div></div><h5 class="mb-3">กิจกรรมล่าสุด</h5><div id="latest-activities-list"><p class="text-center text-muted">กำลังโหลดกิจกรรม...</p></div></div>
+            <div id="home-page" class="page active">
+                <div class="d-flex align-items-center p-3 mb-4 bg-white rounded-3">
+                    <img id="user-profile-pic" src="https://placehold.co/60x60" class="rounded-circle me-3" width="60" height="60" alt="Profile Picture">
+                    <div>
+                        <p class="mb-0 text-muted small" id="user-employee-id">รหัส: ...</p>
+                        <h5 class="mb-0 fw-bold" id="user-display-name">...</h5>
+                    </div>
+                    <div class="ms-auto text-end">
+                        <div class="fw-bold text-primary">
+                            <h4 class="mb-0" id="user-score">0</h4>
+                            <small>คะแนน</small>
+                        </div>
+                    </div>
+                </div>
+                <h5 class="mb-3">กิจกรรมล่าสุด</h5>
+                <div id="latest-activities-list">
+                    <p class="text-center text-muted">กำลังโหลดกิจกรรม...</p>
+                </div>
+            </div>
             <!-- Activities Page -->
-            <div id="activities-page" class="page"><h4 class="mb-3 fw-bold">กิจกรรมทั้งหมด</h4><div id="all-activities-list"></div></div>
+            <div id="activities-page" class="page">
+                <h4 class="mb-3 fw-bold">กิจกรรมทั้งหมด</h4>
+                <div id="all-activities-list"></div>
+            </div>
             <!-- Leaderboard Page -->
-            <div id="leaderboard-page" class="page"><h4 class="mb-3 fw-bold">กระดานผู้นำ</h4><div id="leaderboard-list"></div><div id="leaderboard-loading" class="text-center my-5"><div class="spinner-border" role="status"></div></div></div>
+            <div id="leaderboard-page" class="page">
+                <h4 class="mb-3 fw-bold">กระดานผู้นำ</h4>
+                <div id="leaderboard-list"></div>
+            </div>
             <!-- Profile Page -->
-            <div id="profile-page" class="page"><div class="card shadow-sm border-0"><div class="card-body text-center p-4"><img id="profile-page-pic" src="https://placehold.co/80x80" class="rounded-circle mb-3 border border-3 border-primary" width="80" height="80"><h4 id="profile-page-name" class="fw-bold">...</h4><p class="text-muted" id="profile-page-employee-id">รหัสพนักงาน: ...</p><p class="text-muted mb-4">คะแนนสะสม: <span class="fw-bold text-primary" id="profile-page-score">0</span></p><hr><h5 class="mt-4 mb-3">ป้ายรางวัลของฉัน</h5><div id="badges-container" class="d-flex justify-content-center flex-wrap gap-3"></div></div></div></div>
+            <div id="profile-page" class="page">
+                <div class="card">
+                    <div class="card-body text-center p-4">
+                        <img id="profile-page-pic" src="https://placehold.co/80x80" class="rounded-circle mb-3 border border-3 border-primary" width="80" height="80" alt="Profile Picture">
+                        <h4 id="profile-page-name" class="fw-bold">...</h4>
+                        <p class="text-muted" id="profile-page-employee-id">รหัสพนักงาน: ...</p>
+                        <p class="text-muted mb-4">คะแนนสะสม: <span class="fw-bold text-primary" id="profile-page-score">0</span></p>
+                        <hr>
+                        <h5 class="mt-4 mb-3">ป้ายรางวัลของฉัน</h5>
+                        <div id="badges-container" class="d-flex justify-content-center flex-wrap gap-3"></div>
+                    </div>
+                </div>
+            </div>
             <!-- Admin Page -->
-            <div id="admin-page" class="page"><h4 class="fw-bold mb-3">Admin Panel</h4><div class="list-group"><a href="#" id="view-stats-btn" class="list-group-item list-group-item-action"><i class="fas fa-chart-line me-2"></i> ดูข้อมูลสรุป (Dashboard)</a><a href="#" id="manage-reports-btn" class="list-group-item list-group-item-action"><i class="fas fa-inbox me-2"></i> จัดการรายงานที่ส่งเข้ามา</a><a href="#" id="manage-activities-btn" class="list-group-item list-group-item-action"><i class="fas fa-tasks me-2"></i> จัดการกิจกรรม</a></div></div>
+            <div id="admin-page" class="page">
+                <h4 class="fw-bold mb-3">Admin Panel</h4>
+                <div class="list-group">
+                    <a href="#" id="view-stats-btn" class="list-group-item list-group-item-action"><i class="fas fa-chart-line me-2"></i> ดูข้อมูลสรุป (Dashboard)</a>
+                    <a href="#" id="manage-reports-btn" class="list-group-item list-group-item-action"><i class="fas fa-inbox me-2"></i> จัดการรายงานที่ส่งเข้ามา</a>
+                    <a href="#" id="manage-activities-btn" class="list-group-item list-group-item-action"><i class="fas fa-tasks me-2"></i> จัดการกิจกรรม</a>
+                </div>
+            </div>
         </main>
-        <nav class="navbar navbar-light bg-white fixed-bottom bottom-nav"><div class="container-fluid d-flex justify-content-around"><a href="#home" class="nav-link active text-center" data-page="home-page"><i class="fas fa-home fs-4"></i><div style="font-size:0.7rem;">หน้าหลัก</div></a><a href="#activities" class="nav-link text-center" data-page="activities-page"><i class="fas fa-tasks fs-4"></i><div style="font-size:0.7rem;">กิจกรรม</div></a><a href="#admin" class="nav-link text-center" data-page="admin-page" id="admin-nav-item" style="display:none;"><i class="fas fa-user-shield fs-4"></i><div style="font-size:0.7rem;">Admin</div></a><a href="#leaderboard" class="nav-link text-center" data-page="leaderboard-page"><i class="fas fa-trophy fs-4"></i><div style="font-size:0.7rem;">อันดับ</div></a><a href="#profile" class="nav-link text-center" data-page="profile-page"><i class="fas fa-user fs-4"></i><div style="font-size:0.7rem;">โปรไฟล์</div></a></div></nav>
+        
+        <!-- Bottom Navigation Bar -->
+        <nav class="navbar navbar-light bg-white fixed-bottom bottom-nav">
+            <div class="container-fluid d-flex justify-content-around">
+                <a href="#home" class="nav-link active text-center" data-page="home-page"><i class="fas fa-home fs-4"></i><div style="font-size:0.7rem;">หน้าหลัก</div></a>
+                <a href="#activities" class="nav-link text-center" data-page="activities-page"><i class="fas fa-tasks fs-4"></i><div style="font-size:0.7rem;">กิจกรรม</div></a>
+                <a href="#admin" class="nav-link text-center" data-page="admin-page" id="admin-nav-item" style="display:none;"><i class="fas fa-user-shield fs-4"></i><div style="font-size:0.7rem;">Admin</div></a>
+                <a href="#leaderboard" class="nav-link text-center" data-page="leaderboard-page"><i class="fas fa-trophy fs-4"></i><div style="font-size:0.7rem;">อันดับ</div></a>
+                <a href="#profile" class="nav-link text-center" data-page="profile-page"><i class="fas fa-user fs-4"></i><div style="font-size:0.7rem;">โปรไฟล์</div></a>
+            </div>
+        </nav>
     </div>
     
-    <!-- Modals -->
-    <div class="modal fade" id="submission-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">เข้าร่วมกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="submission-form"><input type="hidden" id="activityId-input"><h5 id="activity-title-modal" class="fw-bold mb-3"></h5><div class="mb-3"><label class="form-label">รายละเอียดจุดเสี่ยง</label><textarea class="form-control" id="description-input" rows="4" required></textarea></div><button type="submit" class="btn btn-primary w-100 fw-bold mt-3 py-2">ส่งรายงาน</button></form></div></div></div></div>
-    <div class="modal fade" id="admin-reports-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการรายงาน (<span id="pending-count-modal">0</span>)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="table-responsive"><table class="table table-striped table-hover mb-0"><thead class="table-dark"><tr><th>ผู้ส่ง</th><th>รายละเอียด</th><th>Actions</th></tr></thead><tbody id="submissions-table-body"></tbody></table></div><div id="reports-loading" class="text-center my-4"><div class="spinner-border"></div></div><div id="no-reports-message" class="text-center my-4" style="display:none;"><p class="text-muted">ไม่มีรายการที่รอตรวจสอบ</p></div></div></div></div></div>
+    <!-- All Modals -->
+    <!-- Submission Modal -->
+    <div class="modal fade" id="submission-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">รายงานจุดเสี่ยง</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="submission-form"><input type="hidden" id="activityId-input"><h5 id="activity-title-modal" class="fw-bold mb-3 text-truncate"></h5><div class="mb-3"><label class="form-label">รายละเอียดจุดเสี่ยง</label><textarea class="form-control" id="description-input" rows="4" required></textarea></div><div class="mb-3"><label for="image-upload" class="form-label">แนบรูปภาพ</label><input class="form-control" type="file" id="image-upload" accept="image/*"><img id="image-preview" src="#" alt="Image Preview" class="img-fluid rounded mt-2" style="display:none; max-height: 200px;"></div><button type="submit" class="btn btn-primary w-100 fw-bold mt-3 py-2">ส่งรายงาน</button></form></div></div></div></div>
+    <!-- Admin: Reports Modal -->
+    <div class="modal fade" id="admin-reports-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการรายงาน (<span id="pending-count-modal">0</span>)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="admin-reports-list"></div><div id="no-reports-message" class="text-center my-4" style="display:none;"><p class="text-muted">ไม่มีรายการที่รอตรวจสอบ</p></div></div></div></div></div>
+    <!-- Admin: Activities Modal -->
     <div class="modal fade" id="admin-activities-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><button id="create-activity-btn" class="btn btn-success mb-3"><i class="fas fa-plus"></i> สร้างกิจกรรมใหม่</button><div id="activities-list-admin"></div></div></div></div></div>
-    <div class="modal fade" id="activity-form-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-form-title">สร้างกิจกรรมใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="activity-form"><input type="hidden" id="form-activity-id"><div class="mb-3"><label class="form-label">หัวข้อ</label><input type="text" class="form-control" id="form-activity-title" required></div><div class="mb-3"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="form-activity-desc" rows="3" required></textarea></div><div class="mb-3"><label class="form-label">Image URL</label><input type="text" class="form-control" id="form-activity-image" required></div><button type="submit" class="btn btn-primary w-100">บันทึก</button></form></div></div></div></div>
-    <!-- NEW: Activity Detail Modal -->
-    <div class="modal fade" id="activity-detail-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-detail-title">...</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body bg-light"><div id="submissions-container" class="container-fluid"></div><div id="submissions-loading" class="text-center my-5"><div class="spinner-border"></div></div></div><div class="modal-footer"><button type="button" class="btn btn-primary w-100 fw-bold py-2 btn-join-from-detail"><i class="fas fa-plus-circle me-1"></i> รายงานจุดเสี่ยงในกิจกรรมนี้</button></div></div></div></div>
-    <!-- NEW: Admin Stats Modal -->
-    <div class="modal fade" id="admin-stats-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">ข้อมูลสรุป Dashboard</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="stats-container" class="row g-3"></div><div id="stats-loading" class="text-center my-4"><div class="spinner-border"></div></div></div></div></div></div>
-
+    <!-- Admin: Activity Form Modal (Create/Edit) -->
+    <div class="modal fade" id="activity-form-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-form-title"></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="activity-form"><input type="hidden" id="form-activity-id"><div class="mb-3"><label class="form-label">หัวข้อ</label><input type="text" class="form-control" id="form-activity-title" required></div><div class="mb-3"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="form-activity-desc" rows="3" required></textarea></div><div class="mb-3"><label class="form-label">แนบรูปภาพ</label><input type="file" class="form-control" id="form-activity-image-upload" accept="image/*"><input type="hidden" id="form-activity-image-url"><img id="form-activity-image-preview" src="#" class="img-fluid rounded mt-2" style="max-height: 150px; display: none;"></div><button type="submit" class="btn btn-primary w-100">บันทึก</button></form></div></div></div></div>
+    <!-- Activity Detail Modal -->
+    <div class="modal fade" id="activity-detail-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-detail-title">...</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body bg-light"><div id="submissions-container" class="container-fluid"></div></div><div class="modal-footer"><button type="button" class="btn btn-primary w-100 fw-bold py-2 btn-join-from-detail"><i class="fas fa-plus-circle me-1"></i> รายงานจุดเสี่ยงในกิจกรรมนี้</button></div></div></div></div>
+    <!-- Admin: Stats Modal -->
+    <div class="modal fade" id="admin-stats-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">ข้อมูลสรุป Dashboard</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="stats-container" class="row g-3"></div><hr class="my-4"><div id="chart-container" style="display: none;"><h5 class="mb-3">จำนวนรายงาน 7 วันย้อนหลัง</h5><canvas id="submissionsChart"></canvas></div></div></div></div></div>
+    
     <!-- JS Libraries -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- Main Application Logic -->
     <script>
         // ===============================================================
-        // CONFIGURATION - ส่วนที่ต้องแก้ไขเมื่อนำขึ้น Production
+        //  APP CONFIGURATION
         // ===============================================================
-        const API_BASE_URL = ""; // ปล่อยว่างไว้เมื่อรันบน Localhost, ใส่ URL ของเซิร์ฟเวอร์เมื่อนำขึ้น Production
-        const LIFF_ID = "2007053300-9xLKdwZp"; // <-- LIFF ID ของคุณ
+        
+        // *** IMPORTANT: REPLACE WITH YOUR RENDER URL ***
+        const API_BASE_URL = "https://shesafety-spot-appbackend.onrender.com"; 
+        const LIFF_ID = "2007053300-9xLKdwZp";
+        
+        // Global variables
         let lineProfile = {}; 
         let allModals = {};
+        let currentUser = {};
+        let submissionsChart = null;
 
         // ===============================================================
-        // INITIALIZATION
+        //  INITIALIZATION
         // ===============================================================
         $(document).ready(function() {
-            ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats'].forEach(id => {
+            initializeAllModals();
+            initializeApp();
+            bindStaticEventListeners();
+        });
+
+        function initializeAllModals() {
+            const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats'];
+            modalIds.forEach(id => {
                 allModals[id] = new bootstrap.Modal(document.getElementById(`${id}-modal`));
             });
-            initializeApp();
-            $('a[data-page="leaderboard-page"]').on('click', loadLeaderboard);
-            $('a[data-page="profile-page"]').on('click', loadUserBadges);
-        });
+        }
 
         async function initializeApp() {
             try {
-                Swal.fire({ title: 'กำลังเริ่มต้น...', text: 'กรุณารอสักครู่', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                showLoading('กำลังเริ่มต้น...');
                 await liff.init({ liffId: LIFF_ID });
-                if (!liff.isLoggedIn()) { liff.login(); return; }
+
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+
                 lineProfile = await liff.getProfile();
-                const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId }, 'GET');
+                const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId });
+                
                 if (result.registered) {
-                    showMainApp(result.user);
+                    await showMainApp(result.user);
                 } else {
-                    Swal.close();
                     $('#registration-page').fadeIn();
+                    hideLoading();
                 }
             } catch (error) {
                 console.error("Initialization failed:", error);
-                Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถเริ่มต้นแอปพลิเคชันได้ กรุณาลองใหม่อีกครั้ง', 'error');
+                showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้ กรุณาลองใหม่อีกครั้ง');
             }
         }
-
+        
         async function showMainApp(userData) {
-            updateUserInfoUI(userData);
-            if (userData.isAdmin) {
+            currentUser = userData;
+            updateUserInfoUI(currentUser);
+            
+            if (currentUser.isAdmin) {
                 $('#admin-nav-item').show();
-                $('#view-stats-btn').on('click', () => { loadAdminStats(); allModals['admin-stats'].show(); });
-                $('#manage-reports-btn').on('click', () => { loadPendingSubmissions(); allModals['admin-reports'].show(); });
-                $('#manage-activities-btn').on('click', () => { loadAllActivitiesForAdmin(); allModals['admin-activities'].show(); });
-                $('#create-activity-btn').on('click', () => { 
-                    $('#activity-form-title').text('สร้างกิจกรรมใหม่'); 
-                    $('#activity-form')[0].reset(); 
-                    $('#form-activity-id').val(''); 
-                    allModals['activity-form'].show(); 
-                });
+                bindAdminEventListeners();
             }
-            const activities = await callApi('/api/activities', {}, 'GET');
-            displayActivitiesUI(activities);
+
+            const activities = await callApi('/api/activities');
+            displayActivitiesUI(activities, 'latest-activities-list');
+            displayActivitiesUI(activities, 'all-activities-list');
+            
+            $('#registration-page').hide();
             $('#main-app').fadeIn();
-            Swal.close();
+            hideLoading();
         }
 
         // ===============================================================
-        // API CALLER - ฟังก์ชันสำหรับเรียก API ใหม่
+        //  API CALLER & IMAGE UPLOADER
         // ===============================================================
         async function callApi(endpoint, payload = {}, method = 'GET') {
-            const url = new URL(API_BASE_URL + endpoint, window.location.origin);
+            const url = new URL(API_BASE_URL + endpoint);
             const options = {
                 method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
             };
 
-            if (method === 'GET') {
-                // สำหรับ GET, เราจะส่งข้อมูลผ่าน query parameters
+            if (method.toUpperCase() === 'GET') {
                 Object.keys(payload).forEach(key => url.searchParams.append(key, payload[key]));
             } else {
-                // สำหรับ POST, PUT, etc., เราจะส่งข้อมูลใน body
                 options.body = JSON.stringify(payload);
             }
 
             try {
                 const response = await fetch(url, options);
                 const result = await response.json();
-
                 if (!response.ok || result.status === 'error') {
                     throw new Error(result.message || 'API request failed');
                 }
-                return result.data; // Return a data property from our server
+                return result.data;
             } catch (error) {
-                console.error(`API call to ${endpoint} failed:`, error);
-                throw error; // Re-throw the error to be caught by the caller
+                console.error(`API Error at ${endpoint}:`, error);
+                throw error;
+            }
+        }
+        
+        async function uploadImage(file) {
+            if (!file) return null;
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            const url = new URL(API_BASE_URL + '/api/upload');
+            try {
+                const response = await fetch(url, { method: 'POST', body: formData });
+                const result = await response.json();
+                if (!response.ok || result.status === 'error') {
+                    throw new Error(result.message || 'Image upload failed');
+                }
+                return result.data.imageUrl;
+            } catch (error) {
+                console.error("Image upload failed:", error);
+                showError("อัปโหลดรูปภาพไม่สำเร็จ");
+                return null;
             }
         }
         
         // ===============================================================
-        // EVENT LISTENERS - เหมือนเดิม ไม่ได้แก้ไขส่วน Logic
+        //  UI RENDERING FUNCTIONS
         // ===============================================================
-        $('.nav-link').on('click',function(e){e.preventDefault();const pageId=$(this).data('page');if(pageId){$('.nav-link').removeClass('active');$(this).addClass('active');$('.page').removeClass('active');$('#'+pageId).addClass('active');}});
-        $('#registration-form').on('submit',async function(e){e.preventDefault();const fullName=$('#fullName').val().trim();const employeeId=$('#employeeId').val().trim();if(!fullName||!employeeId){Swal.fire('ข้อมูลไม่ครบ','กรุณากรอกข้อมูลให้ครบถ้วน','warning');return;} Swal.fire({title:'กำลังบันทึก...',didOpen:()=>Swal.showLoading()});try{const newUser=await callApi("/api/user/register",{lineUserId:lineProfile.userId,displayName:lineProfile.displayName,pictureUrl:lineProfile.pictureUrl,fullName:fullName,employeeId:employeeId}, 'POST');$('#registration-page').hide();await showMainApp(newUser);Swal.fire('สำเร็จ!','ลงทะเบียนเรียบร้อย','success');}catch(error){Swal.fire('ผิดพลาด','ไม่สามารถลงทะเบียนได้','error');}});
-        
-        $(document).on('click','.btn-view-activity', function() { const activityId = $(this).data('activity-id'); const activityTitle = $(this).data('activity-title'); loadAndShowActivityDetails(activityId, activityTitle); });
-        $('.btn-join-from-detail').on('click', function() { const activityId = $(this).data('activity-id'); const activityTitle = $(this).data('activity-title'); $('#activityId-input').val(activityId); $('#activity-title-modal').text(activityTitle); allModals['submission'].show(); });
-        $('#submission-form').on('submit', async function(e){e.preventDefault();Swal.fire({title:'กำลังส่ง...',didOpen:()=>Swal.showLoading()});const payload={lineUserId:lineProfile.userId,activityId:$('#activityId-input').val(),description:$('#description-input').val().trim()};callApi('/api/submissions',payload,'POST').then(()=>{allModals.submission.hide();$('#submission-form')[0].reset();Swal.fire('สำเร็จ!','รายงานของคุณถูกส่งแล้ว','success');}).catch(error=>{Swal.fire('ผิดพลาด','ไม่สามารถส่งรายงานได้','error');});});
-
-        $(document).on('click', '.like-btn', function() {
-            const btn = $(this);
-            const submissionId = btn.data('submission-id');
-            btn.prop('disabled', true);
-            callApi('/api/submissions/like', { submissionId, lineUserId: lineProfile.userId }, 'POST').then(result => {
-                const countSpan = btn.find('.like-count');
-                let currentCount = parseInt(countSpan.text());
-                if(result.status === 'liked') { btn.addClass('liked'); countSpan.text(currentCount + 1); } 
-                else { btn.removeClass('liked'); countSpan.text(currentCount - 1); }
-            }).always(() => btn.prop('disabled', false));
-        });
-
-        $(document).on('submit', '.comment-form', function(e) {
-            e.preventDefault();
-            const form = $(this);
-            const submissionId = form.data('submission-id');
-            const input = form.find('.comment-input');
-            const commentText = input.val().trim();
-            if(!commentText) return;
-            const submitBtn = form.find('button');
-            submitBtn.prop('disabled', true);
-            callApi('/api/submissions/comment', { submissionId, lineUserId: lineProfile.userId, commentText }, 'POST').then(() => {
-                const newComment = `<div class="comment-item p-2 rounded mb-2 d-flex"><img src="${lineProfile.pictureUrl}" class="rounded-circle me-2" width="24" height="24"><div><strong>คุณ:</strong> ${$('<div/>').text(commentText).html()}</div></div>`;
-                form.siblings('.comment-list').append(newComment);
-                input.val('');
-            }).catch(e => { Swal.fire('ผิดพลาด', 'ไม่สามารถเพิ่มความคิดเห็นได้', 'error'); }).always(() => { submitBtn.prop('disabled', false); });
-        });
-
-        $('#activity-form').on('submit', async function(e){e.preventDefault();Swal.fire({title:'กำลังบันทึก...',didOpen:()=>Swal.showLoading()});const payload={activityId:$('#form-activity-id').val(),title:$('#form-activity-title').val(),description:$('#form-activity-desc').val(),imageUrl:$('#form-activity-image').val()};const isUpdate=!!payload.activityId;const method=isUpdate?'PUT':'POST';try{await callApi('/api/admin/activities',payload,method);allModals['activity-form'].hide();Swal.fire('สำเร็จ!','บันทึกกิจกรรมเรียบร้อย','success');loadAllActivitiesForAdmin();}catch(e){Swal.fire('ผิดพลาด','ไม่สามารถบันทึกได้','error');}});
-        $(document).on('click', '.btn-approve, .btn-reject', function(){const btn=$(this);const action=btn.hasClass('btn-approve')?'approve':'reject';const id=btn.data('id');btn.prop('disabled',true).parent().find('button').prop('disabled',true);btn.html('<span class="spinner-border spinner-border-sm"></span>');callApi(`/api/admin/submissions/${action}`,{submissionId:id},'POST').then(()=>{ $(`#row-${id}`).fadeOut(500,function(){$(this).remove();});}).catch(e=>{Swal.fire('Error','เกิดข้อผิดพลาด','error');btn.prop('disabled',false).parent().find('button').prop('disabled',false);btn.html(btn.hasClass('btn-approve')?'✓':'✗');});});
-        $(document).on('click', '.btn-edit-activity', function(){const data=JSON.parse(decodeURIComponent($(this).data('activity-data')));$('#activity-form-title').text('แก้ไขกิจกรรม');$('#form-activity-id').val(data.activityId);$('#form-activity-title').val(data.title);$('#form-activity-desc').val(data.description);$('#form-activity-image').val(data.imageUrl);allModals['activity-form'].show();});
-        $(document).on('click', '.btn-toggle-activity', function(){const btn=$(this);const id=btn.data('id');btn.prop('disabled',true);callApi('/api/admin/activities/toggle',{activityId:id},'POST').then(res=>{btn.prop('disabled',false);loadAllActivitiesForAdmin();}).catch(()=>btn.prop('disabled',false));});
-
-        // ===============================================================
-        // UI & DATA LOADING FUNCTIONS - เหมือนเดิม ไม่ได้แก้ไขส่วน Logic
-        // ===============================================================
-        function updateUserInfoUI(userData){$('#user-profile-pic, #profile-page-pic').attr('src',userData.pictureUrl);$('#user-display-name, #profile-page-name').text(userData.fullName);$('#user-employee-id').text(`รหัส: ${userData.employeeId}`);$('#profile-page-employee-id').text(`รหัสพนักงาน: ${userData.employeeId}`);$('#user-score, #profile-page-score').text(userData.totalScore);}
-        function displayActivitiesUI(activities){const lists=$('#latest-activities-list, #all-activities-list');lists.empty();if(!activities||activities.length===0){lists.html('<p class="text-center text-muted">ยังไม่มีกิจกรรม</p>');return;} activities.forEach(act=>{const cardHtml=`<div class="card shadow-sm mb-3"><img src="${act.imageUrl}" class="card-img-top" style="height:150px;object-fit:cover;" onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';"><div class="card-body"><h5 class="card-title fw-bold">${act.title}</h5><p class="card-text text-muted small">${act.description}</p><button class="btn btn-outline-primary w-100 fw-bold py-2 btn-view-activity" data-activity-id="${act.activityId}" data-activity-title="${act.title}"><i class="fas fa-eye me-1"></i> ดูรายงานและเข้าร่วม</button></div></div>`;lists.append(cardHtml);});}
-        
-        async function loadAndShowActivityDetails(activityId, activityTitle) {
-            $('#activity-detail-title').text(activityTitle);
-            $('.btn-join-from-detail').data('activity-id', activityId).data('activity-title', activityTitle);
-            const container = $('#submissions-container');
-            $('#submissions-loading').show();
-            container.empty();
-            allModals['activity-detail'].show();
-            try {
-                const submissions = await callApi('/api/submissions', { activityId, lineUserId: lineProfile.userId }, 'GET');
-                renderSubmissions(submissions);
-            } catch (error) { container.html('<p class="text-center text-danger">ไม่สามารถโหลดข้อมูลรายงานได้</p>'); } 
-            finally { $('#submissions-loading').hide(); }
+        function updateUserInfoUI(user) {
+            $('#user-profile-pic, #profile-page-pic').attr('src', user.pictureUrl);
+            $('#user-display-name, #profile-page-name').text(user.fullName);
+            $('#user-employee-id, #profile-page-employee-id').text(`รหัส: ${user.employeeId}`);
+            $('#user-score, #profile-page-score').text(user.totalScore);
         }
 
+        function displayActivitiesUI(activities, listId) {
+            const listElement = $(`#${listId}`);
+            listElement.empty();
+            if (!activities || activities.length === 0) {
+                listElement.html('<p class="text-center text-muted">ยังไม่มีกิจกรรมในขณะนี้</p>');
+                return;
+            }
+            activities.forEach(act => {
+                const cardHtml = `
+                    <div class="card mb-3">
+                        <img src="${act.imageUrl}" class="card-img-top" style="height:150px;object-fit:cover;" onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
+                        <div class="card-body">
+                            <h5 class="card-title fw-bold">${sanitizeHTML(act.title)}</h5>
+                            <p class="card-text text-muted small">${sanitizeHTML(act.description)}</p>
+                            <button class="btn btn-outline-primary w-100 fw-bold py-2 btn-view-activity" data-activity-id="${act.activityId}" data-activity-title="${sanitizeHTML(act.title)}">
+                                <i class="fas fa-eye me-1"></i> ดูรายงานและเข้าร่วม
+                            </button>
+                        </div>
+                    </div>`;
+                listElement.append(cardHtml);
+            });
+        }
+        
         function renderSubmissions(submissions) {
             const container = $('#submissions-container');
             container.empty();
-            if (submissions.length === 0) { container.html('<p class="text-center text-muted mt-5">ยังไม่มีใครส่งรายงานสำหรับกิจกรรมนี้<br>มาเป็นคนแรกกันเถอะ!</p>'); return; }
+            if (submissions.length === 0) { 
+                container.html('<p class="text-center text-muted mt-5">ยังไม่มีใครส่งรายงานสำหรับกิจกรรมนี้<br>มาเป็นคนแรกกันเถอะ!</p>'); 
+                return; 
+            }
             submissions.forEach(sub => {
                 const likedClass = sub.didLike ? 'liked' : '';
-                let commentsHtml = sub.comments.map(c => `<div class="comment-item p-2 rounded mb-2 d-flex"><img src="${c.commenter.pictureUrl}" class="rounded-circle me-2" width="24" height="24" onerror="this.onerror=null;this.src='https://placehold.co/24x24';"><div><strong>${$('<div/>').text(c.commenter.fullName).html()}:</strong> ${$('<div/>').text(c.commentText).html()}</div></div>`).join('');
-                const card = `<div class="card submission-card shadow-sm mb-3"><div class="card-body"><div class="d-flex align-items-center mb-2"><img src="${sub.submitter.pictureUrl}" class="rounded-circle me-2" width="40" height="40" onerror="this.onerror=null;this.src='https://placehold.co/40x40';"><div><h6 class="mb-0">${$('<div/>').text(sub.submitter.fullName).html()}</h6><small class="text-muted">${new Date(sub.createdAt).toLocaleString()}</small></div></div><p class="card-text">${$('<div/>').text(sub.description).html()}</p></div><div class="card-footer bg-white d-flex justify-content-start align-items-center gap-3"><button class="btn btn-sm btn-link text-decoration-none like-btn ${likedClass}" data-submission-id="${sub.submissionId}"><i class="fas fa-heart"></i> <span class="like-count">${sub.likes}</span></button><div class="text-muted"><i class="fas fa-comment"></i> ${sub.comments.length}</div></div><div class="card-footer bg-white"><div class="comment-list mb-2">${commentsHtml}</div><form class="d-flex comment-form" data-submission-id="${sub.submissionId}"><input type="text" class="form-control form-control-sm comment-input" placeholder="แสดงความคิดเห็น..."><button type="submit" class="btn btn-primary btn-sm ms-2">ส่ง</button></form></div></div>`;
+                let commentsHtml = sub.comments.map(c => `
+                    <div class="comment-item p-2 rounded mb-2 d-flex align-items-start">
+                        <img src="${c.commenter.pictureUrl}" class="rounded-circle me-2" width="24" height="24" onerror="this.onerror=null;this.src='https://placehold.co/24x24';">
+                        <div><strong>${sanitizeHTML(c.commenter.fullName)}:</strong> ${sanitizeHTML(c.commentText)}</div>
+                    </div>`).join('');
+                
+                const imageHtml = sub.imageUrl ? `<img src="${sub.imageUrl}" class="card-img-top mb-2" alt="Submission Image" onerror="this.style.display='none'">` : '';
+
+                const card = `
+                    <div class="card submission-card mb-3">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-2">
+                                <img src="${sub.submitter.pictureUrl}" class="rounded-circle me-2" width="40" height="40" onerror="this.onerror=null;this.src='https://placehold.co/40x40';">
+                                <div>
+                                    <h6 class="mb-0">${sanitizeHTML(sub.submitter.fullName)}</h6>
+                                    <small class="text-muted">${new Date(sub.createdAt).toLocaleString()}</small>
+                                </div>
+                            </div>
+                            <p class="card-text">${sanitizeHTML(sub.description)}</p>
+                            ${imageHtml}
+                        </div>
+                        <div class="card-footer bg-white d-flex justify-content-start align-items-center gap-3">
+                            <button class="btn btn-sm btn-link text-decoration-none like-btn ${likedClass}" data-submission-id="${sub.submissionId}">
+                                <i class="fas fa-heart"></i> <span class="like-count">${sub.likes}</span>
+                            </button>
+                            <div class="text-muted"><i class="fas fa-comment"></i> ${sub.comments.length}</div>
+                        </div>
+                        <div class="card-footer bg-white">
+                            <div class="comment-list mb-2">${commentsHtml}</div>
+                            <form class="d-flex comment-form" data-submission-id="${sub.submissionId}">
+                                <input type="text" class="form-control form-control-sm comment-input" placeholder="แสดงความคิดเห็น...">
+                                <button type="submit" class="btn btn-primary btn-sm ms-2">ส่ง</button>
+                            </form>
+                        </div>
+                    </div>`;
                 container.append(card);
             });
         }
+        
+        // ===============================================================
+        //  DATA LOADING FUNCTIONS
+        // ===============================================================
+        async function loadAndShowActivityDetails(activityId, activityTitle) {
+            $('#activity-detail-title').text(activityTitle);
+            $('.btn-join-from-detail').data({ 'activity-id': activityId, 'activity-title': activityTitle });
+            const container = $('#submissions-container');
+            container.html('<div class="text-center mt-5"><div class="spinner-border"></div></div>');
+            allModals['activity-detail'].show();
+            try {
+                const submissions = await callApi('/api/submissions', { activityId, lineUserId: lineProfile.userId });
+                renderSubmissions(submissions);
+            } catch (error) { 
+                container.html('<p class="text-center text-danger">ไม่สามารถโหลดข้อมูลรายงานได้</p>'); 
+            }
+        }
+        
+        async function loadLeaderboard() {
+            const list = $('#leaderboard-list');
+            list.html('<div class="text-center mt-5"><div class="spinner-border"></div></div>');
+            try {
+                const users = await callApi('/api/leaderboard');
+                list.empty();
+                if (users.length === 0) { list.html('<p class="text-center text-muted">ยังไม่มีข้อมูล</p>'); return; }
+                
+                users.forEach((user, index) => {
+                    const rank = index + 1;
+                    let rankDisplay = rank;
+                    if (rank === 1) rankDisplay = '<i class="fas fa-trophy"></i>';
+                    else if (rank === 2) rankDisplay = '<i class="fas fa-medal text-secondary"></i>';
+                    else if (rank === 3) rankDisplay = '<i class="fas fa-medal text-bronze"></i>';
 
-        function loadLeaderboard(){const list=$('#leaderboard-list');const loading=$('#leaderboard-loading');list.empty();loading.show();callApi('/api/leaderboard', {}, 'GET').then(users=>{loading.hide();if(users.length===0){list.html('<p class="text-center text-muted">ยังไม่มีข้อมูล</p>');return;} users.forEach((user,index)=>{const rank=index+1;let rankDisplay;if(rank===1)rankDisplay='<i class="fas fa-trophy"></i>';else if(rank===2)rankDisplay='<i class="fas fa-medal text-secondary"></i>';else if(rank===3)rankDisplay='<i class="fas fa-medal" style="color:#cd7f32;"></i>';else rankDisplay=rank;const itemHtml=`<div class="d-flex align-items-center p-2 mb-2 bg-white rounded-3 shadow-sm"><div class="leaderboard-rank me-3">${rankDisplay}</div><img src="${user.pictureUrl}" class="rounded-circle me-3" width="45" height="45" onerror="this.onerror=null;this.src='https://placehold.co/45x45';"><div class="flex-grow-1"><div class="fw-bold">${user.fullName}</div></div><div class="fw-bold text-primary">${user.totalScore} คะแนน</div></div>`;list.append(itemHtml);});}).catch(error=>{loading.hide();list.html('<p class="text-center text-danger">โหลดข้อมูลไม่ได้</p>');});}
-        function loadUserBadges(){const container=$('#badges-container');container.html('<div class="spinner-border"></div>');callApi('/api/user/badges',{lineUserId:lineProfile.userId}, 'GET').then(badges=>{container.empty();if(badges.length===0){container.html('<p class="text-muted">ยังไม่มีป้ายรางวัล</p>');return;} badges.forEach(b=>{const lockClass=b.isEarned?'':'locked';const html=`<div class="text-center" title="${b.name}: ${b.desc}"><img src="${b.img}" class="badge-icon ${lockClass}" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';"><div class="small">${b.name}</div></div>`;container.append(html);});}).catch(e=>{container.html('<p class="text-danger">โหลดป้ายรางวัลไม่ได้</p>')})}
-        function loadPendingSubmissions(){const tableBody=$('#submissions-table-body');$('#reports-loading').show();$('#no-reports-message').hide();tableBody.empty();callApi('/api/admin/submissions/pending', {}, 'GET').then(subs=>{ $('#reports-loading').hide();$('#pending-count-modal').text(subs.length);if(subs.length===0){$('#no-reports-message').show();return;} subs.forEach(s=>{const row=`<tr id="row-${s.submissionId}"><td><div class="fw-bold">${s.submitter.fullName}</div><small class="text-muted">${new Date(s.createdAt).toLocaleString()}</small></td><td>${s.description}</td><td><button class="btn btn-success btn-sm btn-approve" data-id="${s.submissionId}">✓</button><button class="btn btn-danger btn-sm btn-reject" data-id="${s.submissionId}">✗</button></td></tr>`;tableBody.append(row);});});}
-        function loadAllActivitiesForAdmin(){const list=$('#activities-list-admin');list.html('<div class="spinner-border"></div>');callApi('/api/admin/activities', {}, 'GET').then(acts=>{list.empty();acts.forEach(a=>{const statusBadge=a.status==='active'?'bg-success':'bg-secondary';const btnText=a.status==='active'?'Deactivate':'Activate';const btnClass=a.status==='active'?'btn-secondary':'btn-success';const activityData = encodeURIComponent(JSON.stringify(a)); const html=`<div class="card mb-2"><div class="card-body d-flex align-items-center"><div><span class="badge ${statusBadge} me-2">${a.status}</span><strong>${a.title}</strong></div><div class="ms-auto"><button class="btn btn-sm btn-primary btn-edit-activity me-1" data-activity-data='${activityData}'>Edit</button><button class="btn btn-sm ${btnClass} btn-toggle-activity" data-id="${a.activityId}">${btnText}</button></div></div></div>`;list.append(html);});});}
+                    list.append(`
+                        <div class="d-flex align-items-center p-2 mb-2 bg-white rounded-3 leaderboard-item">
+                            <div class="leaderboard-rank me-3">${rankDisplay}</div>
+                            <img src="${user.pictureUrl}" class="rounded-circle me-3" width="45" height="45" onerror="this.onerror=null;this.src='https://placehold.co/45x45';">
+                            <div class="flex-grow-1"><div class="fw-bold">${sanitizeHTML(user.fullName)}</div></div>
+                            <div class="fw-bold text-primary">${user.totalScore} คะแนน</div>
+                        </div>`);
+                });
+            } catch (error) {
+                list.html('<p class="text-center text-danger">ไม่สามารถโหลดข้อมูลได้</p>');
+            }
+        }
+
+        async function loadUserBadges() {
+            const container = $('#badges-container');
+            container.html('<div class="spinner-border"></div>');
+            try {
+                const badges = await callApi('/api/user/badges', { lineUserId: lineProfile.userId });
+                container.empty();
+                if (badges.length === 0) { container.html('<p class="text-muted">ยังไม่มีป้ายรางวัล</p>'); return; }
+
+                badges.forEach(b => {
+                    container.append(`
+                        <div class="text-center" title="${sanitizeHTML(b.name)}: ${sanitizeHTML(b.desc)}">
+                            <img src="${b.img}" class="badge-icon ${b.isEarned ? '' : 'locked'}" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';">
+                            <div class="small">${sanitizeHTML(b.name)}</div>
+                        </div>`);
+                });
+            } catch (e) {
+                container.html('<p class="text-danger">ไม่สามารถโหลดป้ายรางวัลได้</p>');
+            }
+        }
+
+        // ===============================================================
+        //  EVENT LISTENERS
+        // ===============================================================
+        function bindStaticEventListeners() {
+            // Navigation
+            $('.nav-link').on('click', function(e) {
+                e.preventDefault();
+                const pageId = $(this).data('page');
+                if (pageId) {
+                    $('.nav-link').removeClass('active');
+                    $(this).addClass('active');
+                    $('.page').removeClass('active');
+                    $('#' + pageId).addClass('active');
+                    if (pageId === 'leaderboard-page') loadLeaderboard();
+                    if (pageId === 'profile-page') loadUserBadges();
+                }
+            });
+
+            // Forms
+            $('#registration-form').on('submit', handleRegistration);
+            $('#submission-form').on('submit', handleSubmitReport);
+            $('#activity-form').on('submit', handleSaveActivity);
+
+            // Dynamic Buttons
+            $(document).on('click', '.btn-view-activity', handleViewActivity);
+            $(document).on('click', '.like-btn', handleLike);
+            $(document).on('submit', '.comment-form', handleComment);
+            
+            // Other UI
+            $('.btn-join-from-detail').on('click', handleJoinFromDetail);
+            $('#image-upload').on('change', (e) => handleImagePreview(e, '#image-preview'));
+            $('#form-activity-image-upload').on('change', (e) => handleImagePreview(e, '#form-activity-image-preview'));
+        }
+
+        function bindAdminEventListeners() {
+            $('#view-stats-btn').on('click', handleViewStats);
+            $('#manage-reports-btn').on('click', handleManageReports);
+            $('#manage-activities-btn').on('click', handleManageActivities);
+            $('#create-activity-btn').on('click', handleCreateActivity);
+            $(document).on('click', '.btn-approve, .btn-reject', handleApprovalAction);
+            $(document).on('click', '.btn-edit-activity', handleEditActivity);
+            $(document).on('click', '.btn-toggle-activity', handleToggleActivity);
+        }
+        
+        // ===============================================================
+        //  EVENT HANDLER FUNCTIONS
+        // ===============================================================
+        async function handleRegistration(e) {
+            e.preventDefault();
+            const fullName = $('#fullName').val().trim();
+            const employeeId = $('#employeeId').val().trim();
+            if (!fullName || !employeeId) return showWarning('กรุณากรอกข้อมูลให้ครบถ้วน');
+            
+            showLoading('กำลังบันทึก...');
+            try {
+                const newUser = await callApi("/api/user/register", {
+                    lineUserId: lineProfile.userId,
+                    displayName: lineProfile.displayName,
+                    pictureUrl: lineProfile.pictureUrl,
+                    fullName: fullName,
+                    employeeId: employeeId
+                }, 'POST');
+                await showMainApp(newUser);
+                showSuccessToast('ลงทะเบียนเรียบร้อย!');
+            } catch (error) {
+                showError('ไม่สามารถลงทะเบียนได้');
+            }
+        }
+        
+        async function handleSubmitReport(e) {
+            e.preventDefault();
+            const submitBtn = $(this).find('button[type="submit"]');
+            submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+            
+            const imageFile = $('#image-upload')[0].files[0];
+            const imageUrl = await uploadImage(imageFile);
+
+            const payload = {
+                lineUserId: lineProfile.userId,
+                activityId: $('#activityId-input').val(),
+                description: $('#description-input').val().trim(),
+                imageUrl: imageUrl
+            };
+
+            try {
+                await callApi('/api/submissions', payload, 'POST');
+                allModals.submission.hide();
+                $('#submission-form')[0].reset();
+                $('#image-preview').hide();
+                showSuccessToast('รายงานของคุณถูกส่งเรียบร้อย');
+            } catch (error) {
+                showError('ไม่สามารถส่งรายงานได้');
+            } finally {
+                submitBtn.prop('disabled', false).text('ส่งรายงาน');
+            }
+        }
+        
+        function handleViewActivity() {
+            loadAndShowActivityDetails($(this).data('activity-id'), $(this).data('activity-title'));
+        }
+
+        function handleJoinFromDetail() {
+            const activityId = $(this).data('activity-id');
+            const activityTitle = $(this).data('activity-title');
+            $('#activityId-input').val(activityId);
+            $('#activity-title-modal').text(activityTitle);
+            allModals['submission'].show();
+        }
+
+        async function handleLike() {
+            const btn = $(this);
+            const submissionId = btn.data('submission-id');
+            btn.prop('disabled', true);
+            try {
+                const result = await callApi('/api/submissions/like', { submissionId, lineUserId: lineProfile.userId }, 'POST');
+                const countSpan = btn.find('.like-count');
+                let currentCount = parseInt(countSpan.text());
+                countSpan.text(result.status === 'liked' ? currentCount + 1 : currentCount - 1);
+                btn.toggleClass('liked');
+            } catch (error) {
+                console.error("Like failed:", error);
+            } finally {
+                btn.prop('disabled', false);
+            }
+        }
+
+        async function handleComment(e) {
+            e.preventDefault();
+            const form = $(this);
+            const input = form.find('.comment-input');
+            const commentText = input.val().trim();
+            if(!commentText) return;
+            
+            const submitBtn = form.find('button');
+            submitBtn.prop('disabled', true);
+            
+            try {
+                await callApi('/api/submissions/comment', { submissionId: form.data('submission-id'), lineUserId: lineProfile.userId, commentText }, 'POST');
+                form.siblings('.comment-list').append(`
+                    <div class="comment-item p-2 rounded mb-2 d-flex align-items-start">
+                        <img src="${lineProfile.pictureUrl}" class="rounded-circle me-2" width="24" height="24">
+                        <div><strong>คุณ:</strong> ${sanitizeHTML(commentText)}</div>
+                    </div>`);
+                input.val('');
+            } catch (e) { 
+                showError('ไม่สามารถเพิ่มความคิดเห็นได้'); 
+            } finally {
+                submitBtn.prop('disabled', false); 
+            }
+        }
+
+        function handleImagePreview(event, previewSelector) {
+            const reader = new FileReader();
+            reader.onload = function(){
+                $(previewSelector).attr('src', reader.result).show();
+            };
+            reader.readAsDataURL(event.target.files[0]);
+        }
+        
+        // --- Admin Handlers ---
+        function handleViewStats() { loadAdminStats(); allModals['admin-stats'].show(); }
+        function handleManageReports() { loadPendingSubmissions(); allModals['admin-reports'].show(); }
+        function handleManageActivities() { loadAllActivitiesForAdmin(); allModals['admin-activities'].show(); }
+        
+        function handleCreateActivity() {
+            $('#activity-form-title').text('สร้างกิจกรรมใหม่');
+            $('#activity-form')[0].reset();
+            $('#form-activity-id').val('');
+            $('#form-activity-image-url').val('');
+            $('#form-activity-image-preview').hide();
+            allModals['activity-form'].show();
+        }
+
+        async function handleSaveActivity(e) {
+            e.preventDefault();
+            const submitBtn = $(this).find('button[type="submit"]');
+            submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+            
+            const imageFile = $('#form-activity-image-upload')[0].files[0];
+            let imageUrl = $('#form-activity-image-url').val();
+            if (imageFile) {
+                imageUrl = await uploadImage(imageFile);
+                if (!imageUrl) { // Stop if upload fails
+                    submitBtn.prop('disabled', false).text('บันทึก');
+                    return;
+                }
+            }
+            
+            const payload = {
+                activityId: $('#form-activity-id').val(),
+                title: $('#form-activity-title').val(),
+                description: $('#form-activity-desc').val(),
+                imageUrl: imageUrl
+            };
+            
+            const isUpdate = !!payload.activityId;
+            const method = isUpdate ? 'PUT' : 'POST';
+            try {
+                await callApi('/api/admin/activities', payload, method);
+                allModals['activity-form'].hide();
+                showSuccessToast('บันทึกกิจกรรมเรียบร้อย');
+                loadAllActivitiesForAdmin();
+                const allActs = await callApi('/api/activities');
+                displayActivitiesUI(allActs, 'latest-activities-list');
+                displayActivitiesUI(allActs, 'all-activities-list');
+            } catch (e) {
+                showError('ไม่สามารถบันทึกได้');
+            } finally {
+                submitBtn.prop('disabled', false).text('บันทึก');
+            }
+        }
+
+        async function handleApprovalAction() {
+            const btn = $(this);
+            const action = btn.hasClass('btn-approve') ? 'approve' : 'reject';
+            const id = btn.data('id');
+            btn.parent().find('button').prop('disabled', true);
+            try {
+                await callApi(`/api/admin/submissions/${action}`, { submissionId: id }, 'POST');
+                btn.closest('.card').fadeOut(500, function() { $(this).remove(); });
+            } catch (e) {
+                showError('เกิดข้อผิดพลาด');
+                btn.parent().find('button').prop('disabled', false);
+            }
+        }
+        
+        function handleEditActivity() {
+            const data = JSON.parse(decodeURIComponent($(this).data('activity-data')));
+            $('#activity-form-title').text('แก้ไขกิจกรรม');
+            $('#activity-form')[0].reset();
+            $('#form-activity-id').val(data.activityId);
+            $('#form-activity-title').val(data.title);
+            $('#form-activity-desc').val(data.description);
+            $('#form-activity-image-url').val(data.imageUrl);
+            $('#form-activity-image-preview').attr('src', data.imageUrl).show();
+            allModals['activity-form'].show();
+        }
+
+        async function handleToggleActivity() {
+            const btn = $(this);
+            btn.prop('disabled', true);
+            try {
+                await callApi('/api/admin/activities/toggle', { activityId: btn.data('id') }, 'POST');
+                loadAllActivitiesForAdmin();
+            } catch (e) {
+                console.error("Toggle failed:", e);
+                btn.prop('disabled', false);
+            }
+        }
+
+        // ===============================================================
+        //  ADMIN DATA LOADING
+        // ===============================================================
         async function loadAdminStats() {
             const container = $('#stats-container');
-            $('#stats-loading').show();
-            container.empty();
+            container.html('<div class="col-12 text-center"><div class="spinner-border"></div></div>');
+            if (submissionsChart) { submissionsChart.destroy(); }
+            $('#chart-container').hide();
+
             try {
-                const stats = await callApi('/api/admin/stats', {}, 'GET');
-                const statsHtml = `<div class="col-md-6"><div class="card stat-card shadow-sm"><div class="card-body"><h6 class="card-subtitle mb-2 text-muted">ผู้ใช้งานทั้งหมด</h6><h4 class="card-title">${stats.totalUsers} คน</h4></div></div></div><div class="col-md-6"><div class="card stat-card shadow-sm"><div class="card-body"><h6 class="card-subtitle mb-2 text-muted">รายงานทั้งหมด</h6><h4 class="card-title">${stats.totalSubmissions} รายการ</h4></div></div></div><div class="col-md-6"><div class="card stat-card shadow-sm"><div class="card-body"><h6 class="card-subtitle mb-2 text-muted">รายงานวันนี้</h6><h4 class="card-title">${stats.submissionsToday} รายการ</h4></div></div></div><div class="col-md-6"><div class="card stat-card shadow-sm"><div class="card-body"><h6 class="card-subtitle mb-2 text-muted">กิจกรรมที่ถูกรายงานมากที่สุด</h6><h5 class="card-title small">${stats.mostReportedActivity}</h5></div></div></div>`;
-                container.html(statsHtml);
-            } catch(e) { container.html('<p class="text-center text-danger">ไม่สามารถโหลดข้อมูลสรุปได้</p>'); } 
-            finally { $('#stats-loading').hide(); }
+                const stats = await callApi('/api/admin/stats');
+                container.html(`
+                    <div class="col-md-6"><div class="card stat-card"><div class="card-body"><h6 class="card-subtitle mb-2 text-muted">ผู้ใช้งานทั้งหมด</h6><h4 class="card-title">${stats.totalUsers} คน</h4></div></div></div>
+                    <div class="col-md-6"><div class="card stat-card"><div class="card-body"><h6 class="card-subtitle mb-2 text-muted">รายงานทั้งหมด</h6><h4 class="card-title">${stats.totalSubmissions} รายการ</h4></div></div></div>
+                    <div class="col-md-6"><div class="card stat-card"><div class="card-body"><h6 class="card-subtitle mb-2 text-muted">รายงานวันนี้</h6><h4 class="card-title">${stats.submissionsToday} รายการ</h4></div></div></div>
+                    <div class="col-md-6"><div class="card stat-card"><div class="card-body"><h6 class="card-subtitle mb-2 text-muted">Hot Activity</h6><h5 class="card-title small text-truncate">${sanitizeHTML(stats.mostReportedActivity)}</h5></div></div></div>`);
+                
+                const chartData = await callApi('/api/admin/chart-data');
+                renderChart(chartData);
+                $('#chart-container').show();
+
+            } catch(e) { 
+                container.html('<p class="text-center text-danger">ไม่สามารถโหลดข้อมูลสรุปได้</p>'); 
+            }
         }
+        
+        function renderChart(data) {
+            const ctx = document.getElementById('submissionsChart').getContext('2d');
+            submissionsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'จำนวนรายงาน',
+                        data: data.values,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+        }
+
+        async function loadPendingSubmissions() {
+            const list = $('#admin-reports-list');
+            list.html('<div class="text-center"><div class="spinner-border"></div></div>');
+            $('#no-reports-message').hide();
+            
+            try {
+                const subs = await callApi('/api/admin/submissions/pending');
+                list.empty();
+                $('#pending-count-modal').text(subs.length);
+                if (subs.length === 0) {
+                    $('#no-reports-message').show();
+                    return;
+                }
+                subs.forEach(s => {
+                    const imageHtml = s.imageUrl ? `<a href="${s.imageUrl}" target="_blank"><img src="${s.imageUrl}" class="img-fluid rounded my-2" style="max-height: 200px;" onerror="this.style.display='none'"></a>` : '';
+                    list.append(`
+                        <div class="card mb-3">
+                          <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">โดย: ${sanitizeHTML(s.submitter.fullName)}</h6>
+                            <p class="card-text">${sanitizeHTML(s.description)}</p>
+                            ${imageHtml}
+                            <small class="text-muted">เมื่อ: ${new Date(s.createdAt).toLocaleString()}</small>
+                          </div>
+                          <div class="card-footer bg-white text-end">
+                            <button class="btn btn-danger btn-sm btn-reject" data-id="${s.submissionId}"><i class="fas fa-times"></i> ปฏิเสธ</button>
+                            <button class="btn btn-success btn-sm btn-approve" data-id="${s.submissionId}"><i class="fas fa-check"></i> อนุมัติ</button>
+                          </div>
+                        </div>`);
+                });
+            } finally {
+                // Done
+            }
+        }
+
+        async function loadAllActivitiesForAdmin() {
+            const list = $('#activities-list-admin');
+            list.html('<div class="text-center"><div class="spinner-border"></div></div>');
+            try {
+                const acts = await callApi('/api/admin/activities');
+                list.empty();
+                acts.forEach(a => {
+                    const statusBadge = a.status === 'active' ? 'bg-success' : 'bg-secondary';
+                    const btnText = a.status === 'active' ? 'Deactivate' : 'Activate';
+                    const btnClass = a.status === 'active' ? 'btn-outline-secondary' : 'btn-outline-success';
+                    const activityData = encodeURIComponent(JSON.stringify(a));
+                    list.append(`
+                        <div class="card mb-2"><div class="card-body d-flex align-items-center">
+                            <div><span class="badge ${statusBadge} me-2">${a.status}</span><strong>${sanitizeHTML(a.title)}</strong></div>
+                            <div class="ms-auto">
+                                <button class="btn btn-sm btn-outline-primary btn-edit-activity me-1" data-activity-data='${activityData}'><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-sm ${btnClass} btn-toggle-activity" data-id="${a.activityId}">${btnText}</button>
+                            </div>
+                        </div></div>`);
+                });
+            } catch(e) {
+                list.html('<p class="text-danger">ไม่สามารถโหลดกิจกรรมได้</p>');
+            }
+        }
+        
+        // ===============================================================
+        //  UTILITY FUNCTIONS
+        // ===============================================================
+        function showLoading(text) { 
+            $('#loading-text').text(text);
+            $('#loading-overlay').show(); 
+        }
+        function hideLoading() { $('#loading-overlay').hide(); }
+        
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true
+        });
+        function showSuccessToast(title) { Toast.fire({ icon: 'success', title: title }); }
+        function showError(title) { hideLoading(); Swal.fire('เกิดข้อผิดพลาด', title, 'error'); }
+        function showWarning(title) { Swal.fire('คำเตือน', title, 'warning'); }
+        function sanitizeHTML(str) {
+            if (str === null || str === undefined) return '';
+            const temp = document.createElement('div');
+            temp.textContent = str;
+            return temp.innerHTML;
+        }
+
     </script>
 </body>
 </html>
+

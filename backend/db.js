@@ -2,7 +2,6 @@
     const { Pool } = require('pg');
     
     // สร้าง Connection Pool โดยใช้ DATABASE_URL จาก .env
-    // Render จะสร้างตัวแปรนี้ให้เราโดยอัตโนมัติ
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       // ตั้งค่า SSL สำหรับการเชื่อมต่อบน Production (จำเป็นสำหรับ Render)
@@ -16,10 +15,7 @@
         .then(() => console.log('Successfully connected to the PostgreSQL database.'))
         .catch(err => console.error('Failed to connect to the database:', err));
     
-    // Export ฟังก์ชันสำหรับ query ข้อมูล
     module.exports = {
       query: (text, params) => pool.query(text, params),
       getClient: () => pool.connect(),
     };
-    
-
