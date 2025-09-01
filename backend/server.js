@@ -44,9 +44,9 @@ const handleRequest = (handler) => async (req, res) => {
 
 // Middleware to check for admin privileges
 const isAdmin = async (req, res, next) => {
-    // Accommodate lineUserId being in body for POST/DELETE or query for GET
-    const adminUserId = req.body.adminUserId || req.query.adminUserId || (req.params.adminUserId) || req.headers['x-admin-user-id'];
-
+    // Accommodate lineUserId being in body, query, or headers
+    const adminUserId = req.body.adminUserId || req.query.adminUserId || req.params.adminUserId || req.headers['x-admin-user-id'];
+    
     if (!adminUserId) {
         return res.status(401).json({ status: 'error', message: 'Unauthorized: Missing Admin User ID' });
     }
@@ -61,7 +61,7 @@ const isAdmin = async (req, res, next) => {
 // Image Upload Route
 app.post('/api/upload', upload.single('image'), (req, res) => {
     if (!req.file) return res.status(400).json({ status: 'error', message: 'No file uploaded.' });
-    res.status(200).json({ status: 'success', data: { imageUrl: `/uploads/${req.file.filename}` } });
+    res.status(200).json({ status: 'success', data: { imageUrl: req.file.filename } });
 });
 
 // --- User & General Routes ---
@@ -219,13 +219,13 @@ app.get('/api/admin/user-details/:lineUserId', isAdmin, handleRequest(async (req
 app.get('/api/admin/badges', isAdmin, handleRequest(async () => (await db.query('SELECT * FROM badges ORDER BY "badgeName"')).rows));
 
 app.post('/api/admin/badges', isAdmin, handleRequest(async (req) => {
-    const { badgeName, description, imageUrl } = req.body; // Removed adminUserId as it's handled by middleware
+    const { badgeName, description, imageUrl } = req.body;
     const badgeId = "BADGE" + Date.now();
     await db.query('INSERT INTO badges ("badgeId", "badgeName", description, "imageUrl") VALUES ($1, $2, $3, $4)', [badgeId, badgeName, description, imageUrl]);
     return { message: 'Badge created successfully' };
 }));
 
-app.delete('/api/admin/badges/:badgeId/:adminUserId', isAdmin, handleRequest(async (req) => {
+app.delete('/api/admin/badges/:badgeId', isAdmin, handleRequest(async (req) => {
     const { badgeId } = req.params;
     await db.query('DELETE FROM badges WHERE "badgeId" = $1', [badgeId]);
     return { message: 'Badge deleted successfully' };
@@ -250,4 +250,3 @@ app.get('/', (req, res) => res.send('Backend server is running!'));
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
-
