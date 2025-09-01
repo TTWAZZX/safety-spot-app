@@ -224,7 +224,7 @@
         // ===============================================================
         //  APP CONFIGURATION
         // ===============================================================
-        const API_BASE_URL = "https://shesafety-spot-appbackend.onrender.com"; // <-- PASTE YOUR RENDER URL HERE
+        const API_BASE_URL = "https://shesafety-spot-appbackend.onrender.com";
         const LIFF_ID = "2007053300-9xLKdwZp";
         
         // Global variables
@@ -351,6 +351,25 @@
         // ===============================================================
         //  UI RENDERING FUNCTIONS
         // ===============================================================
+        /**
+         * 🪄 คาถาวิเศษ: แปลง URL รูปภาพให้ถูกต้อง
+         * ฟังก์ชันนี้จะตรวจสอบ path ของรูป ถ้าเป็น path สั้นๆ (ขึ้นต้นด้วย /)
+         * มันจะเอา URL ของ Backend มาแปะข้างหน้าให้เอง
+         */
+        function getFullImageUrl(path) {
+            const placeholder = 'https://placehold.co/600x300/e9ecef/6c757d?text=Image';
+            if (!path) {
+                return placeholder;
+            }
+            if (path.startsWith('http')) {
+                return path; // เป็น URL เต็มอยู่แล้ว
+            }
+            if (path.startsWith('/')) {
+                return API_BASE_URL + path; // เป็น path จากหลังบ้านเรา
+            }
+            return placeholder; // กรณีอื่นๆ ที่ไม่รู้จัก
+        }
+
         function updateUserInfoUI(user) {
             $('#user-profile-pic, #profile-page-pic').attr('src', user.pictureUrl || 'https://placehold.co/80x80');
             $('#user-display-name, #profile-page-name').text(user.fullName);
@@ -369,7 +388,7 @@
             activities.forEach(act => {
                 const cardHtml = `
                     <div class="card shadow-sm mb-3">
-                        <img src="${act.imageUrl || 'https://placehold.co/600x300'}" class="card-img-top" style="height:150px;object-fit:cover;" onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
+                        <img src="${getFullImageUrl(act.imageUrl)}" class="card-img-top" style="height:150px;object-fit:cover;" onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
                         <div class="card-body">
                             <h5 class="card-title fw-bold">${sanitizeHTML(act.title)}</h5>
                             <p class="card-text text-muted small">${sanitizeHTML(act.description)}</p>
@@ -397,7 +416,7 @@
                         <div><strong>${sanitizeHTML(c.commenter.fullName)}:</strong> ${sanitizeHTML(c.commentText)}</div>
                     </div>`).join('');
                 
-                const imageHtml = sub.imageUrl ? `<img src="${sub.imageUrl}" class="card-img-top mb-3" alt="Submission Image">` : '';
+                const imageHtml = sub.imageUrl ? `<img src="${getFullImageUrl(sub.imageUrl)}" class="card-img-top mb-3" alt="Submission Image">` : '';
 
                 const card = `
                     <div class="card submission-card shadow-sm mb-3">
@@ -521,7 +540,7 @@
                     const lockClass = b.isEarned ? '' : 'locked';
                     const html = `
                         <div class="text-center" title="${sanitizeHTML(b.name)}: ${sanitizeHTML(b.desc)}">
-                            <img src="${b.img}" class="badge-icon ${lockClass}" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';">
+                            <img src="${getFullImageUrl(b.img)}" class="badge-icon ${lockClass}" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';">
                             <div class="small">${sanitizeHTML(b.name)}</div>
                         </div>`;
                     container.append(html);
@@ -766,7 +785,7 @@
             $('#form-activity-title').val(data.title);
             $('#form-activity-desc').val(data.description);
             $('#form-activity-image-url').val(data.imageUrl); // Store existing URL
-            $('#activity-image-preview').attr('src', data.imageUrl || 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
+            $('#activity-image-preview').attr('src', getFullImageUrl(data.imageUrl));
             allModals['activity-form'].show();
         }
 
@@ -823,7 +842,7 @@
                     $('#no-reports-message').show();
                 } else {
                     subs.forEach(s => {
-                        const imageUrl = s.imageUrl ? `<a href="${s.imageUrl}" target="_blank">ดูรูป</a>` : 'ไม่มี';
+                        const imageUrl = s.imageUrl ? `<a href="${getFullImageUrl(s.imageUrl)}" target="_blank">ดูรูป</a>` : 'ไม่มี';
                         const row = `
                             <tr id="row-${s.submissionId}">
                                 <td><div class="fw-bold">${sanitizeHTML(s.submitter.fullName)}</div><small class="text-muted">${new Date(s.createdAt).toLocaleString()}</small></td>
