@@ -381,7 +381,7 @@
         //  API CALLER & UPLOADER
         // ===============================================================
         async function callApi(endpoint, payload = {}, method = 'GET') {
-            const url = new URL(API_BASE_URL + endpoint, window.location.origin);
+            const url = API_BASE_URL + endpoint; // แก้ไขตรงนี้
             const options = {
                 method,
                 headers: { 'Content-Type': 'application/json' },
@@ -391,7 +391,9 @@
             }
 
             if (method.toUpperCase() === 'GET') {
-                Object.keys(payload).forEach(key => url.searchParams.append(key, payload[key]));
+                const params = new URLSearchParams(payload).toString();
+                url += '?' + params;
+                options.body = undefined;
             } else {
                 options.body = JSON.stringify(payload);
             }
