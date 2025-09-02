@@ -5,9 +5,18 @@ const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
 const db = require('./db');
+const cloudinary = require('cloudinary').v2;
+const streamifier = require('streamifier');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configure Cloudinary with environment variables
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 // Use CORS middleware to allow cross-origin requests
 app.use(cors());
@@ -24,13 +33,7 @@ if (!fs.existsSync(uploadsDir)) {
 app.use('/uploads', express.static(uploadsDir));
 
 // Multer setup for file uploads
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadsDir),
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
+const storage = multer.memoryStorage(); // Use memory storage as Render's filesystem is ephemeral
 const upload = multer({ storage: storage });
 
 // Helper for handling requests and errors
@@ -58,14 +61,28 @@ const isAdmin = async (req, res, next) => {
     next();
 };
 
-// Image Upload Route
-app.post('/api/upload', upload.single('image'), (req, res) => {
+// Image Upload Route with Cloudinary
+app.post('/api/upload', upload.single('image'), async (req, res) => {
     if (!req.file) {
         console.error('No file uploaded.');
         return res.status(400).json({ status: 'error', message: 'No file uploaded.' });
     }
-    console.log('File uploaded:', req.file.filename);
-    res.status(200).json({ status: 'success', data: { imageUrl: req.file.filename } });
+
+    try {
+        const uploadStream = cloudinary.uploader.upload_stream({ folder: 'safety-spot' }, (error, result) => {
+            if (result) {
+                res.status(200).json({ status: 'success', data: { imageUrl: result.secure_url } });
+            } else {
+                console.error('Cloudinary upload error:', error);
+                res.status(500).json({ status: 'error', message: 'Failed to upload image to Cloudinary.' });
+            }
+        });
+
+        streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+    } catch (error) {
+        console.error('API Error on /api/upload:', error);
+        res.status(500).json({ status: 'error', message: 'An internal server error occurred.' });
+    }
 });
 
 // --- User & General Routes ---
