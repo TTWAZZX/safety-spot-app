@@ -530,6 +530,7 @@
                                 <i class="fas fa-heart"></i> <span class="like-count">${sub.likes}</span>
                             </button>
                             <div class="text-muted"><i class="fas fa-comment"></i> ${sub.comments.length}</div>
+                            ${currentUser.isAdmin ? `<button class="btn btn-sm btn-danger ms-auto btn-delete-submission" data-id="${sub.submissionId}"><i class="fas fa-trash-alt"></i> ลบ</button>` : ''}
                         </div>
                         <div class="card-footer bg-white">
                             <div class="comment-list mb-2">${commentsHtml}</div>
@@ -1174,7 +1175,7 @@
                         <div class="card mb-2"><div class="card-body d-flex align-items-center">
                             <div><span class="badge ${statusBadge} me-2">${a.status}</span><strong>${sanitizeHTML(a.title)}</strong></div>
                             <div class="ms-auto">
-                                <button class="btn btn-sm btn-primary btn-edit-activity me-1" data-activity-data='${activityData}'>Edit</button>
+                                <button class="btn btn-sm btn-primary btn-edit-activity me-1" data-activity-data='${activityData}'><i class="fas fa-edit"></i></button>
                                 <button class="btn btn-sm ${btnClass} btn-toggle-activity me-1" data-id="${a.activityId}">${btnText}</button>
                                 <button class="btn btn-sm btn-danger btn-delete-activity" data-id="${a.activityId}"><i class="fas fa-trash-alt"></i></button>
                             </div>
@@ -1223,16 +1224,16 @@
             const resultsDiv = $('#user-search-results');
             resultsDiv.html('<div class="text-center"><div class="spinner-border"></div></div>');
             try {
-                const users = await callApi('/api/admin/users', { adminUserId: currentUser.lineUserId });
+                const users = await callApi('/api/admin/users');
                 resultsDiv.empty();
                 if (users.length === 0) {
                     resultsDiv.html('<p class="text-center text-muted">ไม่พบผู้ใช้งาน</p>');
                 } else {
-                    const allBadges = await callApi('/api/admin/badges', { adminUserId: currentUser.lineUserId });
+                    const allBadges = await callApi('/api/admin/badges');
                     const allBadgesMap = new Map(allBadges.map(b => [b.badgeId, b]));
 
                     for (const u of users) {
-                        const userBadges = await callApi(`/api/admin/user-details/${u.lineUserId}`, { adminUserId: currentUser.lineUserId });
+                        const userBadges = await callApi(`/api/admin/user-details/${u.lineUserId}`);
                         const userEarnedIds = new Set(userBadges.earnedBadgeIds);
                         
                         let badgeButtonsHtml = '';
@@ -1279,16 +1280,16 @@
             const resultsDiv = $('#user-search-results');
             resultsDiv.html('<div class="text-center"><div class="spinner-border"></div></div>');
             try {
-                const users = await callApi('/api/admin/users', { search: query, adminUserId: currentUser.lineUserId });
+                const users = await callApi('/api/admin/users', { search: query });
                 resultsDiv.empty();
                 if (users.length === 0) {
                     resultsDiv.html('<p class="text-center text-muted">ไม่พบผู้ใช้งานที่ตรงกับคำค้นหา</p>');
                 } else {
-                    const allBadges = await callApi('/api/admin/badges', { adminUserId: currentUser.lineUserId });
+                    const allBadges = await callApi('/api/admin/badges');
                     const allBadgesMap = new Map(allBadges.map(b => [b.badgeId, b]));
 
                     for (const u of users) {
-                        const userBadges = await callApi(`/api/admin/user-details/${u.lineUserId}`, { adminUserId: currentUser.lineUserId });
+                        const userBadges = await callApi(`/api/admin/user-details/${u.lineUserId}`);
                         const userEarnedIds = new Set(userBadges.earnedBadgeIds);
                         
                         let badgeButtonsHtml = '';
