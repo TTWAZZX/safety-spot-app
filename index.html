@@ -1209,10 +1209,136 @@ function bindAdminTabEventListeners() {
                 list.html('<p class="text-danger">ไม่สามารถโหลดกิจกรรมได้</p>');
             }
         }
-        async function loadBadgesForAdmin() { /* ... */ }
-        async function loadUsersForAdmin() { /* ... */ }
-        async function searchUsersForAdmin(query) { /* ... */ }
+        async function loadBadgesForAdmin() {
+            const list = $('#badges-list');
+            list.html('<div class="text-center my-4"><div class="spinner-border text-success"></div><p class="text-muted mt-2">กำลังโหลดป้ายรางวัล...</p></div>');
+            try {
+                const badges = await callApi('/api/admin/badges');
+                list.empty();
+                if (badges.length === 0) {
+                    list.html('<p class="text-center text-muted my-4">ยังไม่มีป้ายรางวัลในระบบ</p>');
+                } else {
+                    badges.forEach(b => {
+                        const html = `
+                            <div class="col-6 col-md-4 col-lg-3 mb-3">
+                                <div class="card h-100 shadow-sm text-center">
+                                    <div class="card-body">
+                                        <img src="${getFullImageUrl(b.imageUrl)}" class="badge-icon mb-2" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';" alt="${sanitizeHTML(b.badgeName)}">
+                                        <h6 class="fw-bold mb-1">${sanitizeHTML(b.badgeName)}</h6>
+                                        <small class="text-muted d-block mb-3">${sanitizeHTML(b.description)}</small>
+                                        <div class="d-flex justify-content-center gap-2">
+                                            <button class="btn btn-sm btn-outline-primary btn-edit-badge"
+                                                data-badge-id="${b.badgeId}"
+                                                data-badge-name="${sanitizeHTML(b.badgeName)}"
+                                                data-badge-desc="${sanitizeHTML(b.description)}"
+                                                data-badge-url="${getFullImageUrl(b.imageUrl)}">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger delete-badge-btn" data-badge-id="${b.badgeId}">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>`;
+                        list.append(html);
+                    });
+                }
+            } catch (e) {
+                console.error("Error loading admin badges:", e);
+                list.html('<p class="text-center text-danger my-4">ไม่สามารถโหลดป้ายรางวัลได้</p>');
+            }
+        }
+        async function loadUsersForAdmin() {
+            const resultsContainer = $('#user-search-results');
+            resultsContainer.html('<div class="text-center my-4"><div class="spinner-border text-success"></div><p class="text-muted mt-2">กำลังโหลดผู้ใช้...</p></div>');
+            try {
+                const [users, allBadges] = await Promise.all([
+                    callApi('/api/admin/users'), // โหลดผู้ใช้ทั้งหมด
+                    callApi('/api/admin/badges') // โหลดป้ายรางวัลทั้งหมดเพื่อเปรียบเทียบ
+                ]);
 
+                resultsContainer.empty();
+                if (users.length === 0) {
+                    resultsContainer.html('<p class="text-center text-muted my-4">ไม่พบผู้ใช้งาน</p>');
+                    return;
+                }
+
+                users.forEach(user => {
+                    const earnedBadgeIds = user.earnedBadgeIds || []; // รายการ ID ป้ายรางวัลที่ผู้ใช้มี
+                    const badgesToAwardHtml = allBadges.filter(b => !earnedBadgeIds.includes(b.badgeId)) // กรองเฉพาะป้ายที่ผู้ใช้ยังไม่มี
+                                                        .map(b => `<button class="btn btn-sm btn-outline-primary award-badge-btn me-1 mb-1" data-user-id="${user.lineUserId}" data-badge-id="${b.badgeId}">${sanitizeHTML(b.badgeName)}</button>`)
+                                                        .join('');
+
+                    const html = `
+                        <div class="card shadow-sm mb-3">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <img src="${user.pictureUrl || 'https://placehold.co/45x45'}" class="rounded-circle me-3" width="45" height="45" alt="Profile">
+                                    <div>
+                                        <h6 class="fw-bold mb-0">${sanitizeHTML(user.fullName)}</h6>
+                                        <small class="text-muted">รหัส: ${sanitizeHTML(user.employeeId)} | คะแนน: ${user.totalScore}</small>
+                                    </div>
+                                </div>
+                                <hr>
+                                <p class="fw-bold mb-2">ป้ายรางวัลที่มอบให้ได้:</p>
+                                <div class="badges-award-container">
+                                    ${badgesToAwardHtml || '<small class="text-muted">ผู้ใช้ได้รับป้ายรางวัลทั้งหมดแล้ว หรือยังไม่มีป้ายรางวัลให้มอบ</small>'}
+                                </div>
+                            </div>
+                        </div>`;
+                    resultsContainer.append(html);
+                });
+            } catch (e) {
+                console.error("Error loading users for admin:", e);
+                resultsContainer.html('<p class="text-center text-danger my-4">ไม่สามารถโหลดรายชื่อผู้ใช้ได้</p>');
+            }
+        }
+        async function searchUsersForAdmin(query) {
+            const resultsContainer = $('#user-search-results');
+            resultsContainer.html('<div class="text-center my-4"><div class="spinner-border text-success"></div><p class="text-muted mt-2">กำลังค้นหาผู้ใช้...</p></div>');
+            try {
+                const [users, allBadges] = await Promise.all([
+                    callApi('/api/admin/users', { search: query }), // ส่ง query ไปค้นหา
+                    callApi('/api/admin/badges')
+                ]);
+
+                resultsContainer.empty();
+                if (users.length === 0) {
+                    resultsContainer.html('<p class="text-center text-muted my-4">ไม่พบผู้ใช้งานที่ตรงกับการค้นหา</p>');
+                    return;
+                }
+
+                users.forEach(user => {
+                    const earnedBadgeIds = user.earnedBadgeIds || [];
+                    const badgesToAwardHtml = allBadges.filter(b => !earnedBadgeIds.includes(b.badgeId))
+                                                        .map(b => `<button class="btn btn-sm btn-outline-primary award-badge-btn me-1 mb-1" data-user-id="${user.lineUserId}" data-badge-id="${b.badgeId}">${sanitizeHTML(b.badgeName)}</button>`)
+                                                        .join('');
+
+                    const html = `
+                        <div class="card shadow-sm mb-3">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <img src="${user.pictureUrl || 'https://placehold.co/45x45'}" class="rounded-circle me-3" width="45" height="45" alt="Profile">
+                                    <div>
+                                        <h6 class="fw-bold mb-0">${sanitizeHTML(user.fullName)}</h6>
+                                        <small class="text-muted">รหัส: ${sanitizeHTML(user.employeeId)} | คะแนน: ${user.totalScore}</small>
+                                    </div>
+                                </div>
+                                <hr>
+                                <p class="fw-bold mb-2">ป้ายรางวัลที่มอบให้ได้:</p>
+                                <div class="badges-award-container">
+                                    ${badgesToAwardHtml || '<small class="text-muted">ผู้ใช้ได้รับป้ายรางวัลทั้งหมดแล้ว หรือยังไม่มีป้ายรางวัลให้มอบ</small>'}
+                                </div>
+                            </div>
+                        </div>`;
+                    resultsContainer.append(html);
+                });
+            } catch (e) {
+                console.error("Error searching users for admin:", e);
+                resultsContainer.html('<p class="text-center text-danger my-4">ไม่สามารถค้นหาผู้ใช้ได้</p>');
+            }
+        }
 
         // ===============================================================
         //  UTILITY FUNCTIONS
