@@ -524,6 +524,7 @@
                                 </div>
                             </div>
                             <p class="card-text">${sanitizeHTML(sub.description)}</p>
+                            ${sub.points > 0 ? `<div class="text-end fw-bold text-primary">คะแนนที่ได้รับ: ${sub.points}</div>` : ''}
                         </div>
                         <div class="card-footer bg-white d-flex justify-content-start align-items-center gap-3">
                             <button class="btn btn-sm btn-link text-decoration-none like-btn ${likedClass}" data-submission-id="${sub.submissionId}">
@@ -578,7 +579,6 @@
         // ===============================================================
         async function loadAndShowActivityDetails(activityId, activityTitle) {
             $('#activity-detail-title').text(activityTitle);
-            $('.btn-join-from-detail').data({ 'activity-id': activityId, 'activity-title': activityTitle });
             const container = $('#submissions-container');
             $('#submissions-loading').show();
             container.empty();
@@ -691,7 +691,7 @@
             $(document).on('submit', '.comment-form', handleComment);
             
             // --- Buttons in modals ---
-            $('.btn-join-from-detail').on('click', handleJoinFromDetail);
+            // Remove 'btn-join-from-detail' from the modal
             $('#add-badge-btn').on('click', handleAddBadge);
 
             // Image Previews
@@ -790,17 +790,11 @@
                     imageUrl: imageUrl
                 };
                 
-                // Submit report without status, it will be automatically approved on creation
                 await callApi('/api/submissions', payload, 'POST');
                 allModals.submission.hide();
                 $('#submission-form')[0].reset();
                 $('#submission-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
-                showSuccess('รายงานของคุณถูกส่งเรียบร้อย');
-                
-                // Refresh activity page to show new submission
-                const activityId = $('#activityId-input').val();
-                const activityTitle = $('#activity-title-modal').text();
-                loadAndShowActivityDetails(activityId, activityTitle);
+                showSuccess('รายงานของคุณถูกส่งเพื่อรอการตรวจสอบ');
                 
             } catch (error) {
                 showError(error.message);
@@ -820,15 +814,7 @@
             $('#activity-title-modal').text(activityTitle);
             allModals['submission'].show();
         }
-
-        function handleJoinFromDetail() {
-            const activityId = $(this).data('activity-id');
-            const activityTitle = $(this).data('activity-title');
-            $('#activityId-input').val(activityId);
-            $('#activity-title-modal').text(activityTitle);
-            allModals['submission'].show();
-        }
-
+        
         async function handleLike() {
             const btn = $(this);
             const submissionId = btn.data('submission-id');

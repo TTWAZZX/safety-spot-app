@@ -136,8 +136,8 @@ app.get('/api/submissions', handleRequest(async (req) => {
 }));
 app.post('/api/submissions', handleRequest(async (req) => {
     const { activityId, lineUserId, description, imageUrl } = req.body;
-    await db.query('INSERT INTO submissions ("submissionId", "activityId", "lineUserId", description, "imageUrl", status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)', ["SUB" + Date.now(), activityId, lineUserId, description, imageUrl, 'approved', new Date()]);
-    return { message: 'Report submitted and approved automatically!' };
+    await db.query('INSERT INTO submissions ("submissionId", "activityId", "lineUserId", description, "imageUrl", status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)', ["SUB" + Date.now(), activityId, lineUserId, description, imageUrl, 'pending', new Date()]);
+    return { message: 'Report submitted for review.' };
 }));
 app.post('/api/submissions/like', handleRequest(async (req) => {
     const { submissionId, lineUserId } = req.body;
