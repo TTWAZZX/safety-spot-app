@@ -118,7 +118,7 @@ app.get('/api/user/badges', handleRequest(async (req) => {
 }));
 app.get('/api/submissions', handleRequest(async (req) => {
     const { activityId, lineUserId } = req.query;
-    const sql = `SELECT s."submissionId", s.description, s."imageUrl", s."createdAt", u."fullName" as "submitterFullName", u."pictureUrl" as "submitterPictureUrl", (SELECT COUNT(*) FROM likes WHERE "submissionId" = s."submissionId")::int as likes FROM submissions s JOIN users u ON s."lineUserId" = u."lineUserId" WHERE s."activityId" = $1 AND s.status = 'approved' ORDER BY s."createdAt" DESC;`;
+    const sql = `SELECT s."submissionId", s.description, s."imageUrl", s."createdAt", s.points, u."fullName" as "submitterFullName", u."pictureUrl" as "submitterPictureUrl", (SELECT COUNT(*) FROM likes WHERE "submissionId" = s."submissionId")::int as likes FROM submissions s JOIN users u ON s."lineUserId" = u."lineUserId" WHERE s."activityId" = $1 AND s.status = 'approved' ORDER BY s."createdAt" DESC;`;
     const submissionsRes = await db.query(sql, [activityId]);
     const likesRes = await db.query('SELECT "submissionId" FROM likes WHERE "lineUserId" = $1', [lineUserId]);
     const userLikedIds = new Set(likesRes.rows.map(l => l.submissionId));
@@ -132,12 +132,12 @@ app.get('/api/submissions', handleRequest(async (req) => {
             commentsBySubmission[c.submissionId].push({ commentText: c.commentText, commenter: { fullName: c.commenterFullName, pictureUrl: c.commenterPictureUrl } });
         });
     }
-    return submissionsRes.rows.map(sub => ({ submissionId: sub.submissionId, description: sub.description, imageUrl: sub.imageUrl, createdAt: sub.createdAt, submitter: { fullName: sub.submitterFullName, pictureUrl: sub.submitterPictureUrl }, likes: sub.likes, didLike: userLikedIds.has(sub.submissionId), comments: commentsBySubmission[sub.submissionId] || [] }));
+    return submissionsRes.rows.map(sub => ({ submissionId: sub.submissionId, description: sub.description, imageUrl: sub.imageUrl, createdAt: sub.createdAt, points: sub.points, submitter: { fullName: sub.submitterFullName, pictureUrl: sub.submitterPictureUrl }, likes: sub.likes, didLike: userLikedIds.has(sub.submissionId), comments: commentsBySubmission[sub.submissionId] || [] }));
 }));
 app.post('/api/submissions', handleRequest(async (req) => {
     const { activityId, lineUserId, description, imageUrl } = req.body;
-    await db.query('INSERT INTO submissions ("submissionId", "activityId", "lineUserId", description, "imageUrl", status, points, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', ["SUB" + Date.now(), activityId, lineUserId, description, imageUrl, 'pending', 0, new Date()]);
-    return { message: 'Report submitted successfully!' };
+    await db.query('INSERT INTO submissions ("submissionId", "activityId", "lineUserId", description, "imageUrl", status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)', ["SUB" + Date.now(), activityId, lineUserId, description, imageUrl, 'approved', new Date()]);
+    return { message: 'Report submitted and approved automatically!' };
 }));
 app.post('/api/submissions/like', handleRequest(async (req) => {
     const { submissionId, lineUserId } = req.body;
@@ -174,15 +174,15 @@ app.get('/api/admin/chart-data', isAdmin, handleRequest(async () => {
 }));
 app.get('/api/admin/submissions/pending', isAdmin, handleRequest(async () => (await db.query(`SELECT s.*, u."fullName" FROM submissions s JOIN users u ON s."lineUserId" = u."lineUserId" WHERE s.status = 'pending' ORDER BY s."createdAt" ASC`)).rows.map(s => ({...s, submitter: { fullName: s.fullName }}))));
 app.post('/api/admin/submissions/approve', isAdmin, handleRequest(async (req) => {
-    const { submissionId } = req.body;
+    const { submissionId, score } = req.body;
     const client = await db.getClient();
     try {
         await client.query('BEGIN');
         const submissionRes = await client.query('SELECT "lineUserId" FROM submissions WHERE "submissionId" = $1', [submissionId]);
         if (submissionRes.rows.length === 0) throw new Error('Submission not found');
         const { lineUserId } = submissionRes.rows[0];
-        await client.query('UPDATE submissions SET status = $1, points = $2 WHERE "submissionId" = $3', ['approved', 10, submissionId]);
-        await client.query('UPDATE users SET "totalScore" = "totalScore" + $1 WHERE "lineUserId" = $2', [10, lineUserId]);
+        await client.query('UPDATE submissions SET status = $1, points = $2 WHERE "submissionId" = $3', ['approved', score, submissionId]);
+        await client.query('UPDATE users SET "totalScore" = "totalScore" + $1 WHERE "lineUserId" = $2', [score, lineUserId]);
         await client.query('COMMIT');
         return { message: 'Submission approved.' };
     } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
@@ -191,6 +191,11 @@ app.post('/api/admin/submissions/reject', isAdmin, handleRequest(async (req) => 
     const { submissionId } = req.body;
     await db.query("UPDATE submissions SET status = 'rejected' WHERE \"submissionId\" = $1", [submissionId]);
     return { message: 'Submission rejected.' };
+}));
+app.delete('/api/admin/submissions/:submissionId', isAdmin, handleRequest(async (req) => {
+    const { submissionId } = req.params;
+    await db.query('DELETE FROM submissions WHERE "submissionId" = $1', [submissionId]);
+    return { message: 'Submission deleted.' };
 }));
 app.get('/api/admin/activities', isAdmin, handleRequest(async () => (await db.query('SELECT * FROM activities ORDER BY "createdAt" DESC')).rows));
 app.post('/api/admin/activities', isAdmin, handleRequest(async (req) => {
@@ -203,6 +208,17 @@ app.put('/api/admin/activities', isAdmin, handleRequest(async (req) => {
     await db.query('UPDATE activities SET title = $1, description = $2, "imageUrl" = $3 WHERE "activityId" = $4', [title, description, imageUrl, activityId]);
     return { message: 'Activity updated' };
 }));
+app.delete('/api/admin/activities/:activityId', isAdmin, handleRequest(async (req) => {
+    const { activityId } = req.params;
+    const client = await db.getClient();
+    try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM submissions WHERE "activityId" = $1', [activityId]);
+        await client.query('DELETE FROM activities WHERE "activityId" = $1', [activityId]);
+        await client.query('COMMIT');
+        return { message: 'Activity and its submissions deleted.' };
+    } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}));
 app.post('/api/admin/activities/toggle', isAdmin, handleRequest(async (req) => {
     const { activityId } = req.body;
     const activityRes = await db.query('SELECT status FROM activities WHERE "activityId" = $1', [activityId]);
@@ -214,7 +230,7 @@ app.post('/api/admin/activities/toggle', isAdmin, handleRequest(async (req) => {
 // --- Admin User and Badge Management API Routes ---
 app.get('/api/admin/users', isAdmin, handleRequest(async (req) => {
     const searchTerm = req.query.search || '';
-    const query = 'SELECT "lineUserId", "fullName", "employeeId" FROM users WHERE "fullName" ILIKE $1 OR "employeeId" ILIKE $1 ORDER BY "fullName" LIMIT 50';
+    const query = 'SELECT "lineUserId", "fullName", "employeeId", "totalScore" FROM users WHERE "fullName" ILIKE $1 OR "employeeId" ILIKE $1 ORDER BY "fullName" LIMIT 50';
     const res = await db.query(query, [`%${searchTerm}%`]);
     return res.rows;
 }));
@@ -237,6 +253,12 @@ app.post('/api/admin/badges', isAdmin, handleRequest(async (req) => {
     const badgeId = "BADGE" + Date.now();
     await db.query('INSERT INTO badges ("badgeId", "badgeName", description, "imageUrl") VALUES ($1, $2, $3, $4)', [badgeId, badgeName, description, imageUrl]);
     return { message: 'Badge created successfully' };
+}));
+app.put('/api/admin/badges/:badgeId', isAdmin, handleRequest(async (req) => {
+    const { badgeId } = req.params;
+    const { badgeName, description, imageUrl } = req.body;
+    await db.query('UPDATE badges SET "badgeName" = $1, description = $2, "imageUrl" = $3 WHERE "badgeId" = $4', [badgeName, description, imageUrl, badgeId]);
+    return { message: 'Badge updated successfully.' };
 }));
 app.delete('/api/admin/badges/:badgeId', isAdmin, handleRequest(async (req) => {
     const { badgeId } = req.params;

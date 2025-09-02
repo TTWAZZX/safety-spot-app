@@ -510,7 +510,7 @@
                         <div><strong>${sanitizeHTML(c.commenter.fullName)}:</strong> ${sanitizeHTML(c.commentText)}</div>
                     </div>`).join('');
                 
-                const imageHtml = sub.imageUrl ? `<img src="${getFullImageUrl(sub.imageUrl)}" class="card-img-top mb-3" alt="Submission Image">` : '';
+                const imageHtml = sub.imageUrl ? `<img src="${sub.imageUrl}" class="card-img-top mb-3" alt="Submission Image">` : '';
 
                 const card = `
                     <div class="card submission-card shadow-sm mb-3">
@@ -711,6 +711,10 @@
             $(document).on('click', '.btn-toggle-activity', handleToggleActivity);
             $(document).on('click', '.delete-badge-btn', handleDeleteBadge);
             $(document).on('click', '.award-badge-btn', handleAwardBadge);
+            $(document).on('click', '.btn-edit-badge', handleEditBadge);
+            $(document).on('click', '.btn-delete-activity', handleDeleteActivity);
+            $(document).on('click', '.btn-delete-submission', handleDeleteSubmission);
+
         }
 
         function bindAdminTabEventListeners() {
@@ -766,6 +770,11 @@
             const imageFile = $('#image-input')[0].files[0];
             const description = $('#description-input').val().trim();
             
+            // Allow submission without an image
+            if (!description) {
+                return showWarning('กรุณากรอกรายละเอียดจุดเสี่ยง');
+            }
+            
             showLoading('กำลังอัปโหลดและส่งรายงาน...');
             try {
                 let imageUrl = null;
@@ -779,16 +788,18 @@
                     description: description,
                     imageUrl: imageUrl
                 };
+                
+                // Submit report without status, it will be automatically approved on creation
                 await callApi('/api/submissions', payload, 'POST');
                 allModals.submission.hide();
                 $('#submission-form')[0].reset();
                 $('#submission-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
                 showSuccess('รายงานของคุณถูกส่งเรียบร้อย');
                 
-                // Refresh home page after submission
-                const activities = await callApi('/api/activities');
-                displayActivitiesUI(activities, 'latest-activities-list');
-                displayActivitiesUI(activities, 'all-activities-list');
+                // Refresh activity page to show new submission
+                const activityId = $('#activityId-input').val();
+                const activityTitle = $('#activity-title-modal').text();
+                loadAndShowActivityDetails(activityId, activityTitle);
                 
             } catch (error) {
                 showError(error.message);
@@ -913,6 +924,23 @@
                 showError(e.message);
             }
         }
+        
+        async function handleDeleteActivity() {
+            const activityId = $(this).data('id');
+            if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบกิจกรรมนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) {
+                showLoading('กำลังลบกิจกรรม...');
+                try {
+                    await callApi(`/api/admin/activities/${activityId}`, { adminUserId: currentUser.lineUserId }, 'DELETE');
+                    showSuccess('ลบกิจกรรมเรียบร้อย');
+                    loadAllActivitiesForAdmin();
+                    const activities = await callApi('/api/activities');
+                    displayActivitiesUI(activities, 'latest-activities-list');
+                    displayActivitiesUI(activities, 'all-activities-list');
+                } catch (e) {
+                    showError(e.message);
+                }
+            }
+        }
 
         async function handleApprovalAction() {
             const btn = $(this);
@@ -960,6 +988,23 @@
                 btn.prop('disabled', false);
             }
         }
+
+        async function handleDeleteSubmission() {
+            const submissionId = $(this).data('id');
+            if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรายงานนี้?')) {
+                showLoading('กำลังลบรายงาน...');
+                try {
+                    await callApi(`/api/admin/submissions/${submissionId}`, { adminUserId: currentUser.lineUserId }, 'DELETE');
+                    showSuccess('ลบรายงานเรียบร้อย');
+                    
+                    const activityId = $('.btn-join-from-detail').data('activity-id');
+                    const activityTitle = $('#activity-detail-title').text();
+                    loadAndShowActivityDetails(activityId, activityTitle);
+                } catch (e) {
+                    showError(e.message);
+                }
+            }
+        }
         
         // --- NEW ADMIN FUNCTIONS ---
         function handleManageBadges() {
@@ -981,16 +1026,24 @@
             const payload = {
                 badgeName: $('#badge-name-input').val(),
                 description: $('#badge-desc-input').val(),
+                badgeId: $('#badge-id-input').val()
             };
             
             try {
+                let finalImageUrl = null;
                 if (imageFile) {
-                    payload.imageUrl = await uploadImage(imageFile);
+                    finalImageUrl = await uploadImage(imageFile);
+                } else {
+                    finalImageUrl = $('#badge-image-url-input').val(); // Use existing URL if no new file
                 }
+                payload.imageUrl = finalImageUrl;
 
-                await callApi('/api/admin/badges', payload, 'POST');
+                const method = payload.badgeId ? 'PUT' : 'POST';
+                const url = payload.badgeId ? `/api/admin/badges/${payload.badgeId}` : '/api/admin/badges';
+                await callApi(url, payload, method);
+                
                 allModals['badge-form'].hide();
-                showSuccess('เพิ่มป้ายรางวัลเรียบร้อย');
+                showSuccess('บันทึกป้ายรางวัลเรียบร้อย');
                 loadBadgesForAdmin();
             } catch (e) {
                 showError(e.message);
@@ -1011,6 +1064,23 @@
             }
         }
 
+        function handleEditBadge() {
+            const badgeId = $(this).data('badge-id');
+            const badgeName = $(this).data('badge-name');
+            const badgeDesc = $(this).data('badge-desc');
+            const badgeUrl = $(this).data('badge-url');
+
+            $('#badge-form-title').text('แก้ไขป้ายรางวัล');
+            $('#badge-form')[0].reset();
+            $('#badge-id-input').val(badgeId);
+            $('#badge-name-input').val(badgeName);
+            $('#badge-desc-input').val(badgeDesc);
+            $('#badge-image-url-input').val(badgeUrl);
+            $('#badge-image-preview').attr('src', badgeUrl);
+
+            allModals['badge-form'].show();
+        }
+
         async function handleAwardBadge() {
             const btn = $(this);
             const userId = btn.data('user-id');
@@ -1019,7 +1089,7 @@
             btn.prop('disabled', true);
             try {
                 await callApi('/api/admin/award-badge', { lineUserId: userId, badgeId: badgeId, adminUserId: currentUser.lineUserId }, 'POST');
-                btn.text('มอบแล้ว').addClass('btn-success').removeClass('btn-outline-primary');
+                btn.text('มอบแล้ว').addClass('btn-success').removeClass('btn-outline-primary').prop('disabled', true);
                 showSuccess('มอบป้ายรางวัลเรียบร้อย');
             } catch (e) {
                 showError(e.message);
@@ -1067,7 +1137,7 @@
                     $('#no-reports-message').show();
                 } else {
                     subs.forEach(s => {
-                        const imageUrl = s.imageUrl ? `<a href="${s.imageUrl}" target="_blank">ดูรูป</a>` : 'ไม่มี'; // Use s.imageUrl directly from Cloudinary
+                        const imageUrl = s.imageUrl ? `<a href="${s.imageUrl}" target="_blank">ดูรูป</a>` : 'ไม่มี';
                         const row = `
                             <tr id="row-${s.submissionId}">
                                 <td><div class="fw-bold">${sanitizeHTML(s.submitter.fullName)}</div><small class="text-muted">${new Date(s.createdAt).toLocaleString()}</small></td>
@@ -1106,7 +1176,7 @@
                             <div class="ms-auto">
                                 <button class="btn btn-sm btn-primary btn-edit-activity me-1" data-activity-data='${activityData}'>Edit</button>
                                 <button class="btn btn-sm ${btnClass} btn-toggle-activity me-1" data-id="${a.activityId}">${btnText}</button>
-                                <button class="btn btn-sm btn-danger btn-delete-activity" data-id="${a.activityId}">Delete</button>
+                                <button class="btn btn-sm btn-danger btn-delete-activity" data-id="${a.activityId}"><i class="fas fa-trash-alt"></i></button>
                             </div>
                         </div></div>`;
                     list.append(html);
@@ -1260,7 +1330,7 @@
                 resultsDiv.html('<p class="text-danger text-center">เกิดข้อผิดพลาดในการค้นหาผู้ใช้</p>');
             }
         }
-
+        
         // ===============================================================
         //  UTILITY FUNCTIONS
         // ===============================================================
