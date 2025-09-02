@@ -118,7 +118,9 @@ app.get('/api/user/badges', handleRequest(async (req) => {
 }));
 app.get('/api/submissions', handleRequest(async (req) => {
     const { activityId, lineUserId } = req.query;
-    const sql = `SELECT s."submissionId", s.description, s."imageUrl", s."createdAt", s.points, u."fullName" as "submitterFullName", u."pictureUrl" as "submitterPictureUrl", (SELECT COUNT(*) FROM likes WHERE "submissionId" = s."submissionId")::int as likes FROM submissions s JOIN users u ON s."lineUserId" = u."lineUserId" WHERE s."activityId" = $1 AND s.status = 'approved' ORDER BY s."createdAt" DESC;`;
+    // ===== 👇 จุดที่แก้ไขอยู่ตรงนี้ครับ 👇 =====
+    const sql = `SELECT s."submissionId", s.description, s."imageUrl", s."createdAt", s.points, u."fullName" as "submitterFullName", u."pictureUrl" as "submitterPictureUrl", (SELECT COUNT(*) FROM likes WHERE "submissionId" = s."submissionId")::int as likes FROM submissions s JOIN users u ON s."lineUserId" = u."lineUserId" WHERE s."activityId" = $1 AND s.status IN ('approved', 'pending') ORDER BY s."createdAt" DESC;`;
+    // ===== 👆 จุดที่แก้ไขอยู่ตรงนี้ครับ 👆 =====
     const submissionsRes = await db.query(sql, [activityId]);
     const likesRes = await db.query('SELECT "submissionId" FROM likes WHERE "lineUserId" = $1', [lineUserId]);
     const userLikedIds = new Set(likesRes.rows.map(l => l.submissionId));
