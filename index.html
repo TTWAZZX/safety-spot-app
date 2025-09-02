@@ -380,8 +380,8 @@
         // ===============================================================
         //  API CALLER & UPLOADER
         // ===============================================================
-        async function callApi(endpoint, payload = {}, method = 'GET') {
-            const url = API_BASE_URL + endpoint; // แก้ไขตรงนี้
+async function callApi(endpoint, payload = {}, method = 'GET') {
+            let url = API_BASE_URL + endpoint;
             const options = {
                 method,
                 headers: { 'Content-Type': 'application/json' },
@@ -390,11 +390,10 @@
                  options.headers['X-Admin-User-ID'] = currentUser.lineUserId;
             }
 
-            if (method.toUpperCase() === 'GET') {
+            if (method.toUpperCase() === 'GET' && Object.keys(payload).length > 0) {
                 const params = new URLSearchParams(payload).toString();
                 url += '?' + params;
-                options.body = undefined;
-            } else {
+            } else if (method.toUpperCase() !== 'GET') {
                 options.body = JSON.stringify(payload);
             }
 
