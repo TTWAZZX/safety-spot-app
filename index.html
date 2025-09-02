@@ -738,7 +738,7 @@
             $(document).on('click', '.btn-delete-submission', handleDeleteSubmission);
         }
 
-        function bindAdminTabEventListeners() {
+function bindAdminTabEventListeners() {
             $('.admin-tab-btn').on('click', function(e) {
                 e.preventDefault();
                 $('.admin-tab-btn').removeClass('active');
@@ -746,13 +746,26 @@
                 $('.admin-tab-content').hide();
                 const tab = $(this).data('tab');
                 $('#' + tab + 'Tab').show();
-                if (tab === 'manageBadges') loadBadgesForAdmin();
-                else if (tab === 'manageUsers') loadUsersForAdmin();
+
+                if (tab === 'manageBadges') {
+                    loadBadgesForAdmin();
+                } else if (tab === 'manageUsers') {
+                    // โหลดผู้ใช้เมื่อเปิดแท็บนี้ หรือค้นหาหากมีข้อความในช่องค้นหาอยู่แล้ว
+                    const searchQuery = $('#user-search-input').val();
+                    if (searchQuery.length > 0) {
+                        searchUsersForAdmin(searchQuery);
+                    } else {
+                        loadUsersForAdmin();
+                    }
+                }
             });
             $('#user-search-input').on('input', function() {
                 const query = $(this).val();
-                if (query.length > 2) searchUsersForAdmin(query);
-                else if (query.length === 0) loadUsersForAdmin();
+                if (query.length > 2) { // เริ่มค้นหาเมื่อมีตัวอักษร 3 ตัวขึ้นไป
+                    searchUsersForAdmin(query);
+                } else if (query.length === 0) { // หากลบข้อความออกหมด ให้แสดงผู้ใช้ทั้งหมดใหม่
+                    loadUsersForAdmin();
+                }
             });
         }
 
@@ -1003,7 +1016,12 @@
                 }
             }
         }
-        function handleManageBadges() { allModals['admin-manage-badges'].show(); loadBadgesForAdmin(); }
+        function handleManageBadges() {
+            allModals['admin-manage-badges'].show();
+            $('.admin-tab-btn[data-tab="manageBadges"]').addClass('active').siblings().removeClass('active');
+            $('#manageBadgesTab').show().siblings('.admin-tab-content').hide();
+            loadBadgesForAdmin();
+        }
         function handleAddBadge() {
             $('#badge-form-title').text('เพิ่มป้ายรางวัลใหม่');
             $('#badge-form')[0].reset();
