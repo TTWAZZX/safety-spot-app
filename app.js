@@ -102,8 +102,8 @@ async function callApi(endpoint, payload = {}, method = 'GET') {
     // +++ เพิ่มส่วนนี้เข้ามาแทน +++
     // เพิ่ม lineUserId เข้าไปใน payload ของข้อมูลเสมอ
     // เพื่อให้ Server ใช้ยืนยันตัวตนของผู้ส่ง
-    if (currentUser.lineUserId) {
-        payload.lineUserId = currentUser.lineUserId;
+    if (AppState.currentUser && AppState.currentUser.lineUserId) { // <--- แก้ไขที่นี่
+        payload.lineUserId = AppState.currentUser.lineUserId;
     }
     // +++++++++++++++++++++++++++++
 
