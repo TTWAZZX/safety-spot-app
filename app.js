@@ -37,7 +37,7 @@ $(document).ready(function() {
 function initializeAllModals() {
     const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form'];
     modalIds.forEach(id => {
-        allModals[id] = new bootstrap.Modal(document.getElementById(`${id}-modal`));
+        AppState.allModals[id] = new bootstrap.Modal(document.getElementById(`${id}-modal`)); // <--- แก้ไขที่นี่
     });
 }
 
