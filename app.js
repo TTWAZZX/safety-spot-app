@@ -940,7 +940,7 @@ async function loadBadgesForAdmin() {
             badges.forEach(b => {
                 const html = `
                     <div class="col-6 col-md-4 col-lg-3 mb-3">
-                        <div class="card h-100 shadow-sm text-center">
+                        <div class="card h-100 shadow-sm text-center admin-badge-card">
                             <div class="card-body">
                                 <img src="${getFullImageUrl(b.imageUrl)}" class="badge-icon mb-2" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';" alt="${sanitizeHTML(b.badgeName)}">
                                 <h6 class="fw-bold mb-1">${sanitizeHTML(b.badgeName)}</h6>

@@ -142,15 +142,41 @@ body {
 /* =================================
    Admin - Manage Badges
    ================================= */
-/* highlight-start */
-/* ทำให้การ์ดในหน้าจัดการป้ายรางวัล responsive */
-#badges-list .col-6 {
-    /* บนหน้าจอเล็ก ให้แสดง 2 คอลัมน์ */
-    flex: 0 0 auto;
-    width: 50%;
-}
-/* highlight-end */
 
+/* ทำให้การ์ดในหน้าจัดการป้ายรางวัล responsive */
+#badges-list .admin-badge-card .card-body {
+    padding: 0.75rem; /* ลด padding ภายในการ์ด */
+}
+
+/* ย่อขนาดรูปภาพป้ายรางวัลในหน้า admin */
+#badges-list .admin-badge-card .badge-icon {
+    width: 80px;  /* กำหนดขนาดใหม่ให้เล็กลง */
+    height: 80px;
+    object-fit: cover; /* ทำให้รูปภาพพอดีกับกรอบ */
+}
+
+/* ย่อขนาดตัวอักษรและปุ่ม */
+#badges-list .admin-badge-card h6 {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem !important;
+}
+#badges-list .admin-badge-card small {
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem !important;
+}
+#badges-list .admin-badge-card .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+/* จัดการ Layout ของ Grid บนหน้าจอต่างๆ */
+@media (max-width: 576px) {
+    #badges-list .col-6 {
+        /* บนหน้าจอเล็กมาก ให้แสดง 2 คอลัมน์ */
+        flex: 0 0 auto;
+        width: 50%;
+    }
+}
 
 /* =================================
    Submission Cards (in Detail Page)
