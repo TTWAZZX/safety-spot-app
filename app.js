@@ -8,7 +8,6 @@ const LIFF_ID = "2007053300-9xLKdwZp";
 const AppState = {
     lineProfile: null,
     currentUser: null,
-    // ย้ายการประกาศตัวแปร allModals และ reportsChart มาไว้ที่นี่
     allModals: {},
     reportsChart: null
 };
@@ -38,7 +37,6 @@ $(document).ready(function() {
 function initializeAllModals() {
     const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form'];
     modalIds.forEach(id => {
-        // แก้ไขการเข้าถึง AppState.allModals
         AppState.allModals[id] = new bootstrap.Modal(document.getElementById(`${id}-modal`));
     });
 }
@@ -95,16 +93,10 @@ async function callApi(endpoint, payload = {}, method = 'GET') {
         headers: { 'Content-Type': 'application/json' },
     };
 
-    // --- ลบส่วนที่ส่ง Header ที่ไม่ปลอดภัยออก ---
-    // if (currentUser.lineUserId) {
-    //     options.headers['X-Admin-User-ID'] = currentUser.lineUserId;
-    // }
-    // -----------------------------------------
-
     // +++ เพิ่มส่วนนี้เข้ามาแทน +++
     // เพิ่ม lineUserId เข้าไปใน payload ของข้อมูลเสมอ
     // เพื่อให้ Server ใช้ยืนยันตัวตนของผู้ส่ง
-    if (AppState.currentUser && AppState.currentUser.lineUserId) { // <--- แก้ไขที่นี่
+    if (AppState.currentUser && AppState.currentUser.lineUserId) {
         payload.lineUserId = AppState.currentUser.lineUserId;
     }
     // +++++++++++++++++++++++++++++
@@ -293,10 +285,10 @@ function renderSubmissions(submissions) {
 
 function renderAdminChart(chartData) {
     const ctx = document.getElementById('reportsChart').getContext('2d');
-    if(reportsChart) {
-        reportsChart.destroy();
+    if(AppState.reportsChart) {
+        AppState.reportsChart.destroy();
     }
-    reportsChart = new Chart(ctx, {
+    AppState.reportsChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: chartData.labels,
@@ -331,7 +323,7 @@ async function loadAndShowActivityDetails(activityId, activityTitle) {
     const container = $('#submissions-container');
     $('#submissions-loading').show();
     container.empty();
-    allModals['activity-detail'].show();
+    AppState.allModals['activity-detail'].show();
     try {
         const submissions = await callApi('/api/submissions', { activityId, lineUserId: lineProfile.userId });
         renderSubmissions(submissions);
@@ -533,10 +525,7 @@ async function handleSubmitReport(e) {
         if (imageFile) { imageUrl = await uploadImage(imageFile); }
         const payload = { lineUserId: lineProfile.userId, activityId: $('#activityId-input').val(), description: description, imageUrl: imageUrl };
         await callApi('/api/submissions', payload, 'POST');
-        
-        // แก้ไข: ใช้ AppState เพื่อเข้าถึง allModals
-        AppState.allModals.submission.hide(); 
-
+        AppState.allModals.submission.hide();
         $('#submission-form')[0].reset();
         $('#submission-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
         showSuccess('รายงานของคุณถูกส่งเพื่อรอการตรวจสอบ');
@@ -554,7 +543,7 @@ function handleJoinActivity() {
     const activityTitle = $(this).data('activity-title');
     $('#activityId-input').val(activityId);
     $('#activity-title-modal').text(activityTitle);
-    allModals['submission'].show();
+    AppState.allModals['submission'].show();
 }
 
 async function handleLike(e) {
@@ -609,15 +598,15 @@ function handleImagePreview(input, previewSelector) {
 }
 
 // --- Admin Handlers ---
-function handleViewStats() { loadAdminStats(); allModals['admin-stats'].show(); }
-function handleManageReports() { loadPendingSubmissions(); allModals['admin-reports'].show(); }
-function handleManageActivities() { loadAllActivitiesForAdmin(); allModals['admin-activities'].show(); }
+function handleViewStats() { loadAdminStats(); AppState.allModals['admin-stats'].show(); }
+function handleManageReports() { loadPendingSubmissions(); AppState.allModals['admin-reports'].show(); }
+function handleManageActivities() { loadAllActivitiesForAdmin(); AppState.allModals['admin-activities'].show(); }
 function handleCreateActivity() {
     $('#activity-form-title').text('สร้างกิจกรรมใหม่');
     $('#activity-form')[0].reset();
     $('#form-activity-id').val('');
     $('#activity-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
-    allModals['activity-form'].show();
+    AppState.allModals['activity-form'].show();
 }
 async function handleSaveActivity(e) {
     e.preventDefault();
@@ -642,7 +631,7 @@ async function handleSaveActivity(e) {
         const method = isUpdate ? 'PUT' : 'POST';
         await callApi('/api/admin/activities', payload, method);
         
-        allModals['activity-form'].hide();
+        AppState.allModals['activity-form'].hide();
         showSuccess('บันทึกกิจกรรมเรียบร้อย');
 
         // เรียก API แค่ครั้งเดียว แล้วเก็บข้อมูลไว้ในตัวแปร
@@ -721,7 +710,7 @@ async function handleEditActivity() {
     $('#form-activity-desc').val(data.description);
     $('#form-activity-image-url').val(data.imageUrl);
     $('#activity-image-preview').attr('src', getFullImageUrl(data.imageUrl));
-    allModals['activity-form'].show();
+    AppState.allModals['activity-form'].show();
 }
 async function handleToggleActivity() {
     const btn = $(this);
@@ -762,7 +751,7 @@ async function handleDeleteSubmission() {
     }
 }
 function handleManageBadges() {
-    allModals['admin-manage-badges'].show();
+    AppState.allModals['admin-manage-badges'].show();
     $('.admin-tab-btn[data-tab="manageBadges"]').addClass('active').siblings().removeClass('active');
     $('#manageBadgesTab').show().siblings('.admin-tab-content').hide();
     loadBadgesForAdmin();
@@ -771,7 +760,7 @@ function handleAddBadge() {
     $('#badge-form-title').text('เพิ่มป้ายรางวัลใหม่');
     $('#badge-form')[0].reset();
     $('#badge-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
-    allModals['badge-form'].show();
+    AppState.allModals['badge-form'].show();
 }
 async function handleSaveBadge(e) {
     e.preventDefault();
@@ -794,7 +783,7 @@ async function handleSaveBadge(e) {
         const url = payload.badgeId ? `/api/admin/badges/${payload.badgeId}` : '/api/admin/badges';
         await callApi(url, payload, method);
         
-        allModals['badge-form'].hide();
+        AppState.allModals['badge-form'].hide();
         showSuccess('บันทึกป้ายรางวัลเรียบร้อย');
         loadBadgesForAdmin();
     } catch (e) {
@@ -838,7 +827,7 @@ function handleEditBadge() {
     $('#badge-image-url-input').val(badgeUrl);
     $('#badge-image-preview').attr('src', badgeUrl);
 
-    allModals['badge-form'].show();
+    AppState.allModals['badge-form'].show();
 }
 async function handleAwardBadge() {
     const btn = $(this);
@@ -1098,4 +1087,3 @@ function sanitizeHTML(str) {
     temp.textContent = str;
     return temp.innerHTML;
 }
-
