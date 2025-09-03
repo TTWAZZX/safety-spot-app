@@ -14,6 +14,11 @@ let reportsChart;
 //  INITIALIZATION
 // ===============================================================
 $(document).ready(function() {
+    // highlight-start
+    // เปิดใช้งาน Bootstrap Tooltips สำหรับทุก element ที่มี attribute title
+    $('body').tooltip({ selector: '[title]' });
+    // highlight-end
+
     initializeAllModals();
     initializeApp();
     bindStaticEventListeners();
@@ -162,15 +167,24 @@ function displayActivitiesUI(activities, listId) {
                 <div class="card-body">
                     <h5 class="card-title fw-bold">${sanitizeHTML(act.title)}</h5>
                     <p class="card-text text-muted small">${sanitizeHTML(act.description)}</p>
-                    <div class="d-flex justify-content-between gap-2 mt-3">
-                        <button class="btn btn-info btn-view-activity-image w-50 py-2 me-2" 
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <button class="btn btn-info btn-view-activity-image" 
                                 data-image-full-url="${getFullImageUrl(act.imageUrl)}" 
                                 ${act.imageUrl ? '' : 'disabled'}
-                                title="${act.imageUrl ? 'ดูรูปภาพกิจกรรม' : 'ไม่มีรูปภาพกิจกรรม'}">
-                            <i class="fas fa-image me-1"></i> ดูรูปภาพ
+                                title="ดูรูปภาพกิจกรรม">
+                            <i class="fas fa-image"></i>
                         </button>
-                        <button class="btn btn-outline-secondary btn-view-report w-50 py-2" data-activity-id="${act.activityId}" data-activity-title="${sanitizeHTML(act.title)}">
-                            <i class="fas fa-eye me-1"></i> ดูรายงาน
+                        <button class="btn btn-outline-secondary btn-view-report" 
+                                data-activity-id="${act.activityId}" 
+                                data-activity-title="${sanitizeHTML(act.title)}" 
+                                title="ดูรายงานทั้งหมด">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-primary btn-join-activity" 
+                                data-activity-id="${act.activityId}" 
+                                data-activity-title="${sanitizeHTML(act.title)}" 
+                                title="เข้าร่วมกิจกรรม">
+                            <i class="fas fa-plus-circle"></i>
                         </button>
                     </div>
                     <div class="d-flex justify-content-center mt-2">
