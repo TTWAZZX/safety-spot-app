@@ -163,10 +163,18 @@ function displayActivitiesUI(activities, listId) {
                     <h5 class="card-title fw-bold">${sanitizeHTML(act.title)}</h5>
                     <p class="card-text text-muted small">${sanitizeHTML(act.description)}</p>
                     <div class="d-flex justify-content-between gap-2 mt-3">
+                        <button class="btn btn-info btn-view-activity-image w-50 py-2 me-2" 
+                                data-image-full-url="${getFullImageUrl(act.imageUrl)}" 
+                                ${act.imageUrl ? '' : 'disabled'}
+                                title="${act.imageUrl ? 'ดูรูปภาพกิจกรรม' : 'ไม่มีรูปภาพกิจกรรม'}">
+                            <i class="fas fa-image me-1"></i> ดูรูปภาพ
+                        </button>
                         <button class="btn btn-outline-secondary btn-view-report w-50 py-2" data-activity-id="${act.activityId}" data-activity-title="${sanitizeHTML(act.title)}">
                             <i class="fas fa-eye me-1"></i> ดูรายงาน
                         </button>
-                        <button class="btn btn-primary btn-join-activity w-50 py-2" data-activity-id="${act.activityId}" data-activity-title="${sanitizeHTML(act.title)}">
+                    </div>
+                    <div class="d-flex justify-content-center mt-2">
+                        <button class="btn btn-primary btn-join-activity w-100 py-2" data-activity-id="${act.activityId}" data-activity-title="${sanitizeHTML(act.title)}">
                             <i class="fas fa-plus-circle me-1"></i> เข้าร่วม
                         </button>
                     </div>
@@ -369,8 +377,6 @@ async function loadUserBadges() {
 // ===============================================================
 //  EVENT LISTENERS
 // ===============================================================
-// ===== highlight-start =====
-// แก้ไขโดยการรวมฟังก์ชันที่ซ้ำซ้อน และเพิ่ม Event Listener สำหรับปุ่มดูรูปภาพ
 function bindStaticEventListeners() {
     $('.nav-link').on('click', function(e) {
         e.preventDefault();
@@ -401,8 +407,9 @@ function bindStaticEventListeners() {
     $('#form-activity-image-input').on('change', function() { handleImagePreview(this, '#activity-image-preview'); });
     $('#badge-image-input').on('change', function() { handleImagePreview(this, '#badge-image-preview'); });
 
-    // Event listener สำหรับปุ่มดูรูปภาพตัวใหม่
-    $(document).on('click', '.view-image-btn', function(e) {
+    // highlight-start
+    // ===== แก้ไข: รวม Event Listener สำหรับปุ่มดูรูปภาพทั้งหมดไว้ในที่เดียว =====
+    $(document).on('click', '.view-image-btn, .btn-view-activity-image', function(e) {
         e.preventDefault(); // ป้องกันการเลื่อนหน้าจอ
         const imageUrl = $(this).data('image-full-url');
         if (imageUrl) {
@@ -415,8 +422,9 @@ function bindStaticEventListeners() {
             imageViewerModal.show();
         }
     });
+    // ===== สิ้นสุดส่วนที่แก้ไข =====
+    // highlight-end
 }
-// ===== highlight-end =====
 
 function bindAdminEventListeners() {
     $('#view-stats-btn').on('click', handleViewStats);
