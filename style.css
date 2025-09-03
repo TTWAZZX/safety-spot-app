@@ -72,8 +72,6 @@ body {
 
 .btn-outline-secondary {
     border-radius: 12px;
-    font-weight: 500;
-    padding: 10px 16px;
 }
 .btn-info {
     border-radius: 12px;
@@ -93,6 +91,48 @@ body {
 .bottom-nav .nav-link.active { 
     color: var(--line-green); 
     font-weight: 600;
+}
+
+/* =================================
+   Profile Page & Badges
+   ================================= */
+.profile-card {
+    background-color: var(--card-white);
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* CSS Grid สำหรับจัดเรียงป้ายรางวัล */
+.badges-grid {
+    display: grid;
+    /* สร้างคอลัมน์อัตโนมัติ โดยแต่ละคอลัมน์กว้างอย่างน้อย 80px */
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 1.5rem; /* เพิ่มระยะห่างระหว่างป้าย */
+    justify-items: center;
+}
+
+.badge-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.badge-item .badge-icon {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 0.5rem;
+    transition: transform 0.2s ease-in-out;
+}
+
+.badge-item:hover .badge-icon {
+    transform: scale(1.1);
+}
+
+.badge-item .small {
+    font-size: 12px;
+    color: var(--text-medium-gray);
+    line-height: 1.2;
 }
 
 /* =================================
@@ -151,3 +191,4 @@ body {
 .progress-bar {
     background-color: var(--line-green);
 }
+

@@ -31,6 +31,7 @@ $(document).ready(function() {
     bindAdminTabEventListeners();
 });
 
+
 function initializeAllModals() {
     const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form'];
     modalIds.forEach(id => {
@@ -152,6 +153,8 @@ function getFullImageUrl(path) {
 }
 
 function updateUserInfoUI(user) {
+    $('#user-header').addClass('user-header-card');
+
     $('#user-profile-pic, #profile-page-pic').attr('src', user.pictureUrl || 'https://placehold.co/80x80');
     $('#user-display-name, #profile-page-name').text(user.fullName);
     $('#user-employee-id').text(`รหัส: ${user.employeeId}`);
@@ -168,19 +171,19 @@ function displayActivitiesUI(activities, listId) {
     }
     activities.forEach(act => {
         const cardHtml = `
-            <div class="card shadow-sm mb-3">
-                <img src="${getFullImageUrl(act.imageUrl)}" class="card-img-top" style="height:150px;object-fit:cover;" onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
+            <div class="card activity-card mb-3">
+                <img src="${getFullImageUrl(act.imageUrl)}" class="activity-card-img" onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
                 <div class="card-body">
-                    <h5 class="card-title fw-bold">${sanitizeHTML(act.title)}</h5>
+                    <h5 class="card-title">${sanitizeHTML(act.title)}</h5>
                     <p class="card-text text-muted small">${sanitizeHTML(act.description)}</p>
-                    <div class="d-flex justify-content-end gap-2 mt-3">
-                        <button class="btn btn-info btn-view-activity-image" 
+                    <div class="d-flex justify-content-end align-items-center gap-2 mt-3">
+                        <button class="btn btn-sm btn-outline-secondary btn-view-activity-image" 
                                 data-image-full-url="${getFullImageUrl(act.imageUrl)}" 
                                 ${act.imageUrl ? '' : 'disabled'}
                                 data-bs-toggle="tooltip" title="ดูรูปภาพกิจกรรม">
                             <i class="fas fa-image"></i>
                         </button>
-                        <button class="btn btn-outline-secondary btn-view-report" 
+                        <button class="btn btn-sm btn-outline-secondary btn-view-report" 
                                 data-activity-id="${act.activityId}" 
                                 data-activity-title="${sanitizeHTML(act.title)}" 
                                 data-bs-toggle="tooltip" title="ดูรายงานทั้งหมด">
@@ -190,11 +193,6 @@ function displayActivitiesUI(activities, listId) {
                                 data-activity-id="${act.activityId}" 
                                 data-activity-title="${sanitizeHTML(act.title)}" 
                                 data-bs-toggle="tooltip" title="เข้าร่วมกิจกรรม">
-                            <i class="fas fa-plus-circle"></i>
-                        </button>
-                    </div>
-                    <div class="d-flex justify-content-center mt-2">
-                        <button class="btn btn-primary btn-join-activity w-100 py-2" data-activity-id="${act.activityId}" data-activity-title="${sanitizeHTML(act.title)}">
                             <i class="fas fa-plus-circle me-1"></i> เข้าร่วม
                         </button>
                     </div>
@@ -204,16 +202,15 @@ function displayActivitiesUI(activities, listId) {
     });
 }
 
-// NEW, REDESIGNED submission rendering function
+
 function renderSubmissions(submissions) {
     const container = $('#submissions-container');
     container.empty();
     if (submissions.length === 0) { 
-        //...
+        container.html('<p class="text-center text-muted mt-5">ยังไม่มีใครส่งรายงานสำหรับกิจกรรมนี้<br>มาเป็นคนแรกกันเถอะ!</p>'); 
         return; 
     }
     submissions.forEach(sub => {
-        console.log("Checking submission object:", sub); // <--- เพิ่มบรรทัดนี้
         const likedClass = sub.didLike ? 'liked' : '';
         const imageHtml = sub.imageUrl ? `
             <img src="${sub.imageUrl}" class="card-img-top submission-image" alt="Submission Image">
@@ -290,8 +287,8 @@ function renderAdminChart(chartData) {
             datasets: [{
                 label: 'จำนวนรายงาน',
                 data: chartData.data,
-                backgroundColor: 'rgba(40, 167, 69, 0.6)',
-                borderColor: 'rgba(40, 167, 69, 1)',
+                backgroundColor: 'rgba(6, 199, 85, 0.6)',
+                borderColor: 'rgba(6, 199, 85, 1)',
                 borderWidth: 1
             }]
         },
@@ -312,7 +309,7 @@ function renderAdminChart(chartData) {
 // ===============================================================
 async function loadAndShowActivityDetails(activityId, activityTitle) {
     const modal = $('#activity-detail-modal');
-    modal.data('current-activity-id', activityId); // Store activity ID for later use
+    modal.data('current-activity-id', activityId);
     $('#activity-detail-title').text(activityTitle);
     
     const container = $('#submissions-container');
@@ -351,7 +348,7 @@ async function loadLeaderboard() {
                     <div class="flex-grow-1">
                         <div class="fw-bold">${sanitizeHTML(user.fullName)}</div>
                     </div>
-                    <div class="fw-bold" style="color: var(--safety-green);">${user.totalScore} คะแนน</div>
+                    <div class="fw-bold" style="color: var(--line-green);">${user.totalScore} คะแนน</div>
                 </div>`;
             list.append(itemHtml);
         });
@@ -361,6 +358,7 @@ async function loadLeaderboard() {
     }
 }
 
+// แก้ไข: ปรับปรุงฟังก์ชันให้สร้าง HTML สำหรับ CSS Grid
 async function loadUserBadges() {
     const container = $('#badges-container');
     const progressBar = $('#progress-bar');
@@ -375,11 +373,16 @@ async function loadUserBadges() {
             badges.forEach(b => {
                 const lockClass = b.isEarned ? '' : 'locked';
                 const html = `
-                    <div class="text-center" title="${sanitizeHTML(b.name)}: ${sanitizeHTML(b.desc)}">
+                    <div class="badge-item" data-bs-toggle="tooltip" title="${sanitizeHTML(b.name)}: ${sanitizeHTML(b.desc)}">
                         <img src="${getFullImageUrl(b.img)}" class="badge-icon ${lockClass}" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';">
                         <div class="small">${sanitizeHTML(b.name)}</div>
                     </div>`;
                 container.append(html);
+            });
+            // Re-initialize tooltips for new elements
+            const tooltipTriggerList = [].slice.call(container[0].querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
             });
         }
         
@@ -393,6 +396,7 @@ async function loadUserBadges() {
         container.html('<p class="text-danger">ไม่สามารถโหลดป้ายรางวัลได้</p>');
     }
 }
+
 
 // ===============================================================
 //  EVENT LISTENERS
@@ -427,23 +431,17 @@ function bindStaticEventListeners() {
     $('#form-activity-image-input').on('change', function() { handleImagePreview(this, '#activity-image-preview'); });
     $('#badge-image-input').on('change', function() { handleImagePreview(this, '#badge-image-preview'); });
 
-    // highlight-start
-    // ===== แก้ไข: รวม Event Listener สำหรับปุ่มดูรูปภาพทั้งหมดไว้ในที่เดียว =====
+    // รวม Event Listener สำหรับปุ่มดูรูปภาพทั้งหมดไว้ในที่เดียว
     $(document).on('click', '.view-image-btn, .btn-view-activity-image', function(e) {
-        e.preventDefault(); // ป้องกันการเลื่อนหน้าจอ
+        e.preventDefault(); 
         const imageUrl = $(this).data('image-full-url');
         if (imageUrl) {
-            // นำ URL ไปใส่ใน Modal
             $('#imageViewerContent').attr('src', imageUrl);
             $('#downloadImageBtn').attr('href', imageUrl);
-
-            // สั่งให้ Modal แสดงผลด้วย JavaScript โดยตรง
             const imageViewerModal = new bootstrap.Modal(document.getElementById('imageViewerModal'));
             imageViewerModal.show();
         }
     });
-    // ===== สิ้นสุดส่วนที่แก้ไข =====
-    // highlight-end
 }
 
 function bindAdminEventListeners() {
@@ -527,14 +525,12 @@ async function handleSubmitReport(e) {
 }
 
 function handleViewReport() {
-    console.log("handleViewReport clicked!");
     const activityId = $(this).data('activity-id');
     const activityTitle = $(this).data('activity-title');
     loadAndShowActivityDetails(activityId, activityTitle);
 }
 
 function handleJoinActivity() {
-    console.log("handleJoinActivity clicked!");
     const activityId = $(this).data('activity-id');
     const activityTitle = $(this).data('activity-title');
     $('#activityId-input').val(activityId);
@@ -546,7 +542,7 @@ async function handleLike(e) {
     e.preventDefault();
     const btn = $(this);
     const submissionId = btn.data('submission-id');
-    btn.css('pointer-events', 'none'); // Disable click
+    btn.css('pointer-events', 'none'); 
     try {
         const result = await callApi('/api/submissions/like', { submissionId, lineUserId: lineProfile.userId }, 'POST');
         const countSpan = btn.find('.like-count');
@@ -555,11 +551,10 @@ async function handleLike(e) {
     } catch (error) {
         console.error("Like failed:", error);
     } finally {
-        btn.css('pointer-events', 'auto'); // Re-enable click
+        btn.css('pointer-events', 'auto'); 
     }
 }
 
-// UPDATED comment handler
 async function handleComment(e) {
     e.preventDefault();
     const btn = $(this);
@@ -594,7 +589,7 @@ function handleImagePreview(input, previewSelector) {
     }
 }
 
-// --- Admin Handlers (abbreviated for brevity, no changes needed here) ---
+// --- Admin Handlers ---
 function handleViewStats() { loadAdminStats(); allModals['admin-stats'].show(); }
 function handleManageReports() { loadPendingSubmissions(); allModals['admin-reports'].show(); }
 function handleManageActivities() { loadAllActivitiesForAdmin(); allModals['admin-activities'].show(); }
@@ -830,7 +825,7 @@ async function handleAwardBadge() {
         text: `คุณต้องการมอบป้าย "${btn.text()}" ให้กับคุณ ${userName} ใช่หรือไม่?`,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonColor: 'var(--safety-green)',
+        confirmButtonColor: 'var(--line-green)',
         cancelButtonColor: '#6c757d',
         confirmButtonText: 'ยืนยัน',
         cancelButtonText: 'ยกเลิก'
@@ -978,8 +973,8 @@ async function loadUsersForAdmin() {
     resultsContainer.html('<div class="text-center my-4"><div class="spinner-border text-success"></div><p class="text-muted mt-2">กำลังโหลดผู้ใช้...</p></div>');
     try {
         const [users, allBadges] = await Promise.all([
-            callApi('/api/admin/users'), // โหลดผู้ใช้ทั้งหมด
-            callApi('/api/admin/badges') // โหลดป้ายรางวัลทั้งหมดเพื่อเปรียบเทียบ
+            callApi('/api/admin/users'), 
+            callApi('/api/admin/badges')
         ]);
 
         resultsContainer.empty();
@@ -989,8 +984,8 @@ async function loadUsersForAdmin() {
         }
 
         users.forEach(user => {
-            const earnedBadgeIds = user.earnedBadgeIds || []; // รายการ ID ป้ายรางวัลที่ผู้ใช้มี
-            const badgesToAwardHtml = allBadges.filter(b => !earnedBadgeIds.includes(b.badgeId)) // กรองเฉพาะป้ายที่ผู้ใช้ยังไม่มี
+            const earnedBadgeIds = user.earnedBadgeIds || [];
+            const badgesToAwardHtml = allBadges.filter(b => !earnedBadgeIds.includes(b.badgeId))
                                                         .map(b => `<button class="btn btn-sm btn-outline-primary award-badge-btn me-1 mb-1" data-user-id="${user.lineUserId}" data-badge-id="${b.badgeId}">${sanitizeHTML(b.badgeName)}</button>`)
                                                         .join('');
 
@@ -1023,7 +1018,7 @@ async function searchUsersForAdmin(query) {
     resultsContainer.html('<div class="text-center my-4"><div class="spinner-border text-success"></div><p class="text-muted mt-2">กำลังค้นหาผู้ใช้...</p></div>');
     try {
         const [users, allBadges] = await Promise.all([
-            callApi('/api/admin/users', { search: query }), // ส่ง query ไปค้นหา
+            callApi('/api/admin/users', { search: query }),
             callApi('/api/admin/badges')
         ]);
 
@@ -1065,7 +1060,7 @@ async function searchUsersForAdmin(query) {
 }
 
 // ===============================================================
-//  UTILITY FUNCTIONS
+//  UTILITY FUNCTIONS
 // ===============================================================
 function showLoading(title) { Swal.fire({ title: title, text: 'กรุณารอสักครู่', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); }
 function showSuccess(title) { Swal.fire({icon: 'success', title: 'สำเร็จ!', text: title, timer: 1500, showConfirmButton: false}); }
@@ -1077,3 +1072,4 @@ function sanitizeHTML(str) {
     temp.textContent = str;
     return temp.innerHTML;
 }
+
