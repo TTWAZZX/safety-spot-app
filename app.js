@@ -187,7 +187,7 @@ function renderSubmissions(submissions) {
     submissions.forEach(sub => {
         const likedClass = sub.didLike ? 'liked' : '';
         const imageHtml = sub.imageUrl ? `
-              <img src="${sub.imageUrl}" class="card-img-top submission-image" alt="Submission Image">
+            <img src="${sub.imageUrl}" class="card-img-top submission-image" alt="Submission Image">
         ` : '';
 
         let commentsHtml = sub.comments.map(c => `
@@ -230,7 +230,7 @@ function renderSubmissions(submissions) {
                                 <i class="fas fa-search-plus"></i> ดูรูปภาพ
                              </a>
                              ` : ''}
-                             </div>
+                        </div>
                         ${currentUser.isAdmin ? `<button class="btn btn-sm btn-outline-danger btn-delete-submission" data-id="${sub.submissionId}"><i class="fas fa-trash-alt"></i></button>` : ''}
                     </div>
 
@@ -368,6 +368,8 @@ async function loadUserBadges() {
 // ===============================================================
 //  EVENT LISTENERS
 // ===============================================================
+// ===== highlight-start =====
+// แก้ไขโดยการรวมฟังก์ชันที่ซ้ำซ้อน และเพิ่ม Event Listener สำหรับปุ่มดูรูปภาพ
 function bindStaticEventListeners() {
     $('.nav-link').on('click', function(e) {
         e.preventDefault();
@@ -390,19 +392,30 @@ function bindStaticEventListeners() {
     $(document).on('click', '.btn-view-report', handleViewReport);
     $(document).on('click', '.btn-join-activity', handleJoinActivity);
     $(document).on('click', '.like-btn', handleLike);
-    $(document).on('click', '.send-comment-button', handleComment); // Changed from form submit to button click
+    $(document).on('click', '.send-comment-button', handleComment);
     
     $('#add-badge-btn').on('click', handleAddBadge);
 
     $('#image-input').on('change', function() { handleImagePreview(this, '#submission-image-preview'); });
     $('#form-activity-image-input').on('change', function() { handleImagePreview(this, '#activity-image-preview'); });
     $('#badge-image-input').on('change', function() { handleImagePreview(this, '#badge-image-preview'); });
-    $(document).on('click', '.clickable-image', function() {
+
+    // Event listener สำหรับปุ่มดูรูปภาพตัวใหม่
+    $(document).on('click', '.view-image-btn', function(e) {
+        e.preventDefault(); // ป้องกันการเลื่อนหน้าจอ
         const imageUrl = $(this).data('image-full-url');
-        $('#imageViewerContent').attr('src', imageUrl);
-        $('#downloadImageBtn').attr('href', imageUrl);
+        if (imageUrl) {
+            // นำ URL ไปใส่ใน Modal
+            $('#imageViewerContent').attr('src', imageUrl);
+            $('#downloadImageBtn').attr('href', imageUrl);
+
+            // สั่งให้ Modal แสดงผลด้วย JavaScript โดยตรง
+            const imageViewerModal = new bootstrap.Modal(document.getElementById('imageViewerModal'));
+            imageViewerModal.show();
+        }
     });
 }
+// ===== highlight-end =====
 
 function bindAdminEventListeners() {
     $('#view-stats-btn').on('click', handleViewStats);
@@ -432,7 +445,6 @@ function bindAdminTabEventListeners() {
         if (tab === 'manageBadges') {
             loadBadgesForAdmin();
         } else if (tab === 'manageUsers') {
-            // โหลดผู้ใช้เมื่อเปิดแท็บนี้ หรือค้นหาหากมีข้อความในช่องค้นหาอยู่แล้ว
             const searchQuery = $('#user-search-input').val();
             if (searchQuery.length > 0) {
                 searchUsersForAdmin(searchQuery);
@@ -443,39 +455,12 @@ function bindAdminTabEventListeners() {
     });
     $('#user-search-input').on('input', function() {
         const query = $(this).val();
-        if (query.length > 2) { // เริ่มค้นหาเมื่อมีตัวอักษร 3 ตัวขึ้นไป
+        if (query.length > 2) {
             searchUsersForAdmin(query);
-        } else if (query.length === 0) { // หากลบข้อความออกหมด ให้แสดงผู้ใช้ทั้งหมดใหม่
+        } else if (query.length === 0) {
             loadUsersForAdmin();
         }
     });
-}
-function bindStaticEventListeners() {
-    // ... โค้ด .on(...) อื่นๆ ที่มีอยู่แล้ว ...
-    
-    $(document).on('click', '.clickable-image', function() {
-        const imageUrl = $(this).data('image-full-url');
-        $('#imageViewerContent').attr('src', imageUrl);
-        $('#downloadImageBtn').attr('href', imageUrl);
-    });
-
-    // highlight-start
-    // ===== เพิ่มโค้ดส่วนนี้เข้าไป =====
-    $(document).on('click', '.view-image-btn', function(e) {
-        e.preventDefault(); // ป้องกันการเลื่อนหน้าจอ
-        const imageUrl = $(this).data('image-full-url');
-        if (imageUrl) {
-            // นำ URL ไปใส่ใน Modal
-            $('#imageViewerContent').attr('src', imageUrl);
-            $('#downloadImageBtn').attr('href', imageUrl);
-
-            // สั่งให้ Modal แสดงผลด้วย JavaScript โดยตรง
-            const imageViewerModal = new bootstrap.Modal(document.getElementById('imageViewerModal'));
-            imageViewerModal.show();
-        }
-    });
-    // ===== สิ้นสุดส่วนที่ต้องเพิ่ม =====
-    // highlight-end
 }
 
 // ===============================================================
@@ -513,12 +498,14 @@ async function handleSubmitReport(e) {
 }
 
 function handleViewReport() {
+    console.log("handleViewReport clicked!");
     const activityId = $(this).data('activity-id');
     const activityTitle = $(this).data('activity-title');
     loadAndShowActivityDetails(activityId, activityTitle);
 }
 
 function handleJoinActivity() {
+    console.log("handleJoinActivity clicked!");
     const activityId = $(this).data('activity-id');
     const activityTitle = $(this).data('activity-title');
     $('#activityId-input').val(activityId);
@@ -557,7 +544,6 @@ async function handleComment(e) {
     try {
         await callApi('/api/submissions/comment', { submissionId, lineUserId: lineProfile.userId, commentText }, 'POST');
         
-        // Reload the details to show the new comment
         const modal = $('#activity-detail-modal');
         const currentActivityId = modal.data('current-activity-id');
         const activityTitle = $('#activity-detail-title').text();
@@ -1050,7 +1036,7 @@ async function searchUsersForAdmin(query) {
 }
 
 // ===============================================================
-//  UTILITY FUNCTIONS
+//  UTILITY FUNCTIONS
 // ===============================================================
 function showLoading(title) { Swal.fire({ title: title, text: 'กรุณารอสักครู่', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); }
 function showSuccess(title) { Swal.fire({icon: 'success', title: 'สำเร็จ!', text: title, timer: 1500, showConfirmButton: false}); }
