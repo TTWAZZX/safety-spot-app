@@ -14,10 +14,16 @@ let reportsChart;
 //  INITIALIZATION
 // ===============================================================
 $(document).ready(function() {
-    // highlight-start
-    // เปิดใช้งาน Bootstrap Tooltips สำหรับทุก element ที่มี attribute title
-    $('body').tooltip({ selector: '[title]' });
-    // highlight-end
+    // เปิดใช้งาน Bootstrap Tooltips และตั้งค่าให้ซ่อนเมื่อไม่ได้ใช้งาน
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // เพิ่มโค้ดสำหรับซ่อน Tooltip ที่อาจจะค้างอยู่
+    $('body').on('click', function () {
+        $('[data-bs-toggle="tooltip"]').tooltip('hide');
+    });
 
     initializeAllModals();
     initializeApp();
@@ -171,19 +177,19 @@ function displayActivitiesUI(activities, listId) {
                         <button class="btn btn-info btn-view-activity-image" 
                                 data-image-full-url="${getFullImageUrl(act.imageUrl)}" 
                                 ${act.imageUrl ? '' : 'disabled'}
-                                title="ดูรูปภาพกิจกรรม">
+                                data-bs-toggle="tooltip" title="ดูรูปภาพกิจกรรม">
                             <i class="fas fa-image"></i>
                         </button>
                         <button class="btn btn-outline-secondary btn-view-report" 
                                 data-activity-id="${act.activityId}" 
                                 data-activity-title="${sanitizeHTML(act.title)}" 
-                                title="ดูรายงานทั้งหมด">
+                                data-bs-toggle="tooltip" title="ดูรายงานทั้งหมด">
                             <i class="fas fa-eye"></i>
                         </button>
                         <button class="btn btn-primary btn-join-activity" 
                                 data-activity-id="${act.activityId}" 
                                 data-activity-title="${sanitizeHTML(act.title)}" 
-                                title="เข้าร่วมกิจกรรม">
+                                data-bs-toggle="tooltip" title="เข้าร่วมกิจกรรม">
                             <i class="fas fa-plus-circle"></i>
                         </button>
                     </div>
