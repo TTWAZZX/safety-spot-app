@@ -187,8 +187,7 @@ function renderSubmissions(submissions) {
     submissions.forEach(sub => {
         const likedClass = sub.didLike ? 'liked' : '';
         const imageHtml = sub.imageUrl ? `
-            <img src="${sub.imageUrl}" class="card-img-top submission-image clickable-image" alt="Submission Image" 
-                 data-bs-toggle="modal" data-bs-target="#imageViewerModal" data-image-full-url="${sub.imageUrl}">
+              <img src="${sub.imageUrl}" class="card-img-top submission-image" alt="Submission Image">
         ` : '';
 
         let commentsHtml = sub.comments.map(c => `
@@ -225,7 +224,13 @@ function renderSubmissions(submissions) {
                              <a href="#" class="text-decoration-none comment-btn" data-bs-toggle="collapse" data-bs-target="#comments-${sub.submissionId}">
                                 <i class="fas fa-comment"></i> ${sub.comments.length}
                              </a>
-                        </div>
+                             
+                             ${sub.imageUrl ? `
+                             <a href="#" class="text-decoration-none view-image-btn" data-image-full-url="${sub.imageUrl}">
+                                <i class="fas fa-search-plus"></i> ดูรูปภาพ
+                             </a>
+                             ` : ''}
+                             </div>
                         ${currentUser.isAdmin ? `<button class="btn btn-sm btn-outline-danger btn-delete-submission" data-id="${sub.submissionId}"><i class="fas fa-trash-alt"></i></button>` : ''}
                     </div>
 
@@ -444,6 +449,33 @@ function bindAdminTabEventListeners() {
             loadUsersForAdmin();
         }
     });
+}
+function bindStaticEventListeners() {
+    // ... โค้ด .on(...) อื่นๆ ที่มีอยู่แล้ว ...
+    
+    $(document).on('click', '.clickable-image', function() {
+        const imageUrl = $(this).data('image-full-url');
+        $('#imageViewerContent').attr('src', imageUrl);
+        $('#downloadImageBtn').attr('href', imageUrl);
+    });
+
+    // highlight-start
+    // ===== เพิ่มโค้ดส่วนนี้เข้าไป =====
+    $(document).on('click', '.view-image-btn', function(e) {
+        e.preventDefault(); // ป้องกันการเลื่อนหน้าจอ
+        const imageUrl = $(this).data('image-full-url');
+        if (imageUrl) {
+            // นำ URL ไปใส่ใน Modal
+            $('#imageViewerContent').attr('src', imageUrl);
+            $('#downloadImageBtn').attr('href', imageUrl);
+
+            // สั่งให้ Modal แสดงผลด้วย JavaScript โดยตรง
+            const imageViewerModal = new bootstrap.Modal(document.getElementById('imageViewerModal'));
+            imageViewerModal.show();
+        }
+    });
+    // ===== สิ้นสุดส่วนที่ต้องเพิ่ม =====
+    // highlight-end
 }
 
 // ===============================================================
