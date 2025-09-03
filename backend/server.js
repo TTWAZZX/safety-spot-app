@@ -58,16 +58,30 @@ const handleRequest = (handler) => async (req, res) => {
 
 // Middleware to check for admin privileges
 const isAdmin = async (req, res, next) => {
-    const adminUserId = req.body.adminUserId || req.query.adminUserId || req.params.adminUserId || req.headers['x-admin-user-id'];
-    
-    if (!adminUserId) {
-        return res.status(401).json({ status: 'error', message: 'Unauthorized: Missing Admin User ID' });
+    // 1. อ่าน lineUserId จาก body หรือ query ของ request ที่ส่งมา
+    //    เราจะใช้ค่านี้ในการตรวจสอบความเป็น Admin ที่แท้จริง
+    const lineUserId = req.body.lineUserId || req.query.lineUserId;
+
+    // 2. ตรวจสอบว่ามีการส่ง lineUserId มาเพื่อระบุตัวตนหรือไม่
+    if (!lineUserId) {
+        return res.status(401).json({ status: 'error', message: 'Unauthorized: Missing User ID for verification' });
     }
-    const adminRes = await db.query('SELECT * FROM admins WHERE "lineUserId" = $1', [adminUserId]);
-    if (adminRes.rows.length === 0) {
-        return res.status(403).json({ status: 'error', message: 'Forbidden: Admin access required' });
+
+    // 3. นำ lineUserId ที่ได้ไปค้นหาในตาราง admins
+    try {
+        const adminRes = await db.query('SELECT * FROM admins WHERE "lineUserId" = $1', [lineUserId]);
+        
+        // 4. ถ้าไม่พบผู้ใช้คนนี้ในตาราง admins ให้ปฏิเสธการเข้าถึง
+        if (adminRes.rows.length === 0) {
+            return res.status(403).json({ status: 'error', message: 'Forbidden: You do not have admin privileges.' });
+        }
+        
+        // 5. ถ้าพบ แสดงว่าเป็น Admin จริง -> อนุญาตให้ทำรายการต่อไปได้
+        next();
+    } catch (error) {
+        console.error('Error during admin check:', error);
+        res.status(500).json({ status: 'error', message: 'An internal server error occurred during authentication.' });
     }
-    next();
 };
 
 // Image Upload Route with Cloudinary

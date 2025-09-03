@@ -90,9 +90,20 @@ async function callApi(endpoint, payload = {}, method = 'GET') {
         method,
         headers: { 'Content-Type': 'application/json' },
     };
+
+    // --- ลบส่วนที่ส่ง Header ที่ไม่ปลอดภัยออก ---
+    // if (currentUser.lineUserId) {
+    //     options.headers['X-Admin-User-ID'] = currentUser.lineUserId;
+    // }
+    // -----------------------------------------
+
+    // +++ เพิ่มส่วนนี้เข้ามาแทน +++
+    // เพิ่ม lineUserId เข้าไปใน payload ของข้อมูลเสมอ
+    // เพื่อให้ Server ใช้ยืนยันตัวตนของผู้ส่ง
     if (currentUser.lineUserId) {
-         options.headers['X-Admin-User-ID'] = currentUser.lineUserId;
+        payload.lineUserId = currentUser.lineUserId;
     }
+    // +++++++++++++++++++++++++++++
 
     if (method.toUpperCase() === 'GET' && Object.keys(payload).length > 0) {
         const params = new URLSearchParams(payload).toString();
@@ -101,6 +112,7 @@ async function callApi(endpoint, payload = {}, method = 'GET') {
         options.body = JSON.stringify(payload);
     }
 
+    // ผมได้เพิ่มส่วน try...catch ที่เหลือของฟังก์ชันเข้ามาให้สมบูรณ์ด้วยครับ
     try {
         const response = await fetch(url, options);
         if (!response.ok) {
