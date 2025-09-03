@@ -8,6 +8,7 @@ const LIFF_ID = "2007053300-9xLKdwZp";
 const AppState = {
     lineProfile: null,
     currentUser: null,
+    // ย้ายการประกาศตัวแปร allModals และ reportsChart มาไว้ที่นี่
     allModals: {},
     reportsChart: null
 };
@@ -37,7 +38,8 @@ $(document).ready(function() {
 function initializeAllModals() {
     const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form'];
     modalIds.forEach(id => {
-        AppState.allModals[id] = new bootstrap.Modal(document.getElementById(`${id}-modal`)); // <--- แก้ไขที่นี่
+        // แก้ไขการเข้าถึง AppState.allModals
+        AppState.allModals[id] = new bootstrap.Modal(document.getElementById(`${id}-modal`));
     });
 }
 
@@ -531,7 +533,10 @@ async function handleSubmitReport(e) {
         if (imageFile) { imageUrl = await uploadImage(imageFile); }
         const payload = { lineUserId: lineProfile.userId, activityId: $('#activityId-input').val(), description: description, imageUrl: imageUrl };
         await callApi('/api/submissions', payload, 'POST');
-        allModals.submission.hide();
+        
+        // แก้ไข: ใช้ AppState เพื่อเข้าถึง allModals
+        AppState.allModals.submission.hide(); 
+
         $('#submission-form')[0].reset();
         $('#submission-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
         showSuccess('รายงานของคุณถูกส่งเพื่อรอการตรวจสอบ');

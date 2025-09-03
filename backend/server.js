@@ -58,6 +58,7 @@ const handleRequest = (handler) => async (req, res) => {
 };
 
 // Middleware to check for admin privileges
+// Middleware to check for admin privileges
 const isAdmin = async (req, res, next) => {
     // 1. อ่าน lineUserId จาก body หรือ query ของ request ที่ส่งมา
     //    เราจะใช้ค่านี้ในการตรวจสอบความเป็น Admin ที่แท้จริง
