@@ -181,10 +181,11 @@ function renderSubmissions(submissions) {
     const container = $('#submissions-container');
     container.empty();
     if (submissions.length === 0) { 
-        container.html('<p class="text-center text-muted mt-5">ยังไม่มีใครส่งรายงานสำหรับกิจกรรมนี้<br>มาเป็นคนแรกกันเถอะ!</p>'); 
+        //...
         return; 
     }
     submissions.forEach(sub => {
+        console.log("Checking submission object:", sub); // <--- เพิ่มบรรทัดนี้
         const likedClass = sub.didLike ? 'liked' : '';
         const imageHtml = sub.imageUrl ? `
             <img src="${sub.imageUrl}" class="card-img-top submission-image" alt="Submission Image">
