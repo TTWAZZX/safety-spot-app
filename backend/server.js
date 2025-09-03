@@ -232,7 +232,9 @@ app.post('/api/admin/activities/toggle', isAdmin, handleRequest(async (req) => {
 // --- Admin User and Badge Management API Routes ---
 app.get('/api/admin/users', isAdmin, handleRequest(async (req) => {
     const searchTerm = req.query.search || '';
-    const query = 'SELECT "lineUserId", "fullName", "employeeId", "totalScore" FROM users WHERE "fullName" ILIKE $1 OR "employeeId" ILIKE $1 ORDER BY "fullName" LIMIT 50';
+    // highlight-start
+    const query = 'SELECT "lineUserId", "fullName", "employeeId", "totalScore", "pictureUrl" FROM users WHERE "fullName" ILIKE $1 OR "employeeId" ILIKE $1 ORDER BY "fullName" LIMIT 50';
+    // highlight-end
     const res = await db.query(query, [`%${searchTerm}%`]);
     return res.rows;
 }));
