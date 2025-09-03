@@ -18,8 +18,13 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Use CORS middleware to allow cross-origin requests
-app.use(cors());
+// ===== 👇 จุดที่แก้ไข 1: กำหนดค่า CORS Policy 👇 =====
+const corsOptions = {
+  origin: 'https://ttwazzx.github.io/safety-spot-app/' // อนุญาต Frontend บน GitHub Pages
+};
+app.use(cors(corsOptions));
+// ===== 👆 สิ้นสุดจุดที่แก้ไข 1 👆 =====
+
 app.use(express.json());
 
 // Create uploads directory if it doesn't exist
@@ -118,9 +123,7 @@ app.get('/api/user/badges', handleRequest(async (req) => {
 }));
 app.get('/api/submissions', handleRequest(async (req) => {
     const { activityId, lineUserId } = req.query;
-    // ===== 👇 จุดที่แก้ไขอยู่ตรงนี้ครับ 👇 =====
     const sql = `SELECT s."submissionId", s.description, s."imageUrl", s."createdAt", s.points, u."fullName" as "submitterFullName", u."pictureUrl" as "submitterPictureUrl", (SELECT COUNT(*) FROM likes WHERE "submissionId" = s."submissionId")::int as likes FROM submissions s JOIN users u ON s."lineUserId" = u."lineUserId" WHERE s."activityId" = $1 AND s.status IN ('approved', 'pending') ORDER BY s."createdAt" DESC;`;
-    // ===== 👆 จุดที่แก้ไขอยู่ตรงนี้ครับ 👆 =====
     const submissionsRes = await db.query(sql, [activityId]);
     const likesRes = await db.query('SELECT "submissionId" FROM likes WHERE "lineUserId" = $1', [lineUserId]);
     const userLikedIds = new Set(likesRes.rows.map(l => l.submissionId));
@@ -232,9 +235,9 @@ app.post('/api/admin/activities/toggle', isAdmin, handleRequest(async (req) => {
 // --- Admin User and Badge Management API Routes ---
 app.get('/api/admin/users', isAdmin, handleRequest(async (req) => {
     const searchTerm = req.query.search || '';
-    // highlight-start
+    // ===== 👇 จุดที่แก้ไข 2: เพิ่ม "pictureUrl" ใน Query 👇 =====
     const query = 'SELECT "lineUserId", "fullName", "employeeId", "totalScore", "pictureUrl" FROM users WHERE "fullName" ILIKE $1 OR "employeeId" ILIKE $1 ORDER BY "fullName" LIMIT 50';
-    // highlight-end
+    // ===== 👆 สิ้นสุดจุดที่แก้ไข 2 👆 =====
     const res = await db.query(query, [`%${searchTerm}%`]);
     return res.rows;
 }));
