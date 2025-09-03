@@ -5,10 +5,12 @@ const API_BASE_URL = "https://shesafety-spot-appbackend.onrender.com";
 const LIFF_ID = "2007053300-9xLKdwZp";
 
 // Global variables
-let lineProfile = {}; 
-let allModals = {};
-let currentUser = {};
-let reportsChart;
+const AppState = {
+    lineProfile: null,
+    currentUser: null,
+    allModals: {},
+    reportsChart: null
+};
 
 // ===============================================================
 //  INITIALIZATION
@@ -637,10 +639,17 @@ async function handleSaveActivity(e) {
         
         allModals['activity-form'].hide();
         showSuccess('บันทึกกิจกรรมเรียบร้อย');
-        loadAllActivitiesForAdmin();
-        const activities = await callApi('/api/activities');
-        displayActivitiesUI(activities, 'latest-activities-list');
-        displayActivitiesUI(activities, 'all-activities-list');
+
+        // เรียก API แค่ครั้งเดียว แล้วเก็บข้อมูลไว้ในตัวแปร
+        const updatedActivities = await callApi('/api/admin/activities'); 
+        
+        // นำข้อมูลที่ได้ไปอัปเดต UI ทุกส่วนที่ต้องการ
+        displayActivitiesUIForAdmin(updatedActivities); // ฟังก์ชันใหม่สำหรับ Admin UI
+        
+        // กรองเฉพาะกิจกรรมที่ active เพื่อแสดงให้ User ทั่วไป
+        const activeActivities = updatedActivities.filter(act => act.status === 'active');
+        displayActivitiesUI(activeActivities, 'latest-activities-list');
+        displayActivitiesUI(activeActivities, 'all-activities-list');
     } catch (e) {
         showError(e.message);
     }

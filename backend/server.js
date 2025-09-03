@@ -7,6 +7,7 @@ const fs = require('fs');
 const db = require('./db');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -159,7 +160,7 @@ app.get('/api/submissions', handleRequest(async (req) => {
 }));
 app.post('/api/submissions', handleRequest(async (req) => {
     const { activityId, lineUserId, description, imageUrl } = req.body;
-    await db.query('INSERT INTO submissions ("submissionId", "activityId", "lineUserId", description, "imageUrl", status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)', ["SUB" + Date.now(), activityId, lineUserId, description, imageUrl, 'pending', new Date()]);
+    await db.query('INSERT INTO submissions ("submissionId", "activityId", "lineUserId", description, "imageUrl", status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)', ["SUB" + uuidv4(), activityId, lineUserId, description, imageUrl, 'pending', new Date()]);
     return { message: 'Report submitted for review.' };
 }));
 app.post('/api/submissions/like', handleRequest(async (req) => {
@@ -168,7 +169,7 @@ app.post('/api/submissions/like', handleRequest(async (req) => {
     if (existingLikeRes.rows.length > 0) {
         await db.query('DELETE FROM likes WHERE "likeId" = $1', [existingLikeRes.rows[0].likeId]);
     } else {
-        await db.query('INSERT INTO likes ("likeId", "submissionId", "lineUserId", "createdAt") VALUES ($1, $2, $3, $4)', ["LIKE" + Date.now(), submissionId, lineUserId, new Date()]);
+        await db.query('INSERT INTO likes ("likeId", "submissionId", "lineUserId", "createdAt") VALUES ($1, $2, $3, $4)', ["LIKE" + uuidv4(), submissionId, lineUserId, new Date()]);
     }
     const countRes = await db.query('SELECT COUNT(*) FROM likes WHERE "submissionId" = $1', [submissionId]);
     return { status: existingLikeRes.rows.length > 0 ? 'unliked' : 'liked', newLikeCount: parseInt(countRes.rows[0].count) };
@@ -176,7 +177,7 @@ app.post('/api/submissions/like', handleRequest(async (req) => {
 app.post('/api/submissions/comment', handleRequest(async (req) => {
     const { submissionId, lineUserId, commentText } = req.body;
     if (!commentText || commentText.trim() === '') throw new Error("Comment cannot be empty.");
-    await db.query('INSERT INTO comments ("commentId", "submissionId", "lineUserId", "commentText", "createdAt") VALUES ($1, $2, $3, $4, $5)', ["CMT" + Date.now(), submissionId, lineUserId, commentText.trim(), new Date()]);
+    await db.query('INSERT INTO comments ("commentId", "submissionId", "lineUserId", "commentText", "createdAt") VALUES ($1, $2, $3, $4, $5)', ["CMT" + uuidv4(), submissionId, lineUserId, commentText.trim(), new Date()]);
     return { message: 'Comment added.' };
 }));
 
@@ -223,7 +224,7 @@ app.delete('/api/admin/submissions/:submissionId', isAdmin, handleRequest(async 
 app.get('/api/admin/activities', isAdmin, handleRequest(async () => (await db.query('SELECT * FROM activities ORDER BY "createdAt" DESC')).rows));
 app.post('/api/admin/activities', isAdmin, handleRequest(async (req) => {
     const { title, description, imageUrl } = req.body;
-    await db.query('INSERT INTO activities ("activityId", title, description, "imageUrl", status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6)', ["ACT" + Date.now(), title, description, imageUrl, 'active', new Date()]);
+    await db.query('INSERT INTO activities ("activityId", title, description, "imageUrl", status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6)', ["ACT" + uuidv4(), title, description, imageUrl, 'active', new Date()]);
     return { message: 'Activity created' };
 }));
 app.put('/api/admin/activities', isAdmin, handleRequest(async (req) => {
@@ -275,7 +276,7 @@ app.get('/api/admin/user-details/:lineUserId', isAdmin, handleRequest(async (req
 app.get('/api/admin/badges', isAdmin, handleRequest(async () => (await db.query('SELECT * FROM badges ORDER BY "badgeName"')).rows));
 app.post('/api/admin/badges', isAdmin, handleRequest(async (req) => {
     const { badgeName, description, imageUrl } = req.body;
-    const badgeId = "BADGE" + Date.now();
+    const badgeId = "BADGE" + uuidv4();
     await db.query('INSERT INTO badges ("badgeId", "badgeName", description, "imageUrl") VALUES ($1, $2, $3, $4)', [badgeId, badgeName, description, imageUrl]);
     return { message: 'Badge created successfully' };
 }));
