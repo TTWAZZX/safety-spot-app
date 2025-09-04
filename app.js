@@ -5,7 +5,7 @@ const API_BASE_URL = "https://shesafety-spot-appbackend.onrender.com";
 
 // Global variables
 const AppState = {
-    // lineProfile จะถูกกำหนดค่าใน initializeApp
+    lineProfile: null, // <--- ประกาศตัวแปรเปล่าไว้สำหรับเก็บค่าในภายหลัง
     currentUser: null,
     allModals: {},
     reportsChart: null
@@ -41,7 +41,7 @@ function initializeAllModals() {
 }
 
 async function initializeApp() {
-    let lineProfile = null;
+    let lineProfile = null; // <--- ประกาศตัวแปร local ภายใน function
     try {
         // แสดงสถานะที่ 1
         $('#loading-status-text').text('กำลังเชื่อมต่อกับ LINE');
@@ -56,15 +56,17 @@ async function initializeApp() {
         // แสดงสถานะที่ 2
         $('#loading-status-text').text('กำลังดึงข้อมูลโปรไฟล์');
         $('#loading-sub-text').text('กรุณารอสักครู่...');
-        lineProfile = await liff.getProfile();
+        lineProfile = await liff.getProfile(); // <--- กำหนดค่า lineProfile ที่นี่
+        AppState.lineProfile = lineProfile; // <--- นำไปเก็บไว้ใน AppState
         
         // แสดงสถานะที่ 3
         $('#loading-status-text').text('กำลังตรวจสอบการลงทะเบียน');
         $('#loading-sub-text').text('เชื่อมต่อกับเซิร์ฟเวอร์ Safety Spot...');
-        const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId });
+        const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId }); 
         
         if (result.registered) {
-            await showMainApp(result.user, lineProfile);
+            // ส่งค่า lineProfile ไปให้ function showMainApp ด้วย
+            await showMainApp(result.user, lineProfile); 
         } else {
             // ถ้ายังไม่ลงทะเบียน ให้ซ่อนหน้า Loading แล้วแสดงหน้าลงทะเบียน
             $('#loading-overlay').fadeOut();
@@ -79,7 +81,7 @@ async function initializeApp() {
     }
 }
 
-async function showMainApp(userData, lineProfile) {
+async function showMainApp(userData, lineProfile) { // <--- function นี้รับ parameter lineProfile
     try {
         AppState.currentUser = userData;
         AppState.lineProfile = lineProfile;
@@ -102,8 +104,6 @@ async function showMainApp(userData, lineProfile) {
         showError('เกิดข้อผิดพลาดในการโหลดข้อมูลบางส่วน');
         $('#main-app').fadeIn(); // ยังคงต้องแสดงหน้าหลัก
     } finally {
-        // บล็อก finally จะทำงานเสมอ ไม่ว่า try จะสำเร็จหรือเกิด error
-        // เพื่อให้แน่ใจว่าหน้า Loading จะหายไปแน่นอน
         $('#loading-overlay').fadeOut();
     }
 }
