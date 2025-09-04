@@ -2,11 +2,10 @@
 //  APP CONFIGURATION
 // ===============================================================
 const API_BASE_URL = "https://shesafety-spot-appbackend.onrender.com";
-const LIFF_ID = "2007053300-9xLKdwZp";
 
 // Global variables
 const AppState = {
-    lineProfile: null,
+    // lineProfile จะถูกกำหนดค่าใน initializeApp
     currentUser: null,
     allModals: {},
     reportsChart: null
@@ -42,6 +41,7 @@ function initializeAllModals() {
 }
 
 async function initializeApp() {
+    let lineProfile = null;
     try {
         // แสดงสถานะที่ 1
         $('#loading-status-text').text('กำลังเชื่อมต่อกับ LINE');
@@ -64,7 +64,7 @@ async function initializeApp() {
         const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId });
         
         if (result.registered) {
-            await showMainApp(result.user);
+            await showMainApp(result.user, lineProfile);
         } else {
             // ถ้ายังไม่ลงทะเบียน ให้ซ่อนหน้า Loading แล้วแสดงหน้าลงทะเบียน
             $('#loading-overlay').fadeOut();
@@ -79,9 +79,10 @@ async function initializeApp() {
     }
 }
 
-async function showMainApp(userData) {
+async function showMainApp(userData, lineProfile) {
     try {
         AppState.currentUser = userData;
+        AppState.lineProfile = lineProfile;
         updateUserInfoUI(AppState.currentUser);
         
         if (userData && userData.isAdmin) { // เพิ่มการตรวจสอบ userData ก่อนใช้งาน
@@ -117,8 +118,8 @@ async function callApi(endpoint, payload = {}, method = 'GET') {
         headers: { 'Content-Type': 'application/json' },
     };
 
-    if (AppState.currentUser && AppState.currentUser.lineUserId) {
-        payload.lineUserId = AppState.currentUser.lineUserId;
+    if (AppState.lineProfile && AppState.lineProfile.userId) {
+        payload.lineUserId = AppState.lineProfile.userId;
     }
 
     if (method.toUpperCase() === 'GET' && Object.keys(payload).length > 0) {
@@ -344,7 +345,7 @@ async function loadAndShowActivityDetails(activityId, activityTitle) {
     container.empty();
     AppState.allModals['activity-detail'].show();
     try {
-        const submissions = await callApi('/api/submissions', { activityId, lineUserId: lineProfile.userId });
+        const submissions = await callApi('/api/submissions', { activityId, lineUserId: AppState.lineProfile.userId });
         renderSubmissions(submissions);
     } catch (error) { 
         // 👇 เพิ่มบรรทัดนี้เข้าไป 👇
@@ -395,7 +396,7 @@ async function loadUserBadges() {
     const progressText = $('#progress-text');
     container.html('<div class="spinner-border"></div>');
     try {
-        const badges = await callApi('/api/user/badges', { lineUserId: lineProfile.userId });
+        const badges = await callApi('/api/user/badges', { lineUserId: AppState.lineProfile.userId });
         container.empty();
         if (badges.length === 0) {
             container.html('<p class="text-muted">ยังไม่มีป้ายรางวัล</p>');
@@ -504,7 +505,7 @@ function bindAdminTabEventListeners() {
         } else if (tab === 'manageUsers') {
             const searchQuery = $('#user-search-input').val();
             if (searchQuery.length > 0) {
-                searchUsersForAdmin(searchQuery);
+                searchUsersForAdmin(query);
             } else {
                 loadUsersForAdmin();
             }
@@ -529,9 +530,9 @@ async function handleRegistration(e) {
     const employeeId = $('#employeeId').val().trim();
     showLoading('กำลังบันทึก...');
     try {
-        const newUser = await callApi("/api/user/register", { lineUserId: lineProfile.userId, displayName: lineProfile.displayName, pictureUrl: lineProfile.pictureUrl, fullName: fullName, employeeId: employeeId }, 'POST');
+        const newUser = await callApi("/api/user/register", { lineUserId: AppState.lineProfile.userId, displayName: AppState.lineProfile.displayName, pictureUrl: AppState.lineProfile.pictureUrl, fullName: fullName, employeeId: employeeId }, 'POST');
         $('#registration-page').hide();
-        await showMainApp(newUser);
+        await showMainApp(newUser, AppState.lineProfile);
         showSuccess('ลงทะเบียนเรียบร้อย!');
     } catch (error) { showError(error.message); }
 }
@@ -545,7 +546,7 @@ async function handleSubmitReport(e) {
     try {
         let imageUrl = null;
         if (imageFile) { imageUrl = await uploadImage(imageFile); }
-        const payload = { lineUserId: lineProfile.userId, activityId: $('#activityId-input').val(), description: description, imageUrl: imageUrl };
+        const payload = { lineUserId: AppState.lineProfile.userId, activityId: $('#activityId-input').val(), description: description, imageUrl: imageUrl };
         await callApi('/api/submissions', payload, 'POST');
         AppState.allModals.submission.hide();
         $('#submission-form')[0].reset();
@@ -574,7 +575,7 @@ async function handleLike(e) {
     const submissionId = btn.data('submission-id');
     btn.css('pointer-events', 'none'); 
     try {
-        const result = await callApi('/api/submissions/like', { submissionId, lineUserId: lineProfile.userId }, 'POST');
+        const result = await callApi('/api/submissions/like', { submissionId, lineUserId: AppState.lineProfile.userId }, 'POST');
         const countSpan = btn.find('.like-count');
         countSpan.text(result.newLikeCount);
         btn.toggleClass('liked', result.status === 'liked');
@@ -596,7 +597,7 @@ async function handleComment(e) {
     btn.prop('disabled', true);
     
     try {
-        await callApi('/api/submissions/comment', { submissionId, lineUserId: lineProfile.userId, commentText }, 'POST');
+        await callApi('/api/submissions/comment', { submissionId, lineUserId: AppState.lineProfile.userId, commentText }, 'POST');
         
         const modal = $('#activity-detail-modal');
         const currentActivityId = modal.data('current-activity-id');
@@ -788,17 +789,18 @@ async function handleSaveBadge(e) {
     e.preventDefault();
     showLoading('กำลังบันทึก...');
     const imageFile = $('#badge-image-input')[0].files[0];
-    const payload = {
-        badgeName: $('#badge-name-input').val(),
-        description: $('#badge-desc-input').val(),
-        badgeId: $('#badge-id-input').val()
-    };
+    const existingImageUrl = $('#badge-image-url-input').val();
     
     try {
-        let finalImageUrl = $('#badge-image-url-input').val();
+        let finalImageUrl = existingImageUrl;
         if (imageFile) {
             finalImageUrl = await uploadImage(imageFile);
         }
+        const payload = {
+            badgeName: $('#badge-name-input').val(),
+            description: $('#badge-desc-input').val(),
+            badgeId: $('#badge-id-input').val()
+        };
         payload.imageUrl = finalImageUrl;
 
         const method = payload.badgeId ? 'PUT' : 'POST';
@@ -975,6 +977,7 @@ async function loadBadgesForAdmin() {
             list.html('<p class="text-center text-muted my-4">ยังไม่มีป้ายรางวัลในระบบ</p>');
         } else {
             badges.forEach(b => {
+                const lockClass = b.isEarned ? '' : 'locked';
                 const html = `
                     <div class="col-6 col-md-4 col-lg-3 mb-3">
                         <div class="card h-100 shadow-sm text-center admin-badge-card">
