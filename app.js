@@ -43,7 +43,9 @@ function initializeAllModals() {
 
 async function initializeApp() {
     try {
-        showLoading('กำลังเริ่มต้น...');
+        // แสดงสถานะที่ 1
+        $('#loading-status-text').text('กำลังเชื่อมต่อกับ LINE');
+        $('#loading-sub-text').text('เริ่มต้นการทำงานของ LIFF...');
         await liff.init({ liffId: LIFF_ID });
 
         if (!liff.isLoggedIn()) {
@@ -51,18 +53,29 @@ async function initializeApp() {
             return;
         }
 
+        // แสดงสถานะที่ 2
+        $('#loading-status-text').text('กำลังดึงข้อมูลโปรไฟล์');
+        $('#loading-sub-text').text('กรุณารอสักครู่...');
         lineProfile = await liff.getProfile();
+        
+        // แสดงสถานะที่ 3
+        $('#loading-status-text').text('กำลังตรวจสอบการลงทะเบียน');
+        $('#loading-sub-text').text('เชื่อมต่อกับเซิร์ฟเวอร์ Safety Spot...');
         const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId });
         
         if (result.registered) {
             await showMainApp(result.user);
         } else {
+            // ถ้ายังไม่ลงทะเบียน ให้ซ่อนหน้า Loading แล้วแสดงหน้าลงทะเบียน
+            $('#loading-overlay').fadeOut();
             $('#registration-page').fadeIn();
-            Swal.close();
         }
     } catch (error) {
         console.error("Initialization failed:", error);
-        showError('ไม่สามารถเริ่มต้นแอปพลิเคชันได้ กรุณาลองใหม่อีกครั้ง');
+        // กรณีเกิด Error ให้แสดงข้อความในหน้า Loading เลย
+        $('#loading-status-text').text('เกิดข้อผิดพลาด');
+        $('#loading-sub-text').text('ไม่สามารถเริ่มต้นแอปพลิเคชันได้ กรุณาลองใหม่อีกครั้ง').addClass('text-danger');
+        $('.spinner-border').hide(); // ซ่อนตัวหมุนๆ
     }
 }
 
