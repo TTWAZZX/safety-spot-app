@@ -323,6 +323,9 @@ async function loadAndShowActivityDetails(activityId, activityTitle) {
         const submissions = await callApi('/api/submissions', { activityId, lineUserId: lineProfile.userId });
         renderSubmissions(submissions);
     } catch (error) { 
+        // 👇 เพิ่มบรรทัดนี้เข้าไป 👇
+        console.error("Error details from loadAndShowActivityDetails:", error); 
+        
         container.html('<p class="text-center text-danger">ไม่สามารถโหลดข้อมูลรายงานได้</p>'); 
     } finally { 
         $('#submissions-loading').hide(); 
