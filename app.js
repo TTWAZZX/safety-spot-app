@@ -107,7 +107,8 @@ async function showMainApp(userData) {
         showError('เกิดข้อผิดพลาดในการโหลดข้อมูลบางส่วน');
         $('#main-app').fadeIn();
     } finally {
-        $('#loading-overlay').fadeOut(400);
+        // ใช้ .addClass('d-none') เหมือนกับที่เราแก้ไปเมื่อวาน
+        $('#loading-overlay').addClass('d-none');
     }
 }
 
