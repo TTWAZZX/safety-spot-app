@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const cors = require('cors');
+const cors = require('cors'); // << 1. เรียกใช้ cors ที่ติดตั้งมา
 const multer = require('multer');
 const fs = require('fs');
 const db = require('./db');
@@ -22,14 +22,15 @@ cloudinary.config({
 // ===== 👇 จุดที่แก้ไข 1: กำหนดค่า CORS Policy 👇 =====
 const corsOptions = {
   origin: [
-    'https://ttwazx.github.io', 
+    'https://ttwazzx.github.io', 
+    'https://ttwazzx.github.io/safety-spot-app'
   ],
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  allowedHeaders: "Content-Type, X-Admin-User-ID",
   preflightContinue: false,
   optionsSuccessStatus: 204
 };
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // สำหรับจัดการกับ Preflight Request
 // ===== 👆 สิ้นสุดจุดที่แก้ไข 1 👆 =====
 
 app.use(express.json());
