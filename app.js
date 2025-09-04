@@ -631,6 +631,26 @@ function handleCreateActivity() {
     $('#activity-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
     AppState.allModals['activity-form'].show();
 }
+function displayActivitiesUIForAdmin(activities) {
+    const list = $('#activities-list-admin');
+    list.empty();
+    activities.forEach(a => {
+        const statusBadge = a.status === 'active' ? 'bg-success' : 'bg-secondary';
+        const btnText = a.status === 'active' ? 'ปิดใช้งาน' : 'เปิดใช้งาน';
+        const btnClass = a.status === 'active' ? 'btn-outline-secondary' : 'btn-outline-success';
+        const activityData = encodeURIComponent(JSON.stringify(a));
+        const html = `
+            <div class="card mb-2"><div class="card-body d-flex align-items-center">
+                <div><span class="badge ${statusBadge} me-2">${a.status}</span><strong>${sanitizeHTML(a.title)}</strong></div>
+                <div class="ms-auto">
+                    <button class="btn btn-sm btn-primary btn-edit-activity me-1" data-activity-data='${activityData}'><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-sm ${btnClass} btn-toggle-activity me-1" data-id="${a.activityId}">${btnText}</button>
+                    <button class="btn btn-sm btn-danger btn-delete-activity" data-id="${a.activityId}"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            </div></div>`;
+        list.append(html);
+    });
+}
 async function handleSaveActivity(e) {
     e.preventDefault();
     showLoading('กำลังบันทึก...');
@@ -657,12 +677,12 @@ async function handleSaveActivity(e) {
         AppState.allModals['activity-form'].hide();
         showSuccess('บันทึกกิจกรรมเรียบร้อย');
 
-        const updatedActivities = await callApi('/api/admin/activities'); 
+        const allActivities = await callApi('/api/admin/activities');
         
-        displayActivitiesUIForAdmin(updatedActivities);
+        displayActivitiesUIForAdmin(allActivities); // อัปเดต UI ฝั่งแอดมินด้วยฟังก์ชันใหม่
         
-        const activeActivities = updatedActivities.filter(act => act.status === 'active');
-        displayActivitiesUI(activeActivities, 'latest-activities-list');
+        const activeActivities = allActivities.filter(act => act.status === 'active');
+        displayActivitiesUI(activeActivities, 'latest-activities-list'); // อัปเดต UI ฝั่งผู้ใช้
         displayActivitiesUI(activeActivities, 'all-activities-list');
     } catch (e) {
         showError(e.message);
