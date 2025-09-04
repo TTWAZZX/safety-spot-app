@@ -2,10 +2,11 @@
 //  APP CONFIGURATION
 // ===============================================================
 const API_BASE_URL = "https://shesafety-spot-appbackend.onrender.com";
+const LIFF_ID = "2007053300-9xLKdwZp";
 
 // Global variables
 const AppState = {
-    lineProfile: null, // <--- ประกาศตัวแปรเปล่าไว้สำหรับเก็บค่าในภายหลัง
+    lineProfile: null,
     currentUser: null,
     allModals: {},
     reportsChart: null
@@ -41,7 +42,7 @@ function initializeAllModals() {
 }
 
 async function initializeApp() {
-    let lineProfile = null; // <--- ประกาศตัวแปร local ภายใน function
+    let lineProfile = null;
     try {
         // แสดงสถานะที่ 1
         $('#loading-status-text').text('กำลังเชื่อมต่อกับ LINE');
@@ -56,22 +57,21 @@ async function initializeApp() {
         // แสดงสถานะที่ 2
         $('#loading-status-text').text('กำลังดึงข้อมูลโปรไฟล์');
         $('#loading-sub-text').text('กรุณารอสักครู่...');
-        lineProfile = await liff.getProfile(); // <--- กำหนดค่า lineProfile ที่นี่
-        AppState.lineProfile = lineProfile; // <--- นำไปเก็บไว้ใน AppState
+        lineProfile = await liff.getProfile();
+        AppState.lineProfile = lineProfile;
         
         // แสดงสถานะที่ 3
         $('#loading-status-text').text('กำลังตรวจสอบการลงทะเบียน');
         $('#loading-sub-text').text('เชื่อมต่อกับเซิร์ฟเวอร์ Safety Spot...');
         const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId });
-        console.log('API Result:', result); // <-- เพิ่มบรรทัดนี้
         
         if (result.registered) {
-            // ส่งค่า lineProfile ไปให้ function showMainApp ด้วย
-            await showMainApp(result.user, lineProfile); 
+            await showMainApp(result.user, lineProfile);
         } else {
-            // ถ้ายังไม่ลงทะเบียน ให้ซ่อนหน้า Loading แล้วแสดงหน้าลงทะเบียน
-            $('#loading-overlay').fadeOut();
-            $('#registration-page').fadeIn();
+            // แก้ไข: ใช้ Callback Function เพื่อให้แน่ใจว่าหน้า Loading ถูกซ่อนสนิท
+            $('#loading-overlay').fadeOut(400, function() {
+                $('#registration-page').fadeIn();
+            });
         }
     } catch (error) {
         console.error("Initialization failed:", error);
@@ -82,13 +82,13 @@ async function initializeApp() {
     }
 }
 
-async function showMainApp(userData, lineProfile) { // <--- function นี้รับ parameter lineProfile
+async function showMainApp(userData, lineProfile) {
     try {
         AppState.currentUser = userData;
         AppState.lineProfile = lineProfile;
         updateUserInfoUI(AppState.currentUser);
         
-        if (userData && userData.isAdmin) { // เพิ่มการตรวจสอบ userData ก่อนใช้งาน
+        if (userData && userData.isAdmin) {
             $('#admin-nav-item').show();
             bindAdminEventListeners();
         }
@@ -105,7 +105,7 @@ async function showMainApp(userData, lineProfile) { // <--- function นี้�
         showError('เกิดข้อผิดพลาดในการโหลดข้อมูลบางส่วน');
         $('#main-app').fadeIn(); // ยังคงต้องแสดงหน้าหลัก
     } finally {
-        $('#loading-overlay').fadeOut();
+        $('#loading-overlay').fadeOut(400);
     }
 }
 
@@ -349,7 +349,6 @@ async function loadAndShowActivityDetails(activityId, activityTitle) {
         const submissions = await callApi('/api/submissions', { activityId, lineUserId: AppState.lineProfile.userId });
         renderSubmissions(submissions);
     } catch (error) { 
-        // 👇 เพิ่มบรรทัดนี้เข้าไป 👇
         console.error("Error details from loadAndShowActivityDetails:", error); 
         
         container.html('<p class="text-center text-danger">ไม่สามารถโหลดข้อมูลรายงานได้</p>'); 
@@ -390,7 +389,6 @@ async function loadLeaderboard() {
     }
 }
 
-// แก้ไข: ปรับปรุงฟังก์ชันให้สร้าง HTML สำหรับ CSS Grid
 async function loadUserBadges() {
     const container = $('#badges-container');
     const progressBar = $('#progress-bar');
@@ -411,7 +409,6 @@ async function loadUserBadges() {
                     </div>`;
                 container.append(html);
             });
-            // Re-initialize tooltips for new elements
             const tooltipTriggerList = [].slice.call(container[0].querySelectorAll('[data-bs-toggle="tooltip"]'));
             tooltipTriggerList.map(function (tooltipTriggerEl) {
                 return new bootstrap.Tooltip(tooltipTriggerEl);
@@ -463,7 +460,6 @@ function bindStaticEventListeners() {
     $('#form-activity-image-input').on('change', function() { handleImagePreview(this, '#activity-image-preview'); });
     $('#badge-image-input').on('change', function() { handleImagePreview(this, '#badge-image-preview'); });
 
-    // รวม Event Listener สำหรับปุ่มดูรูปภาพทั้งหมดไว้ในที่เดียว
     $(document).on('click', '.view-image-btn, .btn-view-activity-image', function(e) {
         e.preventDefault(); 
         const imageUrl = $(this).data('image-full-url');
@@ -658,13 +654,10 @@ async function handleSaveActivity(e) {
         AppState.allModals['activity-form'].hide();
         showSuccess('บันทึกกิจกรรมเรียบร้อย');
 
-        // เรียก API แค่ครั้งเดียว แล้วเก็บข้อมูลไว้ในตัวแปร
         const updatedActivities = await callApi('/api/admin/activities'); 
         
-        // นำข้อมูลที่ได้ไปอัปเดต UI ทุกส่วนที่ต้องการ
-        displayActivitiesUIForAdmin(updatedActivities); // ฟังก์ชันใหม่สำหรับ Admin UI
+        displayActivitiesUIForAdmin(updatedActivities);
         
-        // กรองเฉพาะกิจกรรมที่ active เพื่อแสดงให้ User ทั่วไป
         const activeActivities = updatedActivities.filter(act => act.status === 'active');
         displayActivitiesUI(activeActivities, 'latest-activities-list');
         displayActivitiesUI(activeActivities, 'all-activities-list');
@@ -1003,10 +996,20 @@ async function loadBadgesForAdmin() {
                     </div>`;
                 list.append(html);
             });
+            const tooltipTriggerList = [].slice.call(container[0].querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
         }
+        
+        const earnedBadges = badges.filter(b => b.isEarned).length;
+        const totalBadges = badges.length;
+        const progress = totalBadges > 0 ? (earnedBadges / totalBadges) * 100 : 0;
+        progressBar.css('width', progress + '%').attr('aria-valuenow', progress).text(Math.round(progress) + '%');
+        progressText.text(`คุณได้รับ ${earnedBadges} จาก ${totalBadges} ป้ายรางวัลทั้งหมด`);
+
     } catch (e) {
-        console.error("Error loading admin badges:", e);
-        list.html('<p class="text-center text-danger my-4">ไม่สามารถโหลดป้ายรางวัลได้</p>');
+        container.html('<p class="text-danger">ไม่สามารถโหลดป้ายรางวัลได้</p>');
     }
 }
 async function loadUsersForAdmin() {
@@ -1027,8 +1030,8 @@ async function loadUsersForAdmin() {
         users.forEach(user => {
             const earnedBadgeIds = user.earnedBadgeIds || [];
             const badgesToAwardHtml = allBadges.filter(b => !earnedBadgeIds.includes(b.badgeId))
-                                                        .map(b => `<button class="btn btn-sm btn-outline-primary award-badge-btn me-1 mb-1" data-user-id="${user.lineUserId}" data-badge-id="${b.badgeId}">${sanitizeHTML(b.badgeName)}</button>`)
-                                                        .join('');
+                                                         .map(b => `<button class="btn btn-sm btn-outline-primary award-badge-btn me-1 mb-1" data-user-id="${user.lineUserId}" data-badge-id="${b.badgeId}">${sanitizeHTML(b.badgeName)}</button>`)
+                                                         .join('');
 
             const html = `
                 <div class="card shadow-sm mb-3">
@@ -1072,8 +1075,8 @@ async function searchUsersForAdmin(query) {
         users.forEach(user => {
             const earnedBadgeIds = user.earnedBadgeIds || [];
             const badgesToAwardHtml = allBadges.filter(b => !earnedBadgeIds.includes(b.badgeId))
-                                                        .map(b => `<button class="btn btn-sm btn-outline-primary award-badge-btn me-1 mb-1" data-user-id="${user.lineUserId}" data-badge-id="${b.badgeId}">${sanitizeHTML(b.badgeName)}</button>`)
-                                                        .join('');
+                                                         .map(b => `<button class="btn btn-sm btn-outline-primary award-badge-btn me-1 mb-1" data-user-id="${user.lineUserId}" data-badge-id="${b.badgeId}">${sanitizeHTML(b.badgeName)}</button>`)
+                                                         .join('');
 
             const html = `
                 <div class="card shadow-sm mb-3">
