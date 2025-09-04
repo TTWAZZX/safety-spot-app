@@ -13,26 +13,21 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ตั้งค่า Cloudinary
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// ===== ปรับปรุงการตั้งค่า CORS ให้ยืดหยุ่นและมี Log =====
 const allowedOrigins = [
     'https://ttwazzx.github.io',
     'https://ttwazzx.github.io/safety-spot-app'
 ];
-
 const corsOptions = {
     origin: function (origin, callback) {
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            console.log(`[CORS DEBUG] Allowed origin: ${origin || 'No Origin'}`);
             callback(null, true);
         } else {
-            console.error(`[CORS DEBUG] Blocked origin: ${origin}`);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -40,38 +35,27 @@ const corsOptions = {
     optionsSuccessStatus: 204
 };
 app.use(cors(corsOptions));
-// ===== สิ้นสุดการปรับปรุง CORS =====
 
 app.use(express.json());
 
-// สร้าง Directory สำหรับ Uploads หากยังไม่มี
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir);
 }
 app.use('/uploads', express.static(uploadsDir));
 
-// ตั้งค่า Multer
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// ===== เพิ่ม Log อย่างละเอียดใน handleRequest =====
 const handleRequest = (handler) => async (req, res) => {
-    console.log(`[REQUEST START] ${req.method} ${req.path}`);
     try {
-        const data = await handler(req, res);
-        console.log(`[REQUEST HANDLER] Handler for ${req.path} returned data of type: ${typeof data}`);
-
+        let data = await handler(req, res);
         if (data === undefined) {
-            console.warn(`[REQUEST WARNING] Handler for ${req.path} returned undefined. Defaulting to null.`);
-            res.status(200).json({ status: 'success', data: null });
-        } else {
-            console.log(`[REQUEST SUCCESS] Sending 200 OK for ${req.path}`);
-            res.status(200).json({ status: 'success', data });
+            data = null;
         }
-
+        res.status(200).json({ status: 'success', data });
     } catch (error) {
-        console.error(`[REQUEST FAILED] API Error on ${req.method} ${req.path}:`, error);
+        console.error(`API Error on ${req.method} ${req.path}:`, error);
         res.status(500).json({ status: 'error', message: error.message || 'An internal server error occurred.' });
     }
 };
@@ -326,7 +310,4 @@ app.post('/api/admin/revoke-badge', isAdmin, handleRequest(async (req) => {
 
 // ================================= SERVER START =================================
 app.get('/', (req, res) => res.send('Backend server is running!'));
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+app.listen(PORT, '0.0.0.0', () => console.log(`Server is running on port ${PORT}`));
