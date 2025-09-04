@@ -67,10 +67,10 @@ async function initializeApp() {
 }
 
 async function showMainApp(userData) {
-    currentUser = userData;
-    updateUserInfoUI(currentUser);
+    AppState.currentUser = userData; // แก้ไขที่นี่
+    updateUserInfoUI(AppState.currentUser); // และที่นี่ด้วย
     
-    if (currentUser.isAdmin) {
+    if (AppState.currentUser.isAdmin) { // แก้ไขที่นี่ด้วยจะดีมากครับ
         $('#admin-nav-item').show();
         bindAdminEventListeners();
     }
