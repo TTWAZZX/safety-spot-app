@@ -490,6 +490,76 @@ function bindAdminEventListeners() {
     $(document).on('click', '.btn-edit-badge', handleEditBadge);
     $(document).on('click', '.btn-delete-activity', handleDeleteActivity);
     $(document).on('click', '.btn-delete-submission', handleDeleteSubmission);
+    $(document).on('click', '.user-card', function() { handleViewUserDetails($(this).data('userid')); });
+    $(document).on('click', '.badge-toggle-btn', handleToggleBadge);
+}
+
+async function handleViewUserDetails(lineUserId) {
+    const modal = AppState.allModals['user-details'] || new bootstrap.Modal(document.getElementById('user-details-modal'));
+    AppState.allModals['user-details'] = modal;
+    
+    $('#user-details-badges-container').html('<div class="text-center"><div class="spinner-border"></div></div>');
+    modal.show();
+
+    try {
+        const data = await callApi(`/api/admin/user-details/${lineUserId}`);
+        $('#user-details-pic').attr('src', getFullImageUrl(data.user.pictureUrl));
+        $('#user-details-name').text(data.user.fullName);
+        $('#user-details-info').text(`รหัส: ${data.user.employeeId} | คะแนน: ${data.user.totalScore}`);
+
+        const badgesContainer = $('#user-details-badges-container');
+        badgesContainer.empty();
+        
+        const badgesHtml = data.allBadges.map(badge => {
+            const isEarned = data.earnedBadgeIds.includes(badge.badgeId);
+            return `
+                <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                    <span>${sanitizeHTML(badge.badgeName)}</span>
+                    <button class="btn btn-sm ${isEarned ? 'btn-danger' : 'btn-success'} badge-toggle-btn"
+                            data-userid="${lineUserId}"
+                            data-badgeid="${badge.badgeId}"
+                            data-action="${isEarned ? 'revoke' : 'award'}">
+                        ${isEarned ? 'เพิกถอน' : 'มอบรางวัล'}
+                    </button>
+                </div>
+            `;
+        }).join('');
+        badgesContainer.html(badgesHtml);
+
+    } catch (e) {
+        showError(e.message);
+        $('#user-details-badges-container').html('<p class="text-danger">ไม่สามารถโหลดข้อมูลได้</p>');
+    }
+}
+
+async function handleToggleBadge() {
+    const btn = $(this);
+    const userId = btn.data('userid');
+    const badgeId = btn.data('badgeid');
+    const action = btn.data('action');
+
+    btn.prop('disabled', true);
+    
+    try {
+        const endpoint = action === 'award' ? '/api/admin/award-badge' : '/api/admin/revoke-badge';
+        await callApi(endpoint, { lineUserId: userId, badgeId: badgeId }, 'POST');
+        
+        // สลับ Action และ Style ของปุ่มหลังทำสำเร็จ
+        const newAction = action === 'award' ? 'revoke' : 'award';
+        const newText = newAction === 'revoke' ? 'เพิกถอน' : 'มอบรางวัล';
+        const newClass = newAction === 'revoke' ? 'btn-danger' : 'btn-success';
+        const oldClass = newAction === 'revoke' ? 'btn-success' : 'btn-danger';
+        
+        btn.data('action', newAction)
+           .text(newText)
+           .removeClass(oldClass)
+           .addClass(newClass);
+
+    } catch (e) {
+        showError(e.message);
+    } finally {
+        btn.prop('disabled', false);
+    }
 }
 
 function bindAdminTabEventListeners() {
@@ -691,22 +761,33 @@ async function handleSaveActivity(e) {
 }
 async function handleDeleteActivity() {
     const activityId = $(this).data('id');
+    // ดึงชื่อกิจกรรมจาก HTML element ที่ใกล้ที่สุด
+    const activityTitle = $(this).closest('.card-body').find('strong').text();
+
     const result = await Swal.fire({
-        title: 'แน่ใจหรือไม่?',
-        text: "คุณต้องการลบกิจกรรมนี้และรายงานทั้งหมดที่เกี่ยวข้องใช่ไหม?",
-        icon: 'warning',
+        title: 'ยืนยันการลบ',
+        html: `คุณต้องการลบกิจกรรม "<b>${sanitizeHTML(activityTitle)}</b>" ใช่ไหม?<br>การกระทำนี้ไม่สามารถย้อนกลับได้!<br><br>โปรดพิมพ์ "<b>${sanitizeHTML(activityTitle)}</b>" เพื่อยืนยัน:`,
+        input: 'text',
+        inputAttributes: { autocapitalize: 'off' },
         showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
         confirmButtonText: 'ใช่, ลบเลย!',
-        cancelButtonText: 'ยกเลิก'
+        confirmButtonColor: '#d33',
+        cancelButtonText: 'ยกเลิก',
+        showLoaderOnConfirm: true,
+        preConfirm: (inputValue) => {
+            if (inputValue !== activityTitle) {
+                Swal.showValidationMessage('ข้อความที่พิมพ์ไม่ตรงกัน!');
+                return false;
+            }
+            return true;
+        },
+        allowOutsideClick: () => !Swal.isLoading()
     });
 
     if (result.isConfirmed) {
-        showLoading('กำลังลบกิจกรรม...');
         try {
             await callApi(`/api/admin/activities/${activityId}`, {}, 'DELETE');
-            showSuccess('ลบกิจกรรมเรียบร้อย');
+            Swal.fire('ลบสำเร็จ!', 'กิจกรรมและรายงานที่เกี่ยวข้องถูกลบแล้ว', 'success');
             loadAllActivitiesForAdmin();
             const activities = await callApi('/api/activities');
             displayActivitiesUI(activities, 'latest-activities-list');
@@ -877,36 +958,6 @@ function handleEditBadge() {
     $('#badge-image-preview').attr('src', badgeUrl);
 
     AppState.allModals['badge-form'].show();
-}
-async function handleAwardBadge() {
-    const btn = $(this);
-    const userId = btn.data('user-id');
-    const badgeId = btn.data('badge-id');
-    const userName = btn.closest('.card').find('h6').text();
-
-    const result = await Swal.fire({
-        title: `ยืนยันการมอบป้ายรางวัล`,
-        text: `คุณต้องการมอบป้าย "${btn.text()}" ให้กับคุณ ${userName} ใช่หรือไม่?`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: 'var(--line-green)',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'ยืนยัน',
-        cancelButtonText: 'ยกเลิก'
-    });
-
-    if (result.isConfirmed) {
-        showLoading('กำลังมอบป้ายรางวัล...');
-        btn.prop('disabled', true);
-        try {
-            await callApi('/api/admin/award-badge', { lineUserId: userId, badgeId: badgeId }, 'POST');
-            btn.text('มอบแล้ว').addClass('btn-success').removeClass('btn-outline-primary').prop('disabled', true);
-            showSuccess('มอบป้ายรางวัลเรียบร้อย');
-        } catch (e) {
-            showError(e.message);
-            btn.prop('disabled', false);
-        }
-    }
 }
 
 async function loadAdminDashboard() {

@@ -139,7 +139,8 @@
                     <a href="#" id="view-stats-btn" class="list-group-item list-group-item-action"><i class="fas fa-chart-line me-2"></i> ดูข้อมูลสรุป (Dashboard เก่า)</a>
                 </div>
             </div>
-            </main>
+
+        </main>
         
         <nav class="navbar navbar-light bg-white fixed-bottom bottom-nav">
             <div class="container-fluid d-flex justify-content-around">
@@ -162,15 +163,14 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="admin-reports-container" class="container-fluid px-0">
-                        </div>
-                    
+                    <div id="admin-reports-container" class="container-fluid px-0"></div>
                     <div id="reports-loading" class="text-center my-4" style="display: none;"><div class="spinner-border"></div></div>
                     <div id="no-reports-message" class="text-center my-4" style="display:none;"><p class="text-muted">ไม่มีรายการที่รอตรวจสอบ</p></div>
                 </div>
             </div>
         </div>
     </div>
+
     <div class="modal fade" id="admin-activities-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><button id="create-activity-btn" class="btn btn-success mb-3"><i class="fas fa-plus"></i> สร้างกิจกรรมใหม่</button><div id="activities-list-admin"></div></div></div></div></div>
     <div class="modal fade" id="activity-form-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-form-title">สร้างกิจกรรมใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="activity-form"><input type="hidden" id="form-activity-id"><div class="mb-3"><label class="form-label">หัวข้อ</label><input type="text" class="form-control" id="form-activity-title" required></div><div class="mb-3"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="form-activity-desc" rows="3" required></textarea></div><div class="mb-3"><label class="form-label">รูปภาพกิจกรรม</label><input type="file" class="form-control" id="form-activity-image-input" accept="image/*"><div class="image-preview-container mt-2"><img id="activity-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview"></div><input type="hidden" id="form-activity-image-url"></div><button type="submit" class="btn btn-primary w-100">บันทึก</button></form></div></div></div></div>
     <div class="modal fade" id="activity-detail-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-detail-title">...</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body bg-light"><div id="submissions-container" class="container-fluid"></div><div id="submissions-loading" class="text-center my-5"><div class="spinner-border" style="color: var(--line-green);"></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">ปิด</button></div></div></div></div>
@@ -179,6 +179,27 @@
     <div class="modal fade" id="admin-manage-badges-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการผู้ใช้และป้ายรางวัล</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><ul class="nav nav-tabs mb-4"><li class="nav-item"><a class="nav-link active admin-tab-btn" data-tab="manageBadges" href="#">จัดการป้ายรางวัล</a></li><li class="nav-item"><a class="nav-link admin-tab-btn" data-tab="manageUsers" href="#">มอบป้ายรางวัลให้ผู้ใช้</a></a></li></ul><div id="manageBadgesTab" class="admin-tab-content active"><button id="add-badge-btn" class="btn btn-success mb-3"><i class="fas fa-plus"></i> เพิ่มป้ายรางวัลใหม่</button><div id="badges-list" class="row"></div></div><div id="manageUsersTab" class="admin-tab-content" style="display:none;"><div class="mb-3"><input type="text" id="user-search-input" class="form-control" placeholder="ค้นหาผู้ใช้ด้วยชื่อหรือรหัสพนักงาน..."></div><div id="user-search-results"></div></div></div></div></div></div>
     <div class="modal fade" id="badge-form-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="badge-form-title">เพิ่มป้ายรางวัลใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="badge-form"><input type="hidden" id="badge-id-input"><div class="mb-3"><label class="form-label">ชื่อป้ายรางวัล</label><input type="text" class="form-control" id="badge-name-input" required></div><div class="mb-3"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="badge-desc-input" rows="3" required></textarea></div><div class="mb-3"><label class="form-label">รูปภาพป้ายรางวัล</label><input type="file" class="form-control" id="badge-image-input" accept="image/*" required><div class="image-preview-container mt-2"><img id="badge-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview"></div><input type="hidden" id="badge-image-url-input"></div><button type="submit" class="btn btn-primary w-100">บันทึก</button></form></div></div></div></div>
 
+    <div class="modal fade" id="user-details-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="user-details-modal-title">จัดการป้ายรางวัล</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        <img id="user-details-pic" src="https://placehold.co/60x60" class="rounded-circle mb-2" width="60" height="60">
+                        <h5 id="user-details-name" class="fw-bold mb-0">...</h5>
+                        <small id="user-details-info" class="text-muted">...</small>
+                    </div>
+                    <hr>
+                    <div id="user-details-badges-container">
+                        <div class="text-center"><div class="spinner-border"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
