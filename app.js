@@ -69,12 +69,12 @@ async function initializeApp() {
 
             await showMainApp(result.user);
         } else {
-            console.log("3. เงื่อนไขเป็นเท็จ (Not Registered): กำลังแสดงหน้าลงทะเบียน");
+    console.log("3. เงื่อนไขเป็นเท็จ (Not Registered): กำลังแสดงหน้าลงทะเบียน");
 
-            $('#loading-overlay').fadeOut(400, function() {
-                $('#registration-page').fadeIn();
-            });
-        }
+    // แก้ไขแค่ 2 บรรทัดนี้
+    $('#loading-overlay').hide();
+    $('#registration-page').show();
+}
     } catch (error) {
         console.error("เกิดข้อผิดพลาดร้ายแรงใน initializeApp:", error);
         $('#loading-status-text').text('เกิดข้อผิดพลาด');
