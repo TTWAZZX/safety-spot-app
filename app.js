@@ -71,8 +71,11 @@ async function initializeApp() {
         } else {
     console.log("3. เงื่อนไขเป็นเท็จ (Not Registered): กำลังแสดงหน้าลงทะเบียน");
 
-    // แก้ไขแค่ 2 บรรทัดนี้
-    $('#loading-overlay').hide();
+    // --- โค้ดแก้ไขสุดท้าย ---
+    // ใช้ Class d-none ของ Bootstrap เพื่อซ่อนทับ d-flex
+    $('#loading-overlay').addClass('d-none');
+    
+    // ส่วน .show() นี้ทำงานได้ดีอยู่แล้ว ให้คงไว้เหมือนเดิม
     $('#registration-page').show();
 }
     } catch (error) {
