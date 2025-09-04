@@ -290,6 +290,25 @@ app.get('/api/admin/user-details/:lineUserId', isAdmin, handleRequest(async (req
     };
 }));
 
+app.get('/api/admin/user-details/:lineUserId', isAdmin, handleRequest(async (req) => {
+    const { lineUserId } = req.params;
+    const [userRes, allBadgesRes, userBadgesRes] = await Promise.all([
+        db.query('SELECT "lineUserId", "fullName", "employeeId", "totalScore" FROM users WHERE "lineUserId" = $1', [lineUserId]),
+        db.query('SELECT "badgeId", "badgeName" FROM badges ORDER BY "badgeName"'),
+        db.query('SELECT "badgeId" FROM user_badges WHERE "lineUserId" = $1', [lineUserId])
+    ]);
+
+    if (userRes.rows.length === 0) throw new Error('User not found');
+
+    const earnedBadgeIds = new Set(userBadgesRes.rows.map(b => b.badgeId));
+
+    return {
+        user: userRes.rows[0],
+        allBadges: allBadgesRes.rows,
+        earnedBadgeIds: Array.from(earnedBadgeIds)
+    };
+}));
+
 app.get('/api/admin/badges', isAdmin, handleRequest(async () => (await db.query('SELECT * FROM badges ORDER BY "badgeName"')).rows));
 
 app.post('/api/admin/badges', isAdmin, handleRequest(async (req) => {
