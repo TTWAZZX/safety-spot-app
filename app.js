@@ -33,9 +33,12 @@ $(document).ready(function() {
 
 
 function initializeAllModals() {
-    const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form'];
+    const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form', 'user-details'];
     modalIds.forEach(id => {
-        AppState.allModals[id] = new bootstrap.Modal(document.getElementById(`${id}-modal`));
+        const modalElement = document.getElementById(`${id}-modal`);
+        if (modalElement) {
+            AppState.allModals[id] = new bootstrap.Modal(modalElement);
+        }
     });
 }
 
@@ -54,32 +57,19 @@ async function initializeApp() {
         $('#loading-sub-text').text('กรุณารอสักครู่...');
         const lineProfile = await liff.getProfile();
         AppState.lineProfile = lineProfile;
-
-        console.log("1. ได้รับโปรไฟล์จาก LIFF:", lineProfile);
         
         $('#loading-status-text').text('กำลังตรวจสอบการลงทะเบียน');
         $('#loading-sub-text').text('เชื่อมต่อกับเซิร์ฟเวอร์ Safety Spot...');
         const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId });
-
-         console.log("2. ได้รับผลลัพธ์จาก API:", result);
         
         if (result.registered) {
-
-            console.log("3. เงื่อนไขเป็นจริง (Registered): กำลังแสดงแอปหลัก");
-
             await showMainApp(result.user);
         } else {
-    console.log("3. เงื่อนไขเป็นเท็จ (Not Registered): กำลังแสดงหน้าลงทะเบียน");
-
-    // --- โค้ดแก้ไขสุดท้าย ---
-    // ใช้ Class d-none ของ Bootstrap เพื่อซ่อนทับ d-flex
-    $('#loading-overlay').addClass('d-none');
-    
-    // ส่วน .show() นี้ทำงานได้ดีอยู่แล้ว ให้คงไว้เหมือนเดิม
-    $('#registration-page').show();
-}
+            $('#loading-overlay').addClass('d-none');
+            $('#registration-page').show();
+        }
     } catch (error) {
-        console.error("เกิดข้อผิดพลาดร้ายแรงใน initializeApp:", error);
+        console.error("Initialization failed:", error);
         $('#loading-status-text').text('เกิดข้อผิดพลาด');
         $('#loading-sub-text').text('ไม่สามารถเริ่มต้นแอปพลิเคชันได้ กรุณาลองใหม่อีกครั้ง').addClass('text-danger');
         $('.spinner-border').hide();
@@ -107,7 +97,6 @@ async function showMainApp(userData) {
         showError('เกิดข้อผิดพลาดในการโหลดข้อมูลบางส่วน');
         $('#main-app').fadeIn();
     } finally {
-        // ใช้ .addClass('d-none') เหมือนกับที่เราแก้ไปเมื่อวาน
         $('#loading-overlay').addClass('d-none');
     }
 }
@@ -486,80 +475,13 @@ function bindAdminEventListeners() {
     $(document).on('click', '.btn-edit-activity', handleEditActivity);
     $(document).on('click', '.btn-toggle-activity', handleToggleActivity);
     $(document).on('click', '.delete-badge-btn', handleDeleteBadge);
-    $(document).on('click', '.award-badge-btn', handleAwardBadge);
     $(document).on('click', '.btn-edit-badge', handleEditBadge);
     $(document).on('click', '.btn-delete-activity', handleDeleteActivity);
     $(document).on('click', '.btn-delete-submission', handleDeleteSubmission);
+    // ===== START: Event Listeners for Idea 3 =====
     $(document).on('click', '.user-card', function() { handleViewUserDetails($(this).data('userid')); });
     $(document).on('click', '.badge-toggle-btn', handleToggleBadge);
-}
-
-async function handleViewUserDetails(lineUserId) {
-    const modal = AppState.allModals['user-details'] || new bootstrap.Modal(document.getElementById('user-details-modal'));
-    AppState.allModals['user-details'] = modal;
-    
-    $('#user-details-badges-container').html('<div class="text-center"><div class="spinner-border"></div></div>');
-    modal.show();
-
-    try {
-        const data = await callApi(`/api/admin/user-details/${lineUserId}`);
-        $('#user-details-pic').attr('src', getFullImageUrl(data.user.pictureUrl));
-        $('#user-details-name').text(data.user.fullName);
-        $('#user-details-info').text(`รหัส: ${data.user.employeeId} | คะแนน: ${data.user.totalScore}`);
-
-        const badgesContainer = $('#user-details-badges-container');
-        badgesContainer.empty();
-        
-        const badgesHtml = data.allBadges.map(badge => {
-            const isEarned = data.earnedBadgeIds.includes(badge.badgeId);
-            return `
-                <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
-                    <span>${sanitizeHTML(badge.badgeName)}</span>
-                    <button class="btn btn-sm ${isEarned ? 'btn-danger' : 'btn-success'} badge-toggle-btn"
-                            data-userid="${lineUserId}"
-                            data-badgeid="${badge.badgeId}"
-                            data-action="${isEarned ? 'revoke' : 'award'}">
-                        ${isEarned ? 'เพิกถอน' : 'มอบรางวัล'}
-                    </button>
-                </div>
-            `;
-        }).join('');
-        badgesContainer.html(badgesHtml);
-
-    } catch (e) {
-        showError(e.message);
-        $('#user-details-badges-container').html('<p class="text-danger">ไม่สามารถโหลดข้อมูลได้</p>');
-    }
-}
-
-async function handleToggleBadge() {
-    const btn = $(this);
-    const userId = btn.data('userid');
-    const badgeId = btn.data('badgeid');
-    const action = btn.data('action');
-
-    btn.prop('disabled', true);
-    
-    try {
-        const endpoint = action === 'award' ? '/api/admin/award-badge' : '/api/admin/revoke-badge';
-        await callApi(endpoint, { lineUserId: userId, badgeId: badgeId }, 'POST');
-        
-        // สลับ Action และ Style ของปุ่มหลังทำสำเร็จ
-        const newAction = action === 'award' ? 'revoke' : 'award';
-        const newText = newAction === 'revoke' ? 'เพิกถอน' : 'มอบรางวัล';
-        const newClass = newAction === 'revoke' ? 'btn-danger' : 'btn-success';
-        const oldClass = newAction === 'revoke' ? 'btn-success' : 'btn-danger';
-        
-        btn.data('action', newAction)
-           .text(newText)
-           .removeClass(oldClass)
-           .addClass(newClass);
-
-    } catch (e) {
-        showError(e.message);
-    } finally {
-        btn.prop('disabled', false);
-    }
+    // ===== END: Event Listeners for Idea 3 =====
 }
 
 function bindAdminTabEventListeners() {
@@ -692,9 +614,9 @@ function handleImagePreview(input, previewSelector) {
 }
 
 // --- Admin Handlers ---
-function handleViewStats() { loadAdminStats(); AppState.allModals['admin-stats'].show(); }
-function handleManageReports() { loadPendingSubmissions(); AppState.allModals['admin-reports'].show(); }
-function handleManageActivities() { loadAllActivitiesForAdmin(); AppState.allModals['admin-activities'].show(); }
+async function handleViewStats() { await loadAdminStats(); AppState.allModals['admin-stats'].show(); }
+async function handleManageReports() { await loadPendingSubmissions(); AppState.allModals['admin-reports'].show(); }
+async function handleManageActivities() { await loadAllActivitiesForAdmin(); AppState.allModals['admin-activities'].show(); }
 function handleCreateActivity() {
     $('#activity-form-title').text('สร้างกิจกรรมใหม่');
     $('#activity-form')[0].reset();
@@ -702,6 +624,8 @@ function handleCreateActivity() {
     $('#activity-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
     AppState.allModals['activity-form'].show();
 }
+
+// This function creates a new UI function to be reusable
 function displayActivitiesUIForAdmin(activities) {
     const list = $('#activities-list-admin');
     list.empty();
@@ -722,6 +646,7 @@ function displayActivitiesUIForAdmin(activities) {
         list.append(html);
     });
 }
+
 async function handleSaveActivity(e) {
     e.preventDefault();
     showLoading('กำลังบันทึก...');
@@ -750,18 +675,18 @@ async function handleSaveActivity(e) {
 
         const allActivities = await callApi('/api/admin/activities');
         
-        displayActivitiesUIForAdmin(allActivities); // อัปเดต UI ฝั่งแอดมินด้วยฟังก์ชันใหม่
-        
+        displayActivitiesUIForAdmin(allActivities); 
+
         const activeActivities = allActivities.filter(act => act.status === 'active');
-        displayActivitiesUI(activeActivities, 'latest-activities-list'); // อัปเดต UI ฝั่งผู้ใช้
+        displayActivitiesUI(activeActivities, 'latest-activities-list');
         displayActivitiesUI(activeActivities, 'all-activities-list');
     } catch (e) {
         showError(e.message);
     }
 }
+// ===== START: Idea 4 - Safer Delete Confirmation =====
 async function handleDeleteActivity() {
     const activityId = $(this).data('id');
-    // ดึงชื่อกิจกรรมจาก HTML element ที่ใกล้ที่สุด
     const activityTitle = $(this).closest('.card-body').find('strong').text();
 
     const result = await Swal.fire({
@@ -788,8 +713,8 @@ async function handleDeleteActivity() {
         try {
             await callApi(`/api/admin/activities/${activityId}`, {}, 'DELETE');
             Swal.fire('ลบสำเร็จ!', 'กิจกรรมและรายงานที่เกี่ยวข้องถูกลบแล้ว', 'success');
-            loadAllActivitiesForAdmin();
-            const activities = await callApi('/api/activities');
+            loadAllActivitiesForAdmin(); // Reload admin list
+            const activities = await callApi('/api/activities'); // Reload user list
             displayActivitiesUI(activities, 'latest-activities-list');
             displayActivitiesUI(activities, 'all-activities-list');
         } catch (e) {
@@ -797,27 +722,22 @@ async function handleDeleteActivity() {
         }
     }
 }
-// แก้ไขฟังก์ชันนี้
+// ===== END: Idea 4 - Safer Delete Confirmation =====
+
 async function handleApprovalAction() {
     const btn = $(this);
     const action = btn.hasClass('btn-approve') ? 'approve' : 'reject';
     const id = btn.data('id');
     const score = $(`#score-input-${id}`).val();
-
-    // แก้จาก row เป็น card
     const card = $(`#report-card-${id}`); 
-
     card.css('opacity', '0.5');
     btn.prop('disabled', true).closest('.d-flex').find('button, input').prop('disabled', true);
-
     try {
         if (action === 'approve') {
             await callApi(`/api/admin/submissions/approve`, { submissionId: id, score: score }, 'POST');
         } else {
             await callApi(`/api/admin/submissions/reject`, { submissionId: id }, 'POST');
         }
-
-        // แก้จาก row เป็น card และทำให้มี Animation สวยงามขึ้น
         card.slideUp(500, function() { 
             $(this).remove(); 
             const newCount = $('.report-card').length;
@@ -960,6 +880,85 @@ function handleEditBadge() {
     AppState.allModals['badge-form'].show();
 }
 
+// ===== START: New functions for Idea 3 =====
+async function handleViewUserDetails(lineUserId) {
+    const modal = AppState.allModals['user-details'];
+    if (!modal) return;
+    
+    $('#user-details-badges-container').html('<div class="text-center"><div class="spinner-border"></div></div>');
+    modal.show();
+
+    try {
+        const data = await callApi(`/api/admin/user-details/${lineUserId}`);
+        $('#user-details-pic').attr('src', getFullImageUrl(data.user.pictureUrl));
+        $('#user-details-name').text(data.user.fullName);
+        $('#user-details-info').text(`รหัส: ${data.user.employeeId} | คะแนน: ${data.user.totalScore}`);
+
+        const badgesContainer = $('#user-details-badges-container');
+        badgesContainer.empty();
+        
+        if (data.allBadges.length === 0) {
+            badgesContainer.html('<p class="text-center text-muted">ยังไม่มีป้ายรางวัลในระบบ</p>');
+            return;
+        }
+
+        const badgesHtml = data.allBadges.map(badge => {
+            const isEarned = data.earnedBadgeIds.includes(badge.badgeId);
+            return `
+                <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                    <span>${sanitizeHTML(badge.badgeName)}</span>
+                    <button class="btn btn-sm ${isEarned ? 'btn-outline-danger' : 'btn-success'} badge-toggle-btn"
+                            data-userid="${lineUserId}"
+                            data-badgeid="${badge.badgeId}"
+                            data-action="${isEarned ? 'revoke' : 'award'}">
+                        <i class="fas ${isEarned ? 'fa-times' : 'fa-check'} me-1"></i>
+                        ${isEarned ? 'เพิกถอน' : 'มอบรางวัล'}
+                    </button>
+                </div>
+            `;
+        }).join('');
+        badgesContainer.html(badgesHtml);
+
+    } catch (e) {
+        showError(e.message);
+        $('#user-details-badges-container').html('<p class="text-danger">ไม่สามารถโหลดข้อมูลได้</p>');
+    }
+}
+
+async function handleToggleBadge() {
+    const btn = $(this);
+    const userId = btn.data('userid');
+    const badgeId = btn.data('badgeid');
+    const action = btn.data('action');
+
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+    
+    try {
+        const endpoint = action === 'award' ? '/api/admin/award-badge' : '/api/admin/revoke-badge';
+        await callApi(endpoint, { lineUserId: userId, badgeId: badgeId }, 'POST');
+        
+        const newAction = action === 'award' ? 'revoke' : 'award';
+        const newText = newAction === 'revoke' ? 'เพิกถอน' : 'มอบรางวัล';
+        const newClass = newAction === 'revoke' ? 'btn-outline-danger' : 'btn-success';
+        const oldClass = newAction === 'revoke' ? 'btn-success' : 'btn-outline-danger';
+        const newIcon = newAction === 'revoke' ? 'fa-times' : 'fa-check';
+        
+        btn.data('action', newAction)
+           .html(`<i class="fas ${newIcon} me-1"></i> ${newText}`)
+           .removeClass(oldClass)
+           .addClass(newClass);
+
+    } catch (e) {
+        showError(e.message);
+        // Reset button to original state on error
+        const originalText = action === 'award' ? 'มอบรางวัล' : 'เพิกถอน';
+        btn.html(`<i class="fas ${action === 'award' ? 'fa-check' : 'fa-times'} me-1"></i> ${originalText}`);
+    } finally {
+        btn.prop('disabled', false);
+    }
+}
+// ===== END: New functions for Idea 3 =====
+
 async function loadAdminDashboard() {
     try {
         const stats = await callApi('/api/admin/dashboard-stats');
@@ -998,7 +997,7 @@ async function loadAdminStats() {
     }
 }
 async function loadPendingSubmissions() {
-    const container = $('#admin-reports-container'); // เปลี่ยนเป้าหมายเป็น container ใหม่
+    const container = $('#admin-reports-container');
     $('#reports-loading').show();
     $('#no-reports-message').hide();
     container.empty();
@@ -1047,23 +1046,7 @@ async function loadAllActivitiesForAdmin() {
     list.html('<div class="spinner-border"></div>');
     try {
         const acts = await callApi('/api/admin/activities');
-        list.empty();
-        acts.forEach(a => {
-            const statusBadge = a.status === 'active' ? 'bg-success' : 'bg-secondary';
-            const btnText = a.status === 'active' ? 'ปิดใช้งาน' : 'เปิดใช้งาน';
-            const btnClass = a.status === 'active' ? 'btn-outline-secondary' : 'btn-outline-success';
-            const activityData = encodeURIComponent(JSON.stringify(a));
-            const html = `
-                <div class="card mb-2"><div class="card-body d-flex align-items-center">
-                    <div><span class="badge ${statusBadge} me-2">${a.status}</span><strong>${sanitizeHTML(a.title)}</strong></div>
-                    <div class="ms-auto">
-                        <button class="btn btn-sm btn-primary btn-edit-activity me-1" data-activity-data='${activityData}'><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm ${btnClass} btn-toggle-activity me-1" data-id="${a.activityId}">${btnText}</button>
-                        <button class="btn btn-sm btn-danger btn-delete-activity" data-id="${a.activityId}"><i class="fas fa-trash-alt"></i></button>
-                    </div>
-                </div></div>`;
-            list.append(html);
-        });
+        displayActivitiesUIForAdmin(acts);
     } catch(e) {
         list.html('<p class="text-danger">ไม่สามารถโหลดกิจกรรมได้</p>');
     }
@@ -1078,7 +1061,6 @@ async function loadBadgesForAdmin() {
             list.html('<p class="text-center text-muted my-4">ยังไม่มีป้ายรางวัลในระบบ</p>');
         } else {
             badges.forEach(b => {
-                const lockClass = b.isEarned ? '' : 'locked';
                 const html = `
                     <div class="col-6 col-md-4 col-lg-3 mb-3">
                         <div class="card h-100 shadow-sm text-center admin-badge-card">
@@ -1103,112 +1085,66 @@ async function loadBadgesForAdmin() {
                     </div>`;
                 list.append(html);
             });
-            const tooltipTriggerList = [].slice.call(container[0].querySelectorAll('[data-bs-toggle="tooltip"]'));
-            tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl);
-            });
         }
-        
-        const earnedBadges = badges.filter(b => b.isEarned).length;
-        const totalBadges = badges.length;
-        const progress = totalBadges > 0 ? (earnedBadges / totalBadges) * 100 : 0;
-        progressBar.css('width', progress + '%').attr('aria-valuenow', progress).text(Math.round(progress) + '%');
-        progressText.text(`คุณได้รับ ${earnedBadges} จาก ${totalBadges} ป้ายรางวัลทั้งหมด`);
-
     } catch (e) {
-        container.html('<p class="text-danger">ไม่สามารถโหลดป้ายรางวัลได้</p>');
+        list.html('<p class="text-danger">ไม่สามารถโหลดป้ายรางวัลได้</p>');
     }
 }
+
+// ===== START: Updated User Search/Load functions for Idea 3 =====
 async function loadUsersForAdmin() {
     const resultsContainer = $('#user-search-results');
     resultsContainer.html('<div class="text-center my-4"><div class="spinner-border text-success"></div><p class="text-muted mt-2">กำลังโหลดผู้ใช้...</p></div>');
     try {
-        const [users, allBadges] = await Promise.all([
-            callApi('/api/admin/users'), 
-            callApi('/api/admin/badges')
-        ]);
-
+        const users = await callApi('/api/admin/users');
         resultsContainer.empty();
         if (users.length === 0) {
             resultsContainer.html('<p class="text-center text-muted my-4">ไม่พบผู้ใช้งาน</p>');
             return;
         }
-
-        users.forEach(user => {
-            const earnedBadgeIds = user.earnedBadgeIds || [];
-            const badgesToAwardHtml = allBadges.filter(b => !earnedBadgeIds.includes(b.badgeId))
-                                                         .map(b => `<button class="btn btn-sm btn-outline-primary award-badge-btn me-1 mb-1" data-user-id="${user.lineUserId}" data-badge-id="${b.badgeId}">${sanitizeHTML(b.badgeName)}</button>`)
-                                                         .join('');
-
-            const html = `
-                <div class="card shadow-sm mb-3">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center mb-3">
-                            <img src="${getFullImageUrl(user.pictureUrl) || 'https://placehold.co/45x45'}" class="rounded-circle me-3" width="45" height="45" alt="Profile">
-                            <div>
-                                <h6 class="fw-bold mb-0">${sanitizeHTML(user.fullName)}</h6>
-                                <small class="text-muted">รหัส: ${sanitizeHTML(user.employeeId)} | คะแนน: ${user.totalScore}</small>
-                            </div>
-                        </div>
-                        <hr>
-                        <p class="fw-bold mb-2">ป้ายรางวัลที่มอบให้ได้:</p>
-                        <div class="badges-award-container">
-                            ${badgesToAwardHtml || '<small class="text-muted">ผู้ใช้ได้รับป้ายรางวัลทั้งหมดแล้ว หรือยังไม่มีป้ายรางวัลให้มอบ</small>'}
-                        </div>
-                    </div>
-                </div>`;
-            resultsContainer.append(html);
-        });
+        renderUserListForAdmin(users, resultsContainer);
     } catch (e) {
         console.error("Error loading users for admin:", e);
         resultsContainer.html('<p class="text-center text-danger my-4">ไม่สามารถโหลดรายชื่อผู้ใช้ได้</p>');
     }
 }
+
 async function searchUsersForAdmin(query) {
     const resultsContainer = $('#user-search-results');
     resultsContainer.html('<div class="text-center my-4"><div class="spinner-border text-success"></div><p class="text-muted mt-2">กำลังค้นหาผู้ใช้...</p></div>');
     try {
-        const [users, allBadges] = await Promise.all([
-            callApi('/api/admin/users', { search: query }),
-            callApi('/api/admin/badges')
-        ]);
-
+        const users = await callApi('/api/admin/users', { search: query });
         resultsContainer.empty();
         if (users.length === 0) {
             resultsContainer.html('<p class="text-center text-muted my-4">ไม่พบผู้ใช้งานที่ตรงกับการค้นหา</p>');
             return;
         }
-
-        users.forEach(user => {
-            const earnedBadgeIds = user.earnedBadgeIds || [];
-            const badgesToAwardHtml = allBadges.filter(b => !earnedBadgeIds.includes(b.badgeId))
-                                                         .map(b => `<button class="btn btn-sm btn-outline-primary award-badge-btn me-1 mb-1" data-user-id="${user.lineUserId}" data-badge-id="${b.badgeId}">${sanitizeHTML(b.badgeName)}</button>`)
-                                                         .join('');
-
-            const html = `
-                <div class="card shadow-sm mb-3">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center mb-3">
-                            <img src="${getFullImageUrl(user.pictureUrl) || 'https://placehold.co/45x45'}" class="rounded-circle me-3" width="45" height="45" alt="Profile">
-                            <div>
-                                <h6 class="fw-bold mb-0">${sanitizeHTML(user.fullName)}</h6>
-                                <small class="text-muted">รหัส: ${sanitizeHTML(user.employeeId)} | คะแนน: ${user.totalScore}</small>
-                            </div>
-                        </div>
-                        <hr>
-                        <p class="fw-bold mb-2">ป้ายรางวัลที่มอบให้ได้:</p>
-                        <div class="badges-award-container">
-                            ${badgesToAwardHtml || '<small class="text-muted">ผู้ใช้ได้รับป้ายรางวัลทั้งหมดแล้ว หรือยังไม่มีป้ายรางวัลให้มอบ</small>'}
-                        </div>
-                    </div>
-                </div>`;
-            resultsContainer.append(html);
-        });
+        renderUserListForAdmin(users, resultsContainer);
     } catch (e) {
         console.error("Error searching users for admin:", e);
         resultsContainer.html('<p class="text-center text-danger my-4">ไม่สามารถค้นหาผู้ใช้ได้</p>');
     }
 }
+
+function renderUserListForAdmin(users, container) {
+    users.forEach(user => {
+        const html = `
+            <div class="card shadow-sm mb-2 user-card" style="cursor: pointer;" data-userid="${user.lineUserId}">
+                <div class="card-body p-2">
+                    <div class="d-flex align-items-center">
+                        <img src="${getFullImageUrl(user.pictureUrl) || 'https://placehold.co/45x45'}" class="rounded-circle me-3" width="45" height="45" alt="Profile">
+                        <div>
+                            <h6 class="fw-bold mb-0">${sanitizeHTML(user.fullName)}</h6>
+                            <small class="text-muted">รหัส: ${sanitizeHTML(user.employeeId)} | คะแนน: ${user.totalScore}</small>
+                        </div>
+                        <i class="fas fa-chevron-right ms-auto text-muted"></i>
+                    </div>
+                </div>
+            </div>`;
+        container.append(html);
+    });
+}
+// ===== END: Updated User Search/Load functions for Idea 3 =====
 
 // ===============================================================
 //  UTILITY FUNCTIONS
