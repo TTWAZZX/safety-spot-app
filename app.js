@@ -93,7 +93,7 @@ async function showMainApp(userData) {
     displayActivitiesUI(activities, 'all-activities-list');
     
     $('#main-app').fadeIn();
-    Swal.close();
+    $('#loading-overlay').fadeOut();
 }
 
 // ===============================================================
