@@ -54,20 +54,29 @@ async function initializeApp() {
         $('#loading-sub-text').text('กรุณารอสักครู่...');
         const lineProfile = await liff.getProfile();
         AppState.lineProfile = lineProfile;
+
+        console.log("1. ได้รับโปรไฟล์จาก LIFF:", lineProfile);
         
         $('#loading-status-text').text('กำลังตรวจสอบการลงทะเบียน');
         $('#loading-sub-text').text('เชื่อมต่อกับเซิร์ฟเวอร์ Safety Spot...');
         const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId });
+
+         console.log("2. ได้รับผลลัพธ์จาก API:", result);
         
         if (result.registered) {
+
+            console.log("3. เงื่อนไขเป็นจริง (Registered): กำลังแสดงแอปหลัก");
+
             await showMainApp(result.user);
         } else {
+            console.log("3. เงื่อนไขเป็นเท็จ (Not Registered): กำลังแสดงหน้าลงทะเบียน");
+
             $('#loading-overlay').fadeOut(400, function() {
                 $('#registration-page').fadeIn();
             });
         }
     } catch (error) {
-        console.error("Initialization failed:", error);
+        console.error("เกิดข้อผิดพลาดร้ายแรงใน initializeApp:", error);
         $('#loading-status-text').text('เกิดข้อผิดพลาด');
         $('#loading-sub-text').text('ไม่สามารถเริ่มต้นแอปพลิเคชันได้ กรุณาลองใหม่อีกครั้ง').addClass('text-danger');
         $('.spinner-border').hide();
