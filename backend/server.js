@@ -185,6 +185,20 @@ app.get('/api/admin/stats', isAdmin, handleRequest(async () => {
     return { totalUsers: parseInt(totalUsersRes.rows[0].totalUsers), totalSubmissions: parseInt(totalSubmissionsRes.rows[0].totalSubmissions), submissionsToday: parseInt(submissionsTodayRes.rows[0].submissionsToday), mostReportedActivity: mostReportedRes.rows.length > 0 ? mostReportedRes.rows[0].title : "N/A" };
 }));
 
+app.get('/api/admin/dashboard-stats', isAdmin, handleRequest(async (req) => {
+    const [pendingRes, usersRes, activitiesRes] = await Promise.all([
+        db.query("SELECT COUNT(*) FROM submissions WHERE status = 'pending'"),
+        db.query("SELECT COUNT(*) FROM users"),
+        db.query("SELECT COUNT(*) FROM activities WHERE status = 'active'")
+    ]);
+
+    return {
+        pendingCount: parseInt(pendingRes.rows[0].count, 10),
+        userCount: parseInt(usersRes.rows[0].count, 10),
+        activeActivitiesCount: parseInt(activitiesRes.rows[0].count, 10)
+    };
+}));
+
 app.get('/api/admin/chart-data', isAdmin, handleRequest(async () => {
     const query = `SELECT TO_CHAR(d.day, 'YYYY-MM-DD') AS date, COUNT(s."submissionId")::int AS count FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day') AS d(day) LEFT JOIN submissions s ON DATE(s."createdAt") = d.day GROUP BY d.day ORDER BY d.day;`;
     const res = await db.query(query);

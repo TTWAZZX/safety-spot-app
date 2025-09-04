@@ -444,6 +444,7 @@ function bindStaticEventListeners() {
             $('#' + pageId).addClass('active');
             if (pageId === 'leaderboard-page') loadLeaderboard();
             if (pageId === 'profile-page') loadUserBadges();
+            if (pageId === 'admin-page') loadAdminDashboard();
         }
     });
 
@@ -715,30 +716,37 @@ async function handleDeleteActivity() {
         }
     }
 }
+// แก้ไขฟังก์ชันนี้
 async function handleApprovalAction() {
     const btn = $(this);
     const action = btn.hasClass('btn-approve') ? 'approve' : 'reject';
     const id = btn.data('id');
     const score = $(`#score-input-${id}`).val();
-    const row = $(`#row-${id}`);
-    row.css('opacity', '0.5');
-    btn.prop('disabled', true).parent().find('button').prop('disabled', true);
+
+    // แก้จาก row เป็น card
+    const card = $(`#report-card-${id}`); 
+
+    card.css('opacity', '0.5');
+    btn.prop('disabled', true).closest('.d-flex').find('button, input').prop('disabled', true);
+
     try {
         if (action === 'approve') {
             await callApi(`/api/admin/submissions/approve`, { submissionId: id, score: score }, 'POST');
         } else {
             await callApi(`/api/admin/submissions/reject`, { submissionId: id }, 'POST');
         }
-        row.fadeOut(500, function() { 
+
+        // แก้จาก row เป็น card และทำให้มี Animation สวยงามขึ้น
+        card.slideUp(500, function() { 
             $(this).remove(); 
-            const newCount = $('#submissions-table-body tr').length;
+            const newCount = $('.report-card').length;
             $('#pending-count-modal').text(newCount);
             if(newCount === 0) $('#no-reports-message').show();
         });
     } catch (e) {
         showError('เกิดข้อผิดพลาด');
-        row.css('opacity', '1');
-        btn.prop('disabled', false).parent().find('button').prop('disabled', false);
+        card.css('opacity', '1');
+        btn.prop('disabled', false).closest('.d-flex').find('button, input').prop('disabled', false);
     }
 }
 async function handleEditActivity() {
@@ -901,6 +909,19 @@ async function handleAwardBadge() {
     }
 }
 
+async function loadAdminDashboard() {
+    try {
+        const stats = await callApi('/api/admin/dashboard-stats');
+        $('#stat-pending-count').text(stats.pendingCount);
+        $('#stat-user-count').text(stats.userCount);
+        $('#stat-activities-count').text(stats.activeActivitiesCount);
+        $('#quick-action-pending-count').text(stats.pendingCount);
+    } catch (e) {
+        console.error("Failed to load dashboard stats:", e);
+        $('#dashboard-stats').html('<p class="text-danger">ไม่สามารถโหลดข้อมูลสรุปได้</p>');
+    }
+}
+
 async function loadAdminStats() {
     const container = $('#stats-container');
     $('#stats-loading').show();
@@ -926,32 +947,44 @@ async function loadAdminStats() {
     }
 }
 async function loadPendingSubmissions() {
-    const tableBody = $('#submissions-table-body');
+    const container = $('#admin-reports-container'); // เปลี่ยนเป้าหมายเป็น container ใหม่
     $('#reports-loading').show();
     $('#no-reports-message').hide();
-    tableBody.empty();
+    container.empty();
     try {
         const subs = await callApi('/api/admin/submissions/pending');
         $('#pending-count-modal').text(subs.length);
+
         if (subs.length === 0) {
             $('#no-reports-message').show();
         } else {
             subs.forEach(s => {
-                const imageUrl = s.imageUrl ? `<a href="${s.imageUrl}" target="_blank" class="btn btn-sm btn-outline-primary">ดูรูป</a>` : 'ไม่มี';
-                const row = `
-                    <tr id="row-${s.submissionId}">
-                        <td><div class="fw-bold">${sanitizeHTML(s.submitter.fullName)}</div><small class="text-muted">${new Date(s.createdAt).toLocaleString()}</small></td>
-                        <td style="white-space: pre-wrap; word-break: break-word;">${sanitizeHTML(s.description)}</td>
-                        <td>${imageUrl}</td>
-                        <td>
-                            <div class="d-flex align-items-center flex-wrap gap-1">
-                                <input type="number" id="score-input-${s.submissionId}" class="form-control form-control-sm" value="10" min="0" style="width: 70px;">
-                                <button class="btn btn-success btn-sm btn-approve" data-id="${s.submissionId}">✓</button>
-                                <button class="btn btn-danger btn-sm btn-reject" data-id="${s.submissionId}">✗</button>
+                const cardHtml = `
+                    <div class="card shadow-sm mb-3 report-card" id="report-card-${s.submissionId}">
+                        <div class="row g-0">
+                            <div class="col-md-5 col-lg-4">
+                                <img src="${getFullImageUrl(s.imageUrl)}" class="img-fluid rounded-start h-100" style="object-fit: cover;" alt="Submission Image">
                             </div>
-                        </td>
-                    </tr>`;
-                tableBody.append(row);
+                            <div class="col-md-7 col-lg-8">
+                                <div class="card-body">
+                                    <h6 class="card-title fw-bold">${sanitizeHTML(s.submitter.fullName)}</h6>
+                                    <p class="card-text small">${sanitizeHTML(s.description)}</p>
+                                    <p class="card-text"><small class="text-muted">${new Date(s.createdAt).toLocaleString('th-TH')}</small></p>
+                                    <div class="d-flex align-items-center flex-wrap gap-2">
+                                        <label class="small">ให้คะแนน:</label>
+                                        <input type="number" id="score-input-${s.submissionId}" class="form-control form-control-sm" value="10" min="0" style="width: 80px;">
+                                        <button class="btn btn-success btn-sm btn-approve flex-grow-1" data-id="${s.submissionId}">
+                                            <i class="fas fa-check"></i> อนุมัติ
+                                        </button>
+                                        <button class="btn btn-danger btn-sm btn-reject flex-grow-1" data-id="${s.submissionId}">
+                                            <i class="fas fa-times"></i> ปฏิเสธ
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                container.append(cardHtml);
             });
         }
     } finally {

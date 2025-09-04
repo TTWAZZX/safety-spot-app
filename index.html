@@ -98,16 +98,48 @@
                     </div>
                 </div>
             </div>
+            
             <div id="admin-page" class="page">
-                <h4 class="fw-bold mb-3">Admin Panel</h4>
+                <h4 class="fw-bold mb-3">Dashboard</h4>
+                <div class="row g-3 mb-4" id="dashboard-stats">
+                    <div class="col-12 col-md-4">
+                        <div class="card text-white bg-warning shadow-sm">
+                            <div class="card-body">
+                                <h4 class="card-title mb-0" id="stat-pending-count">-</h4>
+                                <p class="card-text small">รายงานที่รอตรวจ</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="card bg-light shadow-sm">
+                            <div class="card-body">
+                                <h4 class="card-title mb-0" id="stat-user-count">-</h4>
+                                <p class="card-text small">ผู้ใช้งานทั้งหมด</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="card bg-light shadow-sm">
+                            <div class="card-body">
+                                <h4 class="card-title mb-0" id="stat-activities-count">-</h4>
+                                <p class="card-text small">กิจกรรมที่ Active</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h5 class="fw-bold mb-3">Quick Actions</h5>
                 <div class="list-group">
-                    <a href="#" id="view-stats-btn" class="list-group-item list-group-item-action"><i class="fas fa-chart-line me-2"></i> ดูข้อมูลสรุป (Dashboard)</a>
-                    <a href="#" id="manage-reports-btn" class="list-group-item list-group-item-action"><i class="fas fa-inbox me-2"></i> จัดการรายงานที่ส่งเข้ามา</a>
+                    <a href="#" id="manage-reports-btn" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div><i class="fas fa-inbox me-2"></i> จัดการรายงาน</div>
+                        <span class="badge bg-warning rounded-pill" id="quick-action-pending-count">0</span>
+                    </a>
                     <a href="#" id="manage-activities-btn" class="list-group-item list-group-item-action"><i class="fas fa-tasks me-2"></i> จัดการกิจกรรม</a>
                     <a href="#" id="manage-badges-btn" class="list-group-item list-group-item-action"><i class="fas fa-certificate me-2"></i> จัดการผู้ใช้และป้ายรางวัล</a>
+                    <a href="#" id="view-stats-btn" class="list-group-item list-group-item-action"><i class="fas fa-chart-line me-2"></i> ดูข้อมูลสรุป (Dashboard เก่า)</a>
                 </div>
             </div>
-        </main>
+            </main>
         
         <nav class="navbar navbar-light bg-white fixed-bottom bottom-nav">
             <div class="container-fluid d-flex justify-content-around">
@@ -121,7 +153,24 @@
     </div>
     
     <div class="modal fade" id="submission-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">เข้าร่วมกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="submission-form"><input type="hidden" id="activityId-input"><h5 id="activity-title-modal" class="fw-bold mb-3"></h5><div class="mb-3"><label class="form-label">รายละเอียดจุดเสี่ยง</label><textarea class="form-control" id="description-input" rows="4" required></textarea></div><div class="mb-3"><label class="form-label">รูปภาพ</label><input type="file" class="form-control" id="image-input" accept="image/*"></div><div class="image-preview-container"><img id="submission-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview"></div><button type="submit" class="btn btn-primary w-100 fw-bold mt-3 py-2">ส่งรายงาน</button></form></div></div></div></div>
-    <div class="modal fade" id="admin-reports-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการรายงาน (<span id="pending-count-modal">0</span>)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="table-responsive"><table class="table table-striped table-hover mb-0"><thead class="table-dark"><tr><th>ผู้ส่ง</th><th>รายละเอียด</th><th>รูปภาพ</th><th>Actions</th></tr></thead><tbody id="submissions-table-body"></tbody></table></div><div id="reports-loading" class="text-center my-4"><div class="spinner-border"></div></div><div id="no-reports-message" class="text-center my-4" style="display:none;"><p class="text-muted">ไม่มีรายการที่รอตรวจสอบ</p></div></div></div></div></div>
+    
+    <div class="modal fade" id="admin-reports-modal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">จัดการรายงาน (<span id="pending-count-modal">0</span>)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="admin-reports-container" class="container-fluid px-0">
+                        </div>
+                    
+                    <div id="reports-loading" class="text-center my-4" style="display: none;"><div class="spinner-border"></div></div>
+                    <div id="no-reports-message" class="text-center my-4" style="display:none;"><p class="text-muted">ไม่มีรายการที่รอตรวจสอบ</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="modal fade" id="admin-activities-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><button id="create-activity-btn" class="btn btn-success mb-3"><i class="fas fa-plus"></i> สร้างกิจกรรมใหม่</button><div id="activities-list-admin"></div></div></div></div></div>
     <div class="modal fade" id="activity-form-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-form-title">สร้างกิจกรรมใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="activity-form"><input type="hidden" id="form-activity-id"><div class="mb-3"><label class="form-label">หัวข้อ</label><input type="text" class="form-control" id="form-activity-title" required></div><div class="mb-3"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="form-activity-desc" rows="3" required></textarea></div><div class="mb-3"><label class="form-label">รูปภาพกิจกรรม</label><input type="file" class="form-control" id="form-activity-image-input" accept="image/*"><div class="image-preview-container mt-2"><img id="activity-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview"></div><input type="hidden" id="form-activity-image-url"></div><button type="submit" class="btn btn-primary w-100">บันทึก</button></form></div></div></div></div>
     <div class="modal fade" id="activity-detail-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-detail-title">...</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body bg-light"><div id="submissions-container" class="container-fluid"></div><div id="submissions-loading" class="text-center my-5"><div class="spinner-border" style="color: var(--line-green);"></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">ปิด</button></div></div></div></div>
