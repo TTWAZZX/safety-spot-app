@@ -16,13 +16,11 @@ const AppState = {
 //  INITIALIZATION
 // ===============================================================
 $(document).ready(function() {
-    // เปิดใช้งาน Bootstrap Tooltips และตั้งค่าให้ซ่อนเมื่อไม่ได้ใช้งาน
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
-    // เพิ่มโค้ดสำหรับซ่อน Tooltip ที่อาจจะค้างอยู่
     $('body').on('click', function () {
         $('[data-bs-toggle="tooltip"]').tooltip('hide');
     });
@@ -42,9 +40,7 @@ function initializeAllModals() {
 }
 
 async function initializeApp() {
-    let lineProfile = null;
     try {
-        // แสดงสถานะที่ 1
         $('#loading-status-text').text('กำลังเชื่อมต่อกับ LINE');
         $('#loading-sub-text').text('เริ่มต้นการทำงานของ LIFF...');
         await liff.init({ liffId: LIFF_ID });
@@ -54,38 +50,33 @@ async function initializeApp() {
             return;
         }
 
-        // แสดงสถานะที่ 2
         $('#loading-status-text').text('กำลังดึงข้อมูลโปรไฟล์');
         $('#loading-sub-text').text('กรุณารอสักครู่...');
-        lineProfile = await liff.getProfile();
+        const lineProfile = await liff.getProfile();
         AppState.lineProfile = lineProfile;
         
-        // แสดงสถานะที่ 3
         $('#loading-status-text').text('กำลังตรวจสอบการลงทะเบียน');
         $('#loading-sub-text').text('เชื่อมต่อกับเซิร์ฟเวอร์ Safety Spot...');
         const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId });
         
         if (result.registered) {
-            await showMainApp(result.user, lineProfile);
+            await showMainApp(result.user);
         } else {
-            // แก้ไข: ใช้ Callback Function เพื่อให้แน่ใจว่าหน้า Loading ถูกซ่อนสนิท
             $('#loading-overlay').fadeOut(400, function() {
                 $('#registration-page').fadeIn();
             });
         }
     } catch (error) {
         console.error("Initialization failed:", error);
-        // กรณีเกิด Error ให้แสดงข้อความในหน้า Loading เลย
         $('#loading-status-text').text('เกิดข้อผิดพลาด');
         $('#loading-sub-text').text('ไม่สามารถเริ่มต้นแอปพลิเคชันได้ กรุณาลองใหม่อีกครั้ง').addClass('text-danger');
-        $('.spinner-border').hide(); // ซ่อนตัวหมุนๆ
+        $('.spinner-border').hide();
     }
 }
 
-async function showMainApp(userData, lineProfile) {
+async function showMainApp(userData) {
     try {
         AppState.currentUser = userData;
-        AppState.lineProfile = lineProfile;
         updateUserInfoUI(AppState.currentUser);
         
         if (userData && userData.isAdmin) {
@@ -101,9 +92,8 @@ async function showMainApp(userData, lineProfile) {
 
     } catch (error) {
         console.error("Error during showMainApp:", error);
-        // หากเกิด Error ให้แสดงหน้าหลักไปก่อน แต่แจ้งผู้ใช้
         showError('เกิดข้อผิดพลาดในการโหลดข้อมูลบางส่วน');
-        $('#main-app').fadeIn(); // ยังคงต้องแสดงหน้าหลัก
+        $('#main-app').fadeIn();
     } finally {
         $('#loading-overlay').fadeOut(400);
     }
@@ -502,7 +492,7 @@ function bindAdminTabEventListeners() {
         } else if (tab === 'manageUsers') {
             const searchQuery = $('#user-search-input').val();
             if (searchQuery.length > 0) {
-                searchUsersForAdmin(query);
+                searchUsersForAdmin(searchQuery);
             } else {
                 loadUsersForAdmin();
             }
@@ -529,7 +519,7 @@ async function handleRegistration(e) {
     try {
         const newUser = await callApi("/api/user/register", { lineUserId: AppState.lineProfile.userId, displayName: AppState.lineProfile.displayName, pictureUrl: AppState.lineProfile.pictureUrl, fullName: fullName, employeeId: employeeId }, 'POST');
         $('#registration-page').hide();
-        await showMainApp(newUser, AppState.lineProfile);
+        await showMainApp(newUser);
         showSuccess('ลงทะเบียนเรียบร้อย!');
     } catch (error) { showError(error.message); }
 }
