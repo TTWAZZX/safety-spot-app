@@ -21,7 +21,10 @@ cloudinary.config({
 
 // ===== 👇 จุดที่แก้ไข 1: กำหนดค่า CORS Policy 👇 =====
 const corsOptions = {
-  origin: 'https://ttwazzx.github.io', // <-- แก้ไขที่บรรทัดนี้
+  origin: [
+    'https://ttwazzx.github.io', 
+    'https://ttwazzx.github.io/safety-spot-app'
+  ],
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   allowedHeaders: "Content-Type, X-Admin-User-ID",
   preflightContinue: false,
