@@ -279,11 +279,16 @@ app.get('/api/admin/users', isAdmin, handleRequest(async (req) => {
 
 app.get('/api/admin/user-details/:lineUserId', isAdmin, handleRequest(async (req) => {
     const { lineUserId } = req.params;
-    const userRes = await db.query('SELECT "lineUserId", "fullName", "employeeId" FROM users WHERE "lineUserId" = $1', [lineUserId]);
+    const [userRes, allBadgesRes, userBadgesRes] = await Promise.all([
+        db.query('SELECT "lineUserId", "fullName", "employeeId", "pictureUrl", "totalScore" FROM users WHERE "lineUserId" = $1', [lineUserId]),
+        db.query('SELECT "badgeId", "badgeName" FROM badges ORDER BY "badgeName"'),
+        db.query('SELECT "badgeId" FROM user_badges WHERE "lineUserId" = $1', [lineUserId])
+    ]);
+
     if (userRes.rows.length === 0) throw new Error('User not found');
-    const allBadgesRes = await db.query('SELECT "badgeId", "badgeName" FROM badges ORDER BY "badgeName"');
-    const userBadgesRes = await db.query('SELECT "badgeId" FROM user_badges WHERE "lineUserId" = $1', [lineUserId]);
+    
     const earnedBadgeIds = new Set(userBadgesRes.rows.map(b => b.badgeId));
+    
     return {
         user: userRes.rows[0],
         allBadges: allBadgesRes.rows,
