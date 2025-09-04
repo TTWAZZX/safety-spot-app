@@ -23,7 +23,7 @@ cloudinary.config({
 const corsOptions = {
   origin: 'https://ttwazzx.github.io',
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  allowedHeaders: "Content-Type, X-Admin-User-ID", // อนุญาต Header ที่เราใช้
+  allowedHeaders: "Content-Type, X-Admin-User-ID",
   preflightContinue: false,
   optionsSuccessStatus: 204
 };
