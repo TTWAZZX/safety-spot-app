@@ -122,13 +122,28 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 // --- User & General Routes ---
 app.get('/api/user/profile', handleRequest(async (req) => {
     const { lineUserId } = req.query;
-    if (!lineUserId) throw new Error('lineUserId is required');
+    if (!lineUserId) {
+        // ถ้าไม่มี lineUserId ส่งมา, ถือว่ายังไม่ลงทะเบียน
+        return { registered: false, user: null };
+    }
+
+    // ค้นหาผู้ใช้ในฐานข้อมูล
     const userRes = await db.query('SELECT * FROM users WHERE "lineUserId" = $1', [lineUserId]);
-    if (userRes.rows.length === 0) return { registered: false, user: null };
-    const adminRes = await db.query('SELECT * FROM admins WHERE "lineUserId" = $1', [lineUserId]);
+    
+    if (userRes.rows.length === 0) {
+        // ถ้าไม่พบผู้ใช้, ถือว่ายังไม่ลงทะเบียน
+        return { registered: false, user: null };
+    }
+
+    // ถ้าพบผู้ใช้, ให้ส่งข้อมูลผู้ใช้กลับไปเสมอ
     const user = userRes.rows[0];
+    
+    // ตรวจสอบสถานะแอดมิน
+    const adminRes = await db.query('SELECT * FROM admins WHERE "lineUserId" = $1', [lineUserId]);
     user.isAdmin = adminRes.rows.length > 0;
-    return { registered: true, user };
+    
+    // ส่งข้อมูลกลับไปว่าลงทะเบียนแล้ว พร้อมข้อมูลผู้ใช้ที่ครบถ้วน
+    return { registered: true, user: user };
 }));
 app.post('/api/user/register', handleRequest(async (req) => {
     const { lineUserId, displayName, pictureUrl, fullName, employeeId } = req.body;
