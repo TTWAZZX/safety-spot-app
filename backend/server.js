@@ -293,7 +293,7 @@ app.get('/api/admin/user-details/:lineUserId', isAdmin, handleRequest(async (req
 app.get('/api/admin/user-details/:lineUserId', isAdmin, handleRequest(async (req) => {
     const { lineUserId } = req.params;
     const [userRes, allBadgesRes, userBadgesRes] = await Promise.all([
-        db.query('SELECT "lineUserId", "fullName", "employeeId", "totalScore" FROM users WHERE "lineUserId" = $1', [lineUserId]),
+        db.query('SELECT "lineUserId", "fullName", "employeeId", "pictureUrl", "totalScore" FROM users WHERE "lineUserId" = $1', [lineUserId]),
         db.query('SELECT "badgeId", "badgeName" FROM badges ORDER BY "badgeName"'),
         db.query('SELECT "badgeId" FROM user_badges WHERE "lineUserId" = $1', [lineUserId])
     ]);
