@@ -62,7 +62,8 @@ async function initializeApp() {
         // แสดงสถานะที่ 3
         $('#loading-status-text').text('กำลังตรวจสอบการลงทะเบียน');
         $('#loading-sub-text').text('เชื่อมต่อกับเซิร์ฟเวอร์ Safety Spot...');
-        const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId }); 
+        const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId });
+        console.log('API Result:', result); // <-- เพิ่มบรรทัดนี้
         
         if (result.registered) {
             // ส่งค่า lineProfile ไปให้ function showMainApp ด้วย
