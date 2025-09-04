@@ -30,7 +30,6 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // สำหรับจัดการกับ Preflight Request
 // ===== 👆 สิ้นสุดจุดที่แก้ไข 1 👆 =====
 
 app.use(express.json());
