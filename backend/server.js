@@ -20,14 +20,17 @@ cloudinary.config({
 });
 
 const allowedOrigins = [
-    'https://ttwazzx.github.io',
-    'https://ttwazzx.github.io/safety-spot-app'
+    'https://ttwazzx.github.io', // Origin ของ Production Frontend
+    'http://localhost:5500',     // ตัวอย่าง Origin สำหรับ VS Code Live Server
+    'http://127.0.0.1:5500'      // อีกรูปแบบของ Localhost
 ];
 const corsOptions = {
     origin: function (origin, callback) {
+        // อนุญาต request ที่ไม่มี origin (เช่น จาก mobile apps หรือ curl) และ request จากใน list
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
+            console.error('CORS Error: Origin not allowed:', origin); // เพิ่ม log เพื่อดูว่าใครพยายามเรียกเข้ามา
             callback(new Error('Not allowed by CORS'));
         }
     },
