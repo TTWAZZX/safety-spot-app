@@ -49,7 +49,16 @@ const upload = multer({ storage: storage });
 // Helper for handling requests and errors
 const handleRequest = (handler) => async (req, res) => {
     try {
-        const data = await handler(req, res);
+        let data = await handler(req, res);
+
+        // ===== 👇 เพิ่มโค้ดป้องกัน 👇 =====
+        // ถ้า data ที่ได้จาก handler เป็น undefined ให้แปลงเป็น null
+        // เพื่อป้องกันไม่ให้ Express ส่งสถานะ 204 No Content กลับไป
+        if (data === undefined) {
+            data = null;
+        }
+        // ===== 👆 สิ้นสุดส่วนที่เพิ่ม 👆 =====
+
         res.status(200).json({ status: 'success', data });
     } catch (error) {
         console.error(`API Error on ${req.path}:`, error);
