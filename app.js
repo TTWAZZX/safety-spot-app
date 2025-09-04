@@ -239,7 +239,7 @@ function renderSubmissions(submissions) {
 
         let commentsHtml = sub.comments.map(c => `
             <div class="d-flex mb-2">
-                <img src="${c.commenter.pictureUrl || 'https://placehold.co/32x32'}" class="rounded-circle me-2 comment-profile-pic" alt="Profile">
+                <img src="${c.commenter.pictureUrl || 'https://placehold.co/32x32'}" class="rounded-circle me-2 comment-profile-pic" width="32" height="32" alt="Profile">
                 <div>
                     <small class="fw-bold d-block">${sanitizeHTML(c.commenter.fullName)}</small>
                     <small class="text-muted">${sanitizeHTML(c.commentText)}</small>
