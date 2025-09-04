@@ -158,7 +158,11 @@ app.post('/api/user/register', handleRequest(async (req) => {
     newUser.isAdmin = adminRes.rows.length > 0;
     return newUser;
 }));
-app.get('/api/activities', handleRequest(async () => (await db.query(`SELECT "activityId", title, description, "imageUrl", status, "createdAt" FROM activities WHERE status = 'active' ORDER BY "createdAt" DESC`)).rows));
+app.get('/api/activities', handleRequest(async () => {
+    const result = await db.query(`SELECT "activityId", title, description, "imageUrl", status, "createdAt" FROM activities WHERE status = 'active' ORDER BY "createdAt" DESC`);
+    // คืนค่า result.rows เสมอ ซึ่งจะเป็น Array เสมอ (แม้จะเป็น Array ว่าง)
+    return result.rows || []; 
+}));
 app.get('/api/leaderboard', handleRequest(async () => (await db.query('SELECT "fullName", "pictureUrl", "totalScore" FROM users ORDER BY "totalScore" DESC, "fullName" ASC LIMIT 50')).rows));
 app.get('/api/user/badges', handleRequest(async (req) => {
     const { lineUserId } = req.query;

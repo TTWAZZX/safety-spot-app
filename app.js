@@ -80,20 +80,31 @@ async function initializeApp() {
 }
 
 async function showMainApp(userData) {
-    AppState.currentUser = userData; // แก้ไขที่นี่
-    updateUserInfoUI(AppState.currentUser); // และที่นี่ด้วย
-    
-    if (AppState.currentUser.isAdmin) { // แก้ไขที่นี่ด้วยจะดีมากครับ
-        $('#admin-nav-item').show();
-        bindAdminEventListeners();
-    }
+    try {
+        AppState.currentUser = userData;
+        updateUserInfoUI(AppState.currentUser);
+        
+        if (userData && userData.isAdmin) { // เพิ่มการตรวจสอบ userData ก่อนใช้งาน
+            $('#admin-nav-item').show();
+            bindAdminEventListeners();
+        }
 
-    const activities = await callApi('/api/activities');
-    displayActivitiesUI(activities, 'latest-activities-list');
-    displayActivitiesUI(activities, 'all-activities-list');
-    
-    $('#main-app').fadeIn();
-    $('#loading-overlay').fadeOut();
+        const activities = await callApi('/api/activities');
+        displayActivitiesUI(activities, 'latest-activities-list');
+        displayActivitiesUI(activities, 'all-activities-list');
+        
+        $('#main-app').fadeIn();
+
+    } catch (error) {
+        console.error("Error during showMainApp:", error);
+        // หากเกิด Error ให้แสดงหน้าหลักไปก่อน แต่แจ้งผู้ใช้
+        showError('เกิดข้อผิดพลาดในการโหลดข้อมูลบางส่วน');
+        $('#main-app').fadeIn(); // ยังคงต้องแสดงหน้าหลัก
+    } finally {
+        // บล็อก finally จะทำงานเสมอ ไม่ว่า try จะสำเร็จหรือเกิด error
+        // เพื่อให้แน่ใจว่าหน้า Loading จะหายไปแน่นอน
+        $('#loading-overlay').fadeOut();
+    }
 }
 
 // ===============================================================
