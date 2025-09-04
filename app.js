@@ -260,7 +260,7 @@ function renderSubmissions(submissions) {
                              </a>
                              ` : ''}
                         </div>
-                        ${currentUser.isAdmin ? `<button class="btn btn-sm btn-outline-danger btn-delete-submission" data-id="${sub.submissionId}"><i class="fas fa-trash-alt"></i></button>` : ''}
+                        ${AppState.currentUser.isAdmin ? `<button class="btn btn-sm btn-outline-danger btn-delete-submission" data-id="${sub.submissionId}"><i class="fas fa-trash-alt"></i></button>` : ''}
                     </div>
 
                     <div class="collapse mt-3" id="comments-${sub.submissionId}">
