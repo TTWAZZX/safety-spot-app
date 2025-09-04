@@ -300,7 +300,11 @@ app.delete('/api/admin/badges/:badgeId', isAdmin, handleRequest(async (req) => {
 
 app.post('/api/admin/award-badge', isAdmin, handleRequest(async (req) => {
     const { lineUserId, badgeId } = req.body;
-    await db.query('INSERT INTO user_badges ("lineUserId", "badgeId") VALUES ($1, $2) ON CONFLICT DO NOTHING');
+    // แก้ไขโดยการเพิ่ม [lineUserId, badgeId] เข้าไป
+    await db.query(
+        'INSERT INTO user_badges ("lineUserId", "badgeId") VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [lineUserId, badgeId] // <--- เพิ่ม Array ของค่าที่ต้องการส่งเข้าไป
+    );
     return { message: 'Badge awarded successfully' };
 }));
 
