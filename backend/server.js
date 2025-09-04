@@ -66,10 +66,11 @@ const handleRequest = (handler) => async (req, res) => {
 
 // Middleware ตรวจสอบสิทธิ์ Admin
 const isAdmin = async (req, res, next) => {
-    const lineUserId = req.body.lineUserId || req.query.lineUserId;
-    if (!lineUserId) return res.status(401).json({ status: 'error', message: 'Unauthorized: Missing User ID' });
+    // เปลี่ยนมาตรวจสอบสิทธิ์จาก requesterId แทน
+    const requesterId = req.body.requesterId || req.query.requesterId;
+    if (!requesterId) return res.status(401).json({ status: 'error', message: 'Unauthorized: Missing Requester ID' });
     try {
-        const adminRes = await db.query('SELECT * FROM admins WHERE "lineUserId" = $1', [lineUserId]);
+        const adminRes = await db.query('SELECT * FROM admins WHERE "lineUserId" = $1', [requesterId]);
         if (adminRes.rows.length === 0) return res.status(403).json({ status: 'error', message: 'Forbidden: Not an admin' });
         next();
     } catch (error) {

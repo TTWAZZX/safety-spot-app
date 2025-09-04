@@ -111,10 +111,9 @@ async function callApi(endpoint, payload = {}, method = 'GET') {
         headers: { 'Content-Type': 'application/json' },
     };
 
-    if (AppState.lineProfile && AppState.lineProfile.userId && !payload.lineUserId) {
-        // จะใส่ lineUserId ของแอดมินลงไป ก็ต่อเมื่อใน payload ยังไม่มี lineUserId มาก่อนเท่านั้น
-        payload.lineUserId = AppState.lineProfile.userId;
-    }
+    if (AppState.lineProfile && AppState.lineProfile.userId) {
+    payload.requesterId = AppState.lineProfile.userId;
+}
 
     if (method.toUpperCase() === 'GET' && Object.keys(payload).length > 0) {
         const params = new URLSearchParams(payload).toString();
