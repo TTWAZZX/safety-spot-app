@@ -996,6 +996,7 @@ async function loadAdminStats() {
         $('#stats-loading').hide(); 
     }
 }
+// แก้ไขฟังก์ชันนี้ทั้งฟังก์ชัน
 async function loadPendingSubmissions() {
     const container = $('#admin-reports-container');
     $('#reports-loading').show();
@@ -1009,13 +1010,28 @@ async function loadPendingSubmissions() {
             $('#no-reports-message').show();
         } else {
             subs.forEach(s => {
+                // ----- START: ส่วนที่แก้ไข -----
+                let imageHtmlBlock = '';
+                let contentClass = 'col-12'; // เริ่มต้นให้ข้อความเต็มความกว้าง
+
+                // ตรวจสอบว่ามี imageUrl หรือไม่
+                if (s.imageUrl) {
+                    // ถ้ามีรูป ให้สร้าง HTML บล็อกของรูปภาพ
+                    imageHtmlBlock = `
+                        <div class="col-md-5 col-lg-4">
+                            <img src="${getFullImageUrl(s.imageUrl)}" class="img-fluid rounded-start h-100" style="object-fit: cover;" alt="Submission Image">
+                        </div>
+                    `;
+                    // และปรับขนาดคลาสของส่วนเนื้อหา
+                    contentClass = 'col-md-7 col-lg-8';
+                }
+                
+                // นำตัวแปรที่สร้างมาประกอบร่างเป็น Card ที่สมบูรณ์
                 const cardHtml = `
                     <div class="card shadow-sm mb-3 report-card" id="report-card-${s.submissionId}">
                         <div class="row g-0">
-                            <div class="col-md-5 col-lg-4">
-                                <img src="${getFullImageUrl(s.imageUrl)}" class="img-fluid rounded-start h-100" style="object-fit: cover;" alt="Submission Image">
-                            </div>
-                            <div class="col-md-7 col-lg-8">
+                            ${imageHtmlBlock}
+                            <div class="${contentClass}">
                                 <div class="card-body">
                                     <h6 class="card-title fw-bold">${sanitizeHTML(s.submitter.fullName)}</h6>
                                     <p class="card-text small">${sanitizeHTML(s.description)}</p>
@@ -1034,6 +1050,7 @@ async function loadPendingSubmissions() {
                             </div>
                         </div>
                     </div>`;
+                // ----- END: ส่วนที่แก้ไข -----
                 container.append(cardHtml);
             });
         }
