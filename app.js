@@ -1188,9 +1188,12 @@ function renderUserListForAdmin(users, container) {
                 <div class="card-body p-2">
                     <div class="d-flex align-items-center">
                         <img src="${getFullImageUrl(user.pictureUrl) || 'https://placehold.co/45x45'}" class="rounded-circle me-3" width="45" height="45" alt="Profile">
-                        <div>
+                        <div class="flex-grow-1">
                             <h6 class="fw-bold mb-0">${sanitizeHTML(user.fullName)}</h6>
-                            <small class="text-muted">รหัส: ${sanitizeHTML(user.employeeId)} | คะแนน: ${user.totalScore}</small>
+                            {/* แก้ไขบรรทัดนี้เพื่อเพิ่มจำนวนป้ายรางวัล */}
+                            <small class="text-muted">
+                                รหัส: ${sanitizeHTML(user.employeeId)} | คะแนน: ${user.totalScore} | <i class="fas fa-certificate text-warning"></i> ${user.badgeCount}
+                            </small>
                         </div>
                         <i class="fas fa-chevron-right ms-auto text-muted"></i>
                     </div>
