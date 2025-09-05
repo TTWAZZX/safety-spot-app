@@ -1190,7 +1190,7 @@ function renderUserListForAdmin(users, container) {
                         <img src="${getFullImageUrl(user.pictureUrl) || 'https://placehold.co/45x45'}" class="rounded-circle me-3" width="45" height="45" alt="Profile">
                         <div class="flex-grow-1">
                             <h6 class="fw-bold mb-0">${sanitizeHTML(user.fullName)}</h6>
-                            {/* แก้ไขบรรทัดนี้เพื่อเพิ่มจำนวนป้ายรางวัล */}
+                            {/* << ลบบรรทัดคอมเมนต์ที่เป็นปัญหาออกจากตรงนี้ >> */}
                             <small class="text-muted">
                                 รหัส: ${sanitizeHTML(user.employeeId)} | คะแนน: ${user.totalScore} | <i class="fas fa-certificate text-warning"></i> ${user.badgeCount}
                             </small>
