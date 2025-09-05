@@ -91,6 +91,20 @@ async function showMainApp(userData) {
         displayActivitiesUI(activities, 'all-activities-list');
         
         $('#main-app').fadeIn();
+        // ===== START: เพิ่มโค้ดเรียกใช้ Pull to Refresh ตรงนี้ =====
+        PullToRefresh.init({
+            mainElement: 'body', // Element หลักที่อนุญาตให้ดึง
+            onRefresh: async function(done) { // ฟังก์ชันที่จะทำงานเมื่อผู้ใช้ปล่อยนิ้ว
+                await refreshHomePageData(); // เรียกใช้ฟังก์ชันรีเฟรชที่เราสร้างไว้
+                done(); // บอก Library ว่ารีเฟรชเสร็จแล้ว (Spinner จะหายไป)
+            },
+            // ตั้งค่าไอคอนให้เข้ากับแอป (ใช้ Font Awesome)
+            iconArrow: '<i class="fas fa-arrow-down"></i>',
+            iconRefreshing: '<div class="spinner-border spinner-border-sm text-success" role="status"></div>',
+            distThreshold: 80, // ระยะที่ต้องดึงลงมา (pixel)
+            distMax: 100
+        });
+        // ===== END: เพิ่มโค้ดเรียกใช้ Pull to Refresh =====
 
     } catch (error) {
         console.error("Error during showMainApp:", error);
@@ -378,6 +392,30 @@ async function loadLeaderboard() {
     } catch (error) {
         loading.hide();
         list.html('<p class="text-center text-danger">ไม่สามารถโหลดข้อมูลได้</p>');
+    }
+}
+
+async function refreshHomePageData() {
+    try {
+        // ดึงข้อมูลผู้ใช้ (เพื่ออัปเดตคะแนน) และข้อมูลกิจกรรมพร้อมกัน
+        const [userDataResponse, activities] = await Promise.all([
+            callApi('/api/user/profile', { lineUserId: AppState.lineProfile.userId }),
+            callApi('/api/activities')
+        ]);
+
+        // อัปเดตข้อมูลผู้ใช้และคะแนนบน UI
+        if (userDataResponse.registered) {
+            AppState.currentUser = userDataResponse.user;
+            updateUserInfoUI(AppState.currentUser);
+        }
+
+        // อัปเดตลิสต์กิจกรรมล่าสุด
+        displayActivitiesUI(activities, 'latest-activities-list');
+
+    } catch (error) {
+        console.error("Failed to refresh home page data:", error);
+        // อาจจะแสดง Pop-up เล็กๆ ว่ารีเฟรชไม่สำเร็จ
+        showError("ไม่สามารถรีเฟรชข้อมูลได้");
     }
 }
 
