@@ -753,7 +753,7 @@ async function handleSaveActivity(e) {
     }
 }
 // ===== START: Idea 4 - Safer Delete Confirmation =====
-// ในไฟล์ app.js
+// ในไฟล์ app.js ฟังก์ชัน handleDeleteActivity
 async function handleDeleteActivity() {
     const activityId = $(this).data('id');
     const activityTitle = $(this).closest('.card-body').find('strong').text();
@@ -769,13 +769,15 @@ async function handleDeleteActivity() {
         cancelButtonText: 'ยกเลิก',
         showLoaderOnConfirm: true,
 
-        // ===== เพิ่มส่วนนี้เข้าไป =====
+        // ===== เพิ่มบรรทัดนี้เข้าไปอีก 1 บรรทัด =====
+        stopKeydownPropagation: false,
+        // ===================================
+
         didOpen: () => {
             const popup = Swal.getPopup();
             const input = popup.querySelector('.swal2-input');
             input.focus();
         },
-        // ==========================
 
         preConfirm: (inputValue) => {
             if (inputValue !== activityTitle) {
