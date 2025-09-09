@@ -754,40 +754,24 @@ async function handleSaveActivity(e) {
 }
 // ===== START: Idea 4 - Safer Delete Confirmation =====
 // ในไฟล์ app.js ฟังก์ชัน handleDeleteActivity
+// ในไฟล์ app.js ให้นำฟังก์ชันนี้ไปทับของเดิมทั้งหมด
 async function handleDeleteActivity() {
     const activityId = $(this).data('id');
     const activityTitle = $(this).closest('.card-body').find('strong').text();
 
+    // ===== แก้ไข Swal.fire ทั้งหมดเป็นแบบนี้ =====
     const result = await Swal.fire({
         title: 'ยืนยันการลบ',
-        html: `คุณต้องการลบกิจกรรม "<b>${sanitizeHTML(activityTitle)}</b>" ใช่ไหม?<br>การกระทำนี้ไม่สามารถย้อนกลับได้!<br><br>โปรดพิมพ์ "<b>${sanitizeHTML(activityTitle)}</b>" เพื่อยืนยัน:`,
-        input: 'text',
-        inputAttributes: { autocapitalize: 'off' },
+        html: `คุณต้องการลบกิจกรรม "<b>${sanitizeHTML(activityTitle)}</b>" ใช่ไหม?`,
+        text: "การกระทำนี้ไม่สามารถย้อนกลับได้!",
+        icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'ใช่, ลบเลย!',
         confirmButtonColor: '#d33',
-        cancelButtonText: 'ยกเลิก',
-        showLoaderOnConfirm: true,
-
-        // ===== เพิ่มบรรทัดนี้เข้าไปอีก 1 บรรทัด =====
-        stopKeydownPropagation: false,
-        // ===================================
-
-        didOpen: () => {
-            const popup = Swal.getPopup();
-            const input = popup.querySelector('.swal2-input');
-            input.focus();
-        },
-
-        preConfirm: (inputValue) => {
-            if (inputValue !== activityTitle) {
-                Swal.showValidationMessage('ข้อความที่พิมพ์ไม่ตรงกัน!');
-                return false;
-            }
-            return true;
-        },
-        allowOutsideClick: () => !Swal.isLoading()
+        cancelButtonColor: '#6e7881',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
     });
+    // ===========================================
 
     if (result.isConfirmed) {
         try {
