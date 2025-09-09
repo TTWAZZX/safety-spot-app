@@ -86,7 +86,7 @@ async function showMainApp(userData) {
             bindAdminEventListeners();
         }
 
-        const activities = await callApi('/api/activities');
+        const activities = await callApi('/api/activities', { lineUserId: AppState.lineProfile.userId });
         displayActivitiesUI(activities, 'latest-activities-list');
         displayActivitiesUI(activities, 'all-activities-list');
         
@@ -197,6 +197,7 @@ function updateUserInfoUI(user) {
     $('#user-score, #profile-page-score').text(user.totalScore);
 }
 
+// ในไฟล์ app.js
 function displayActivitiesUI(activities, listId) {
     const listElement = $(`#${listId}`);
     listElement.empty();
@@ -205,12 +206,35 @@ function displayActivitiesUI(activities, listId) {
         return;
     }
     activities.forEach(act => {
+        // --- ส่วนที่เพิ่มเข้ามา ---
+        let joinButtonHtml = '';
+        if (act.userHasSubmitted) {
+            // ถ้า User เข้าร่วมแล้ว ให้แสดงปุ่มที่กดไม่ได้
+            joinButtonHtml = `
+                <button class="btn btn-success" disabled>
+                    <i class="fas fa-check-circle me-1"></i> เข้าร่วมแล้ว
+                </button>
+            `;
+        } else {
+            // ถ้ายังไม่เคยเข้าร่วม ให้แสดงปุ่มปกติ
+            joinButtonHtml = `
+                <button class="btn btn-primary btn-join-activity" 
+                        data-activity-id="${act.activityId}" 
+                        data-activity-title="${sanitizeHTML(act.title)}"
+                        data-image-required="${!act.description.includes('[no-image]')}" 
+                        data-bs-toggle="tooltip" title="เข้าร่วมกิจกรรม">
+                    <i class="fas fa-plus-circle me-1"></i> เข้าร่วม
+                </button>
+            `;
+        }
+        // --- จบส่วนที่เพิ่มเข้ามา ---
+
         const cardHtml = `
             <div class="card activity-card mb-3">
                 <img src="${getFullImageUrl(act.imageUrl)}" class="activity-card-img" onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
                 <div class="card-body">
                     <h5 class="card-title">${sanitizeHTML(act.title)}</h5>
-                    <p class="card-text text-muted small">${sanitizeHTML(act.description)}</p>
+                    <p class="card-text text-muted small">${sanitizeHTML(act.description.replace('[no-image]', ''))}</p>
                     <div class="d-flex justify-content-end align-items-center gap-2 mt-3">
                         <button class="btn btn-sm btn-outline-secondary btn-view-activity-image" 
                                 data-image-full-url="${getFullImageUrl(act.imageUrl)}" 
@@ -224,20 +248,13 @@ function displayActivitiesUI(activities, listId) {
                                 data-bs-toggle="tooltip" title="ดูรายงานทั้งหมด">
                             <i class="fas fa-eye"></i>
                         </button>
-                        <button class="btn btn-primary btn-join-activity" 
-                                data-activity-id="${act.activityId}" 
-                                data-activity-title="${sanitizeHTML(act.title)}"
-                                data-image-required="${!act.description.includes('[no-image]')}" 
-                                data-bs-toggle="tooltip" title="เข้าร่วมกิจกรรม">
-                            <i class="fas fa-plus-circle me-1"></i> เข้าร่วม
-                        </button>
+                        ${joinButtonHtml}
                     </div>
                 </div>
             </div>`;
         listElement.append(cardHtml);
     });
 }
-
 
 function renderSubmissions(submissions) {
     const container = $('#submissions-container');
@@ -584,6 +601,19 @@ async function handleSubmitReport(e) {
         $('#submission-form')[0].reset();
         $('#submission-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
         showSuccess('รายงานของคุณถูกส่งเพื่อรอการตรวจสอบ');
+        // --- ส่วนที่เพิ่มเข้ามา ---
+        // หาปุ่มของกิจกรรมที่เราเพิ่งส่งไป แล้วเปลี่ยนสถานะมัน
+        const activityId = $('#activityId-input').val();
+        const activityButton = $(`.btn-join-activity[data-activity-id="${activityId}"]`);
+        if (activityButton.length > 0) {
+            activityButton
+                .prop('disabled', true)
+                .removeClass('btn-primary')
+                .addClass('btn-success')
+                .html('<i class="fas fa-check-circle me-1"></i> เข้าร่วมแล้ว');
+        }
+        // --- จบส่วนที่เพิ่มเข้ามา ---
+
     } catch (error) { showError(error.message); }
 }
 
@@ -778,7 +808,7 @@ async function handleDeleteActivity() {
             await callApi(`/api/admin/activities/${activityId}`, {}, 'DELETE');
             Swal.fire('ลบสำเร็จ!', 'กิจกรรมและรายงานที่เกี่ยวข้องถูกลบแล้ว', 'success');
             loadAllActivitiesForAdmin(); // Reload admin list
-            const activities = await callApi('/api/activities'); // Reload user list
+            const activities = await callApi('/api/activities', { lineUserId: AppState.lineProfile.userId });
             displayActivitiesUI(activities, 'latest-activities-list');
             displayActivitiesUI(activities, 'all-activities-list');
         } catch (e) {

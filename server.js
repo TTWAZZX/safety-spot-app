@@ -127,7 +127,39 @@ app.post('/api/user/register', async (req, res) => {
 });
 
 
-app.get('/api/activities', handleRequest(async () => db.query("SELECT `activityId`, title, description, `imageUrl`, status, `createdAt` FROM activities WHERE status = 'active' ORDER BY `createdAt` DESC")));
+// ในไฟล์ server.js
+app.get('/api/activities', async (req, res) => {
+    try {
+        const { lineUserId } = req.query;
+        if (!lineUserId) {
+            // กรณีที่ไม่ได้ส่ง lineUserId มา (อาจจะใช้ในบางกรณี)
+            const [activities] = await db.query("SELECT * FROM activities WHERE status = 'active' ORDER BY `createdAt` DESC");
+            return res.status(200).json({ status: 'success', data: activities });
+        }
+
+        // 1. ดึงกิจกรรมที่ active ทั้งหมด
+        const [activities] = await db.query("SELECT * FROM activities WHERE status = 'active' ORDER BY `createdAt` DESC");
+
+        // 2. ดึง ID ของกิจกรรมที่ User คนนี้เคยเข้าร่วมแล้ว
+        const [submittedActivities] = await db.query(
+            'SELECT `activityId` FROM submissions WHERE `lineUserId` = ?',
+            [lineUserId]
+        );
+        const submittedActivityIds = new Set(submittedActivities.map(s => s.activityId));
+
+        // 3. เพิ่มสถานะ 'userHasSubmitted' เข้าไปในข้อมูลกิจกรรมแต่ละอัน
+        const activitiesWithStatus = activities.map(activity => ({
+            ...activity,
+            userHasSubmitted: submittedActivityIds.has(activity.activityId)
+        }));
+
+        res.status(200).json({ status: 'success', data: activitiesWithStatus });
+
+    } catch (error) {
+        console.error(`API Error on ${req.method} ${req.path}:`, error);
+        res.status(500).json({ status: 'error', message: error.message || 'An internal server error occurred.' });
+    }
+});
 
 app.get('/api/leaderboard', handleRequest(async () => db.query('SELECT `fullName`, `pictureUrl`, `totalScore` FROM users ORDER BY `totalScore` DESC, `fullName` ASC LIMIT 50')));
 
@@ -189,10 +221,37 @@ app.get('/api/submissions', async (req, res) => {
 });
 
 
-app.post('/api/submissions', handleRequest(async (req) => {
+app.post('/api/submissions', async (req, res) => {
     const { activityId, lineUserId, description, imageUrl } = req.body;
-    return db.query('INSERT INTO submissions (`submissionId`, `activityId`, `lineUserId`, `description`, `imageUrl`, `status`, `createdAt`) VALUES (?, ?, ?, ?, ?, ?, ?)', ["SUB" + uuidv4(), activityId, lineUserId, description, imageUrl, 'pending', new Date()]);
-}));
+    try {
+        // --- ส่วนที่เพิ่มเข้ามาเพื่อตรวจสอบการส่งซ้ำ ---
+        const [existingSubmissions] = await db.query(
+            'SELECT `submissionId` FROM `submissions` WHERE `activityId` = ? AND `lineUserId` = ?',
+            [activityId, lineUserId]
+        );
+
+        if (existingSubmissions.length > 0) {
+            // ถ้าหาเจอ (length > 0) แสดงว่าเคยส่งแล้ว ให้ส่ง Error กลับไป
+            throw new Error('คุณได้เข้าร่วมกิจกรรมนี้ไปแล้ว');
+        }
+        // --- จบส่วนที่เพิ่มเข้ามา ---
+
+        // ถ้าไม่เคยส่งมาก่อน ก็ทำการ INSERT ตามปกติ
+        await db.query(
+            'INSERT INTO submissions (`submissionId`, `activityId`, `lineUserId`, `description`, `imageUrl`, `status`, `createdAt`) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            ["SUB" + uuidv4(), activityId, lineUserId, description, imageUrl, 'pending', new Date()]
+        );
+        
+        // ส่ง response สำเร็จกลับไป
+        res.status(200).json({ status: 'success', data: { message: 'Submission created.' } });
+
+    } catch (error) {
+        // จัดการ Error ที่เราสร้างขึ้นเองและ Error อื่นๆ
+        console.error(`API Error on ${req.method} ${req.path}:`, error);
+        // ส่ง message จาก error ที่เรา throw กลับไปให้ Frontend
+        res.status(400).json({ status: 'error', message: error.message || 'An internal server error occurred.' });
+    }
+});
 
 
 app.post('/api/submissions/like', async (req, res) => {
