@@ -226,7 +226,8 @@ function displayActivitiesUI(activities, listId) {
                         </button>
                         <button class="btn btn-primary btn-join-activity" 
                                 data-activity-id="${act.activityId}" 
-                                data-activity-title="${sanitizeHTML(act.title)}" 
+                                data-activity-title="${sanitizeHTML(act.title)}"
+                                data-image-required="${!act.description.includes('[no-image]')}" 
                                 data-bs-toggle="tooltip" title="เข้าร่วมกิจกรรม">
                             <i class="fas fa-plus-circle me-1"></i> เข้าร่วม
                         </button>
@@ -595,6 +596,19 @@ function handleViewReport() {
 function handleJoinActivity() {
     const activityId = $(this).data('activity-id');
     const activityTitle = $(this).data('activity-title');
+
+    const isImageRequired = $(this).data('image-required');
+    const imageUploadSection = $('#image-upload-section');
+    const imageInput = $('#image-input');
+
+    if (isImageRequired) {
+        imageUploadSection.show(); // แสดงส่วนอัปโหลด
+        imageInput.prop('required', true); // ตั้งให้ "ต้องมี" ไฟล์
+    } else {
+        imageUploadSection.hide(); // ซ่อนส่วนอัปโหลด
+        imageInput.prop('required', false); // ตั้งให้ "ไม่จำเป็นต้องมี" ไฟล์
+    }
+
     $('#activityId-input').val(activityId);
     $('#activity-title-modal').text(activityTitle);
     AppState.allModals['submission'].show();
@@ -685,6 +699,7 @@ function displayActivitiesUIForAdmin(activities) {
     });
 }
 
+// ในไฟล์ app.js
 async function handleSaveActivity(e) {
     e.preventDefault();
     showLoading('กำลังบันทึก...');
@@ -697,10 +712,24 @@ async function handleSaveActivity(e) {
             finalImageUrl = await uploadImage(imageFile);
         }
 
+        // ===== ส่วนที่แก้ไข =====
+        let description = $('#form-activity-desc').val();
+        const noImageTag = '[no-image]';
+        const isImageRequired = $('#image-required-toggle').is(':checked');
+
+        // 1. ลบแท็กเก่าทิ้งก่อนเสมอ เพื่อป้องกันการซ้ำซ้อน
+        description = description.replace(noImageTag, '').trim();
+
+        if (!isImageRequired) {
+          // 2. ถ้า "ไม่บังคับ" (สวิตช์ถูกปิด) ค่อยเติมแท็กเข้าไปใหม่
+          description += noImageTag;
+        }
+        // =======================
+
         const payload = {
             activityId: $('#form-activity-id').val(),
             title: $('#form-activity-title').val(),
-            description: $('#form-activity-desc').val(),
+            description: description, // <--- 3. ใช้ตัวแปร description ที่เราจัดการแท็กแล้ว
             imageUrl: finalImageUrl
         };
 
@@ -718,6 +747,7 @@ async function handleSaveActivity(e) {
         const activeActivities = allActivities.filter(act => act.status === 'active');
         displayActivitiesUI(activeActivities, 'latest-activities-list');
         displayActivitiesUI(activeActivities, 'all-activities-list');
+
     } catch (e) {
         showError(e.message);
     }
@@ -794,7 +824,11 @@ async function handleEditActivity() {
     $('#activity-form')[0].reset();
     $('#form-activity-id').val(data.activityId);
     $('#form-activity-title').val(data.title);
-    $('#form-activity-desc').val(data.description);
+    const description = data.description || '';
+    const noImageTag = '[no-image]';
+    const isImageRequired = !description.includes(noImageTag);
+    $('#image-required-toggle').prop('checked', isImageRequired);
+    $('#form-activity-desc').val(description.replace(noImageTag, ''));
     $('#form-activity-image-url').val(data.imageUrl);
     $('#activity-image-preview').attr('src', getFullImageUrl(data.imageUrl));
     AppState.allModals['activity-form'].show();

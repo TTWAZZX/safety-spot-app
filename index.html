@@ -153,7 +153,37 @@
         </nav>
     </div>
     
-    <div class="modal fade" id="submission-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">เข้าร่วมกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="submission-form"><input type="hidden" id="activityId-input"><h5 id="activity-title-modal" class="fw-bold mb-3"></h5><div class="mb-3"><label class="form-label">รายละเอียดจุดเสี่ยง</label><textarea class="form-control" id="description-input" rows="4" required></textarea></div><div class="mb-3"><label class="form-label">รูปภาพ</label><input type="file" class="form-control" id="image-input" accept="image/*"></div><div class="image-preview-container"><img id="submission-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview"></div><button type="submit" class="btn btn-primary w-100 fw-bold mt-3 py-2">ส่งรายงาน</button></form></div></div></div></div>
+    <div class="modal fade" id="submission-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">เข้าร่วมกิจกรรม</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="submission-form">
+                    <input type="hidden" id="activityId-input">
+                    <h5 id="activity-title-modal" class="fw-bold mb-3"></h5>
+                    <div class="mb-3">
+                        <label class="form-label">รายละเอียดจุดเสี่ยง</label>
+                        <textarea class="form-control" id="description-input" rows="4" required></textarea>
+                    </div>
+
+                    <div id="image-upload-section">
+                        <div class="mb-3">
+                            <label class="form-label">รูปภาพ</label>
+                            <input type="file" class="form-control" id="image-input" accept="image/*">
+                        </div>
+                        <div class="image-preview-container">
+                            <img id="submission-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold mt-3 py-2">ส่งรายงาน</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
     
     <div class="modal fade" id="admin-reports-modal" tabindex="-1">
         <div class="modal-dialog modal-fullscreen">
@@ -172,7 +202,43 @@
     </div>
 
     <div class="modal fade" id="admin-activities-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><button id="create-activity-btn" class="btn btn-success mb-3"><i class="fas fa-plus"></i> สร้างกิจกรรมใหม่</button><div id="activities-list-admin"></div></div></div></div></div>
-    <div class="modal fade" id="activity-form-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-form-title">สร้างกิจกรรมใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="activity-form"><input type="hidden" id="form-activity-id"><div class="mb-3"><label class="form-label">หัวข้อ</label><input type="text" class="form-control" id="form-activity-title" required></div><div class="mb-3"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="form-activity-desc" rows="3" required></textarea></div><div class="mb-3"><label class="form-label">รูปภาพกิจกรรม</label><input type="file" class="form-control" id="form-activity-image-input" accept="image/*"><div class="image-preview-container mt-2"><img id="activity-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview"></div><input type="hidden" id="form-activity-image-url"></div><button type="submit" class="btn btn-primary w-100">บันทึก</button></form></div></div></div></div>
+    <div class="modal fade" id="activity-form-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="activity-form-title">สร้างกิจกรรมใหม่</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="activity-form">
+                    <input type="hidden" id="form-activity-id">
+                    <div class="mb-3">
+                        <label class="form-label">หัวข้อ</label>
+                        <input type="text" class="form-control" id="form-activity-title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">คำอธิบาย</label>
+                        <textarea class="form-control" id="form-activity-desc" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">รูปภาพกิจกรรม</label>
+                        <input type="file" class="form-control" id="form-activity-image-input" accept="image/*">
+                        <div class="image-preview-container mt-2">
+                            <img id="activity-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview">
+                        </div>
+                        <input type="hidden" id="form-activity-image-url">
+                    </div>
+                    
+                    <div class="form-check form-switch mb-3">
+                      <input class="form-check-input" type="checkbox" role="switch" id="image-required-toggle" checked>
+                      <label class="form-check-label" for="image-required-toggle">บังคับให้แนบรูปภาพ</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">บันทึก</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
     <div class="modal fade" id="activity-detail-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-detail-title">...</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body bg-light"><div id="submissions-container" class="container-fluid"></div><div id="submissions-loading" class="text-center my-5"><div class="spinner-border" style="color: var(--line-green);"></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">ปิด</button></div></div></div></div>
     <div class="modal fade" id="imageViewerModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="imageViewerModalLabel">รูปภาพกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body text-center p-0"><img id="imageViewerContent" src="" class="img-fluid" alt="Activity Image" style="max-height: 80vh; width: auto;"></div><div class="modal-footer justify-content-center"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button><a id="downloadImageBtn" class="btn btn-primary" download><i class="fas fa-download me-2"></i> บันทึกรูปภาพ</a></div></div></div></div>
     <div class="modal fade" id="admin-stats-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">ข้อมูลสรุป Dashboard</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3"><div class="col-12"><canvas id="reportsChart"></canvas></div></div><div id="stats-container" class="row g-3 mt-3"></div><div id="stats-loading" class="text-center my-4"><div class="spinner-border"></div></div></div></div></div></div>
