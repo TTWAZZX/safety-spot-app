@@ -1,0 +1,14 @@
+﻿INSERT INTO public.badges ("badgeId","badgeName",description,"imageUrl") VALUES
+	 ('BADGEed3aac39-ade4-4d50-90fb-c9bd9cfa60b2','มือไก่หัดใหม่','0-100 คะแนน','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756949062/safety-spot/v8f8isjastdvfwe7pirv.png'),
+	 ('BADGE921048e1-c6d6-40ff-8387-83b941ae2706','ทองแดงแสลงใจ','100-200 คะแนน','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756949079/safety-spot/fsmkoymoh6y7j8b8uom1.png'),
+	 ('BADGEf4b8b33b-c7be-4520-b2df-e44ec06626ed','เงินอยู่ในอากาศนะพี่จ๋า','200-300 คะแนน','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756949110/safety-spot/vrtndcawj8mkl2mlylrw.png'),
+	 ('BADGE3e0ceed1-e38f-434e-920d-a8e53d3ca964','วันทองสองใจ','300-500','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756949133/safety-spot/wajqmk91v8rtsxesvzll.png'),
+	 ('BADGEb0eb6401-68ec-4b8a-8240-80db109fef6c','เพชรพระอุมา','มากว่า 500 คะแนน','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756949173/safety-spot/jjoc7qru3nemmitabb0f.png'),
+	 ('BADGEb2ad1766-7356-4b0b-b0cf-5e0f9e300096','ยศพิเศษ','Coming จีจี','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756949325/safety-spot/ccme8bxcuktifxh2d6d5.png'),
+	 ('BADGEdad57f4c-e788-4e46-bc6f-09115dfc83e1','ยศพิเศษ','Soon Cum จีจี','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756949384/safety-spot/urzc2qu8mchtjtn4zz1b.png'),
+	 ('BADGEe9adb1ae-6dc5-49df-8af4-4c77eeb8e054','ยศพิเศษ','Soonๆ นะพี่','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756949418/safety-spot/g2lutgztf2nfezau95nd.png'),
+	 ('BADGE6d40b300-898f-4102-8264-b07a66e3666c','ยศพิเศษ','Coming อะเกน','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756949451/safety-spot/otew8rnoaipkuxkaedac.png'),
+	 ('BADGEb447b0f1-1033-48ae-85e0-058a939ae7f6','ยศพิเศษ','ฮัลโหลคัมมิ่งน้า','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756949476/safety-spot/zlqigrws3phze0toi6sx.png');
+INSERT INTO public.badges ("badgeId","badgeName",description,"imageUrl") VALUES
+	 ('BADGE1bdced48-1b96-4fd4-b61c-2288ac4d357b','ยศพิเศษ','Soon as ซูน','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756974843/safety-spot/tj5fq69v3cdbuv2atmq9.png'),
+	 ('BADGE8988112b-fc8d-4b11-9ada-0efe3ef9054b','ยศพิเศษ','ซูน12เด้อ','https://res.cloudinary.com/ddvmr1z07/image/upload/v1756975350/safety-spot/dwuba7qo7z5ilu3e090l.png');

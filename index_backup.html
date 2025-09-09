@@ -524,7 +524,7 @@
                                 </div>
                             </div>
                             <p class="card-text">${sanitizeHTML(sub.description)}</p>
-                            ${sub.points > 0 ? `<div class="text-end fw-bold text-primary">คะแนนที่ได้รับ: ${sub.points}</div>` : ''}
+                            ${sub.points > 0 ? `<div class="text-end fw-bold text-primary">คะแนนที่ได้รับ: ${sub.points}</div>` : '<div class="text-end text-muted small">รอ Admin ให้คะแนน</div>'}
                         </div>
                         <div class="card-footer bg-white d-flex justify-content-start align-items-center gap-3">
                             <button class="btn btn-sm btn-link text-decoration-none like-btn ${likedClass}" data-submission-id="${sub.submissionId}">
@@ -583,6 +583,10 @@
             $('#submissions-loading').show();
             container.empty();
             allModals['activity-detail'].show();
+            
+            // Remove 'btn-join-activity' from the modal footer
+            $('.modal-footer .btn-join-activity').remove();
+            
             try {
                 const submissions = await callApi('/api/submissions', { activityId, lineUserId: lineProfile.userId });
                 renderSubmissions(submissions);
@@ -691,8 +695,8 @@
             $(document).on('submit', '.comment-form', handleComment);
             
             // --- Buttons in modals ---
-            // Remove 'btn-join-from-detail' from the modal
             $('#add-badge-btn').on('click', handleAddBadge);
+            $(document).on('click', '.btn-delete-submission', handleDeleteSubmission);
 
             // Image Previews
             $('#image-input').on('change', function() { handleImagePreview(this, '#submission-image-preview'); });
@@ -714,8 +718,7 @@
             $(document).on('click', '.award-badge-btn', handleAwardBadge);
             $(document).on('click', '.btn-edit-badge', handleEditBadge);
             $(document).on('click', '.btn-delete-activity', handleDeleteActivity);
-            $(document).on('click', '.btn-delete-submission', handleDeleteSubmission);
-
+            
         }
 
         function bindAdminTabEventListeners() {
@@ -814,7 +817,7 @@
             $('#activity-title-modal').text(activityTitle);
             allModals['submission'].show();
         }
-        
+
         async function handleLike() {
             const btn = $(this);
             const submissionId = btn.data('submission-id');
