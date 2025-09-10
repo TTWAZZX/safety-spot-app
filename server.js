@@ -293,31 +293,94 @@ app.post('/api/submissions', async (req, res) => {
 });
 
 app.post('/api/submissions/like', async (req, res) => {
+    const { submissionId, lineUserId } = req.body;
+    // highlight-start
+    const client = await db.getClient(); // ใช้ Transaction เพื่อความปลอดภัยของข้อมูล
     try {
-        const { submissionId, lineUserId } = req.body;
-        const [existingLikeRows] = await db.query('SELECT `likeId` FROM likes WHERE `submissionId` = ? AND `lineUserId` = ?', [submissionId, lineUserId]);
+        await client.beginTransaction();
+
+        const [existingLikeRows] = await client.query('SELECT `likeId` FROM likes WHERE `submissionId` = ? AND `lineUserId` = ?', [submissionId, lineUserId]);
         
         if (existingLikeRows.length > 0) {
-            await db.query('DELETE FROM likes WHERE `likeId` = ?', [existingLikeRows[0].likeId]);
+            // กรณี Unlike: แค่ลบไลค์ออก ไม่ต้องทำอะไรกับคะแนน
+            await client.query('DELETE FROM likes WHERE `likeId` = ?', [existingLikeRows[0].likeId]);
         } else {
-            await db.query('INSERT INTO likes (`likeId`, `submissionId`, `lineUserId`, `createdAt`) VALUES (?, ?, ?, ?)', ["LIKE" + uuidv4(), submissionId, lineUserId, new Date()]);
+            // กรณี Like: เพิ่มไลค์ และบวกคะแนนให้เจ้าของโพสต์
+            await client.query('INSERT INTO likes (`likeId`, `submissionId`, `lineUserId`, `createdAt`) VALUES (?, ?, ?, ?)', ["LIKE" + uuidv4(), submissionId, lineUserId, new Date()]);
+
+            // --- ส่วนที่เพิ่มเข้ามาสำหรับการให้คะแนน ---
+            // 1. ค้นหาเจ้าของรายงาน (submission)
+            const [submissionRows] = await client.query('SELECT `lineUserId` FROM submissions WHERE `submissionId` = ?', [submissionId]);
+            
+            if (submissionRows.length > 0) {
+                const ownerId = submissionRows[0].lineUserId;
+
+                // 2. เช็คว่าคนกดไลค์ไม่ใช่เจ้าของโพสต์
+                if (ownerId !== lineUserId) {
+                    // 3. บวก 1 คะแนนให้เจ้าของโพสต์
+                    await client.query('UPDATE users SET `totalScore` = `totalScore` + 1 WHERE `lineUserId` = ?', [ownerId]);
+                }
+            }
+            // --- จบส่วนการให้คะแนน ---
         }
         
-        const [countRows] = await db.query('SELECT COUNT(*) as count FROM likes WHERE `submissionId` = ?', [submissionId]);
+        const [countRows] = await client.query('SELECT COUNT(*) as count FROM likes WHERE `submissionId` = ?', [submissionId]);
+        
+        await client.commit(); // ยืนยันการเปลี่ยนแปลงทั้งหมด
+        
         res.status(200).json({ status: 'success', data: { status: existingLikeRows.length > 0 ? 'unliked' : 'liked', newLikeCount: countRows[0].count }});
+    
     } catch (error) {
+        await client.rollback(); // ถ้ามีข้อผิดพลาด ให้ย้อนกลับทั้งหมด
         console.error(`API Error on ${req.method} ${req.path}:`, error);
         res.status(500).json({ status: 'error', message: error.message || 'An internal server error occurred.' });
+    } finally {
+        client.release(); // คืน connection
     }
+    // highlight-end
 });
 
-
-app.post('/api/submissions/comment', handleRequest(async (req) => {
+app.post('/api/submissions/comment', async (req, res) => { // <<< แก้ไขเล็กน้อยให้เป็น async (req, res)
     const { submissionId, lineUserId, commentText } = req.body;
-    if (!commentText || commentText.trim() === '') throw new Error("Comment cannot be empty.");
-    return db.query('INSERT INTO comments (`commentId`, `submissionId`, `lineUserId`, `commentText`, `createdAt`) VALUES (?, ?, ?, ?, ?)', ["CMT" + uuidv4(), submissionId, lineUserId, commentText.trim(), new Date()]);
-}));
+    if (!commentText || commentText.trim() === '') {
+        return res.status(400).json({ status: 'error', message: "Comment cannot be empty."});
+    }
 
+    // highlight-start
+    const client = await db.getClient();
+    try {
+        await client.beginTransaction();
+
+        // 1. บันทึกคอมเมนต์ลงฐานข้อมูล
+        await client.query('INSERT INTO comments (`commentId`, `submissionId`, `lineUserId`, `commentText`, `createdAt`) VALUES (?, ?, ?, ?, ?)', ["CMT" + uuidv4(), submissionId, lineUserId, commentText.trim(), new Date()]);
+
+        // --- ส่วนที่เพิ่มเข้ามาสำหรับการให้คะแนน ---
+        // 2. ค้นหาเจ้าของรายงาน (submission)
+        const [submissionRows] = await client.query('SELECT `lineUserId` FROM submissions WHERE `submissionId` = ?', [submissionId]);
+        
+        if (submissionRows.length > 0) {
+            const ownerId = submissionRows[0].lineUserId;
+
+            // 3. เช็คว่าคนคอมเมนต์ไม่ใช่เจ้าของโพสต์
+            if (ownerId !== lineUserId) {
+                // 4. บวก 1 คะแนนให้เจ้าของโพสต์
+                await client.query('UPDATE users SET `totalScore` = `totalScore` + 1 WHERE `lineUserId` = ?', [ownerId]);
+            }
+        }
+        // --- จบส่วนการให้คะแนน ---
+
+        await client.commit();
+        res.status(200).json({ status: 'success', data: null });
+
+    } catch (error) {
+        await client.rollback();
+        console.error(`API Error on ${req.method} ${req.path}:`, error);
+        res.status(500).json({ status: 'error', message: error.message || 'An internal server error occurred.' });
+    } finally {
+        client.release();
+    }
+    // highlight-end
+});
 
 // --- Admin Routes (Converted to MySQL) ---
 app.get('/api/admin/stats', isAdmin, async (req, res) => {
