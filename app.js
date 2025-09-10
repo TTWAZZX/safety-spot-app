@@ -9,7 +9,11 @@ const AppState = {
     lineProfile: null,
     currentUser: null,
     allModals: {},
-    reportsChart: null
+    reportsChart: null,
+    // --- เพิ่ม 2 บรรทัดนี้ ---
+    leaderboard: { currentPage: 1, hasMore: true },
+    adminUsers: { currentPage: 1, hasMore: true, currentSearch: '' }
+    // -------------------------
 };
 
 // ===============================================================
@@ -381,16 +385,36 @@ async function loadAndShowActivityDetails(activityId, activityTitle) {
     }
 }
 
-async function loadLeaderboard() {
+// ในไฟล์ app.js
+async function loadLeaderboard(isLoadMore = false) {
+    if (!isLoadMore) {
+        // ถ้าเป็นการโหลดครั้งแรก ให้รีเซ็ตค่า
+        AppState.leaderboard.currentPage = 1;
+        AppState.leaderboard.hasMore = true;
+        $('#leaderboard-list').empty();
+        $('#leaderboard-load-more-container').hide();
+    }
+
+    if (!AppState.leaderboard.hasMore) return; // ถ้าไม่มีข้อมูลแล้วก็ไม่ต้องทำอะไรต่อ
+
     const list = $('#leaderboard-list');
     const loading = $('#leaderboard-loading');
-    list.empty();
+    const loadMoreBtn = $('#leaderboard-load-more-btn');
+
     loading.show();
+    loadMoreBtn.prop('disabled', true);
+
     try {
-        const users = await callApi('/api/leaderboard');
+        const users = await callApi('/api/leaderboard', { page: AppState.leaderboard.currentPage });
         loading.hide();
+
+        if (users.length === 0 && !isLoadMore) {
+            list.html('<p class="text-center text-muted">ยังไม่มีข้อมูล</p>');
+            return;
+        }
+
         users.forEach((user, index) => {
-            const rank = index + 1;
+            const rank = ((AppState.leaderboard.currentPage - 1) * 30) + index + 1;
             let rankDisplay = rank;
             if (rank === 1) rankDisplay = '<i class="fas fa-trophy"></i>';
             else if (rank === 2) rankDisplay = '<i class="fas fa-medal text-secondary"></i>';
@@ -400,16 +424,27 @@ async function loadLeaderboard() {
                 <div class="d-flex align-items-center p-2 mb-2 bg-white rounded-3 shadow-sm leaderboard-item">
                     <div class="leaderboard-rank me-3">${rankDisplay}</div>
                     <img src="${user.pictureUrl}" class="rounded-circle me-3" width="45" height="45" onerror="this.onerror=null;this.src='https://placehold.co/45x45';">
-                    <div class="flex-grow-1">
-                        <div class="fw-bold">${sanitizeHTML(user.fullName)}</div>
-                    </div>
+                    <div class="flex-grow-1"><div class="fw-bold">${sanitizeHTML(user.fullName)}</div></div>
                     <div class="fw-bold" style="color: var(--line-green);">${user.totalScore} คะแนน</div>
                 </div>`;
             list.append(itemHtml);
         });
+
+        if (users.length < 30) {
+            // ถ้าข้อมูลที่ได้มาน้อยกว่า 30 แสดงว่าหมดแล้ว
+            AppState.leaderboard.hasMore = false;
+            $('#leaderboard-load-more-container').hide();
+        } else {
+            // ถ้ายังมีอีก ให้แสดงปุ่ม
+            AppState.leaderboard.currentPage++;
+            $('#leaderboard-load-more-container').show();
+        }
+
     } catch (error) {
         loading.hide();
         list.html('<p class="text-center text-danger">ไม่สามารถโหลดข้อมูลได้</p>');
+    } finally {
+        loadMoreBtn.prop('disabled', false);
     }
 }
 
@@ -490,6 +525,7 @@ function bindStaticEventListeners() {
             if (pageId === 'leaderboard-page') loadLeaderboard();
             if (pageId === 'profile-page') loadUserBadges();
             if (pageId === 'admin-page') loadAdminDashboard();
+            $('#leaderboard-load-more-btn').on('click', () => loadLeaderboard(true));
         }
     });
 
@@ -567,6 +603,10 @@ function bindAdminTabEventListeners() {
         } else if (query.length === 0) {
             loadUsersForAdmin();
         }
+    });
+    $('#users-load-more-btn').on('click', () => {
+        // เรียกใช้ fetchAdminUsers โดยบอกว่าเป็น "Load More" (isLoadMore = true)
+        fetchAdminUsers(AppState.adminUsers.currentPage, AppState.adminUsers.currentSearch, true);
     });
 }
 
@@ -1208,40 +1248,63 @@ async function loadBadgesForAdmin() {
 
 // ===== START: Updated User Search/Load functions for Idea 3 =====
 async function loadUsersForAdmin() {
-    const resultsContainer = $('#user-search-results');
-    resultsContainer.html('<div class="text-center my-4"><div class="spinner-border text-success"></div><p class="text-muted mt-2">กำลังโหลดผู้ใช้...</p></div>');
-    try {
-        const users = await callApi('/api/admin/users');
-        resultsContainer.empty();
-        if (users.length === 0) {
-            resultsContainer.html('<p class="text-center text-muted my-4">ไม่พบผู้ใช้งาน</p>');
-            return;
-        }
-        renderUserListForAdmin(users, resultsContainer);
-    } catch (e) {
-        console.error("Error loading users for admin:", e);
-        resultsContainer.html('<p class="text-center text-danger my-4">ไม่สามารถโหลดรายชื่อผู้ใช้ได้</p>');
-    }
+    AppState.adminUsers.currentSearch = ''; // รีเซ็ตคำค้นหา
+    await fetchAdminUsers(1, ''); // เรียกใช้ฟังก์ชันใหม่เพื่อโหลดหน้า 1
 }
 
 async function searchUsersForAdmin(query) {
+    AppState.adminUsers.currentSearch = query; // เก็บคำค้นหาปัจจุบัน
+    await fetchAdminUsers(1, query); // เรียกใช้ฟังก์ชันใหม่เพื่อโหลดหน้า 1 ของผลการค้นหา
+}
+
+async function fetchAdminUsers(page, query, isLoadMore = false) {
     const resultsContainer = $('#user-search-results');
-    resultsContainer.html('<div class="text-center my-4"><div class="spinner-border text-success"></div><p class="text-muted mt-2">กำลังค้นหาผู้ใช้...</p></div>');
+    const loadMoreContainer = $('#users-load-more-container');
+    const loadMoreBtn = $('#users-load-more-btn');
+
+    if (!isLoadMore) {
+        // ถ้าเป็นการโหลดครั้งแรก ให้แสดง Spinner และรีเซ็ตค่า
+        resultsContainer.html('<div class="text-center my-4"><div class="spinner-border text-success"></div></div>');
+        AppState.adminUsers.currentPage = 1;
+        AppState.adminUsers.hasMore = true;
+    }
+
+    if (!AppState.adminUsers.hasMore) return; // ถ้าไม่มีข้อมูลให้โหลดแล้ว ก็หยุด
+    loadMoreBtn.prop('disabled', true);
+
     try {
-        const users = await callApi('/api/admin/users', { search: query });
-        resultsContainer.empty();
-        if (users.length === 0) {
-            resultsContainer.html('<p class="text-center text-muted my-4">ไม่พบผู้ใช้งานที่ตรงกับการค้นหา</p>');
+        // เรียก API พร้อมส่ง page และ search query ไปด้วย
+        const users = await callApi('/api/admin/users', { search: query, page: page });
+
+        if (!isLoadMore) resultsContainer.empty(); // ถ้าเป็นการโหลดครั้งแรก ให้ล้างข้อมูลเก่าทิ้ง
+
+        if (users.length === 0 && !isLoadMore) {
+            resultsContainer.html('<p class="text-center text-muted my-4">ไม่พบผู้ใช้งาน</p>');
+            loadMoreContainer.hide();
             return;
         }
-        renderUserListForAdmin(users, resultsContainer);
+
+        renderUserListForAdmin(users, resultsContainer); // เรียกใช้ฟังก์ชันแสดงผล
+
+        if (users.length < 30) {
+            // ถ้าข้อมูลที่ได้กลับมาน้อยกว่า 30 แสดงว่าหมดแล้ว
+            AppState.adminUsers.hasMore = false;
+            loadMoreContainer.hide();
+        } else {
+            // ถ้ายังมีข้อมูลอีก ก็ให้เพิ่มหมายเลขหน้าและแสดงปุ่ม "โหลดเพิ่มเติม"
+            AppState.adminUsers.currentPage++;
+            loadMoreContainer.show();
+        }
+
     } catch (e) {
-        console.error("Error searching users for admin:", e);
-        resultsContainer.html('<p class="text-center text-danger my-4">ไม่สามารถค้นหาผู้ใช้ได้</p>');
+        if (!isLoadMore) resultsContainer.html('<p class="text-center text-danger my-4">ไม่สามารถโหลดข้อมูลได้</p>');
+    } finally {
+        loadMoreBtn.prop('disabled', false);
     }
 }
 
 function renderUserListForAdmin(users, container) {
+    // เราจะไม่ .empty() ที่นี่แล้ว
     users.forEach(user => {
         const html = `
             <div class="card shadow-sm mb-2 user-card" style="cursor: pointer;" data-userid="${user.lineUserId}">
@@ -1250,9 +1313,7 @@ function renderUserListForAdmin(users, container) {
                         <img src="${getFullImageUrl(user.pictureUrl) || 'https://placehold.co/45x45'}" class="rounded-circle me-3" width="45" height="45" alt="Profile">
                         <div class="flex-grow-1">
                             <h6 class="fw-bold mb-0">${sanitizeHTML(user.fullName)}</h6>
-                            <small class="text-muted">
-                                รหัส: ${sanitizeHTML(user.employeeId)} | คะแนน: ${user.totalScore} | <i class="fas fa-certificate text-warning"></i> ${user.badgeCount}
-                            </small>
+                            <small class="text-muted">รหัส: ${sanitizeHTML(user.employeeId)} | คะแนน: ${user.totalScore} | <i class="fas fa-certificate text-warning"></i> ${user.badgeCount}</small>
                         </div>
                         <i class="fas fa-chevron-right ms-auto text-muted"></i>
                     </div>

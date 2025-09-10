@@ -161,7 +161,16 @@ app.get('/api/activities', async (req, res) => {
     }
 });
 
-app.get('/api/leaderboard', handleRequest(async () => db.query('SELECT `fullName`, `pictureUrl`, `totalScore` FROM users ORDER BY `totalScore` DESC, `fullName` ASC LIMIT 50')));
+app.get('/api/leaderboard', handleRequest(async (req) => {
+    const limit = 30; // กำหนดให้ดึงข้อมูลครั้งละ 30 คน
+    const page = parseInt(req.query.page) || 1; // รับหมายเลขหน้ามาจาก Frontend (ถ้าไม่ส่งมา ให้เป็นหน้า 1)
+    const offset = (page - 1) * limit; // คำนวณว่าจะต้องข้ามข้อมูลไปกี่แถว
+
+    const query = 'SELECT `fullName`, `pictureUrl`, `totalScore` FROM users ORDER BY `totalScore` DESC, `fullName` ASC LIMIT ? OFFSET ?';
+    
+    // ส่ง limit และ offset เข้าไปใน query อย่างปลอดภัย
+    return db.query(query, [limit, offset]);
+}));
 
 app.get('/api/user/badges', async (req, res) => {
     try {
@@ -444,9 +453,12 @@ app.post('/api/admin/activities/toggle', isAdmin, async (req, res) => {
     }
 });
 
-
 app.get('/api/admin/users', isAdmin, handleRequest(async (req) => {
+    const limit = 30; // กำหนดให้ดึงข้อมูลครั้งละ 30 คน
+    const page = parseInt(req.query.page) || 1;
+    const offset = (page - 1) * limit;
     const searchTerm = req.query.search || '';
+
     const query = `
       SELECT 
         \`lineUserId\`, 
@@ -457,12 +469,12 @@ app.get('/api/admin/users', isAdmin, handleRequest(async (req) => {
         (SELECT COUNT(*) FROM user_badges WHERE \`lineUserId\` = users.\`lineUserId\`) as badgeCount
       FROM users 
       WHERE \`fullName\` LIKE ? OR \`employeeId\` LIKE ? 
-      ORDER BY \`fullName\` 
-      LIMIT 50`;
-    // Pass search term for both placeholders
-    return db.query(query, [`%${searchTerm}%`, `%${searchTerm}%`]);
+      ORDER BY \`fullName\`
+      LIMIT ? OFFSET ?`;
+      
+    // ส่ง parameter ทั้งหมดเข้าไปใน query
+    return db.query(query, [`%${searchTerm}%`, `%${searchTerm}%`, limit, offset]);
 }));
-
 
 app.get('/api/admin/user-details/:lineUserId', isAdmin, async (req, res) => {
     try {
