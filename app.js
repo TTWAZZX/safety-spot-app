@@ -242,7 +242,7 @@ function displayActivitiesUI(activities, listId) {
                 <img src="${getFullImageUrl(act.imageUrl)}" class="activity-card-img" onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
                 <div class="card-body">
                     <h5 class="card-title">${sanitizeHTML(act.title)}</h5>
-                    <p class="card-text text-muted small">${sanitizeHTML(act.description.replace('[no-image]', ''))}</p>
+                    <p class="card-text text-muted small preserve-whitespace">${sanitizeHTML(act.description.replace('[no-image]', ''))}</p>
                     <div class="d-flex justify-content-end align-items-center gap-2 mt-3">
                         <button class="btn btn-sm btn-outline-secondary btn-view-activity-image" 
                                 data-image-full-url="${getFullImageUrl(act.imageUrl)}" 
@@ -282,7 +282,7 @@ function renderSubmissions(submissions) {
                 <img src="${c.commenter.pictureUrl || 'https://placehold.co/32x32'}" class="rounded-circle me-2 comment-profile-pic" width="32" height="32" alt="Profile">
                 <div>
                     <small class="fw-bold d-block">${sanitizeHTML(c.commenter.fullName)}</small>
-                    <small class="text-muted">${sanitizeHTML(c.commentText)}</small>
+                    <small class="text-muted preserve-whitespace">${sanitizeHTML(c.commentText)}</small>
                 </div>
             </div>`).join('');
         if (commentsHtml === '') {
@@ -300,7 +300,7 @@ function renderSubmissions(submissions) {
                             <small class="text-muted">${new Date(sub.createdAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</small>
                         </div>
                     </div>
-                    <p class="card-text submission-description mb-3">${sanitizeHTML(sub.description)}</p>
+                    <p class="card-text submission-description mb-3 preserve-whitespace">${sanitizeHTML(sub.description)}</p>
                     
                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                         <div class="d-flex align-items-center gap-3">
@@ -1266,7 +1266,7 @@ async function loadBadgesForAdmin() {
                             <div class="card-body">
                                 <img src="${getFullImageUrl(b.imageUrl)}" class="badge-icon mb-2" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';" alt="${sanitizeHTML(b.badgeName)}">
                                 <h6 class="fw-bold mb-1">${sanitizeHTML(b.badgeName)}</h6>
-                                <small class="text-muted d-block mb-3">${sanitizeHTML(b.description)}</small>
+                                <small class="text-muted d-block mb-3 preserve-whitespace">${sanitizeHTML(b.description)}</small>
                                 <div class="d-flex justify-content-center gap-2">
                                     <button class="btn btn-sm btn-outline-primary btn-edit-badge"
                                         data-badge-id="${b.badgeId}"
