@@ -10,10 +10,10 @@ const AppState = {
     currentUser: null,
     allModals: {},
     reportsChart: null,
-    // --- เพิ่ม 2 บรรทัดนี้ ---
     leaderboard: { currentPage: 1, hasMore: true },
-    adminUsers: { currentPage: 1, hasMore: true, currentSearch: '' }
-    // -------------------------
+    // highlight-start
+    adminUsers: { currentPage: 1, hasMore: true, currentSearch: '', currentSort: 'score' } // เพิ่ม currentSort
+    // highlight-end
 };
 
 // ===============================================================
@@ -609,6 +609,7 @@ function bindAdminTabEventListeners() {
             }
         }
     });
+    
     $('#user-search-input').on('input', function() {
         const query = $(this).val();
         if (query.length > 2) {
@@ -617,9 +618,32 @@ function bindAdminTabEventListeners() {
             loadUsersForAdmin();
         }
     });
+
     $('#users-load-more-btn').on('click', () => {
         // เรียกใช้ fetchAdminUsers โดยบอกว่าเป็น "Load More" (isLoadMore = true)
         fetchAdminUsers(AppState.adminUsers.currentPage, AppState.adminUsers.currentSearch, true);
+    });
+
+    // ---- เพิ่ม Event Listener สำหรับปุ่ม Sort ----
+    $('#user-sort-options').on('click', '.btn-sort', function() {
+        const btn = $(this);
+        const sortBy = btn.data('sort');
+
+        // ถ้ากดปุ่มที่ Active อยู่แล้ว ไม่ต้องทำอะไร
+        if (btn.hasClass('active')) {
+            return; 
+        }
+
+        // อัปเดต UI ของปุ่ม
+        $('#user-sort-options .btn-sort').removeClass('active');
+        btn.addClass('active');
+
+        // อัปเดต state
+        AppState.adminUsers.currentSort = sortBy;
+
+        // เรียกข้อมูลใหม่ โดยเริ่มจากหน้า 1 เสมอเมื่อมีการเปลี่ยนการเรียงลำดับ
+        const currentQuery = $('#user-search-input').val();
+        fetchAdminUsers(1, currentQuery, false);
     });
 }
 
@@ -1287,7 +1311,7 @@ async function fetchAdminUsers(page, query, isLoadMore = false) {
 
     try {
         // เรียก API พร้อมส่ง page และ search query ไปด้วย
-        const users = await callApi('/api/admin/users', { search: query, page: page });
+        const users = await callApi('/api/admin/users', { search: query, page: page, sortBy: AppState.adminUsers.currentSort });
 
         if (!isLoadMore) resultsContainer.empty(); // ถ้าเป็นการโหลดครั้งแรก ให้ล้างข้อมูลเก่าทิ้ง
 

@@ -454,10 +454,27 @@ app.post('/api/admin/activities/toggle', isAdmin, async (req, res) => {
 });
 
 app.get('/api/admin/users', isAdmin, handleRequest(async (req) => {
-    const limit = 30; // กำหนดให้ดึงข้อมูลครั้งละ 30 คน
+    const limit = 30;
     const page = parseInt(req.query.page) || 1;
     const offset = (page - 1) * limit;
     const searchTerm = req.query.search || '';
+    // highlight-start
+    const sortBy = req.query.sortBy || 'score'; // รับค่า sortBy, ถ้าไม่ส่งมาให้เรียงตาม 'score' เป็นค่าเริ่มต้น
+
+    let orderByClause = 'ORDER BY `totalScore` DESC'; // ตั้งค่าการเรียงตามคะแนนสูงสุดเป็นค่าเริ่มต้น
+
+    switch (sortBy) {
+        case 'name':
+            orderByClause = 'ORDER BY `fullName` ASC'; // ถ้าขอเรียงตามชื่อ
+            break;
+        case 'newest':
+            // ตรวจสอบให้แน่ใจว่าตาราง users มีคอลัมน์ createdAt หรือคอลัมน์ที่เก็บวันที่สร้าง
+            // หากไม่มี อาจจะต้องเพิ่มเข้าไปเพื่อให้ฟีเจอร์นี้ทำงานได้สมบูรณ์
+            orderByClause = 'ORDER BY `createdAt` DESC'; 
+            break;
+        // default case คือ 'score' ที่เราตั้งไว้ข้างบนแล้ว
+    }
+    // highlight-end
 
     const query = `
       SELECT 
@@ -466,13 +483,13 @@ app.get('/api/admin/users', isAdmin, handleRequest(async (req) => {
         \`employeeId\`, 
         \`totalScore\`, 
         \`pictureUrl\`,
-        (SELECT COUNT(*) FROM user_badges WHERE \`lineUserId\` = users.\`lineUserId\`) as badgeCount
+        (SELECT COUNT(*) FROM user_badges WHERE \`lineUserId\` = users.\`lineUserId\`) as badgeCount,
+        \`createdAt\`
       FROM users 
-      WHERE \`fullName\` LIKE ? OR \`employeeId\` LIKE ? 
-      ORDER BY \`fullName\`
+      WHERE (\`fullName\` LIKE ? OR \`employeeId\` LIKE ?) 
+      ${orderByClause}
       LIMIT ? OFFSET ?`;
       
-    // ส่ง parameter ทั้งหมดเข้าไปใน query
     return db.query(query, [`%${searchTerm}%`, `%${searchTerm}%`, limit, offset]);
 }));
 
