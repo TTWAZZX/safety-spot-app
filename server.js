@@ -127,28 +127,28 @@ app.post('/api/user/register', async (req, res) => {
     }
 });
 
-
-// ในไฟล์ server.js
 app.get('/api/activities', async (req, res) => {
     try {
         const { lineUserId } = req.query;
+        // ดึงกิจกรรมที่ active ทั้งหมดมาก่อนเสมอ
+        const [activities] = await db.query("SELECT * FROM activities WHERE status = 'active' ORDER BY `createdAt` DESC");
+
+        // ถ้าไม่ได้ส่ง lineUserId มา (เช่น จากการรีเฟรช) ก็ส่งข้อมูลกิจกรรมกลับไปเลย
         if (!lineUserId) {
-            // กรณีที่ไม่ได้ส่ง lineUserId มา (อาจจะใช้ในบางกรณี)
-            const [activities] = await db.query("SELECT * FROM activities WHERE status = 'active' ORDER BY `createdAt` DESC");
             return res.status(200).json({ status: 'success', data: activities });
         }
 
-        // 1. ดึงกิจกรรมที่ active ทั้งหมด
-        const [activities] = await db.query("SELECT * FROM activities WHERE status = 'active' ORDER BY `createdAt` DESC");
-
-        // 2. ดึง ID ของกิจกรรมที่ User คนนี้เคยเข้าร่วมแล้ว
+        // --- จุดที่แก้ไขอยู่ตรงนี้ครับ ---
+        // highlight-start
+        // ดึง ID ของกิจกรรมที่ User คนนี้เคยเข้าร่วม และสถานะยังเป็น pending หรือ approved เท่านั้น
         const [submittedActivities] = await db.query(
-            'SELECT `activityId` FROM submissions WHERE `lineUserId` = ?',
+            "SELECT `activityId` FROM submissions WHERE `lineUserId` = ? AND `status` IN ('pending', 'approved')",
             [lineUserId]
         );
+        // highlight-end
         const submittedActivityIds = new Set(submittedActivities.map(s => s.activityId));
 
-        // 3. เพิ่มสถานะ 'userHasSubmitted' เข้าไปในข้อมูลกิจกรรมแต่ละอัน
+        // เพิ่มสถานะ 'userHasSubmitted' เข้าไปในข้อมูลกิจกรรมแต่ละอัน
         const activitiesWithStatus = activities.map(activity => ({
             ...activity,
             userHasSubmitted: submittedActivityIds.has(activity.activityId)
