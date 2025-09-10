@@ -577,6 +577,25 @@ function bindStaticEventListeners() {
     // highlight-end
 }
 
+function bindAdminEventListeners() {
+    $('#view-stats-btn').on('click', handleViewStats);
+    $('#manage-reports-btn').on('click', handleManageReports);
+    $('#manage-activities-btn').on('click', handleManageActivities);
+    $('#manage-badges-btn').on('click', handleManageBadges);
+    $('#create-activity-btn').on('click', handleCreateActivity);
+    $(document).on('click', '.btn-approve, .btn-reject', handleApprovalAction);
+    $(document).on('click', '.btn-edit-activity', handleEditActivity);
+    $(document).on('click', '.btn-toggle-activity', handleToggleActivity);
+    $(document).on('click', '.delete-badge-btn', handleDeleteBadge);
+    $(document).on('click', '.btn-edit-badge', handleEditBadge);
+    $(document).on('click', '.btn-delete-activity', handleDeleteActivity);
+    $(document).on('click', '.btn-delete-submission', handleDeleteSubmission);
+    // ===== START: Event Listeners for Idea 3 =====
+    $(document).on('click', '.user-card', function() { handleViewUserDetails($(this).data('userid')); });
+    $(document).on('click', '.badge-toggle-btn', handleToggleBadge);
+    // ===== END: Event Listeners for Idea 3 =====
+}
+
 function bindAdminTabEventListeners() {
     $('.admin-tab-btn').on('click', function(e) {
         e.preventDefault();
