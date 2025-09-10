@@ -4,11 +4,13 @@ const mysql = require('mysql2/promise');
 const pool = mysql.createPool({
   uri: process.env.DATABASE_URL,
   ssl: {
-    // Aiven ใช้ Certificate ที่เชื่อถือได้โดยทั่วไป
-    // การตั้งค่านี้จะบังคับให้ใช้ SSL/TLS ในการเชื่อมต่อ
-    rejectUnauthorized: true 
+    // highlight-start
+    // สำหรับ Aiven เราต้องตั้งค่านี้เป็น false
+    // เพื่ออนุญาตการเชื่อมต่อที่ใช้ Self-Signed Certificate
+    rejectUnauthorized: false
+    // highlight-end
   }
-}); // <<< เพิ่มวงเล็บปิด }) ตรงนี้ครับ
+});
 
 // ทดสอบการเชื่อมต่อเมื่อเซิร์ฟเวอร์เริ่มทำงาน
 pool.getConnection()
