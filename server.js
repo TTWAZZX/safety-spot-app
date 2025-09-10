@@ -294,80 +294,81 @@ app.post('/api/submissions', async (req, res) => {
 
 app.post('/api/submissions/like', async (req, res) => {
     const { submissionId, lineUserId } = req.body;
-    // highlight-start
-    const client = await db.getClient(); // ใช้ Transaction เพื่อความปลอดภัยของข้อมูล
+    const client = await db.getClient();
     try {
         await client.beginTransaction();
 
         const [existingLikeRows] = await client.query('SELECT `likeId` FROM likes WHERE `submissionId` = ? AND `lineUserId` = ?', [submissionId, lineUserId]);
         
         if (existingLikeRows.length > 0) {
-            // กรณี Unlike: แค่ลบไลค์ออก ไม่ต้องทำอะไรกับคะแนน
             await client.query('DELETE FROM likes WHERE `likeId` = ?', [existingLikeRows[0].likeId]);
         } else {
-            // กรณี Like: เพิ่มไลค์ และบวกคะแนนให้เจ้าของโพสต์
             await client.query('INSERT INTO likes (`likeId`, `submissionId`, `lineUserId`, `createdAt`) VALUES (?, ?, ?, ?)', ["LIKE" + uuidv4(), submissionId, lineUserId, new Date()]);
 
-            // --- ส่วนที่เพิ่มเข้ามาสำหรับการให้คะแนน ---
-            // 1. ค้นหาเจ้าของรายงาน (submission)
             const [submissionRows] = await client.query('SELECT `lineUserId` FROM submissions WHERE `submissionId` = ?', [submissionId]);
             
             if (submissionRows.length > 0) {
                 const ownerId = submissionRows[0].lineUserId;
-
-                // 2. เช็คว่าคนกดไลค์ไม่ใช่เจ้าของโพสต์
                 if (ownerId !== lineUserId) {
-                    // 3. บวก 1 คะแนนให้เจ้าของโพสต์
                     await client.query('UPDATE users SET `totalScore` = `totalScore` + 1 WHERE `lineUserId` = ?', [ownerId]);
+                    
+                    // --- ส่วนที่เพิ่มเข้ามา: สร้าง Notification ---
+                    const [likerRows] = await client.query('SELECT fullName FROM users WHERE lineUserId = ?', [lineUserId]);
+                    const likerName = likerRows.length > 0 ? likerRows[0].fullName : 'Someone';
+                    const message = `${likerName} ได้กดไลค์รายงานของคุณ`;
+                    await client.query(
+                        'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId) VALUES (?, ?, ?, ?, ?)',
+                        ["NOTIF" + uuidv4(), ownerId, message, 'like', submissionId]
+                    );
+                    // --- จบส่วนที่เพิ่ม ---
                 }
             }
-            // --- จบส่วนการให้คะแนน ---
         }
         
         const [countRows] = await client.query('SELECT COUNT(*) as count FROM likes WHERE `submissionId` = ?', [submissionId]);
         
-        await client.commit(); // ยืนยันการเปลี่ยนแปลงทั้งหมด
-        
+        await client.commit();
         res.status(200).json({ status: 'success', data: { status: existingLikeRows.length > 0 ? 'unliked' : 'liked', newLikeCount: countRows[0].count }});
     
     } catch (error) {
-        await client.rollback(); // ถ้ามีข้อผิดพลาด ให้ย้อนกลับทั้งหมด
+        await client.rollback();
         console.error(`API Error on ${req.method} ${req.path}:`, error);
         res.status(500).json({ status: 'error', message: error.message || 'An internal server error occurred.' });
     } finally {
-        client.release(); // คืน connection
+        client.release();
     }
-    // highlight-end
 });
 
-app.post('/api/submissions/comment', async (req, res) => { // <<< แก้ไขเล็กน้อยให้เป็น async (req, res)
+app.post('/api/submissions/comment', async (req, res) => {
     const { submissionId, lineUserId, commentText } = req.body;
     if (!commentText || commentText.trim() === '') {
         return res.status(400).json({ status: 'error', message: "Comment cannot be empty."});
     }
 
-    // highlight-start
     const client = await db.getClient();
     try {
         await client.beginTransaction();
 
-        // 1. บันทึกคอมเมนต์ลงฐานข้อมูล
         await client.query('INSERT INTO comments (`commentId`, `submissionId`, `lineUserId`, `commentText`, `createdAt`) VALUES (?, ?, ?, ?, ?)', ["CMT" + uuidv4(), submissionId, lineUserId, commentText.trim(), new Date()]);
 
-        // --- ส่วนที่เพิ่มเข้ามาสำหรับการให้คะแนน ---
-        // 2. ค้นหาเจ้าของรายงาน (submission)
         const [submissionRows] = await client.query('SELECT `lineUserId` FROM submissions WHERE `submissionId` = ?', [submissionId]);
         
         if (submissionRows.length > 0) {
             const ownerId = submissionRows[0].lineUserId;
-
-            // 3. เช็คว่าคนคอมเมนต์ไม่ใช่เจ้าของโพสต์
             if (ownerId !== lineUserId) {
-                // 4. บวก 1 คะแนนให้เจ้าของโพสต์
                 await client.query('UPDATE users SET `totalScore` = `totalScore` + 1 WHERE `lineUserId` = ?', [ownerId]);
+                
+                // --- ส่วนที่เพิ่มเข้ามา: สร้าง Notification ---
+                const [commenterRows] = await client.query('SELECT fullName FROM users WHERE lineUserId = ?', [lineUserId]);
+                const commenterName = commenterRows.length > 0 ? commenterRows[0].fullName : 'Someone';
+                const message = `${commenterName} ได้แสดงความคิดเห็นบนรายงานของคุณ`;
+                await client.query(
+                    'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId) VALUES (?, ?, ?, ?, ?)',
+                    ["NOTIF" + uuidv4(), ownerId, message, 'comment', submissionId]
+                );
+                // --- จบส่วนที่เพิ่ม ---
             }
         }
-        // --- จบส่วนการให้คะแนน ---
 
         await client.commit();
         res.status(200).json({ status: 'success', data: null });
@@ -379,7 +380,6 @@ app.post('/api/submissions/comment', async (req, res) => { // <<< แก้ไ�
     } finally {
         client.release();
     }
-    // highlight-end
 });
 
 // --- Admin Routes (Converted to MySQL) ---
@@ -459,6 +459,8 @@ app.get('/api/admin/submissions/pending', isAdmin, async (req, res) => {
 });
 
 
+// server.js
+
 app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
     const { submissionId, score } = req.body;
     const client = await db.getClient();
@@ -471,6 +473,14 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
         await client.query('UPDATE submissions SET status = ?, points = ? WHERE `submissionId` = ?', ['approved', score, submissionId]);
         await client.query('UPDATE users SET `totalScore` = `totalScore` + ? WHERE `lineUserId` = ?', [score, lineUserId]);
         
+        // --- ส่วนที่เพิ่มเข้ามา: สร้าง Notification ---
+        const message = `รายงานของคุณได้รับการอนุมัติ และได้รับ ${score} คะแนน`;
+        await client.query(
+            'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId) VALUES (?, ?, ?, ?, ?)',
+            ["NOTIF" + uuidv4(), lineUserId, message, 'approved', submissionId]
+        );
+        // --- จบส่วนที่เพิ่ม ---
+
         await client.commit();
         res.status(200).json({ status: 'success', data: { message: 'Submission approved.' } });
     } catch (error) {
@@ -643,6 +653,34 @@ app.post('/api/admin/revoke-badge', isAdmin, handleRequest(async (req) => {
     return db.query('DELETE FROM user_badges WHERE `lineUserId` = ? AND `badgeId` = ?', [lineUserId, badgeId]);
 }));
 
+// ================================= NOTIFICATION ROUTES =================================
+
+// 1. API สำหรับดึงการแจ้งเตือนทั้งหมดของผู้ใช้
+app.get('/api/notifications', handleRequest(async (req) => {
+    // requesterId ถูกส่งมาจาก Frontend โดยอัตโนมัติจากฟังก์ชัน callApi
+    const { requesterId } = req.query; 
+    if (!requesterId) throw new Error("User ID is required.");
+    return db.query('SELECT * FROM notifications WHERE recipientUserId = ? ORDER BY createdAt DESC', [requesterId]);
+}));
+
+// 2. API สำหรับนับจำนวนที่ยังไม่อ่าน (สำหรับจุดสีแดง)
+app.get('/api/notifications/unread-count', handleRequest(async (req) => {
+    const { requesterId } = req.query;
+    if (!requesterId) throw new Error("User ID is required.");
+    const [rows] = await db.query("SELECT COUNT(*) as unreadCount FROM notifications WHERE recipientUserId = ? AND isRead = FALSE", [requesterId]);
+    // handleRequest คาดหวัง array เราจึงส่ง [rows] กลับไป
+    return [rows]; 
+}));
+
+// 3. API สำหรับ "ทำเครื่องหมายว่าอ่านแล้วทั้งหมด"
+app.post('/api/notifications/mark-read', handleRequest(async (req) => {
+    // requesterId ถูกส่งมาจาก Frontend โดยอัตโนมัติจากฟังก์ชัน callApi
+    const { requesterId } = req.body; 
+    if (!requesterId) throw new Error("User ID is required.");
+    return db.query("UPDATE notifications SET isRead = TRUE WHERE recipientUserId = ? AND isRead = FALSE", [requesterId]);
+}));
+
 // ================================= SERVER START =================================
 app.get('/', (req, res) => res.send('Backend server is running!'));
 app.listen(PORT, '0.0.0.0', () => console.log(`Server is running on port ${PORT}`));
+

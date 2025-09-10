@@ -35,9 +35,10 @@ $(document).ready(function() {
     bindAdminTabEventListeners();
 });
 
-
 function initializeAllModals() {
-    const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form', 'user-details'];
+    // highlight-start
+    const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form', 'user-details', 'notification'];
+    // highlight-end
     modalIds.forEach(id => {
         const modalElement = document.getElementById(`${id}-modal`);
         if (modalElement) {
@@ -109,6 +110,9 @@ async function showMainApp(userData) {
             distMax: 100
         });
         // ===== END: เพิ่มโค้ดเรียกใช้ Pull to Refresh =====
+         // highlight-start
+        checkUnreadNotifications(); // เช็คการแจ้งเตือนที่ยังไม่ได้อ่าน
+        // highlight-end
 
     } catch (error) {
         console.error("Error during showMainApp:", error);
@@ -514,6 +518,8 @@ async function loadUserBadges() {
 //  EVENT LISTENERS
 // ===============================================================
 // ในไฟล์ app.js ให้นำโค้ดนี้ไปทับฟังก์ชันเดิม
+// app.js
+
 function bindStaticEventListeners() {
     $('.nav-link').on('click', function(e) {
         e.preventDefault();
@@ -524,9 +530,7 @@ function bindStaticEventListeners() {
             $('.page').removeClass('active');
             $('#' + pageId).addClass('active');
 
-            // ===== ส่วนที่แก้ไข =====
             if (pageId === 'leaderboard-page') {
-                // เมื่อกดแท็บ "อันดับ" ให้เรียก loadLeaderboard แบบเริ่มต้นใหม่เสมอ
                 loadLeaderboard(false); 
             }
             if (pageId === 'profile-page') {
@@ -535,7 +539,6 @@ function bindStaticEventListeners() {
             if (pageId === 'admin-page') {
                 loadAdminDashboard();
             }
-            // ======================
         }
     });
 
@@ -566,27 +569,12 @@ function bindStaticEventListeners() {
         }
     });
     
-    // เพิ่ม Event Listener ของปุ่ม Leaderboard ที่นี่
     $('#leaderboard-load-more-btn').on('click', () => loadLeaderboard(true));
-}
 
-function bindAdminEventListeners() {
-    $('#view-stats-btn').on('click', handleViewStats);
-    $('#manage-reports-btn').on('click', handleManageReports);
-    $('#manage-activities-btn').on('click', handleManageActivities);
-    $('#manage-badges-btn').on('click', handleManageBadges);
-    $('#create-activity-btn').on('click', handleCreateActivity);
-    $(document).on('click', '.btn-approve, .btn-reject', handleApprovalAction);
-    $(document).on('click', '.btn-edit-activity', handleEditActivity);
-    $(document).on('click', '.btn-toggle-activity', handleToggleActivity);
-    $(document).on('click', '.delete-badge-btn', handleDeleteBadge);
-    $(document).on('click', '.btn-edit-badge', handleEditBadge);
-    $(document).on('click', '.btn-delete-activity', handleDeleteActivity);
-    $(document).on('click', '.btn-delete-submission', handleDeleteSubmission);
-    // ===== START: Event Listeners for Idea 3 =====
-    $(document).on('click', '.user-card', function() { handleViewUserDetails($(this).data('userid')); });
-    $(document).on('click', '.badge-toggle-btn', handleToggleBadge);
-    // ===== END: Event Listeners for Idea 3 =====
+    // highlight-start
+    // ---- เพิ่ม Event Listener สำหรับปุ่มแจ้งเตือนไว้ตรงนี้ ----
+    $('#notification-bell').on('click', openNotificationCenter);
+    // highlight-end
 }
 
 function bindAdminTabEventListeners() {
@@ -1359,7 +1347,80 @@ function renderUserListForAdmin(users, container) {
         container.append(html);
     });
 }
-// ===== END: Updated User Search/Load functions for Idea 3 =====
+
+// ---- START: Notification Functions ----
+
+async function checkUnreadNotifications() {
+    try {
+        const data = await callApi('/api/notifications/unread-count');
+        if (data[0].unreadCount > 0) {
+            $('#notification-badge').show();
+        } else {
+            $('#notification-badge').hide();
+        }
+    } catch (e) {
+        console.error("Failed to check unread notifications:", e);
+        $('#notification-badge').hide();
+    }
+}
+
+async function openNotificationCenter() {
+    const modal = AppState.allModals['notification'];
+    modal.show();
+    
+    const container = $('#notification-list-container');
+    container.html('<div class="text-center my-5"><div class="spinner-border text-success"></div></div>');
+
+    try {
+        // 1. ดึงข้อมูลแจ้งเตือนทั้งหมดมาแสดง
+        const notifications = await callApi('/api/notifications');
+        renderNotifications(notifications, container);
+        
+        // 2. เมื่อเปิดดูแล้ว ให้ส่ง request ไปบอก Server ว่าเราอ่านแล้ว
+        await callApi('/api/notifications/mark-read', {}, 'POST');
+        
+        // 3. ซ่อนจุดแดงบนไอคอนกระดิ่ง
+        $('#notification-badge').hide();
+
+    } catch (e) {
+        container.html('<p class="text-center text-danger my-4">ไม่สามารถโหลดการแจ้งเตือนได้</p>');
+    }
+}
+
+function renderNotifications(notifications, container) {
+    container.empty();
+    if (notifications.length === 0) {
+        container.html('<div class="d-flex flex-column justify-content-center align-items-center h-100 text-center"><i class="fas fa-bell-slash fa-3x text-muted mb-3"></i><p class="text-muted">ยังไม่มีการแจ้งเตือน</p></div>');
+        return;
+    }
+
+    const listGroup = $('<div class="list-group list-group-flush"></div>');
+    notifications.forEach(notif => {
+        // ใส่ icon ตามประเภทของ notification
+        let icon = 'fa-info-circle text-primary';
+        if (notif.type === 'like') icon = 'fa-heart text-danger';
+        if (notif.type === 'comment') icon = 'fa-comment text-info';
+        if (notif.type === 'approved') icon = 'fa-check-circle text-success';
+        if (notif.type === 'badge') icon = 'fa-certificate text-warning';
+
+        const isUnreadClass = notif.isRead ? '' : 'list-group-item-light';
+        const timeAgo = new Date(notif.createdAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short'});
+        
+        const itemHtml = `
+            <div class="list-group-item ${isUnreadClass}" data-item-id="${notif.relatedItemId}">
+                <div class="d-flex align-items-center">
+                    <i class="fas ${icon} fa-fw me-3"></i>
+                    <div class="flex-grow-1">
+                        <p class="mb-0 small">${sanitizeHTML(notif.message)}</p>
+                        <small class="text-muted">${timeAgo}</small>
+                    </div>
+                </div>
+            </div>`;
+        listGroup.append(itemHtml);
+    });
+    container.append(listGroup);
+}
+// ---- END: Notification Functions ----
 
 // ===============================================================
 //  UTILITY FUNCTIONS
