@@ -1,9 +1,14 @@
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 
-// สร้าง Connection Pool โดยใช้ DATABASE_URL จาก .env
-// mysql2 สามารถทำงานกับ DATABASE_URL ได้โดยตรง
-const pool = mysql.createPool(process.env.DATABASE_URL);
+const pool = mysql.createPool({
+  uri: process.env.DATABASE_URL,
+  ssl: {
+    // Aiven ใช้ Certificate ที่เชื่อถือได้โดยทั่วไป
+    // การตั้งค่านี้จะบังคับให้ใช้ SSL/TLS ในการเชื่อมต่อ
+    rejectUnauthorized: true 
+  }
+}); // <<< เพิ่มวงเล็บปิด }) ตรงนี้ครับ
 
 // ทดสอบการเชื่อมต่อเมื่อเซิร์ฟเวอร์เริ่มทำงาน
 pool.getConnection()
