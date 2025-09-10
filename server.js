@@ -230,55 +230,40 @@ app.get('/api/submissions', async (req, res) => {
     }
 });
 
-
-// server.js
-
-// server.js
-
 app.post('/api/submissions', async (req, res) => {
     const { activityId, lineUserId, description, imageUrl } = req.body;
     try {
-        // --- การจัดการและตรวจสอบข้อมูลเบื้องต้น (จากครั้งที่แล้ว) ---
         const normalizedDescription = description.trim();
         if (!normalizedDescription) {
             throw new Error('กรุณากรอกรายละเอียดของรายงาน');
         }
 
-        // highlight-start
-        // --- START: Level 2 - ตรวจสอบความคล้ายคลึงของข้อความ ---
-
-        // 1. ตั้งค่าความคลาดเคลื่อนที่ยอมรับได้ (ยิ่งน้อยยิ่งเข้มงวด)
         const SIMILARITY_THRESHOLD = 5; 
-
-        // 2. ดึงรายงานล่าสุด 20 รายการของกิจกรรมนี้มาเพื่อเปรียบเทียบ
         const [recentSubmissions] = await db.query(
             'SELECT `description` FROM `submissions` WHERE `activityId` = ? ORDER BY `createdAt` DESC LIMIT 20',
             [activityId]
         );
 
-        // 3. วนลูปเพื่อเปรียบเทียบข้อความใหม่กับข้อความเก่าแต่ละอัน
         for (const submission of recentSubmissions) {
             const similarity = distance(normalizedDescription, submission.description);
-            
-            // 4. ถ้าค่าความต่างมันน้อยกว่าที่เราตั้งไว้ ให้ถือว่าเป็นข้อมูลที่คล้ายกันเกินไป
             if (similarity < SIMILARITY_THRESHOLD) {
                 throw new Error('เนื้อหารายงานมีความคล้ายคลึงกับรายงานที่มีอยู่แล้ว');
             }
         }
-        // --- END: Level 2 ---
-        // highlight-end
 
-        // 5. ตรวจสอบว่าผู้ใช้คนเดิมเคยส่งรายงานในกิจกรรมนี้หรือยัง (Logic เดิม)
+        // --- จุดที่แก้ไขอยู่ตรงนี้ครับ ---
+        // highlight-start
+        // ตรวจสอบว่าผู้ใช้คนเดิมมีรายงานที่ "รอตรวจ" หรือ "อนุมัติแล้ว" ค้างอยู่ในกิจกรรมนี้หรือไม่
         const [existingSubmissions] = await db.query(
-            'SELECT `submissionId` FROM `submissions` WHERE `activityId` = ? AND `lineUserId` = ?',
+            "SELECT `submissionId` FROM `submissions` WHERE `activityId` = ? AND `lineUserId` = ? AND `status` IN ('pending', 'approved')",
             [activityId, lineUserId]
         );
+        // highlight-end
 
         if (existingSubmissions.length > 0) {
-            throw new Error('คุณได้เข้าร่วมกิจกรรมนี้ไปแล้ว');
+            throw new Error('คุณได้เข้าร่วมกิจกรรมนี้และรายงานกำลังรอการตรวจสอบหรือได้รับการอนุมัติไปแล้ว');
         }
 
-        // 6. ถ้าทุกอย่างผ่าน ก็ทำการ INSERT
         await db.query(
             'INSERT INTO submissions (`submissionId`, `activityId`, `lineUserId`, `description`, `imageUrl`, `status`, `createdAt`) VALUES (?, ?, ?, ?, ?, ?, ?)',
             ["SUB" + uuidv4(), activityId, lineUserId, normalizedDescription, imageUrl, 'pending', new Date()]
@@ -492,12 +477,39 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
     }
 });
 
-
-app.post('/api/admin/submissions/reject', isAdmin, handleRequest(async (req) => {
+app.post('/api/admin/submissions/reject', isAdmin, async (req, res) => {
     const { submissionId } = req.body;
-    return db.query("UPDATE submissions SET status = 'rejected' WHERE `submissionId` = ?", [submissionId]);
-}));
+    const client = await db.getClient();
+    try {
+        await client.beginTransaction();
 
+        // 1. ค้นหาเจ้าของรายงานก่อน เพื่อจะได้รู้ว่าจะส่งแจ้งเตือนไปให้ใคร
+        const [submissionRows] = await client.query('SELECT `lineUserId` FROM submissions WHERE `submissionId` = ?', [submissionId]);
+        if (submissionRows.length === 0) throw new Error('Submission not found');
+        const { lineUserId } = submissionRows[0];
+
+        // 2. อัปเดตสถานะรายงานเป็น 'rejected'
+        await client.query("UPDATE submissions SET status = 'rejected' WHERE `submissionId` = ?", [submissionId]);
+
+        // --- ส่วนที่เพิ่มเข้ามา: สร้าง Notification ---
+        const message = `น่าเสียดาย, รายงานของคุณไม่ผ่านการตรวจสอบ`;
+        await client.query(
+            'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId) VALUES (?, ?, ?, ?, ?)',
+            ["NOTIF" + uuidv4(), lineUserId, message, 'rejected', submissionId] // อาจจะใช้ type 'rejected' หรือ 'approved' ก็ได้
+        );
+        // --- จบส่วนที่เพิ่ม ---
+
+        await client.commit();
+        res.status(200).json({ status: 'success', data: { message: 'Submission rejected.' } });
+
+    } catch (error) {
+        await client.rollback();
+        console.error(`API Error on ${req.method} ${req.path}:`, error);
+        res.status(500).json({ status: 'error', message: error.message || 'An internal server error occurred.' });
+    } finally {
+        client.release();
+    }
+});
 
 app.delete('/api/admin/submissions/:submissionId', isAdmin, handleRequest(async (req) => {
     const { submissionId } = req.params;
