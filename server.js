@@ -9,6 +9,7 @@ const db = require('./db'); // db.js จะเป็นเวอร์ชัน�
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
 const { v4: uuidv4 } = require('uuid');
+const { distance } = require('fastest-levenshtein'); // <<< เพิ่มบรรทัดนี้
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -230,38 +231,66 @@ app.get('/api/submissions', async (req, res) => {
 });
 
 
+// server.js
+
+// server.js
+
 app.post('/api/submissions', async (req, res) => {
     const { activityId, lineUserId, description, imageUrl } = req.body;
     try {
-        // --- ส่วนที่เพิ่มเข้ามาเพื่อตรวจสอบการส่งซ้ำ ---
+        // --- การจัดการและตรวจสอบข้อมูลเบื้องต้น (จากครั้งที่แล้ว) ---
+        const normalizedDescription = description.trim();
+        if (!normalizedDescription) {
+            throw new Error('กรุณากรอกรายละเอียดของรายงาน');
+        }
+
+        // highlight-start
+        // --- START: Level 2 - ตรวจสอบความคล้ายคลึงของข้อความ ---
+
+        // 1. ตั้งค่าความคลาดเคลื่อนที่ยอมรับได้ (ยิ่งน้อยยิ่งเข้มงวด)
+        const SIMILARITY_THRESHOLD = 5; 
+
+        // 2. ดึงรายงานล่าสุด 20 รายการของกิจกรรมนี้มาเพื่อเปรียบเทียบ
+        const [recentSubmissions] = await db.query(
+            'SELECT `description` FROM `submissions` WHERE `activityId` = ? ORDER BY `createdAt` DESC LIMIT 20',
+            [activityId]
+        );
+
+        // 3. วนลูปเพื่อเปรียบเทียบข้อความใหม่กับข้อความเก่าแต่ละอัน
+        for (const submission of recentSubmissions) {
+            const similarity = distance(normalizedDescription, submission.description);
+            
+            // 4. ถ้าค่าความต่างมันน้อยกว่าที่เราตั้งไว้ ให้ถือว่าเป็นข้อมูลที่คล้ายกันเกินไป
+            if (similarity < SIMILARITY_THRESHOLD) {
+                throw new Error('เนื้อหารายงานมีความคล้ายคลึงกับรายงานที่มีอยู่แล้ว');
+            }
+        }
+        // --- END: Level 2 ---
+        // highlight-end
+
+        // 5. ตรวจสอบว่าผู้ใช้คนเดิมเคยส่งรายงานในกิจกรรมนี้หรือยัง (Logic เดิม)
         const [existingSubmissions] = await db.query(
             'SELECT `submissionId` FROM `submissions` WHERE `activityId` = ? AND `lineUserId` = ?',
             [activityId, lineUserId]
         );
 
         if (existingSubmissions.length > 0) {
-            // ถ้าหาเจอ (length > 0) แสดงว่าเคยส่งแล้ว ให้ส่ง Error กลับไป
             throw new Error('คุณได้เข้าร่วมกิจกรรมนี้ไปแล้ว');
         }
-        // --- จบส่วนที่เพิ่มเข้ามา ---
 
-        // ถ้าไม่เคยส่งมาก่อน ก็ทำการ INSERT ตามปกติ
+        // 6. ถ้าทุกอย่างผ่าน ก็ทำการ INSERT
         await db.query(
             'INSERT INTO submissions (`submissionId`, `activityId`, `lineUserId`, `description`, `imageUrl`, `status`, `createdAt`) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            ["SUB" + uuidv4(), activityId, lineUserId, description, imageUrl, 'pending', new Date()]
+            ["SUB" + uuidv4(), activityId, lineUserId, normalizedDescription, imageUrl, 'pending', new Date()]
         );
         
-        // ส่ง response สำเร็จกลับไป
         res.status(200).json({ status: 'success', data: { message: 'Submission created.' } });
 
     } catch (error) {
-        // จัดการ Error ที่เราสร้างขึ้นเองและ Error อื่นๆ
         console.error(`API Error on ${req.method} ${req.path}:`, error);
-        // ส่ง message จาก error ที่เรา throw กลับไปให้ Frontend
         res.status(400).json({ status: 'error', message: error.message || 'An internal server error occurred.' });
     }
 });
-
 
 app.post('/api/submissions/like', async (req, res) => {
     try {
