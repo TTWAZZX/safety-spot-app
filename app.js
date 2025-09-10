@@ -513,6 +513,7 @@ async function loadUserBadges() {
 // ===============================================================
 //  EVENT LISTENERS
 // ===============================================================
+// ในไฟล์ app.js ให้นำโค้ดนี้ไปทับฟังก์ชันเดิม
 function bindStaticEventListeners() {
     $('.nav-link').on('click', function(e) {
         e.preventDefault();
@@ -522,10 +523,19 @@ function bindStaticEventListeners() {
             $(this).addClass('active');
             $('.page').removeClass('active');
             $('#' + pageId).addClass('active');
-            if (pageId === 'leaderboard-page') loadLeaderboard();
-            if (pageId === 'profile-page') loadUserBadges();
-            if (pageId === 'admin-page') loadAdminDashboard();
-            $('#leaderboard-load-more-btn').on('click', () => loadLeaderboard(true));
+
+            // ===== ส่วนที่แก้ไข =====
+            if (pageId === 'leaderboard-page') {
+                // เมื่อกดแท็บ "อันดับ" ให้เรียก loadLeaderboard แบบเริ่มต้นใหม่เสมอ
+                loadLeaderboard(false); 
+            }
+            if (pageId === 'profile-page') {
+                loadUserBadges();
+            }
+            if (pageId === 'admin-page') {
+                loadAdminDashboard();
+            }
+            // ======================
         }
     });
 
@@ -555,6 +565,9 @@ function bindStaticEventListeners() {
             imageViewerModal.show();
         }
     });
+    
+    // เพิ่ม Event Listener ของปุ่ม Leaderboard ที่นี่
+    $('#leaderboard-load-more-btn').on('click', () => loadLeaderboard(true));
 }
 
 function bindAdminEventListeners() {
