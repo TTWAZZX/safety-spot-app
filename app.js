@@ -396,7 +396,7 @@ async function loadAndShowActivityDetails(activityId, activityTitle, scrollToSub
                 const targetCard = $(`.like-btn[data-submission-id="${scrollToSubmissionId}"]`).closest('.submission-card');
                 if (targetCard.length) {
                     // สั่งให้เลื่อนจอไปที่ card เป้าหมายอย่างนุ่มนวล
-                    targetCard[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    targetCard[0].scrollIntoView({ behavior: 'smooth', block: 'end' });
                 }
             }, 100); // หน่วงเวลา 100 มิลลิวินาที
         }
