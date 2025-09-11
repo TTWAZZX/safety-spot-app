@@ -326,15 +326,19 @@ app.post('/api/submissions/like', async (req, res) => {
 
 app.post('/api/submissions/comment', async (req, res) => {
     const { submissionId, lineUserId, commentText } = req.body;
-    if (!commentText || commentText.trim() === '') {
+    if (!commentText || !commentText.trim()) {
         return res.status(400).json({ status: 'error', message: "Comment cannot be empty."});
     }
 
     const client = await db.getClient();
     try {
         await client.beginTransaction();
+        const commentId = "CMT" + uuidv4();
+        const trimmedComment = commentText.trim();
 
-        await client.query('INSERT INTO comments (`commentId`, `submissionId`, `lineUserId`, `commentText`, `createdAt`) VALUES (?, ?, ?, ?, ?)', ["CMT" + uuidv4(), submissionId, lineUserId, commentText.trim(), new Date()]);
+        await client.query('INSERT INTO comments (`commentId`, `submissionId`, `lineUserId`, `commentText`, `createdAt`) VALUES (?, ?, ?, ?, ?)', 
+            [commentId, submissionId, lineUserId, trimmedComment, new Date()]
+        );
 
         const [submissionRows] = await client.query('SELECT `lineUserId` FROM submissions WHERE `submissionId` = ?', [submissionId]);
         
@@ -343,20 +347,39 @@ app.post('/api/submissions/comment', async (req, res) => {
             if (ownerId !== lineUserId) {
                 await client.query('UPDATE users SET `totalScore` = `totalScore` + 1 WHERE `lineUserId` = ?', [ownerId]);
                 
-                // --- ส่วนที่เพิ่มเข้ามา: สร้าง Notification ---
                 const [commenterRows] = await client.query('SELECT fullName FROM users WHERE lineUserId = ?', [lineUserId]);
                 const commenterName = commenterRows.length > 0 ? commenterRows[0].fullName : 'Someone';
                 const message = `${commenterName} ได้แสดงความคิดเห็นบนรายงานของคุณ`;
-                await client.query(
-                    'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId) VALUES (?, ?, ?, ?, ?)',
+                await client.query('INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId) VALUES (?, ?, ?, ?, ?)', 
                     ["NOTIF" + uuidv4(), ownerId, message, 'comment', submissionId]
                 );
-                // --- จบส่วนที่เพิ่ม ---
             }
         }
 
+        // --- ส่วนที่อัปเกรด ---
+        // highlight-start
+        // ดึงข้อมูลคอมเมนต์ที่เพิ่งสร้าง พร้อมข้อมูลผู้คอมเมนต์ เพื่อส่งกลับไปให้ Frontend
+        const [newCommentRows] = await client.query(`
+            SELECT c.commentText, u.fullName, u.pictureUrl 
+            FROM comments c 
+            JOIN users u ON c.lineUserId = u.lineUserId 
+            WHERE c.commentId = ?
+        `, [commentId]);
+
+        const newCommentData = {
+            commentText: newCommentRows[0].commentText,
+            commenter: {
+                fullName: newCommentRows[0].fullName,
+                pictureUrl: newCommentRows[0].pictureUrl
+            }
+        };
+        // highlight-end
+
         await client.commit();
-        res.status(200).json({ status: 'success', data: null });
+        // highlight-start
+        // ส่งข้อมูลคอมเมนต์ใหม่กลับไปใน response
+        res.status(200).json({ status: 'success', data: newCommentData });
+        // highlight-end
 
     } catch (error) {
         await client.rollback();

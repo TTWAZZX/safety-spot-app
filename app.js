@@ -767,38 +767,61 @@ async function handleLike(e) {
     }
 }
 
-// app.js (แก้ไขในฟังก์ชัน handleComment)
-
 async function handleComment(e) {
     e.preventDefault();
     const btn = $(this);
     const submissionId = btn.data('submission-id');
-    const input = btn.siblings('.comment-input');
+    const input = btn.closest('.input-group').find('.comment-input');
     const commentText = input.val().trim();
-    if(!commentText) return;
     
+    if (!commentText) return;
+
     btn.prop('disabled', true);
     
     try {
-        await callApi('/api/submissions/comment', { submissionId, lineUserId: AppState.lineProfile.userId, commentText }, 'POST');
-        
-        const modal = $('#activity-detail-modal');
-        const currentActivityId = modal.data('current-activity-id');
-        const activityTitle = $('#activity-detail-title').text();
-        if (currentActivityId) {
-           // highlight-start
-           // ส่ง submissionId เพิ่มเข้าไปเป็น parameter ที่ 3
-           loadAndShowActivityDetails(currentActivityId, activityTitle, submissionId); 
-           // highlight-end
+        // 1. ส่งคอมเมนต์ไป Server และรอรับข้อมูลคอมเมนต์ใหม่กลับมา
+        const result = await callApi('/api/submissions/comment', { submissionId, lineUserId: AppState.lineProfile.userId, commentText });
+        const newComment = result.data;
+
+        // 2. หาตำแหน่งที่จะแสดงคอมเมนต์
+        const commentSection = $(`#comments-${submissionId}`);
+        const commentList = commentSection.find('.comment-list');
+
+        // 3. สร้าง HTML สำหรับคอมเมนต์ใหม่
+        const newCommentHtml = `
+            <div class="d-flex mb-2 new-comment-animation">
+                <img src="${newComment.commenter.pictureUrl || 'https://placehold.co/32x32'}" class="rounded-circle me-2 comment-profile-pic" width="32" height="32" alt="Profile">
+                <div>
+                    <small class="fw-bold d-block">${sanitizeHTML(newComment.commenter.fullName)}</small>
+                    <small class="text-muted preserve-whitespace">${sanitizeHTML(newComment.commentText)}</small>
+                </div>
+            </div>`;
+
+        // 4. ตรวจสอบว่าก่อนหน้านี้มีคอมเมนต์หรือไม่
+        if (commentList.find('small.text-muted').length > 0 && commentList.text().includes('ยังไม่มีความคิดเห็น')) {
+            commentList.html(newCommentHtml); // แทนที่ข้อความ "ยังไม่มีความคิดเห็น"
+        } else {
+            commentList.append(newCommentHtml); // ต่อท้ายคอมเมนต์ใหม่เข้าไป
         }
+
+        // 5. อัปเดตจำนวนคอมเมนต์ที่ปุ่ม
+        const commentBtn = btn.closest('.card-body').find('.comment-btn');
+        const currentCount = parseInt(commentBtn.text().trim()) || 0;
+        commentBtn.html(`<i class="fas fa-comment"></i> ${currentCount + 1}`);
+
+        // 6. ล้างช่อง input
+        input.val('');
+
+        // 7. เลื่อนจอไปที่คอมเมนต์ใหม่ล่าสุดอย่างนุ่มนวล
+        const newCommentElement = commentList.children().last();
+        newCommentElement[0].scrollIntoView({ behavior: 'smooth', block: 'end' });
+
     } catch (e) { 
-        showError('ไม่สามารถเพิ่มความคิดเห็นได้'); 
-        // highlight-start
-        // เพิ่มบรรทัดนี้เพื่อให้ปุ่มกลับมาใช้งานได้แม้จะเกิด Error
+        showError('ไม่สามารถเพิ่มความคิดเห็นได้: ' + e.message); 
+    } finally {
+        // คืนสภาพปุ่มให้กดได้อีกครั้ง
         btn.prop('disabled', false); 
-        // highlight-end
-    } 
-    // ไม่ต้องมี finally แล้ว เพราะเราจัดการ btn.prop('disabled', false) ใน catch แล้ว
+    }
 }
 
 function handleImagePreview(input, previewSelector) {
