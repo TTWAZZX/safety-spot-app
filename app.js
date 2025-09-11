@@ -780,7 +780,7 @@ async function handleComment(e) {
     
     try {
         // 1. ส่งคอมเมนต์ไป Server และรอรับข้อมูลคอมเมนต์ใหม่กลับมา
-        const result = await callApi('/api/submissions/comment', { submissionId, lineUserId: AppState.lineProfile.userId, commentText });
+        const result = await callApi('/api/submissions/comment', { submissionId, lineUserId: AppState.lineProfile.userId, commentText }, 'POST');
         const newComment = result.data;
 
         // 2. หาตำแหน่งที่จะแสดงคอมเมนต์
