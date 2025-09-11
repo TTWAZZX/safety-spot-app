@@ -368,7 +368,9 @@ function renderAdminChart(chartData) {
 // ===============================================================
 //  DATA LOADING FUNCTIONS
 // ===============================================================
-async function loadAndShowActivityDetails(activityId, activityTitle) {
+// app.js
+
+async function loadAndShowActivityDetails(activityId, activityTitle, scrollToSubmissionId = null) {
     const modal = $('#activity-detail-modal');
     modal.data('current-activity-id', activityId);
     $('#activity-detail-title').text(activityTitle);
@@ -376,13 +378,33 @@ async function loadAndShowActivityDetails(activityId, activityTitle) {
     const container = $('#submissions-container');
     $('#submissions-loading').show();
     container.empty();
-    AppState.allModals['activity-detail'].show();
+    
+    // ถ้ายังไม่ได้เปิด modal ให้เปิดก่อน
+    if (!modal.hasClass('show')) {
+        AppState.allModals['activity-detail'].show();
+    }
+
     try {
         const submissions = await callApi('/api/submissions', { activityId, lineUserId: AppState.lineProfile.userId });
         renderSubmissions(submissions);
+
+        // highlight-start
+        // --- ส่วนที่เพิ่มเข้ามาเพื่อเลื่อนจอ ---
+        if (scrollToSubmissionId) {
+            // ใช้ setTimeout เล็กน้อยเพื่อให้แน่ใจว่า DOM ถูก render เสร็จสมบูรณ์แล้ว
+            setTimeout(() => {
+                const targetCard = $(`.like-btn[data-submission-id="${scrollToSubmissionId}"]`).closest('.submission-card');
+                if (targetCard.length) {
+                    // สั่งให้เลื่อนจอไปที่ card เป้าหมายอย่างนุ่มนวล
+                    targetCard[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100); // หน่วงเวลา 100 มิลลิวินาที
+        }
+        // --- จบส่วนเลื่อนจอ ---
+        // highlight-end
+
     } catch (error) { 
         console.error("Error details from loadAndShowActivityDetails:", error); 
-        
         container.html('<p class="text-center text-danger">ไม่สามารถโหลดข้อมูลรายงานได้</p>'); 
     } finally { 
         $('#submissions-loading').hide(); 
@@ -745,6 +767,8 @@ async function handleLike(e) {
     }
 }
 
+// app.js (แก้ไขในฟังก์ชัน handleComment)
+
 async function handleComment(e) {
     e.preventDefault();
     const btn = $(this);
@@ -762,13 +786,19 @@ async function handleComment(e) {
         const currentActivityId = modal.data('current-activity-id');
         const activityTitle = $('#activity-detail-title').text();
         if (currentActivityId) {
-           loadAndShowActivityDetails(currentActivityId, activityTitle);
+           // highlight-start
+           // ส่ง submissionId เพิ่มเข้าไปเป็น parameter ที่ 3
+           loadAndShowActivityDetails(currentActivityId, activityTitle, submissionId); 
+           // highlight-end
         }
     } catch (e) { 
         showError('ไม่สามารถเพิ่มความคิดเห็นได้'); 
-    } finally {
+        // highlight-start
+        // เพิ่มบรรทัดนี้เพื่อให้ปุ่มกลับมาใช้งานได้แม้จะเกิด Error
         btn.prop('disabled', false); 
-    }
+        // highlight-end
+    } 
+    // ไม่ต้องมี finally แล้ว เพราะเราจัดการ btn.prop('disabled', false) ใน catch แล้ว
 }
 
 function handleImagePreview(input, previewSelector) {
