@@ -722,6 +722,75 @@ app.post('/api/notifications/mark-read', handleRequest(async (req) => {
     return db.query("UPDATE notifications SET isRead = TRUE WHERE recipientUserId = ? AND isRead = FALSE", [requesterId]);
 }));
 
+// server.js
+
+app.post('/api/admin/recalculate-all-scores', isAdmin, async (req, res) => {
+    console.log('Starting score recalculation process...');
+    const client = await db.getClient();
+    try {
+        await client.beginTransaction();
+
+        // 1. ดึงรายชื่อผู้ใช้ทั้งหมด
+        const [allUsers] = await client.query('SELECT lineUserId FROM users');
+        console.log(`Found ${allUsers.length} users to process.`);
+
+        // 2. วนลูปผู้ใช้ทุกคนเพื่อคำนวณคะแนนใหม่
+        for (const user of allUsers) {
+            const userId = user.lineUserId;
+            let newTotalScore = 0;
+
+            // 2a. คำนวณคะแนนจากการอนุมัติรายงานของตัวเอง
+            const [approvedScoreRows] = await client.query(
+                "SELECT SUM(points) as score FROM submissions WHERE lineUserId = ? AND status = 'approved'",
+                [userId]
+            );
+            if (approvedScoreRows[0].score) {
+                newTotalScore += parseInt(approvedScoreRows[0].score, 10);
+            }
+
+            // 2b. คำนวณคะแนนจากการถูกไลค์ (นับ 1 ครั้งต่อ 1 คน ต่อ 1 รายงาน)
+            const [likesScoreRows] = await client.query(`
+                SELECT COUNT(DISTINCT l.lineUserId, s.submissionId) as score
+                FROM submissions s
+                JOIN likes l ON s.submissionId = l.submissionId
+                WHERE s.lineUserId = ? AND s.lineUserId != l.lineUserId
+            `, [userId]);
+            if (likesScoreRows[0].score) {
+                newTotalScore += parseInt(likesScoreRows[0].score, 10);
+            }
+            
+            // 2c. คำนวณคะแนนจากการถูกคอมเมนต์ (นับ 1 ครั้งต่อ 1 คน ต่อ 1 รายงาน)
+             const [commentsScoreRows] = await client.query(`
+                SELECT COUNT(DISTINCT c.lineUserId, s.submissionId) as score
+                FROM submissions s
+                JOIN comments c ON s.submissionId = c.submissionId
+                WHERE s.lineUserId = ? AND s.lineUserId != c.lineUserId
+            `, [userId]);
+            if (commentsScoreRows[0].score) {
+                newTotalScore += parseInt(commentsScoreRows[0].score, 10);
+            }
+
+            // 3. อัปเดตคะแนนใหม่ที่ถูกต้องลงในตาราง users
+            await client.query(
+                'UPDATE users SET totalScore = ? WHERE lineUserId = ?',
+                [newTotalScore, userId]
+            );
+            console.log(`Recalculated score for user ${userId}. New score: ${newTotalScore}`);
+        }
+
+        await client.commit();
+        console.log('Score recalculation process completed successfully.');
+        res.status(200).json({ status: 'success', message: `Recalculated scores for ${allUsers.length} users.` });
+
+    } catch (error) {
+        await client.rollback();
+        console.error('Error during score recalculation:', error);
+        res.status(500).json({ status: 'error', message: 'An error occurred during recalculation.' });
+    } finally {
+        client.release();
+    }
+});
+
 // ================================= SERVER START =================================
 app.get('/', (req, res) => res.send('Backend server is running!'));
 app.listen(PORT, '0.0.0.0', () => console.log(`Server is running on port ${PORT}`));
