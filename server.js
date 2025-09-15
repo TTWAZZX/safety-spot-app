@@ -282,12 +282,13 @@ app.post('/api/submissions/like', async (req, res) => {
     const client = await db.getClient();
     try {
         await client.beginTransaction();
-
         const [existingLikeRows] = await client.query('SELECT `likeId` FROM likes WHERE `submissionId` = ? AND `lineUserId` = ?', [submissionId, lineUserId]);
         
         if (existingLikeRows.length > 0) {
+            // กรณี Unlike: แค่ลบไลค์ออก ไม่ทำอะไรกับคะแนนและ Notification
             await client.query('DELETE FROM likes WHERE `likeId` = ?', [existingLikeRows[0].likeId]);
         } else {
+            // กรณี Like ใหม่:
             await client.query('INSERT INTO likes (`likeId`, `submissionId`, `lineUserId`, `createdAt`) VALUES (?, ?, ?, ?)', ["LIKE" + uuidv4(), submissionId, lineUserId, new Date()]);
 
             const [submissionRows] = await client.query('SELECT `lineUserId` FROM submissions WHERE `submissionId` = ?', [submissionId]);
@@ -295,23 +296,31 @@ app.post('/api/submissions/like', async (req, res) => {
             if (submissionRows.length > 0) {
                 const ownerId = submissionRows[0].lineUserId;
                 if (ownerId !== lineUserId) {
-                    await client.query('UPDATE users SET `totalScore` = `totalScore` + 1 WHERE `lineUserId` = ?', [ownerId]);
-                    
-                    // --- ส่วนที่เพิ่มเข้ามา: สร้าง Notification ---
-                    const [likerRows] = await client.query('SELECT fullName FROM users WHERE lineUserId = ?', [lineUserId]);
-                    const likerName = likerRows.length > 0 ? likerRows[0].fullName : 'Someone';
-                    const message = `${likerName} ได้กดไลค์รายงานของคุณ`;
-                    await client.query(
-                        'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId) VALUES (?, ?, ?, ?, ?)',
-                        ["NOTIF" + uuidv4(), ownerId, message, 'like', submissionId]
+                    // --- Logic ป้องกันการปั๊มคะแนน ---
+                    // 1. ค้นหาใน 'สมุดบัญชี' (notifications) ว่าเคยให้คะแนนจากการไลค์ของผู้ใช้คนนี้ที่โพสต์นี้แล้วหรือยัง
+                    const [existingPointNotif] = await client.query(
+                        "SELECT notificationId FROM notifications WHERE relatedItemId = ? AND type = 'like' AND triggeringUserId = ?",
+                        [submissionId, lineUserId]
                     );
-                    // --- จบส่วนที่เพิ่ม ---
+
+                    // 2. ถ้ายังไม่เคยเจอ (เป็นไลค์ครั้งแรกที่ควรได้คะแนน) เราถึงจะบวกคะแนนและสร้าง Notification
+                    if (existingPointNotif.length === 0) {
+                        await client.query('UPDATE users SET `totalScore` = `totalScore` + 1 WHERE `lineUserId` = ?', [ownerId]);
+                        
+                        const [likerRows] = await client.query('SELECT fullName FROM users WHERE lineUserId = ?', [lineUserId]);
+                        const likerName = likerRows.length > 0 ? likerRows[0].fullName : 'Someone';
+                        const message = `${likerName} ได้กดไลค์รายงานของคุณ`;
+                        await client.query(
+                            'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId) VALUES (?, ?, ?, ?, ?, ?)',
+                            ["NOTIF" + uuidv4(), ownerId, message, 'like', submissionId, lineUserId]
+                        );
+                    }
+                    // ถ้าเคยเจอแล้ว (existingPointNotif.length > 0) ก็จะไม่ทำอะไรเลย ข้ามการให้คะแนนไป
                 }
             }
         }
         
         const [countRows] = await client.query('SELECT COUNT(*) as count FROM likes WHERE `submissionId` = ?', [submissionId]);
-        
         await client.commit();
         res.status(200).json({ status: 'success', data: { status: existingLikeRows.length > 0 ? 'unliked' : 'liked', newLikeCount: countRows[0].count }});
     
@@ -345,41 +354,39 @@ app.post('/api/submissions/comment', async (req, res) => {
         if (submissionRows.length > 0) {
             const ownerId = submissionRows[0].lineUserId;
             if (ownerId !== lineUserId) {
-                await client.query('UPDATE users SET `totalScore` = `totalScore` + 1 WHERE `lineUserId` = ?', [ownerId]);
-                
-                const [commenterRows] = await client.query('SELECT fullName FROM users WHERE lineUserId = ?', [lineUserId]);
-                const commenterName = commenterRows.length > 0 ? commenterRows[0].fullName : 'Someone';
-                const message = `${commenterName} ได้แสดงความคิดเห็นบนรายงานของคุณ`;
-                await client.query('INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId) VALUES (?, ?, ?, ?, ?)', 
-                    ["NOTIF" + uuidv4(), ownerId, message, 'comment', submissionId]
+                // --- ส่วนที่อัปเกรด ---
+                // highlight-start
+                // 1. ตรวจสอบว่าผู้ใช้คนนี้เคยคอมเมนต์ที่โพสต์นี้กี่ครั้งแล้ว (นับรวมครั้งล่าสุดที่เพิ่งเพิ่มเข้าไป)
+                const [commentCountRows] = await client.query(
+                    'SELECT COUNT(*) as commentCount FROM comments WHERE submissionId = ? AND lineUserId = ?',
+                    [submissionId, lineUserId]
                 );
+
+                // 2. ถ้าเคยคอมเมนต์แค่ครั้งเดียว (คือครั้งนี้เป็นครั้งแรก) ถึงจะให้คะแนน
+                if (commentCountRows[0].commentCount === 1) {
+                    await client.query('UPDATE users SET `totalScore` = `totalScore` + 1 WHERE `lineUserId` = ?', [ownerId]);
+
+                    // สร้าง Notification (ยังคงทำเหมือนเดิมสำหรับคอมเมนต์แรก)
+                    const [commenterRows] = await client.query('SELECT fullName FROM users WHERE lineUserId = ?', [lineUserId]);
+                    const commenterName = commenterRows.length > 0 ? commenterRows[0].fullName : 'Someone';
+                    const message = `${commenterName} ได้แสดงความคิดเห็นบนรายงานของคุณ`;
+                    await client.query(
+                       'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId) VALUES (?, ?, ?, ?, ?, ?)', 
+                       ["NOTIF" + uuidv4(), ownerId, message, 'comment', submissionId, lineUserId] // lineUserId คือ ID ของผู้คอมเมนต์
+                    );
+                }
+                // highlight-end
             }
         }
-
-        // --- ส่วนที่อัปเกรด ---
-        // highlight-start
-        // ดึงข้อมูลคอมเมนต์ที่เพิ่งสร้าง พร้อมข้อมูลผู้คอมเมนต์ เพื่อส่งกลับไปให้ Frontend
+        
         const [newCommentRows] = await client.query(`
-            SELECT c.commentText, u.fullName, u.pictureUrl 
-            FROM comments c 
-            JOIN users u ON c.lineUserId = u.lineUserId 
-            WHERE c.commentId = ?
-        `, [commentId]);
+            SELECT c.commentText, u.fullName, u.pictureUrl FROM comments c 
+            JOIN users u ON c.lineUserId = u.lineUserId WHERE c.commentId = ?`, [commentId]);
 
-        const newCommentData = {
-            commentText: newCommentRows[0].commentText,
-            commenter: {
-                fullName: newCommentRows[0].fullName,
-                pictureUrl: newCommentRows[0].pictureUrl
-            }
-        };
-        // highlight-end
-
+        const newCommentData = { commentText: newCommentRows[0].commentText, commenter: { fullName: newCommentRows[0].fullName, pictureUrl: newCommentRows[0].pictureUrl }};
+        
         await client.commit();
-        // highlight-start
-        // ส่งข้อมูลคอมเมนต์ใหม่กลับไปใน response
         res.status(200).json({ status: 'success', data: newCommentData });
-        // highlight-end
 
     } catch (error) {
         await client.rollback();
@@ -484,8 +491,8 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
         // --- ส่วนที่เพิ่มเข้ามา: สร้าง Notification ---
         const message = `รายงานของคุณได้รับการอนุมัติ และได้รับ ${score} คะแนน`;
         await client.query(
-            'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId) VALUES (?, ?, ?, ?, ?)',
-            ["NOTIF" + uuidv4(), lineUserId, message, 'approved', submissionId]
+            'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId) VALUES (?, ?, ?, ?, ?, ?)',
+           ["NOTIF"+uuidv4(), lineUserId, message, 'approved', submissionId, req.body.requesterId] // req.body.requesterId คือ ID ของแอดมิน
         );
         // --- จบส่วนที่เพิ่ม ---
 
@@ -517,8 +524,8 @@ app.post('/api/admin/submissions/reject', isAdmin, async (req, res) => {
         // --- ส่วนที่เพิ่มเข้ามา: สร้าง Notification ---
         const message = `น่าเสียดาย, รายงานของคุณไม่ผ่านการตรวจสอบ`;
         await client.query(
-            'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId) VALUES (?, ?, ?, ?, ?)',
-            ["NOTIF" + uuidv4(), lineUserId, message, 'rejected', submissionId] // อาจจะใช้ type 'rejected' หรือ 'approved' ก็ได้
+           'INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId) VALUES (?, ?, ?, ?, ?, ?)',
+           ["NOTIF" + uuidv4(), lineUserId, message, 'rejected', submissionId, req.body.requesterId] // req.body.requesterId คือ ID ของแอดมิน
         );
         // --- จบส่วนที่เพิ่ม ---
 
