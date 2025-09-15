@@ -397,6 +397,18 @@ app.post('/api/submissions/comment', async (req, res) => {
     }
 });
 
+app.post('/api/user/refresh-profile', handleRequest(async (req) => {
+    const { lineUserId, displayName, pictureUrl } = req.body;
+    if (!lineUserId || !displayName || !pictureUrl) {
+        throw new Error('Missing required profile data.');
+    }
+    // อัปเดตชื่อและ URL รูปภาพล่าสุดลงฐานข้อมูล
+    return db.query(
+        'UPDATE users SET displayName = ?, pictureUrl = ? WHERE lineUserId = ?',
+        [displayName, pictureUrl, lineUserId]
+    );
+}));
+
 // --- Admin Routes (Converted to MySQL) ---
 app.get('/api/admin/stats', isAdmin, async (req, res) => {
     try {

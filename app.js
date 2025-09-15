@@ -50,7 +50,6 @@ function initializeAllModals() {
 async function initializeApp() {
     try {
         $('#loading-status-text').text('กำลังเชื่อมต่อกับ LINE');
-        $('#loading-sub-text').text('เริ่มต้นการทำงานของ LIFF...');
         await liff.init({ liffId: LIFF_ID });
 
         if (!liff.isLoggedIn()) {
@@ -59,14 +58,23 @@ async function initializeApp() {
         }
 
         $('#loading-status-text').text('กำลังดึงข้อมูลโปรไฟล์');
-        $('#loading-sub-text').text('กรุณารอสักครู่...');
         const lineProfile = await liff.getProfile();
         AppState.lineProfile = lineProfile;
-        
+
+        // --- ส่วนที่เพิ่มเข้ามา ---
+        // highlight-start
+        // "ยิงแล้วลืม" (Fire and forget) ส่งโปรไฟล์ไปอัปเดตที่ Backend
+        // เราไม่ต้องรอให้เสร็จก็สามารถทำงานต่อไปได้เลย
+        callApi('/api/user/refresh-profile', {
+            lineUserId: lineProfile.userId,
+            displayName: lineProfile.displayName,
+            pictureUrl: lineProfile.pictureUrl
+        }, 'POST').catch(err => console.error("Profile refresh failed:", err));
+        // highlight-end
+
         $('#loading-status-text').text('กำลังตรวจสอบการลงทะเบียน');
-        $('#loading-sub-text').text('เชื่อมต่อกับเซิร์ฟเวอร์ Safety Spot...');
         const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId });
-        
+
         if (result.registered) {
             await showMainApp(result.user);
         } else {
