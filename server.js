@@ -740,17 +740,18 @@ app.post('/api/notifications/mark-read', handleRequest(async (req) => {
 // ================================= SERVER START =================================
 app.get('/', (req, res) => res.send('Backend server is running!'));
 
-// === Cloudinary Quota Checker ===
-import axios from "axios"; // ถ้ายังไม่มี ให้ npm install axios ก่อน
+// === Cloudinary Quota Checker (using environment variables) ===
+const axios = require("axios");
 
-const CLOUDINARY_ACCOUNT = "ddvmr1z07"; // << ใส่ cloud name ของคุณตรงนี้
-const CLOUDINARY_API_KEY = "477592162899246";
-const CLOUDINARY_API_SECRET = "vViHnyB7YLXPZSMrQaD12n2J0hg";
+const CLOUDINARY_ACCOUNT = process.env.CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 
-// แปลง Basic Auth เป็น Base64
-const authHeader = 'Basic ' + Buffer.from(`${CLOUDINARY_API_KEY}:${CLOUDINARY_API_SECRET}`).toString('base64');
+const authHeader =
+  "Basic " +
+  Buffer.from(`${CLOUDINARY_API_KEY}:${CLOUDINARY_API_SECRET}`).toString("base64");
 
-// สร้าง endpoint สำหรับตรวจโควต้า
+// Endpoint to check Cloudinary usage
 app.get("/api/cloudinary-usage", async (req, res) => {
   try {
     const response = await axios.get(
