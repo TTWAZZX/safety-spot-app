@@ -169,28 +169,67 @@ async function callApi(endpoint, payload = {}, method = 'GET') {
     }
 }
 
+// === Add: lightweight in-browser resize (no external libs) ===
+async function resizeImageFile(file, maxDim = 1600, quality = 0.8) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(maxDim / bitmap.width, maxDim / bitmap.height, 1);
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, w, h);
+
+  const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
+  return new File([blob], 'upload.jpg', { type: 'image/jpeg' });
+}
+
+// === Replace your uploadImage(file) with this version ===
 async function uploadImage(file) {
-    const formData = new FormData();
-    formData.append('image', file);
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/upload`, {
-            method: 'POST',
-            body: formData,
-        });
-         if (!response.ok) {
-            const errorResult = await response.json().catch(() => ({ message: 'Image upload failed with status ' + response.status }));
-            throw new Error(errorResult.message);
-        }
-        const result = await response.json();
-        if (result.status === 'success') {
-            return result.data.imageUrl;
-        } else {
-            throw new Error(result.message || 'Failed to get image URL from server.');
-        }
-    } catch (error) {
-        console.error('Image Upload Error:', error);
-        throw new Error('อัปโหลดรูปภาพไม่สำเร็จ');
+  // 1) shrink on client first
+  const optimized = await resizeImageFile(file, 1600, 0.8);
+
+  // 2) upload via existing backend
+  const formData = new FormData();
+  formData.append('image', optimized);
+
+  const response = await fetch(`${API_BASE_URL}/api/upload`, { method: 'POST', body: formData });
+  if (!response.ok) {
+    const errorResult = await response.json().catch(() => ({ message: 'Image upload failed with status ' + response.status }));
+    throw new Error(errorResult.message);
+  }
+  const result = await response.json();
+  if (result.status === 'success') return result.data.imageUrl;
+  throw new Error(result.message || 'Failed to get image URL from server.');
+}
+
+// === Add: Helper to inject Cloudinary delivery transforms ===
+function optimizeCloudinaryUrl(url, { w = 800, q = 'auto:eco', f = 'auto' } = {}) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes('res.cloudinary.com') && u.pathname.includes('/upload/')) {
+      const parts = u.pathname.split('/upload/');
+      // insert transforms at .../upload/<TRANSFORMS>/...
+      u.pathname = parts[0] + '/upload/' + `f_${f},q_${q},w_${w}/` + parts[1];
+      return u.toString();
     }
+  } catch (e) {}
+  return url;
+}
+
+// === Replace your original getFullImageUrl with this version ===
+function getFullImageUrl(path, opts = {}) {
+  const placeholder = 'https://placehold.co/600x400/e9ecef/6c757d?text=Image';
+  if (!path) return placeholder;
+
+  // If it's already a full URL
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    // enforce Cloudinary transforms when applicable
+    return optimizeCloudinaryUrl(path, opts);
+  }
+  // local uploads
+  return `${API_BASE_URL}/uploads/${path}`;
 }
 
 // ===============================================================
@@ -247,13 +286,16 @@ function displayActivitiesUI(activities, listId) {
 
         const cardHtml = `
             <div class="card activity-card mb-3">
-                <img src="${getFullImageUrl(act.imageUrl)}" class="activity-card-img" onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
+                 <img src="${getFullImageUrl(act.imageUrl, { w: 600 })}"
+                        loading="lazy" decoding="async"
+                        class="activity-card-img"
+                        onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
                 <div class="card-body">
                     <h5 class="card-title">${sanitizeHTML(act.title)}</h5>
                     <p class="card-text text-muted small preserve-whitespace">${sanitizeHTML(act.description.replace('[no-image]', ''))}</p>
                     <div class="d-flex justify-content-end align-items-center gap-2 mt-3">
                         <button class="btn btn-sm btn-outline-secondary btn-view-activity-image" 
-                                data-image-full-url="${getFullImageUrl(act.imageUrl)}" 
+                                data-image-full-url="${getFullImageUrl(act.imageUrl, { w: 1200 })}" 
                                 ${act.imageUrl ? '' : 'disabled'}
                                 data-bs-toggle="tooltip" title="ดูรูปภาพกิจกรรม">
                             <i class="fas fa-image"></i>
@@ -282,7 +324,9 @@ function renderSubmissions(submissions) {
     submissions.forEach(sub => {
         const likedClass = sub.didLike ? 'liked' : '';
         const imageHtml = sub.imageUrl ? `
-            <img src="${sub.imageUrl}" class="card-img-top submission-image" alt="Submission Image">
+            <img src="${getFullImageUrl(sub.imageUrl, { w: 900 })}"
+                loading="lazy" decoding="async"
+                class="card-img-top submission-image" alt="Submission Image">
         ` : '';
 
         let commentsHtml = sub.comments.map(c => `
@@ -321,7 +365,7 @@ function renderSubmissions(submissions) {
                              </a>
                              
                              ${sub.imageUrl ? `
-                             <a href="#" class="text-decoration-none view-image-btn" data-image-full-url="${sub.imageUrl}">
+                             <a href="#" class="text-decoration-none view-image-btn" data-image-full-url="${getFullImageUrl(sub.imageUrl, { w: 1200 })}">
                                 <i class="fas fa-search-plus"></i> ดูรูปภาพ
                              </a>
                              ` : ''}
@@ -523,7 +567,9 @@ async function loadUserBadges() {
                 const lockClass = b.isEarned ? '' : 'locked';
                 const html = `
                     <div class="badge-item" data-bs-toggle="tooltip" title="${sanitizeHTML(b.name)}: ${sanitizeHTML(b.desc)}">
-                        <img src="${getFullImageUrl(b.img)}" class="badge-icon ${lockClass}" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';">
+                         <img src="${getFullImageUrl(b.img, { w: 120 })}"
+                              loading="lazy" decoding="async"
+                              class="badge-icon ${lockClass}" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';">
                         <div class="small">${sanitizeHTML(b.name)}</div>
                     </div>`;
                 container.append(html);

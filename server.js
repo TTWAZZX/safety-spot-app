@@ -45,7 +45,10 @@ const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir);
 }
-app.use('/uploads', express.static(uploadsDir));
+app.use('/uploads', express.static(uploadsDir, {
+  maxAge: '30d',
+  immutable: true
+}));
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
