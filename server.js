@@ -751,33 +751,63 @@ const authHeader =
   "Basic " +
   Buffer.from(`${CLOUDINARY_API_KEY}:${CLOUDINARY_API_SECRET}`).toString("base64");
 
-// Endpoint to check Cloudinary usage
+// Endpoint to check Cloudinary usage  (REPLACE this handler)
 app.get("/api/cloudinary-usage", async (req, res) => {
   try {
     const response = await axios.get(
       `https://api.cloudinary.com/v1_1/${CLOUDINARY_ACCOUNT}/usage`,
       { headers: { Authorization: authHeader } }
     );
-    const data = response.data;
+    const data = response.data || {};
+
+    // helpers
+    const toGB = (v) => (typeof v === "number" && isFinite(v)) ? (v / (1024 ** 3)) : null;
+    const pickLimit = (obj) => (obj && (obj.limit ?? obj.quota ?? null));
+
+    // storage
+    const stUsedRaw = data.storage?.usage ?? null;
+    const stLimitRaw = pickLimit(data.storage);
+    const stUsedGB  = toGB(stUsedRaw);
+    const stLimitGB = toGB(stLimitRaw);
+    const stPct     = (stUsedGB !== null && stLimitGB) ? Number(((stUsedGB / stLimitGB) * 100).toFixed(2)) : null;
+
+    // bandwidth
+    const bwUsedRaw = data.bandwidth?.usage ?? null;
+    const bwLimitRaw = pickLimit(data.bandwidth);
+    const bwUsedGB  = toGB(bwUsedRaw);
+    const bwLimitGB = toGB(bwLimitRaw);
+    const bwPct     = (bwUsedGB !== null && bwLimitGB) ? Number(((bwUsedGB / bwLimitGB) * 100).toFixed(2)) : null;
+
+    // transformations
+    const tfUsed = data.transformations?.usage ?? null;
+    const tfLimit = data.transformations?.limit ?? data.transformations?.quota ?? null;
 
     res.json({
       status: "success",
       storage: {
-        used_gb: (data.storage.usage / 1024 / 1024 / 1024).toFixed(2),
-        limit_gb: (data.storage.limit / 1024 / 1024 / 1024).toFixed(2),
+        used_gb: stUsedGB !== null ? stUsedGB.toFixed(2) : null,
+        limit_gb: stLimitGB !== null ? stLimitGB.toFixed(2) : null,
+        percent_used: stPct,
+        used_raw: stUsedRaw,
+        limit_raw: stLimitRaw
       },
       bandwidth: {
-        used_gb: (data.bandwidth.usage / 1024 / 1024 / 1024).toFixed(2),
-        limit_gb: (data.bandwidth.limit / 1024 / 1024 / 1024).toFixed(2),
+        used_gb: bwUsedGB !== null ? bwUsedGB.toFixed(2) : null,
+        limit_gb: bwLimitGB !== null ? bwLimitGB.toFixed(2) : null,
+        percent_used: bwPct,
+        used_raw: bwUsedRaw,
+        limit_raw: bwLimitRaw,
+        over_limit: (bwLimitGB && bwUsedGB !== null) ? (bwUsedGB > bwLimitGB) : null
       },
       transformations: {
-        used: data.transformations.usage,
-        limit: data.transformations.limit,
+        used: tfUsed,
+        limit: tfLimit
       },
-      updated_at: data.last_updated,
+      updated_at: data.last_updated || null,
+      plan: data.plan || null
     });
   } catch (error) {
-    console.error("Cloudinary check failed:", error.message);
+    console.error("Cloudinary check failed:", error?.response?.data || error.message);
     res.status(500).json({ status: "error", message: error.message });
   }
 });
