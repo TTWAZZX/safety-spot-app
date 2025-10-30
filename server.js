@@ -760,51 +760,56 @@ app.get("/api/cloudinary-usage", async (req, res) => {
     );
     const data = response.data || {};
 
-    // helpers
+    // ===== Default limits (for Free plan) with ENV overrides =====
+    const DEF_STORAGE_GB = Number(process.env.CLOUDINARY_STORAGE_LIMIT_GB || 25);
+    const DEF_BW_GB      = Number(process.env.CLOUDINARY_BANDWIDTH_LIMIT_GB || 25);
+    const DEF_TF         = Number(process.env.CLOUDINARY_TRANSFORM_LIMIT   || 25000);
+
     const toGB = (v) => (typeof v === "number" && isFinite(v)) ? (v / (1024 ** 3)) : null;
     const pickLimit = (obj) => (obj && (obj.limit ?? obj.quota ?? null));
 
-    // storage
+    // raw values from API
     const stUsedRaw = data.storage?.usage ?? null;
-    const stLimitRaw = pickLimit(data.storage);
-    const stUsedGB  = toGB(stUsedRaw);
-    const stLimitGB = toGB(stLimitRaw);
-    const stPct     = (stUsedGB !== null && stLimitGB) ? Number(((stUsedGB / stLimitGB) * 100).toFixed(2)) : null;
-
-    // bandwidth
+    let   stLimitRaw = pickLimit(data.storage);
     const bwUsedRaw = data.bandwidth?.usage ?? null;
-    const bwLimitRaw = pickLimit(data.bandwidth);
-    const bwUsedGB  = toGB(bwUsedRaw);
-    const bwLimitGB = toGB(bwLimitRaw);
-    const bwPct     = (bwUsedGB !== null && bwLimitGB) ? Number(((bwUsedGB / bwLimitGB) * 100).toFixed(2)) : null;
+    let   bwLimitRaw = pickLimit(data.bandwidth);
+    let   tfLimit    = data.transformations?.limit ?? data.transformations?.quota ?? null;
+    const tfUsed     = data.transformations?.usage ?? null;
 
-    // transformations
-    const tfUsed = data.transformations?.usage ?? null;
-    const tfLimit = data.transformations?.limit ?? data.transformations?.quota ?? null;
+    // if API doesn't provide, fall back to defaults (GB -> bytes)
+    if (!stLimitRaw) stLimitRaw = DEF_STORAGE_GB * 1024 ** 3;
+    if (!bwLimitRaw) bwLimitRaw = DEF_BW_GB      * 1024 ** 3;
+    if (!tfLimit)    tfLimit    = DEF_TF;
+
+    const stUsedGB = toGB(stUsedRaw);
+    const stLimitGB = toGB(stLimitRaw);
+    const bwUsedGB = toGB(bwUsedRaw);
+    const bwLimitGB = toGB(bwLimitRaw);
+
+    const stPct = (stUsedGB !== null && stLimitGB) ? Number(((stUsedGB / stLimitGB) * 100).toFixed(2)) : null;
+    const bwPct = (bwUsedGB !== null && bwLimitGB) ? Number(((bwUsedGB / bwLimitGB) * 100).toFixed(2)) : null;
 
     res.json({
       status: "success",
+      plan: data.plan || "Free",
       storage: {
         used_gb: stUsedGB !== null ? stUsedGB.toFixed(2) : null,
         limit_gb: stLimitGB !== null ? stLimitGB.toFixed(2) : null,
         percent_used: stPct,
-        used_raw: stUsedRaw,
-        limit_raw: stLimitRaw
+        over_limit: (stUsedGB !== null && stLimitGB) ? stUsedGB > stLimitGB : null
       },
       bandwidth: {
         used_gb: bwUsedGB !== null ? bwUsedGB.toFixed(2) : null,
         limit_gb: bwLimitGB !== null ? bwLimitGB.toFixed(2) : null,
         percent_used: bwPct,
-        used_raw: bwUsedRaw,
-        limit_raw: bwLimitRaw,
-        over_limit: (bwLimitGB && bwUsedGB !== null) ? (bwUsedGB > bwLimitGB) : null
+        over_limit: (bwUsedGB !== null && bwLimitGB) ? bwUsedGB > bwLimitGB : null
       },
       transformations: {
         used: tfUsed,
-        limit: tfLimit
+        limit: tfLimit,
+        percent_used: (typeof tfUsed === "number" && tfLimit) ? Number(((tfUsed / tfLimit) * 100).toFixed(2)) : null
       },
-      updated_at: data.last_updated || null,
-      plan: data.plan || null
+      updated_at: data.last_updated || null
     });
   } catch (error) {
     console.error("Cloudinary check failed:", error?.response?.data || error.message);
