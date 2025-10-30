@@ -739,5 +739,47 @@ app.post('/api/notifications/mark-read', handleRequest(async (req) => {
 
 // ================================= SERVER START =================================
 app.get('/', (req, res) => res.send('Backend server is running!'));
+
+// === Cloudinary Quota Checker ===
+import axios from "axios"; // ถ้ายังไม่มี ให้ npm install axios ก่อน
+
+const CLOUDINARY_ACCOUNT = "ddvmr1z07"; // << ใส่ cloud name ของคุณตรงนี้
+const CLOUDINARY_API_KEY = "477592162899246";
+const CLOUDINARY_API_SECRET = "vViHnyB7YLXPZSMrQaD12n2J0hg";
+
+// แปลง Basic Auth เป็น Base64
+const authHeader = 'Basic ' + Buffer.from(`${CLOUDINARY_API_KEY}:${CLOUDINARY_API_SECRET}`).toString('base64');
+
+// สร้าง endpoint สำหรับตรวจโควต้า
+app.get("/api/cloudinary-usage", async (req, res) => {
+  try {
+    const response = await axios.get(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_ACCOUNT}/usage`,
+      { headers: { Authorization: authHeader } }
+    );
+    const data = response.data;
+
+    res.json({
+      status: "success",
+      storage: {
+        used_gb: (data.storage.usage / 1024 / 1024 / 1024).toFixed(2),
+        limit_gb: (data.storage.limit / 1024 / 1024 / 1024).toFixed(2),
+      },
+      bandwidth: {
+        used_gb: (data.bandwidth.usage / 1024 / 1024 / 1024).toFixed(2),
+        limit_gb: (data.bandwidth.limit / 1024 / 1024 / 1024).toFixed(2),
+      },
+      transformations: {
+        used: data.transformations.usage,
+        limit: data.transformations.limit,
+      },
+      updated_at: data.last_updated,
+    });
+  } catch (error) {
+    console.error("Cloudinary check failed:", error.message);
+    res.status(500).json({ status: "error", message: error.message });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => console.log(`Server is running on port ${PORT}`));
 
