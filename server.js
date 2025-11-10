@@ -78,19 +78,81 @@ const isAdmin = async (req, res, next) => {
     }
 };
 
+// --- เพิ่ม import ใหม่ที่ส่วนบนสุด ---
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const crypto = require('crypto');
+
+// --- ฟังก์ชันอัปโหลดไป R2 ---
+async function uploadToR2(buffer, mime = 'image/jpeg') {
+  const {
+    R2_ACCOUNT_ID,
+    R2_ACCESS_KEY_ID,
+    R2_SECRET_ACCESS_KEY,
+    R2_BUCKET_NAME,
+    R2_PUBLIC_BASE_URL,
+  } = process.env;
+
+  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME || !R2_PUBLIC_BASE_URL) {
+    throw new Error('R2 not configured');
+  }
+
+  const s3 = new S3Client({
+    region: 'auto',
+    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: R2_ACCESS_KEY_ID,
+      secretAccessKey: R2_SECRET_ACCESS_KEY,
+    },
+  });
+
+  const ext = mime === 'image/png' ? 'png' : 'jpg';
+  const objectKey = `safety-spot/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: objectKey,
+      Body: buffer,
+      ContentType: mime,
+    })
+  );
+
+  return `${R2_PUBLIC_BASE_URL}/${objectKey}`;
+}
+
+// --- แทนที่ endpoint เดิม /api/upload ---
 app.post('/api/upload', upload.single('image'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ status: 'error', message: 'No file uploaded.' });
+  if (!req.file) return res.status(400).json({ status: 'error', message: 'No file uploaded.' });
+
+  try {
+    const mime = req.file.mimetype || 'image/jpeg';
+    let finalUrl;
+
     try {
-        const uploadStream = cloudinary.uploader.upload_stream({ folder: 'safety-spot' }, (error, result) => {
-            if (result) return res.status(200).json({ status: 'success', data: { imageUrl: result.secure_url } });
-            console.error('Cloudinary upload error:', error);
-            res.status(500).json({ status: 'error', message: 'Failed to upload to Cloudinary.' });
-        });
+      // ลองอัปขึ้น R2 ก่อน
+      finalUrl = await uploadToR2(req.file.buffer, mime);
+      console.log('✅ Uploaded to R2:', finalUrl);
+    } catch (err) {
+      console.warn('⚠️  R2 upload failed, fallback to Cloudinary:', err.message);
+      // fallback Cloudinary เดิม
+      finalUrl = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { folder: 'safety-spot' },
+          (error, result) => {
+            if (error) return reject(error);
+            resolve(result.secure_url);
+          }
+        );
         streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
-    } catch (error) {
-        console.error('API Error on /api/upload:', error);
-        res.status(500).json({ status: 'error', message: 'Internal server error.' });
+      });
     }
+
+    // คืนผลแบบเดิมให้ frontend
+    res.status(200).json({ status: 'success', data: { imageUrl: finalUrl } });
+  } catch (error) {
+    console.error('❌ Upload error:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error.' });
+  }
 });
 
 // --- User & General Routes (Converted to MySQL) ---

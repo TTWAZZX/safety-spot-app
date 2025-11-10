@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <body>
+    <h2>Test upload -> http://localhost:3000/api/upload</h2>
+    <form id="f">
+      <input type="file" name="image" accept="image/*" />
+      <button type="submit">Upload</button>
+    </form>
+    <pre id="out"></pre>
+
+    <script>
+      const f = document.getElementById('f');
+      const out = document.getElementById('out');
+      f.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(f);
+        const res = await fetch('http://localhost:3000/api/upload', {
+          method: 'POST',
+          body: fd,
+        });
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+      });
+    </script>
+  </body>
+</html>
