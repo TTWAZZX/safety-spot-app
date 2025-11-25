@@ -290,37 +290,6 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 });
 
-// ================= USER BADGES (for profile page) =================
-app.get('/api/user/badges', async (req, res) => {
-    try {
-        const { lineUserId } = req.query;
-
-        // ดึงป้ายทั้งหมด
-        const [allBadges] = await db.query(
-            "SELECT badgeId, badgeName, description, imageUrl FROM badges ORDER BY badgeName ASC"
-        );
-
-        // ดึงป้ายที่ user ได้รับแล้ว
-        const [earned] = await db.query(
-            "SELECT badgeId FROM user_badges WHERE lineUserId = ?",
-            [lineUserId]
-        );
-
-        const earnedSet = new Set(earned.map(b => b.badgeId));
-
-        const result = allBadges.map(b => ({
-            ...b,
-            isEarned: earnedSet.has(b.badgeId)
-        }));
-
-        res.json({ status: "success", data: result });
-
-    } catch (err) {
-        console.error("GET /api/user/badges ERROR:", err);
-        res.status(500).json({ status: "error", message: err.message });
-    }
-});
-
 // ======================================================
 // USER BADGES (frontend ต้องใช้ endpoint นี้)
 // ======================================================
@@ -342,7 +311,7 @@ app.get('/api/user/badges', async (req, res) => {
         id: b.badgeId,
         name: b.badgeName,
         desc: b.description,
-        img: b.imageUrl,
+        img: b.imageUrl || "https://placehold.co/200x200?text=Badge",
         isEarned: earnedSet.has(b.badgeId)
     }));
 
@@ -1040,36 +1009,6 @@ app.post('/api/admin/revoke-badge', isAdmin, async (req, res) => {
 // ADMIN: Users list for admin panel
 // ======================================================
 app.get('/api/admin/users', isAdmin, async (req, res) => {
-    try {
-        const search = req.query.search || "";
-        const sort = req.query.sort || "score"; // default frontend requires
-        const order = sort === "name" ? "fullName ASC" : "totalScore DESC";
-
-        let sql = `
-            SELECT lineUserId, fullName, employeeId, pictureUrl, totalScore
-            FROM users
-        `;
-
-        const params = [];
-
-        if (search) {
-            sql += " WHERE fullName LIKE ? OR employeeId LIKE ? ";
-            params.push(`%${search}%`, `%${search}%`);
-        }
-
-        sql += ` ORDER BY ${order}`;
-
-        const [rows] = await db.query(sql, params);
-
-        res.json({ status: "success", data: rows });
-
-    } catch (err) {
-        console.error("ADMIN /users ERROR:", err);
-        res.status(500).json({ status: "error", message: err.message });
-    }
-});
-
-app.get('/api/admin/users', isAdmin, async (req, res) => {
     const { search, sortBy } = req.query;
 
     let sql = `
@@ -1081,16 +1020,14 @@ app.get('/api/admin/users', isAdmin, async (req, res) => {
     let params = [];
 
     if (search) {
-        sql += ` AND (fullName LIKE ? OR employeeId LIKE ?)`;
+        sql += ` AND (fullName LIKE ? OR employeeId LIKE ?) `;
         params.push(`%${search}%`, `%${search}%`);
     }
 
-    if (sortBy === 'score') {
-        sql += ` ORDER BY totalScore DESC`;
-    } else if (sortBy === 'name') {
+    if (sortBy === "name") {
         sql += ` ORDER BY fullName ASC`;
     } else {
-        sql += ` ORDER BY createdAt DESC`;
+        sql += ` ORDER BY totalScore DESC`;
     }
 
     const [rows] = await db.query(sql, params);
