@@ -235,13 +235,6 @@ function getFullImageUrl(path, opts = {}) {
 // ===============================================================
 //  UI RENDERING FUNCTIONS
 // ===============================================================
-function getFullImageUrl(path) {
-    const placeholder = 'https://placehold.co/600x400/e9ecef/6c757d?text=Image';
-    if (!path) { return placeholder; }
-    if (path.startsWith('http://') || path.startsWith('https://')) { return path; }
-    return `${API_BASE_URL}/uploads/${path}`;
-}
-
 function updateUserInfoUI(user) {
     $('#user-header').addClass('user-header-card');
 
@@ -346,7 +339,7 @@ function renderSubmissions(submissions) {
                 ${imageHtml}
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center mb-3">
-                        <img src="${sub.submitter.pictureUrl || 'https://placehold.co/45x45'}" class="rounded-circle me-3 profile-pic" alt="Profile Picture">
+                        <img src="${s.pictureUrl || 'https://placehold.co/45x45'}" class="rounded-circle me-3 profile-pic" alt="Profile Picture">
                         <div>
                             <h6 class="mb-0 submission-submitter">${sanitizeHTML(sub.submitter.fullName)}</h6>
                             <small class="text-muted">${new Date(sub.createdAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</small>
@@ -998,9 +991,16 @@ async function handleApprovalAction() {
     btn.prop('disabled', true).closest('.d-flex').find('button, input').prop('disabled', true);
     try {
         if (action === 'approve') {
-            await callApi(`/api/admin/submissions/approve`, { submissionId: id, score: score }, 'POST');
+            await callApi('/api/admin/submissions/approve', {
+                submissionId: id,
+                score: score,
+                requesterId: AppState.lineProfile.userId
+            }, 'POST');
         } else {
-            await callApi(`/api/admin/submissions/reject`, { submissionId: id }, 'POST');
+            await callApi('/api/admin/submissions/reject', {
+                submissionId: id,
+                requesterId: AppState.lineProfile.userId
+            }, 'POST');
         }
         card.slideUp(500, function() { 
             $(this).remove(); 
@@ -1157,7 +1157,7 @@ async function handleViewUserDetails(lineUserId) {
     modal.show();
 
     try {
-        const data = await callApi(`/api/admin/user-details/${lineUserId}`);
+        const data = await callApi('/api/admin/user-details', { lineUserId });
         $('#user-details-pic').attr('src', getFullImageUrl(data.user.pictureUrl));
         $('#user-details-name').text(data.user.fullName);
         $('#user-details-info').text(`รหัส: ${data.user.employeeId} | คะแนน: ${data.user.totalScore}`);
@@ -1301,7 +1301,7 @@ async function loadPendingSubmissions() {
                             ${imageHtmlBlock}
                             <div class="${contentClass}">
                                 <div class="card-body">
-                                    <h6 class="card-title fw-bold">${sanitizeHTML(s.submitter.fullName)}</h6>
+                                    <h6 class="card-title fw-bold">${sanitizeHTML(s.fullName)}</h6>
                                     <p class="card-text small">${sanitizeHTML(s.description)}</p>
                                     <p class="card-text"><small class="text-muted">${new Date(s.createdAt).toLocaleString('th-TH')}</small></p>
                                     <div class="d-flex align-items-center flex-wrap gap-2">

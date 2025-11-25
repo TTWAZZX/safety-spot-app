@@ -936,6 +936,32 @@ app.post('/api/admin/activities/toggle', isAdmin, async (req, res) => {
 });
 
 // ======================================================
+// ADMIN: Delete Activity
+// ======================================================
+app.delete('/api/admin/activities/:activityId', isAdmin, async (req, res) => {
+    try {
+        const { activityId } = req.params;
+
+        // ลบ submission ทั้งหมดของกิจกรรมนี้ก่อน
+        await db.query(
+            "DELETE FROM submissions WHERE activityId = ?",
+            [activityId]
+        );
+
+        // ลบกิจกรรม
+        await db.query(
+            "DELETE FROM activities WHERE activityId = ?",
+            [activityId]
+        );
+
+        res.json({ status: "success", data: { removed: true } });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+
+// ======================================================
 // ADMIN: Badge Management
 // ======================================================
 app.get('/api/admin/badges', isAdmin, async (req, res) => {
