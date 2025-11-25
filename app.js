@@ -774,13 +774,17 @@ function renderUserListForBadge(users) {
     }
 
     users.forEach(u => {
+        const score = (typeof u.totalScore === 'number' && !isNaN(u.totalScore))
+            ? u.totalScore
+            : 0;
+
         listEl.append(`
             <div class="user-item flex justify-between items-center py-3 border-b cursor-pointer"
                  onclick="viewUserBadgeDetail('${u.lineUserId}')">
                 <div>
                     <div class="font-bold">${u.fullName || '-'}</div>
                     <div class="text-sm text-gray-600">รหัส: ${u.employeeId || '-'}</div>
-                    <div class="text-sm text-yellow-600">คะแนน: ${u.totalPoints || 0}</div>
+                    <div class="text-sm text-yellow-600">คะแนน: ${score}</div>
                 </div>
                 <div>
                     <i class="fa-solid fa-chevron-right"></i>
@@ -789,7 +793,6 @@ function renderUserListForBadge(users) {
         `);
     });
 }
-
 
 // ===============================================================
 //  EVENT HANDLER FUNCTIONS
