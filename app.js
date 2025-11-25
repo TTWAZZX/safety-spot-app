@@ -310,74 +310,112 @@ function displayActivitiesUI(activities, listId) {
 function renderSubmissions(submissions) {
     const container = $('#submissions-container');
     container.empty();
-    if (submissions.length === 0) { 
-        container.html('<p class="text-center text-muted mt-5">ยังไม่มีใครส่งรายงานสำหรับกิจกรรมนี้<br>มาเป็นคนแรกกันเถอะ!</p>'); 
-        return; 
-    }
-    submissions.forEach(sub => {
-        const likedClass = sub.didLike ? 'liked' : '';
-        const imageHtml = sub.imageUrl ? `
-            <img src="${getFullImageUrl(sub.imageUrl, { w: 900 })}"
-                loading="lazy" decoding="async"
-                class="card-img-top submission-image" alt="Submission Image">
-        ` : '';
 
-        let commentsHtml = sub.comments.map(c => `
-            <div class="d-flex mb-2">
-                <img src="${c.commenter.pictureUrl || 'https://placehold.co/32x32'}" class="rounded-circle me-2 comment-profile-pic" width="32" height="32" alt="Profile">
-                <div>
-                    <small class="fw-bold d-block">${sanitizeHTML(c.commenter.fullName)}</small>
-                    <small class="text-muted preserve-whitespace">${sanitizeHTML(c.commentText)}</small>
+    if (!Array.isArray(submissions) || submissions.length === 0) {
+        container.html('<p class="text-center text-muted mt-5">ยังไม่มีใครส่งรายงานสำหรับกิจกรรมนี้<br>มาเป็นคนแรกกันเถอะ!</p>');
+        return;
+    }
+
+    submissions.forEach((sub) => {
+        const likedClass = sub.didLike ? 'liked' : '';
+
+        const imageHtml = sub.imageUrl
+            ? `
+                <img src="${getFullImageUrl(sub.imageUrl, { w: 900 })}"
+                     loading="lazy" decoding="async"
+                     class="card-img-top submission-image"
+                     alt="Submission Image">
+              `
+            : '';
+
+        let commentsHtml = '';
+        if (Array.isArray(sub.comments) && sub.comments.length > 0) {
+            commentsHtml = sub.comments.map((c) => `
+                <div class="d-flex mb-2">
+                    <img src="${c.commenter && c.commenter.pictureUrl ? c.commenter.pictureUrl : 'https://placehold.co/32x32'}"
+                         class="rounded-circle me-2 comment-profile-pic"
+                         width="32" height="32" alt="Profile">
+                    <div>
+                        <small class="fw-bold d-block">${sanitizeHTML(c.commenter ? c.commenter.fullName : '')}</small>
+                        <small class="text-muted preserve-whitespace">${sanitizeHTML(c.commentText)}</small>
+                    </div>
                 </div>
-            </div>`).join('');
-        if (commentsHtml === '') {
+            `).join('');
+        } else {
             commentsHtml = '<small class="text-muted">ยังไม่มีความคิดเห็น</small>';
         }
-        
-        const card = `
+
+        const createdAtText = sub.createdAt
+            ? new Date(sub.createdAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
+            : '';
+
+        const pointsBadge = sub.points && sub.points > 0
+            ? `<span class="badge points-badge"><i class="fas fa-star me-1"></i> ${sub.points} คะแนน</span>`
+            : '';
+
+        const deleteButtonHtml = AppState.currentUser && AppState.currentUser.isAdmin
+            ? `<button class="btn btn-sm btn-outline-danger btn-delete-submission" data-id="${sub.submissionId}">
+                   <i class="fas fa-trash-alt"></i>
+               </button>`
+            : '';
+
+        const cardHtml = `
             <div class="card shadow-sm mb-3 submission-card">
                 ${imageHtml}
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center mb-3">
-                        <img src="${s.pictureUrl || 'https://placehold.co/45x45'}" class="rounded-circle me-3 profile-pic" alt="Profile Picture">
+                        <img src="${sub.submitter && sub.submitter.pictureUrl ? sub.submitter.pictureUrl : 'https://placehold.co/45x45'}"
+                             class="rounded-circle me-3 profile-pic" alt="Profile Picture">
                         <div>
-                            <h6 class="mb-0 submission-submitter">${sanitizeHTML(sub.submitter.fullName)}</h6>
-                            <small class="text-muted">${new Date(sub.createdAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</small>
+                            <h6 class="mb-0 submission-submitter">${sanitizeHTML(sub.submitter ? sub.submitter.fullName : '')}</h6>
+                            <small class="text-muted">${createdAtText}</small>
                         </div>
                     </div>
-                    <p class="card-text submission-description mb-3 preserve-whitespace">${sanitizeHTML(sub.description)}</p>
-                    
+
+                    <p class="card-text submission-description mb-3 preserve-whitespace">
+                        ${sanitizeHTML(sub.description)}
+                    </p>
+
                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                         <div class="d-flex align-items-center gap-3">
-                             ${sub.points > 0 ? `<span class="badge points-badge"><i class="fas fa-star me-1"></i> ${sub.points} คะแนน</span>` : ''}
-                             <a href="#" class="text-decoration-none like-btn ${likedClass}" data-submission-id="${sub.submissionId}">
-                                <i class="fas fa-heart"></i> <span class="like-count">${sub.likes}</span>
-                             </a>
-                             <a href="#" class="text-decoration-none comment-btn" data-bs-toggle="collapse" data-bs-target="#comments-${sub.submissionId}">
-                                <i class="fas fa-comment"></i> ${sub.comments.length}
-                             </a>
-                             
-                             ${sub.imageUrl ? `
-                             <a href="#" class="text-decoration-none view-image-btn" data-image-full-url="${getFullImageUrl(sub.imageUrl, { w: 1200 })}">
-                                <i class="fas fa-search-plus"></i> ดูรูปภาพ
-                             </a>
-                             ` : ''}
+                            ${pointsBadge}
+                            <a href="#" class="text-decoration-none like-btn ${likedClass}"
+                               data-submission-id="${sub.submissionId}">
+                                <i class="fas fa-heart"></i>
+                                <span class="like-count">${sub.likes || 0}</span>
+                            </a>
+                            <a href="#" class="text-decoration-none comment-btn"
+                               data-bs-toggle="collapse"
+                               data-bs-target="#comments-${sub.submissionId}">
+                                <i class="fas fa-comment"></i>
+                                ${Array.isArray(sub.comments) ? sub.comments.length : 0}
+                            </a>
+                            ${sub.imageUrl ? `
+                                <a href="#" class="text-decoration-none view-image-btn"
+                                   data-image-full-url="${getFullImageUrl(sub.imageUrl, { w: 1200 })}">
+                                    <i class="fas fa-search-plus"></i> ดูรูปภาพ
+                                </a>
+                            ` : ''}
                         </div>
-                        ${AppState.currentUser.isAdmin ? `<button class="btn btn-sm btn-outline-danger btn-delete-submission" data-id="${sub.submissionId}"><i class="fas fa-trash-alt"></i></button>` : ''}
+                        ${deleteButtonHtml}
                     </div>
 
                     <div class="collapse mt-3" id="comments-${sub.submissionId}">
                         <div class="comment-section p-3">
                             <div class="comment-list mb-3">${commentsHtml}</div>
                             <div class="input-group">
-                                <input type="text" class="form-control form-control-sm comment-input" placeholder="แสดงความคิดเห็น...">
-                                <button class="btn btn-sm send-comment-button" type="button" data-submission-id="${sub.submissionId}">ส่ง</button>
+                                <input type="text" class="form-control form-control-sm comment-input"
+                                       placeholder="แสดงความคิดเห็น...">
+                                <button class="btn btn-sm send-comment-button" type="button"
+                                        data-submission-id="${sub.submissionId}">ส่ง</button>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>`;
-        container.append(card);
+            </div>
+        `;
+
+        container.append(cardHtml);
     });
 }
 
@@ -1152,26 +1190,38 @@ function handleEditBadge() {
 async function handleViewUserDetails(lineUserId) {
     const modal = AppState.allModals['user-details'];
     if (!modal) return;
-    
-    $('#user-details-badges-container').html('<div class="text-center"><div class="spinner-border"></div></div>');
+
+    $('#user-details-badges-container').html(
+        '<div class="text-center"><div class="spinner-border"></div></div>'
+    );
     modal.show();
 
     try {
-        const data = await callApi('/api/admin/user-details', { lineUserId });
-        $('#user-details-pic').attr('src', getFullImageUrl(data.user.pictureUrl));
-        $('#user-details-name').text(data.user.fullName);
-        $('#user-details-info').text(`รหัส: ${data.user.employeeId} | คะแนน: ${data.user.totalScore}`);
+        // 1) ดึงข้อมูลผู้ใช้ + ป้ายรางวัลที่ได้แล้ว
+        const userData = await callApi('/api/admin/user-details', { lineUserId });
+        // userData = { user, badges }
+        const user = userData.user;
+        const earnedBadges = Array.isArray(userData.badges) ? userData.badges : [];
+
+        // 2) ดึงรายการป้ายรางวัลทั้งหมด
+        const allBadges = await callApi('/api/admin/badges');
+
+        $('#user-details-pic').attr('src', getFullImageUrl(user.pictureUrl));
+        $('#user-details-name').text(user.fullName);
+        $('#user-details-info').text(`รหัส: ${user.employeeId} | คะแนน: ${user.totalScore}`);
 
         const badgesContainer = $('#user-details-badges-container');
         badgesContainer.empty();
-        
-        if (data.allBadges.length === 0) {
+
+        if (!allBadges || allBadges.length === 0) {
             badgesContainer.html('<p class="text-center text-muted">ยังไม่มีป้ายรางวัลในระบบ</p>');
             return;
         }
 
-        const badgesHtml = data.allBadges.map(badge => {
-            const isEarned = data.earnedBadgeIds.includes(badge.badgeId);
+        const earnedIds = new Set(earnedBadges.map(b => b.badgeId));
+
+        const badgesHtml = allBadges.map((badge) => {
+            const isEarned = earnedIds.has(badge.badgeId);
             return `
                 <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
                     <span>${sanitizeHTML(badge.badgeName)}</span>
@@ -1185,10 +1235,11 @@ async function handleViewUserDetails(lineUserId) {
                 </div>
             `;
         }).join('');
-        badgesContainer.html(badgesHtml);
 
+        badgesContainer.html(badgesHtml);
     } catch (e) {
-        showError(e.message);
+        console.error('handleViewUserDetails error:', e);
+        showError(e.message || 'ไม่สามารถโหลดข้อมูลได้');
         $('#user-details-badges-container').html('<p class="text-danger">ไม่สามารถโหลดข้อมูลได้</p>');
     }
 }
@@ -1458,7 +1509,13 @@ function renderUserListForAdmin(users, container) {
 async function checkUnreadNotifications() {
     try {
         const data = await callApi('/api/notifications/unread-count');
-        if (data[0].unreadCount > 0) {
+
+        // data จาก backend = { unreadCount: number }
+        const unread = data && typeof data.unreadCount === 'number'
+            ? data.unreadCount
+            : 0;
+
+        if (unread > 0) {
             $('#notification-badge').show();
         } else {
             $('#notification-badge').hide();
@@ -1468,6 +1525,7 @@ async function checkUnreadNotifications() {
         $('#notification-badge').hide();
     }
 }
+
 
 async function openNotificationCenter() {
     const modal = AppState.allModals['notification'];
