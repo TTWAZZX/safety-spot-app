@@ -61,12 +61,16 @@ async function initializeApp() {
         const lineProfile = await liff.getProfile();
         AppState.lineProfile = lineProfile;
 
-        // "ยิงแล้วลืม" ส่งโปรไฟล์ไปอัปเดตที่ Backend
+        // --- ส่วนที่เพิ่มเข้ามา ---
+        // highlight-start
+        // "ยิงแล้วลืม" (Fire and forget) ส่งโปรไฟล์ไปอัปเดตที่ Backend
+        // เราไม่ต้องรอให้เสร็จก็สามารถทำงานต่อไปได้เลย
         callApi('/api/user/refresh-profile', {
             lineUserId: lineProfile.userId,
             displayName: lineProfile.displayName,
             pictureUrl: lineProfile.pictureUrl
         }, 'POST').catch(err => console.error("Profile refresh failed:", err));
+        // highlight-end
 
         $('#loading-status-text').text('กำลังตรวจสอบการลงทะเบียน');
         const result = await callApi('/api/user/profile', { lineUserId: lineProfile.userId });
@@ -80,9 +84,7 @@ async function initializeApp() {
     } catch (error) {
         console.error("Initialization failed:", error);
         $('#loading-status-text').text('เกิดข้อผิดพลาด');
-        $('#loading-sub-text')
-            .text('ไม่สามารถเริ่มต้นแอปพลิเคชันได้ กรุณาลองใหม่อีกครั้ง')
-            .addClass('text-danger');
+        $('#loading-sub-text').text('ไม่สามารถเริ่มต้นแอปพลิเคชันได้ กรุณาลองใหม่อีกครั้ง').addClass('text-danger');
         $('.spinner-border').hide();
     }
 }
@@ -102,22 +104,24 @@ async function showMainApp(userData) {
         displayActivitiesUI(activities, 'all-activities-list');
         
         $('#main-app').fadeIn();
-
-        // Pull to refresh
+        // ===== START: เพิ่มโค้ดเรียกใช้ Pull to Refresh ตรงนี้ =====
         PullToRefresh.init({
-            mainElement: 'body',
-            onRefresh: async function(done) {
-                await refreshHomePageData();
-                done();
+            mainElement: 'body', // Element หลักที่อนุญาตให้ดึง
+            onRefresh: async function(done) { // ฟังก์ชันที่จะทำงานเมื่อผู้ใช้ปล่อยนิ้ว
+                await refreshHomePageData(); // เรียกใช้ฟังก์ชันรีเฟรชที่เราสร้างไว้
+                done(); // บอก Library ว่ารีเฟรชเสร็จแล้ว (Spinner จะหายไป)
             },
+            // ตั้งค่าไอคอนให้เข้ากับแอป (ใช้ Font Awesome)
             iconArrow: '<i class="fas fa-arrow-down"></i>',
             iconRefreshing: '<div class="spinner-border spinner-border-sm text-success" role="status"></div>',
-            distThreshold: 80,
+            distThreshold: 80, // ระยะที่ต้องดึงลงมา (pixel)
             distMax: 100
         });
+        // ===== END: เพิ่มโค้ดเรียกใช้ Pull to Refresh =====
+         // highlight-start
+        checkUnreadNotifications(); // เช็คการแจ้งเตือนที่ยังไม่ได้อ่าน
+        // highlight-end
 
-        // เช็คการแจ้งเตือนที่ยังไม่ได้อ่าน
-        checkUnreadNotifications();
     } catch (error) {
         console.error("Error during showMainApp:", error);
         showError('เกิดข้อผิดพลาดในการโหลดข้อมูลบางส่วน');
@@ -138,8 +142,8 @@ async function callApi(endpoint, payload = {}, method = 'GET') {
     };
 
     if (AppState.lineProfile && AppState.lineProfile.userId) {
-        payload.requesterId = AppState.lineProfile.userId;
-    }
+    payload.requesterId = AppState.lineProfile.userId;
+}
 
     if (method.toUpperCase() === 'GET' && Object.keys(payload).length > 0) {
         const params = new URLSearchParams(payload).toString();
@@ -151,9 +155,7 @@ async function callApi(endpoint, payload = {}, method = 'GET') {
     try {
         const response = await fetch(url, options);
         if (!response.ok) {
-            const errorResult = await response.json().catch(
-                () => ({ message: 'API request failed with status ' + response.status })
-            );
+            const errorResult = await response.json().catch(() => ({ message: 'API request failed with status ' + response.status }));
             throw new Error(errorResult.message);
         }
         const result = await response.json();
@@ -167,7 +169,7 @@ async function callApi(endpoint, payload = {}, method = 'GET') {
     }
 }
 
-// resize ภาพก่อนอัปโหลด
+// === Add: lightweight in-browser resize (no external libs) ===
 async function resizeImageFile(file, maxDim = 1600, quality = 0.8) {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(maxDim / bitmap.width, maxDim / bitmap.height, 1);
@@ -175,8 +177,7 @@ async function resizeImageFile(file, maxDim = 1600, quality = 0.8) {
   const h = Math.round(bitmap.height * scale);
 
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(bitmap, 0, 0, w, h);
 
@@ -184,7 +185,7 @@ async function resizeImageFile(file, maxDim = 1600, quality = 0.8) {
   return new File([blob], 'upload.jpg', { type: 'image/jpeg' });
 }
 
-// อัปโหลดภาพไป backend (/api/upload → R2)
+// === Replace your uploadImage(file) with this version ===
 async function uploadImage(file) {
   // 1) shrink on client first
   const optimized = await resizeImageFile(file, 1600, 0.8);
@@ -193,22 +194,47 @@ async function uploadImage(file) {
   const formData = new FormData();
   formData.append('image', optimized);
 
-  const response = await fetch(`${API_BASE_URL}/api/upload`, {
-    method: 'POST',
-    body: formData
-  });
+  const response = await fetch(`${API_BASE_URL}/api/upload`, { method: 'POST', body: formData });
   if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    console.error('Upload error:', response.status, text);
-    throw new Error('Upload failed');
+    const errorResult = await response.json().catch(() => ({ message: 'Image upload failed with status ' + response.status }));
+    throw new Error(errorResult.message);
   }
-
   const result = await response.json();
   if (result.status === 'success') return result.data.imageUrl;
   throw new Error(result.message || 'Failed to get image URL from server.');
 }
 
-// helper แปลง path → URL (รองรับ R2 หรือ URL ไหนก็ได้)
+// === Add: Helper to inject Cloudinary delivery transforms ===
+function optimizeCloudinaryUrl(url, { w = 800, q = 'auto:eco', f = 'auto' } = {}) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes('res.cloudinary.com') && u.pathname.includes('/upload/')) {
+      const parts = u.pathname.split('/upload/');
+      // insert transforms at .../upload/<TRANSFORMS>/...
+      u.pathname = parts[0] + '/upload/' + `f_${f},q_${q},w_${w}/` + parts[1];
+      return u.toString();
+    }
+  } catch (e) {}
+  return url;
+}
+
+// === Replace your original getFullImageUrl with this version ===
+function getFullImageUrl(path, opts = {}) {
+  const placeholder = 'https://placehold.co/600x400/e9ecef/6c757d?text=Image';
+  if (!path) return placeholder;
+
+  // If it's already a full URL
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    // enforce Cloudinary transforms when applicable
+    return optimizeCloudinaryUrl(path, opts);
+  }
+  // local uploads
+  return `${API_BASE_URL}/uploads/${path}`;
+}
+
+// ===============================================================
+//  UI RENDERING FUNCTIONS
+// ===============================================================
 function getFullImageUrl(path) {
     const placeholder = 'https://placehold.co/600x400/e9ecef/6c757d?text=Image';
     if (!path) { return placeholder; }
@@ -216,61 +242,76 @@ function getFullImageUrl(path) {
     return `${API_BASE_URL}/uploads/${path}`;
 }
 
-// ===============================================================
-//  UI RENDERING FUNCTIONS
-// ===============================================================
 function updateUserInfoUI(user) {
     $('#user-header').addClass('user-header-card');
 
-    $('#user-profile-pic, #profile-page-pic')
-        .attr('src', user.pictureUrl || 'https://placehold.co/80x80');
+    $('#user-profile-pic, #profile-page-pic').attr('src', user.pictureUrl || 'https://placehold.co/80x80');
     $('#user-display-name, #profile-page-name').text(user.fullName);
     $('#user-employee-id').text(`รหัส: ${user.employeeId}`);
     $('#profile-page-employee-id').text(`รหัสพนักงาน: ${user.employeeId}`);
     $('#user-score, #profile-page-score').text(user.totalScore);
 }
 
-function displayActivitiesUI(activities, containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
+// ในไฟล์ app.js
+function displayActivitiesUI(activities, listId) {
+    const listElement = $(`#${listId}`);
+    listElement.empty();
     if (!activities || activities.length === 0) {
-        container.innerHTML = `
-            <div class="text-center text-gray-500 py-8">
-                ยังไม่มีกิจกรรมในขณะนี้
-            </div>
-        `;
+        listElement.html('<p class="text-center text-muted">ยังไม่มีกิจกรรมในขณะนี้</p>');
         return;
     }
+    activities.forEach(act => {
+        // --- ส่วนที่เพิ่มเข้ามา ---
+        let joinButtonHtml = '';
+        if (act.userHasSubmitted) {
+            // ถ้า User เข้าร่วมแล้ว ให้แสดงปุ่มที่กดไม่ได้
+            joinButtonHtml = `
+                <button class="btn btn-success" disabled>
+                    <i class="fas fa-check-circle me-1"></i> เข้าร่วมแล้ว
+                </button>
+            `;
+        } else {
+            // ถ้ายังไม่เคยเข้าร่วม ให้แสดงปุ่มปกติ
+            joinButtonHtml = `
+                <button class="btn btn-primary btn-join-activity" 
+                        data-activity-id="${act.activityId}" 
+                        data-activity-title="${sanitizeHTML(act.title)}"
+                        data-image-required="${!act.description.includes('[no-image]')}" 
+                        data-bs-toggle="tooltip" title="เข้าร่วมกิจกรรม">
+                    <i class="fas fa-plus-circle me-1"></i> เข้าร่วม
+                </button>
+            `;
+        }
+        // --- จบส่วนที่เพิ่มเข้ามา ---
 
-    container.innerHTML = activities.map(a => `
-        <div class="col">
-            <div class="card h-100 shadow-sm border-0 activity-card" data-id="${a.id}">
-                <div class="ratio ratio-16x9">
-                    <img src="${getFullImageUrl(a.imageUrl)}" 
-                         class="card-img-top" 
-                         alt="${a.title || 'Activity Image'}"
-                         loading="lazy"
-                         decoding="async"
-                         onerror="this.onerror=null;this.src='https://placehold.co/600x400/e9ecef/6c757d?text=No+Image'">
-                </div>
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title mb-1">${sanitizeHTML(a.title)}</h5>
-                    <p class="card-text flex-grow-1 text-muted small">
-                        ${sanitizeHTML(a.description || '')}
-                    </p>
-                    <div class="d-flex justify-content-between align-items-center mt-2">
-                        <span class="badge bg-primary-soft text-primary">
-                            ${a.points || 0} คะแนน
-                        </span>
-                        <span class="text-muted small">
-                            ส่งแล้ว ${a.submissionsCount || 0} ครั้ง
-                        </span>
+        const cardHtml = `
+            <div class="card activity-card mb-3">
+                 <img src="${getFullImageUrl(act.imageUrl, { w: 600 })}"
+                        loading="lazy" decoding="async"
+                        class="activity-card-img"
+                        onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
+                <div class="card-body">
+                    <h5 class="card-title">${sanitizeHTML(act.title)}</h5>
+                    <p class="card-text text-muted small preserve-whitespace">${sanitizeHTML(act.description.replace('[no-image]', ''))}</p>
+                    <div class="d-flex justify-content-end align-items-center gap-2 mt-3">
+                        <button class="btn btn-sm btn-outline-secondary btn-view-activity-image" 
+                                data-image-full-url="${getFullImageUrl(act.imageUrl, { w: 1200 })}" 
+                                ${act.imageUrl ? '' : 'disabled'}
+                                data-bs-toggle="tooltip" title="ดูรูปภาพกิจกรรม">
+                            <i class="fas fa-image"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary btn-view-report" 
+                                data-activity-id="${act.activityId}" 
+                                data-activity-title="${sanitizeHTML(act.title)}" 
+                                data-bs-toggle="tooltip" title="ดูรายงานทั้งหมด">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${joinButtonHtml}
                     </div>
                 </div>
-            </div>
-        </div>
-    `).join('');
+            </div>`;
+        listElement.append(cardHtml);
+    });
 }
 
 function renderSubmissions(submissions) {
@@ -283,7 +324,7 @@ function renderSubmissions(submissions) {
     submissions.forEach(sub => {
         const likedClass = sub.didLike ? 'liked' : '';
         const imageHtml = sub.imageUrl ? `
-            <img src="${getFullImageUrl(sub.imageUrl)}"
+            <img src="${getFullImageUrl(sub.imageUrl, { w: 900 })}"
                 loading="lazy" decoding="async"
                 class="card-img-top submission-image" alt="Submission Image">
         ` : '';
@@ -324,7 +365,7 @@ function renderSubmissions(submissions) {
                              </a>
                              
                              ${sub.imageUrl ? `
-                             <a href="#" class="text-decoration-none view-image-btn" data-image-full-url="${getFullImageUrl(sub.imageUrl)}">
+                             <a href="#" class="text-decoration-none view-image-btn" data-image-full-url="${getFullImageUrl(sub.imageUrl, { w: 1200 })}">
                                 <i class="fas fa-search-plus"></i> ดูรูปภาพ
                              </a>
                              ` : ''}
@@ -379,6 +420,10 @@ function renderAdminChart(chartData) {
 // ===============================================================
 //  DATA LOADING FUNCTIONS
 // ===============================================================
+// app.js
+
+// app.js
+
 async function loadAndShowActivityDetails(activityId, activityTitle, scrollToSubmissionId = null) {
     const modal = $('#activity-detail-modal');
     modal.data('current-activity-id', activityId);
@@ -388,6 +433,7 @@ async function loadAndShowActivityDetails(activityId, activityTitle, scrollToSub
     $('#submissions-loading').show();
     container.empty();
     
+    // ถ้ายังไม่ได้เปิด modal ให้เปิดก่อน
     if (!modal.hasClass('show')) {
         AppState.allModals['activity-detail'].show();
     }
@@ -396,14 +442,20 @@ async function loadAndShowActivityDetails(activityId, activityTitle, scrollToSub
         const submissions = await callApi('/api/submissions', { activityId, lineUserId: AppState.lineProfile.userId });
         renderSubmissions(submissions);
 
+        // highlight-start
+        // --- ส่วนที่เพิ่มเข้ามาเพื่อเลื่อนจอ ---
         if (scrollToSubmissionId) {
+            // ใช้ setTimeout เล็กน้อยเพื่อให้แน่ใจว่า DOM ถูก render เสร็จสมบูรณ์แล้ว
             setTimeout(() => {
                 const targetCard = $(`.like-btn[data-submission-id="${scrollToSubmissionId}"]`).closest('.submission-card');
                 if (targetCard.length) {
+                    // สั่งให้เลื่อนจอไปที่ card เป้าหมายอย่างนุ่มนวล
                     targetCard[0].scrollIntoView({ behavior: 'smooth', block: 'end' });
                 }
-            }, 100);
+            }, 100); // หน่วงเวลา 100 มิลลิวินาที
         }
+        // --- จบส่วนเลื่อนจอ ---
+        // highlight-end
 
     } catch (error) { 
         console.error("Error details from loadAndShowActivityDetails:", error); 
@@ -413,15 +465,17 @@ async function loadAndShowActivityDetails(activityId, activityTitle, scrollToSub
     }
 }
 
+// ในไฟล์ app.js
 async function loadLeaderboard(isLoadMore = false) {
     if (!isLoadMore) {
+        // ถ้าเป็นการโหลดครั้งแรก ให้รีเซ็ตค่า
         AppState.leaderboard.currentPage = 1;
         AppState.leaderboard.hasMore = true;
         $('#leaderboard-list').empty();
         $('#leaderboard-load-more-container').hide();
     }
 
-    if (!AppState.leaderboard.hasMore) return;
+    if (!AppState.leaderboard.hasMore) return; // ถ้าไม่มีข้อมูลแล้วก็ไม่ต้องทำอะไรต่อ
 
     const list = $('#leaderboard-list');
     const loading = $('#leaderboard-loading');
@@ -457,9 +511,11 @@ async function loadLeaderboard(isLoadMore = false) {
         });
 
         if (users.length < 30) {
+            // ถ้าข้อมูลที่ได้มาน้อยกว่า 30 แสดงว่าหมดแล้ว
             AppState.leaderboard.hasMore = false;
             $('#leaderboard-load-more-container').hide();
         } else {
+            // ถ้ายังมีอีก ให้แสดงปุ่ม
             AppState.leaderboard.currentPage++;
             $('#leaderboard-load-more-container').show();
         }
@@ -474,20 +530,24 @@ async function loadLeaderboard(isLoadMore = false) {
 
 async function refreshHomePageData() {
     try {
+        // ดึงข้อมูลผู้ใช้ (เพื่ออัปเดตคะแนน) และข้อมูลกิจกรรมพร้อมกัน
         const [userDataResponse, activities] = await Promise.all([
             callApi('/api/user/profile', { lineUserId: AppState.lineProfile.userId }),
             callApi('/api/activities')
         ]);
 
+        // อัปเดตข้อมูลผู้ใช้และคะแนนบน UI
         if (userDataResponse.registered) {
             AppState.currentUser = userDataResponse.user;
             updateUserInfoUI(AppState.currentUser);
         }
 
+        // อัปเดตลิสต์กิจกรรมล่าสุด
         displayActivitiesUI(activities, 'latest-activities-list');
 
     } catch (error) {
         console.error("Failed to refresh home page data:", error);
+        // อาจจะแสดง Pop-up เล็กๆ ว่ารีเฟรชไม่สำเร็จ
         showError("ไม่สามารถรีเฟรชข้อมูลได้");
     }
 }
@@ -507,7 +567,7 @@ async function loadUserBadges() {
                 const lockClass = b.isEarned ? '' : 'locked';
                 const html = `
                     <div class="badge-item" data-bs-toggle="tooltip" title="${sanitizeHTML(b.name)}: ${sanitizeHTML(b.desc)}">
-                         <img src="${getFullImageUrl(b.img)}"
+                         <img src="${getFullImageUrl(b.img, { w: 120 })}"
                               loading="lazy" decoding="async"
                               class="badge-icon ${lockClass}" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';">
                         <div class="small">${sanitizeHTML(b.name)}</div>
@@ -531,9 +591,13 @@ async function loadUserBadges() {
     }
 }
 
+
 // ===============================================================
 //  EVENT LISTENERS
 // ===============================================================
+// ในไฟล์ app.js ให้นำโค้ดนี้ไปทับฟังก์ชันเดิม
+// app.js
+
 function bindStaticEventListeners() {
     $('.nav-link').on('click', function(e) {
         e.preventDefault();
@@ -585,8 +649,10 @@ function bindStaticEventListeners() {
     
     $('#leaderboard-load-more-btn').on('click', () => loadLeaderboard(true));
 
-    // notification bell
+    // highlight-start
+    // ---- เพิ่ม Event Listener สำหรับปุ่มแจ้งเตือนไว้ตรงนี้ ----
     $('#notification-bell').on('click', openNotificationCenter);
+    // highlight-end
 }
 
 function bindAdminEventListeners() {
@@ -602,8 +668,10 @@ function bindAdminEventListeners() {
     $(document).on('click', '.btn-edit-badge', handleEditBadge);
     $(document).on('click', '.btn-delete-activity', handleDeleteActivity);
     $(document).on('click', '.btn-delete-submission', handleDeleteSubmission);
+    // ===== START: Event Listeners for Idea 3 =====
     $(document).on('click', '.user-card', function() { handleViewUserDetails($(this).data('userid')); });
     $(document).on('click', '.badge-toggle-btn', handleToggleBadge);
+    // ===== END: Event Listeners for Idea 3 =====
 }
 
 function bindAdminTabEventListeners() {
@@ -637,22 +705,28 @@ function bindAdminTabEventListeners() {
     });
 
     $('#users-load-more-btn').on('click', () => {
+        // เรียกใช้ fetchAdminUsers โดยบอกว่าเป็น "Load More" (isLoadMore = true)
         fetchAdminUsers(AppState.adminUsers.currentPage, AppState.adminUsers.currentSearch, true);
     });
 
+    // ---- เพิ่ม Event Listener สำหรับปุ่ม Sort ----
     $('#user-sort-options').on('click', '.btn-sort', function() {
         const btn = $(this);
         const sortBy = btn.data('sort');
 
+        // ถ้ากดปุ่มที่ Active อยู่แล้ว ไม่ต้องทำอะไร
         if (btn.hasClass('active')) {
             return; 
         }
 
+        // อัปเดต UI ของปุ่ม
         $('#user-sort-options .btn-sort').removeClass('active');
         btn.addClass('active');
 
+        // อัปเดต state
         AppState.adminUsers.currentSort = sortBy;
 
+        // เรียกข้อมูลใหม่ โดยเริ่มจากหน้า 1 เสมอเมื่อมีการเปลี่ยนการเรียงลำดับ
         const currentQuery = $('#user-search-input').val();
         fetchAdminUsers(1, currentQuery, false);
     });
@@ -667,19 +741,11 @@ async function handleRegistration(e) {
     const employeeId = $('#employeeId').val().trim();
     showLoading('กำลังบันทึก...');
     try {
-        const newUser = await callApi("/api/user/register", {
-            lineUserId: AppState.lineProfile.userId,
-            displayName: AppState.lineProfile.displayName,
-            pictureUrl: AppState.lineProfile.pictureUrl,
-            fullName,
-            employeeId
-        }, 'POST');
+        const newUser = await callApi("/api/user/register", { lineUserId: AppState.lineProfile.userId, displayName: AppState.lineProfile.displayName, pictureUrl: AppState.lineProfile.pictureUrl, fullName: fullName, employeeId: employeeId }, 'POST');
         $('#registration-page').hide();
         await showMainApp(newUser);
         showSuccess('ลงทะเบียนเรียบร้อย!');
-    } catch (error) {
-        showError(error.message);
-    }
+    } catch (error) { showError(error.message); }
 }
 
 async function handleSubmitReport(e) {
@@ -691,18 +757,14 @@ async function handleSubmitReport(e) {
     try {
         let imageUrl = null;
         if (imageFile) { imageUrl = await uploadImage(imageFile); }
-        const payload = {
-            lineUserId: AppState.lineProfile.userId,
-            activityId: $('#activityId-input').val(),
-            description,
-            imageUrl
-        };
+        const payload = { lineUserId: AppState.lineProfile.userId, activityId: $('#activityId-input').val(), description: description, imageUrl: imageUrl };
         await callApi('/api/submissions', payload, 'POST');
         AppState.allModals.submission.hide();
         $('#submission-form')[0].reset();
         $('#submission-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
         showSuccess('รายงานของคุณถูกส่งเพื่อรอการตรวจสอบ');
-
+        // --- ส่วนที่เพิ่มเข้ามา ---
+        // หาปุ่มของกิจกรรมที่เราเพิ่งส่งไป แล้วเปลี่ยนสถานะมัน
         const activityId = $('#activityId-input').val();
         const activityButton = $(`.btn-join-activity[data-activity-id="${activityId}"]`);
         if (activityButton.length > 0) {
@@ -712,10 +774,9 @@ async function handleSubmitReport(e) {
                 .addClass('btn-success')
                 .html('<i class="fas fa-check-circle me-1"></i> เข้าร่วมแล้ว');
         }
+        // --- จบส่วนที่เพิ่มเข้ามา ---
 
-    } catch (error) { 
-        showError(error.message); 
-    }
+    } catch (error) { showError(error.message); }
 }
 
 function handleViewReport() {
@@ -733,11 +794,11 @@ function handleJoinActivity() {
     const imageInput = $('#image-input');
 
     if (isImageRequired) {
-        imageUploadSection.show();
-        imageInput.prop('required', true);
+        imageUploadSection.show(); // แสดงส่วนอัปโหลด
+        imageInput.prop('required', true); // ตั้งให้ "ต้องมี" ไฟล์
     } else {
-        imageUploadSection.hide();
-        imageInput.prop('required', false);
+        imageUploadSection.hide(); // ซ่อนส่วนอัปโหลด
+        imageInput.prop('required', false); // ตั้งให้ "ไม่จำเป็นต้องมี" ไฟล์
     }
 
     $('#activityId-input').val(activityId);
@@ -754,13 +815,15 @@ async function handleLike(e) {
         const result = await callApi('/api/submissions/like', { submissionId, lineUserId: AppState.lineProfile.userId }, 'POST');
         const countSpan = btn.find('.like-count');
         countSpan.text(result.newLikeCount);
-        btn.toggleClass('liked', result.liked);
+        btn.toggleClass('liked', result.status === 'liked');
     } catch (error) {
         console.error("Like failed:", error);
     } finally {
         btn.css('pointer-events', 'auto'); 
     }
 }
+
+// app.js (แก้ไขในฟังก์ชัน handleComment)
 
 async function handleComment(e) {
     e.preventDefault();
@@ -773,22 +836,25 @@ async function handleComment(e) {
     btn.prop('disabled', true);
     
     try {
-        await callApi('/api/submissions/comment', {
-            submissionId,
-            lineUserId: AppState.lineProfile.userId,
-            commentText
-        }, 'POST');
+        await callApi('/api/submissions/comment', { submissionId, lineUserId: AppState.lineProfile.userId, commentText }, 'POST');
         
         const modal = $('#activity-detail-modal');
         const currentActivityId = modal.data('current-activity-id');
         const activityTitle = $('#activity-detail-title').text();
         if (currentActivityId) {
+           // highlight-start
+           // ส่ง submissionId เพิ่มเข้าไปเป็น parameter ที่ 3
            loadAndShowActivityDetails(currentActivityId, activityTitle, submissionId); 
+           // highlight-end
         }
     } catch (e) { 
         showError('ไม่สามารถเพิ่มความคิดเห็นได้'); 
+        // highlight-start
+        // เพิ่มบรรทัดนี้เพื่อให้ปุ่มกลับมาใช้งานได้แม้จะเกิด Error
         btn.prop('disabled', false); 
-    }
+        // highlight-end
+    } 
+    // ไม่ต้องมี finally แล้ว เพราะเราจัดการ btn.prop('disabled', false) ใน catch แล้ว
 }
 
 function handleImagePreview(input, previewSelector) {
@@ -800,18 +866,9 @@ function handleImagePreview(input, previewSelector) {
 }
 
 // --- Admin Handlers ---
-async function handleViewStats() { 
-    await loadAdminStats(); 
-    AppState.allModals['admin-stats'].show(); 
-}
-async function handleManageReports() { 
-    await loadPendingSubmissions(); 
-    AppState.allModals['admin-reports'].show(); 
-}
-async function handleManageActivities() { 
-    await loadAllActivitiesForAdmin(); 
-    AppState.allModals['admin-activities'].show(); 
-}
+async function handleViewStats() { await loadAdminStats(); AppState.allModals['admin-stats'].show(); }
+async function handleManageReports() { await loadPendingSubmissions(); AppState.allModals['admin-reports'].show(); }
+async function handleManageActivities() { await loadAllActivitiesForAdmin(); AppState.allModals['admin-activities'].show(); }
 function handleCreateActivity() {
     $('#activity-form-title').text('สร้างกิจกรรมใหม่');
     $('#activity-form')[0].reset();
@@ -820,6 +877,7 @@ function handleCreateActivity() {
     AppState.allModals['activity-form'].show();
 }
 
+// This function creates a new UI function to be reusable
 function displayActivitiesUIForAdmin(activities) {
     const list = $('#activities-list-admin');
     list.empty();
@@ -841,6 +899,7 @@ function displayActivitiesUIForAdmin(activities) {
     });
 }
 
+// ในไฟล์ app.js
 async function handleSaveActivity(e) {
     e.preventDefault();
     showLoading('กำลังบันทึก...');
@@ -853,20 +912,24 @@ async function handleSaveActivity(e) {
             finalImageUrl = await uploadImage(imageFile);
         }
 
+        // ===== ส่วนที่แก้ไข =====
         let description = $('#form-activity-desc').val();
         const noImageTag = '[no-image]';
         const isImageRequired = $('#image-required-toggle').is(':checked');
 
+        // 1. ลบแท็กเก่าทิ้งก่อนเสมอ เพื่อป้องกันการซ้ำซ้อน
         description = description.replace(noImageTag, '').trim();
 
         if (!isImageRequired) {
+          // 2. ถ้า "ไม่บังคับ" (สวิตช์ถูกปิด) ค่อยเติมแท็กเข้าไปใหม่
           description += noImageTag;
         }
+        // =======================
 
         const payload = {
             activityId: $('#form-activity-id').val(),
             title: $('#form-activity-title').val(),
-            description,
+            description: description, // <--- 3. ใช้ตัวแปร description ที่เราจัดการแท็กแล้ว
             imageUrl: finalImageUrl
         };
 
@@ -889,11 +952,14 @@ async function handleSaveActivity(e) {
         showError(e.message);
     }
 }
-
+// ===== START: Idea 4 - Safer Delete Confirmation =====
+// ในไฟล์ app.js ฟังก์ชัน handleDeleteActivity
+// ในไฟล์ app.js ให้นำฟังก์ชันนี้ไปทับของเดิมทั้งหมด
 async function handleDeleteActivity() {
     const activityId = $(this).data('id');
     const activityTitle = $(this).closest('.card-body').find('strong').text();
 
+    // ===== แก้ไข Swal.fire ทั้งหมดเป็นแบบนี้ =====
     const result = await Swal.fire({
         title: 'ยืนยันการลบ',
         html: `คุณต้องการลบกิจกรรม "<b>${sanitizeHTML(activityTitle)}</b>" ใช่ไหม?`,
@@ -905,12 +971,13 @@ async function handleDeleteActivity() {
         confirmButtonText: 'ใช่, ลบเลย!',
         cancelButtonText: 'ยกเลิก'
     });
+    // ===========================================
 
     if (result.isConfirmed) {
         try {
             await callApi(`/api/admin/activities/${activityId}`, {}, 'DELETE');
             Swal.fire('ลบสำเร็จ!', 'กิจกรรมและรายงานที่เกี่ยวข้องถูกลบแล้ว', 'success');
-            loadAllActivitiesForAdmin(); 
+            loadAllActivitiesForAdmin(); // Reload admin list
             const activities = await callApi('/api/activities', { lineUserId: AppState.lineProfile.userId });
             displayActivitiesUI(activities, 'latest-activities-list');
             displayActivitiesUI(activities, 'all-activities-list');
@@ -919,6 +986,7 @@ async function handleDeleteActivity() {
         }
     }
 }
+// ===== END: Idea 4 - Safer Delete Confirmation =====
 
 async function handleApprovalAction() {
     const btn = $(this);
@@ -946,7 +1014,6 @@ async function handleApprovalAction() {
         btn.prop('disabled', false).closest('.d-flex').find('button, input').prop('disabled', false);
     }
 }
-
 async function handleEditActivity() {
     const data = JSON.parse(decodeURIComponent($(this).data('activity-data')));
     $('#activity-form-title').text('แก้ไขกิจกรรม');
@@ -962,20 +1029,18 @@ async function handleEditActivity() {
     $('#activity-image-preview').attr('src', getFullImageUrl(data.imageUrl));
     AppState.allModals['activity-form'].show();
 }
-
 async function handleToggleActivity() {
     const btn = $(this);
     const id = btn.data('id');
     btn.prop('disabled', true);
     try {
-        await callApi(`/api/admin/activities/${id}`, { isActive: false /* หรือ true ตามสถานะใหม่ */ }, 'PUT');
+        await callApi('/api/admin/activities/toggle', { activityId: id }, 'POST');
         loadAllActivitiesForAdmin();
     } catch (e) {
         console.error("Toggle failed:", e);
         btn.prop('disabled', false);
     }
 }
-
 async function handleDeleteSubmission() {
     const submissionId = $(this).data('id');
     const result = await Swal.fire({
@@ -1002,21 +1067,18 @@ async function handleDeleteSubmission() {
         }
     }
 }
-
 function handleManageBadges() {
     AppState.allModals['admin-manage-badges'].show();
     $('.admin-tab-btn[data-tab="manageBadges"]').addClass('active').siblings().removeClass('active');
     $('#manageBadgesTab').show().siblings('.admin-tab-content').hide();
     loadBadgesForAdmin();
 }
-
 function handleAddBadge() {
     $('#badge-form-title').text('เพิ่มป้ายรางวัลใหม่');
     $('#badge-form')[0].reset();
     $('#badge-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
     AppState.allModals['badge-form'].show();
 }
-
 async function handleSaveBadge(e) {
     e.preventDefault();
     showLoading('กำลังบันทึก...');
@@ -1046,7 +1108,6 @@ async function handleSaveBadge(e) {
         showError(e.message);
     }
 }
-
 async function handleDeleteBadge() {
      const badgeId = $(this).data('badge-id');
      const result = await Swal.fire({
@@ -1070,7 +1131,6 @@ async function handleDeleteBadge() {
         }
     }
 }
-
 function handleEditBadge() {
     const badgeId = $(this).data('badge-id');
     const badgeName = $(this).data('badge-name');
@@ -1158,6 +1218,7 @@ async function handleToggleBadge() {
 
     } catch (e) {
         showError(e.message);
+        // Reset button to original state on error
         const originalText = action === 'award' ? 'มอบรางวัล' : 'เพิกถอน';
         btn.html(`<i class="fas ${action === 'award' ? 'fa-check' : 'fa-times'} me-1"></i> ${originalText}`);
     } finally {
@@ -1203,7 +1264,7 @@ async function loadAdminStats() {
         $('#stats-loading').hide(); 
     }
 }
-
+// แก้ไขฟังก์ชันนี้ทั้งฟังก์ชัน
 async function loadPendingSubmissions() {
     const container = $('#admin-reports-container');
     $('#reports-loading').show();
@@ -1217,18 +1278,23 @@ async function loadPendingSubmissions() {
             $('#no-reports-message').show();
         } else {
             subs.forEach(s => {
+                // ----- START: ส่วนที่แก้ไข -----
                 let imageHtmlBlock = '';
-                let contentClass = 'col-12';
+                let contentClass = 'col-12'; // เริ่มต้นให้ข้อความเต็มความกว้าง
 
+                // ตรวจสอบว่ามี imageUrl หรือไม่
                 if (s.imageUrl) {
+                    // ถ้ามีรูป ให้สร้าง HTML บล็อกของรูปภาพ
                     imageHtmlBlock = `
                         <div class="col-md-5 col-lg-4">
                             <img src="${getFullImageUrl(s.imageUrl)}" class="img-fluid rounded-start h-100" style="object-fit: cover;" alt="Submission Image">
                         </div>
                     `;
+                    // และปรับขนาดคลาสของส่วนเนื้อหา
                     contentClass = 'col-md-7 col-lg-8';
                 }
                 
+                // นำตัวแปรที่สร้างมาประกอบร่างเป็น Card ที่สมบูรณ์
                 const cardHtml = `
                     <div class="card shadow-sm mb-3 report-card" id="report-card-${s.submissionId}">
                         <div class="row g-0">
@@ -1252,6 +1318,7 @@ async function loadPendingSubmissions() {
                             </div>
                         </div>
                     </div>`;
+                // ----- END: ส่วนที่แก้ไข -----
                 container.append(cardHtml);
             });
         }
@@ -1259,7 +1326,6 @@ async function loadPendingSubmissions() {
         $('#reports-loading').hide();
     }
 }
-
 async function loadAllActivitiesForAdmin() {
     const list = $('#activities-list-admin');
     list.html('<div class="spinner-border"></div>');
@@ -1270,7 +1336,6 @@ async function loadAllActivitiesForAdmin() {
         list.html('<p class="text-danger">ไม่สามารถโหลดกิจกรรมได้</p>');
     }
 }
-
 async function loadBadgesForAdmin() {
     const list = $('#badges-list');
     list.html('<div class="text-center my-4"><div class="spinner-border text-success"></div><p class="text-muted mt-2">กำลังโหลดป้ายรางวัล...</p></div>');
@@ -1311,15 +1376,15 @@ async function loadBadgesForAdmin() {
     }
 }
 
-// ===== User search / admin users =====
+// ===== START: Updated User Search/Load functions for Idea 3 =====
 async function loadUsersForAdmin() {
-    AppState.adminUsers.currentSearch = '';
-    await fetchAdminUsers(1, '');
+    AppState.adminUsers.currentSearch = ''; // รีเซ็ตคำค้นหา
+    await fetchAdminUsers(1, ''); // เรียกใช้ฟังก์ชันใหม่เพื่อโหลดหน้า 1
 }
 
 async function searchUsersForAdmin(query) {
-    AppState.adminUsers.currentSearch = query;
-    await fetchAdminUsers(1, query);
+    AppState.adminUsers.currentSearch = query; // เก็บคำค้นหาปัจจุบัน
+    await fetchAdminUsers(1, query); // เรียกใช้ฟังก์ชันใหม่เพื่อโหลดหน้า 1 ของผลการค้นหา
 }
 
 async function fetchAdminUsers(page, query, isLoadMore = false) {
@@ -1328,22 +1393,20 @@ async function fetchAdminUsers(page, query, isLoadMore = false) {
     const loadMoreBtn = $('#users-load-more-btn');
 
     if (!isLoadMore) {
+        // ถ้าเป็นการโหลดครั้งแรก ให้แสดง Spinner และรีเซ็ตค่า
         resultsContainer.html('<div class="text-center my-4"><div class="spinner-border text-success"></div></div>');
         AppState.adminUsers.currentPage = 1;
         AppState.adminUsers.hasMore = true;
     }
 
-    if (!AppState.adminUsers.hasMore) return;
+    if (!AppState.adminUsers.hasMore) return; // ถ้าไม่มีข้อมูลให้โหลดแล้ว ก็หยุด
     loadMoreBtn.prop('disabled', true);
 
     try {
-        const users = await callApi('/api/admin/users', {
-            search: query,
-            page,
-            sortBy: AppState.adminUsers.currentSort
-        });
+        // เรียก API พร้อมส่ง page และ search query ไปด้วย
+        const users = await callApi('/api/admin/users', { search: query, page: page, sortBy: AppState.adminUsers.currentSort });
 
-        if (!isLoadMore) resultsContainer.empty();
+        if (!isLoadMore) resultsContainer.empty(); // ถ้าเป็นการโหลดครั้งแรก ให้ล้างข้อมูลเก่าทิ้ง
 
         if (users.length === 0 && !isLoadMore) {
             resultsContainer.html('<p class="text-center text-muted my-4">ไม่พบผู้ใช้งาน</p>');
@@ -1351,12 +1414,14 @@ async function fetchAdminUsers(page, query, isLoadMore = false) {
             return;
         }
 
-        renderUserListForAdmin(users, resultsContainer);
+        renderUserListForAdmin(users, resultsContainer); // เรียกใช้ฟังก์ชันแสดงผล
 
         if (users.length < 30) {
+            // ถ้าข้อมูลที่ได้กลับมาน้อยกว่า 30 แสดงว่าหมดแล้ว
             AppState.adminUsers.hasMore = false;
             loadMoreContainer.hide();
         } else {
+            // ถ้ายังมีข้อมูลอีก ก็ให้เพิ่มหมายเลขหน้าและแสดงปุ่ม "โหลดเพิ่มเติม"
             AppState.adminUsers.currentPage++;
             loadMoreContainer.show();
         }
@@ -1369,6 +1434,7 @@ async function fetchAdminUsers(page, query, isLoadMore = false) {
 }
 
 function renderUserListForAdmin(users, container) {
+    // เราจะไม่ .empty() ที่นี่แล้ว
     users.forEach(user => {
         const html = `
             <div class="card shadow-sm mb-2 user-card" style="cursor: pointer;" data-userid="${user.lineUserId}">
@@ -1387,7 +1453,8 @@ function renderUserListForAdmin(users, container) {
     });
 }
 
-// ---- Notification Functions ----
+// ---- START: Notification Functions ----
+
 async function checkUnreadNotifications() {
     try {
         const data = await callApi('/api/notifications/unread-count');
@@ -1410,10 +1477,14 @@ async function openNotificationCenter() {
     container.html('<div class="text-center my-5"><div class="spinner-border text-success"></div></div>');
 
     try {
+        // 1. ดึงข้อมูลแจ้งเตือนทั้งหมดมาแสดง
         const notifications = await callApi('/api/notifications');
         renderNotifications(notifications, container);
         
+        // 2. เมื่อเปิดดูแล้ว ให้ส่ง request ไปบอก Server ว่าเราอ่านแล้ว
         await callApi('/api/notifications/mark-read', {}, 'POST');
+        
+        // 3. ซ่อนจุดแดงบนไอคอนกระดิ่ง
         $('#notification-badge').hide();
 
     } catch (e) {
@@ -1430,6 +1501,7 @@ function renderNotifications(notifications, container) {
 
     const listGroup = $('<div class="list-group list-group-flush"></div>');
     notifications.forEach(notif => {
+        // ใส่ icon ตามประเภทของ notification
         let icon = 'fa-info-circle text-primary';
         if (notif.type === 'like') icon = 'fa-heart text-danger';
         if (notif.type === 'comment') icon = 'fa-comment text-info';
@@ -1453,30 +1525,15 @@ function renderNotifications(notifications, container) {
     });
     container.append(listGroup);
 }
+// ---- END: Notification Functions ----
 
 // ===============================================================
 //  UTILITY FUNCTIONS
 // ===============================================================
-function showLoading(title) { 
-    Swal.fire({ 
-        title: title, 
-        text: 'กรุณารอสักครู่', 
-        allowOutsideClick: false, 
-        didOpen: () => Swal.showLoading() 
-    }); 
-}
-function showSuccess(title) { 
-    Swal.fire({
-        icon: 'success',
-        title: 'สำเร็จ!',
-        text: title,
-        timer: 1500,
-        showConfirmButton: false
-    }); 
-}
+function showLoading(title) { Swal.fire({ title: title, text: 'กรุณารอสักครู่', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); }
+function showSuccess(title) { Swal.fire({icon: 'success', title: 'สำเร็จ!', text: title, timer: 1500, showConfirmButton: false}); }
 function showError(title) { Swal.fire('เกิดข้อผิดพลาด', title, 'error'); }
 function showWarning(title) { Swal.fire('คำเตือน', title, 'warning'); }
-
 function sanitizeHTML(str) {
     if (!str) return '';
     const temp = document.createElement('div');
