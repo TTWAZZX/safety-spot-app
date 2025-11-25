@@ -185,7 +185,7 @@ app.get('/api/user/profile', async (req, res) => {
     }
 
     const [rows] = await db.query(
-      'SELECT id, lineUserId, displayName, pictureUrl, points, totalScore, isAdmin FROM users WHERE lineUserId = ?',
+      'SELECT lineUserId AS id, lineUserId, displayName, pictureUrl, totalScore FROM users WHERE lineUserId = ?',
       [lineUserId]
     );
 
@@ -211,7 +211,7 @@ app.get('/api/user/profile', async (req, res) => {
 
 app.post('/api/user/register', async (req, res) => {
   try {
-    const { lineUserId, displayName, pictureUrl } = req.body;
+    const { lineUserId, displayName, pictureUrl, fullName, employeeId } = req.body;
 
     if (!lineUserId) {
       return res
@@ -228,8 +228,8 @@ app.post('/api/user/register', async (req, res) => {
     }
 
     const [result] = await db.query(
-      'INSERT INTO users (lineUserId, displayName, pictureUrl, points, totalScore, isAdmin) VALUES (?, ?, ?, ?, ?, ?)',
-      [lineUserId, displayName || null, pictureUrl || null, 0, 0, 0]
+      'INSERT INTO users (lineUserId, displayName, pictureUrl, fullName, employeeId, totalScore) VALUES (?, ?, ?, ?, ?, ?)',
+      [lineUserId, displayName || null, pictureUrl || null, fullName || null, employeeId || null, 0]
     );
 
     const newUser = {
@@ -301,13 +301,14 @@ app.get('/api/activities', async (req, res) => {
   try {
     const lineUserId = getRequesterLineUserId(req) || null;
 
-    const [activities] = await db.query(
-      `SELECT a.*,
+    const [activities] = await db.query(`
+        SELECT a.*,
               (SELECT COUNT(*) FROM submissions s 
-               WHERE s.activityId = a.id AND s.status = 'approved') AS submissionsCount
-       FROM activities a
-       ORDER BY a.createdAt DESC`
-    );
+                WHERE s.activityId = a.activityId AND s.status = 'approved') AS submissionsCount
+        FROM activities a
+        WHERE a.status = 'active'
+        ORDER BY a.createdAt DESC
+    `);
 
     let userId = null;
     if (lineUserId) {
@@ -401,8 +402,7 @@ app.get('/api/user/badges', async (req, res) => {
 // ======================= SUBMISSIONS =======================
 app.get('/api/submissions', async (req, res) => {
   try {
-    const { page = 1, pageSize = 12 } = req.query;
-    const offset = (page - 1) * pageSize;
+    const { activityId } = req.query;
     const lineUserId = getRequesterLineUserId(req);
 
     let userId = null;
@@ -416,21 +416,19 @@ app.get('/api/submissions', async (req, res) => {
       }
     }
 
-    const [submissions] = await db.query(
-      `SELECT s.*,
-              u.displayName AS userName,
-              u.pictureUrl AS userPicture,
-              a.title AS activityTitle,
-              (SELECT COUNT(*) FROM likes l WHERE l.submissionId = s.id) AS likesCount,
-              (SELECT COUNT(*) FROM comments c WHERE c.submissionId = s.id) AS commentsCount
-       FROM submissions s
-       JOIN users u ON s.userId = u.id
-       LEFT JOIN activities a ON s.activityId = a.id
-       WHERE s.status = 'approved'
-       ORDER BY s.createdAt DESC
-       LIMIT ? OFFSET ?`,
-      [Number(pageSize), Number(offset)]
-    );
+    let queryStr = `
+        SELECT s.*, u.displayName AS userName, u.pictureUrl AS userPicture, a.title AS activityTitle,
+              (SELECT COUNT(*) FROM likes l WHERE l.submissionId = s.submissionId) AS likesCount,
+              (SELECT COUNT(*) FROM comments c WHERE c.submissionId = s.submissionId) AS commentsCount
+        FROM submissions s
+        JOIN users u ON s.lineUserId = u.lineUserId
+        LEFT JOIN activities a ON s.activityId = a.activityId
+        WHERE s.status = 'approved' `;
+    if (activityId) {
+        queryStr += 'AND s.activityId = ' + db.escape(activityId) + ' ';
+    }
+    queryStr += 'ORDER BY s.createdAt DESC';
+    const [submissions] = await db.query(queryStr);
 
     let userLikes = [];
     let userBookmarks = [];
@@ -564,19 +562,13 @@ app.post('/api/submissions/like', async (req, res) => {
       [userId, submissionId]
     );
 
-    if (likeRows && likeRows.length > 0) {
-      await db.query(
-        'DELETE FROM likes WHERE userId = ? AND submissionId = ?',
-        [userId, submissionId]
-      );
-      res.json({ status: 'success', data: { liked: false } });
-    } else {
-      await db.query(
-        'INSERT INTO likes (userId, submissionId, createdAt) VALUES (?, ?, NOW())',
-        [userId, submissionId]
-      );
-      res.json({ status: 'success', data: { liked: true } });
-    }
+      if (likeRows && likeRows.length > 0) {
+          await db.query('DELETE FROM likes WHERE userId = ? AND submissionId = ?', [userId, submissionId]);
+      } else {
+          await db.query('INSERT INTO likes (userId, submissionId, createdAt) VALUES (?, ?, NOW())', [userId, submissionId]);
+      }
+      const [[{ count: newLikeCount }]] = await db.query('SELECT COUNT(*) AS count FROM likes WHERE submissionId = ?', [submissionId]);
+      res.json({ status: 'success', data: { liked: !(likeRows && likeRows.length > 0), newLikeCount } });
   } catch (error) {
     console.error('Error liking submission:', error);
     res
@@ -587,7 +579,7 @@ app.post('/api/submissions/like', async (req, res) => {
 
 app.post('/api/submissions/comment', async (req, res) => {
   try {
-    const { lineUserId, submissionId, comment } = req.body;
+    const { lineUserId, submissionId, commentText } = req.body;
 
     if (!lineUserId || !submissionId || !comment) {
       return res
@@ -605,8 +597,8 @@ app.post('/api/submissions/comment', async (req, res) => {
     const userId = userRows[0].id;
 
     await db.query(
-      'INSERT INTO comments (submissionId, userId, comment, createdAt) VALUES (?, ?, ?, NOW())',
-      [submissionId, userId, comment]
+      'INSERT INTO comments (submissionId, lineUserId, commentText, createdAt) VALUES (?, ?, ?, NOW())',
+      [submissionId, lineUserId, commentText]
     );
 
     res.json({ status: 'success', data: { message: 'Comment added' } });
@@ -893,6 +885,17 @@ app.post(
     return activity;
   })
 );
+
+app.post('/api/admin/activities/toggle', isAdmin, handleRequest(async (req) => {
+    const { activityId } = req.body;
+    if (!activityId) throw new Error('Missing activityId');
+    const [[activity]] = await db.query('SELECT * FROM activities WHERE activityId = ?', [activityId]);
+    if (!activity) throw new Error('Activity not found');
+    // สมมติใช้ฟิลด์ status (active/inactive):
+    const newStatus = (activity.status === 'active') ? 'inactive' : 'active';
+    await db.query('UPDATE activities SET status = ? WHERE activityId = ?', [newStatus, activityId]);
+    return { message: 'Activity status toggled' };
+}));
 
 app.put(
   '/api/admin/activities/:id',
