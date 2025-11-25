@@ -1069,6 +1069,57 @@ app.get('/api/admin/users', isAdmin, async (req, res) => {
     }
 });
 
+app.get('/api/admin/users', isAdmin, async (req, res) => {
+    const { search, sortBy } = req.query;
+
+    let sql = `
+        SELECT lineUserId, fullName, pictureUrl, employeeId, totalScore
+        FROM users
+        WHERE 1=1
+    `;
+
+    let params = [];
+
+    if (search) {
+        sql += ` AND (fullName LIKE ? OR employeeId LIKE ?)`;
+        params.push(`%${search}%`, `%${search}%`);
+    }
+
+    if (sortBy === 'score') {
+        sql += ` ORDER BY totalScore DESC`;
+    } else if (sortBy === 'name') {
+        sql += ` ORDER BY fullName ASC`;
+    } else {
+        sql += ` ORDER BY createdAt DESC`;
+    }
+
+    const [rows] = await db.query(sql, params);
+
+    res.json({ status: "success", data: rows });
+});
+
+app.get('/api/admin/user-details', isAdmin, async (req, res) => {
+    const { lineUserId } = req.query;
+
+    const [[user]] = await db.query(
+        `SELECT lineUserId, fullName, employeeId, pictureUrl, totalScore
+         FROM users
+         WHERE lineUserId = ?`,
+        [lineUserId]
+    );
+
+    if (!user) return res.status(404).json({ status: "error", message: "User not found" });
+
+    const [badges] = await db.query(
+        `SELECT b.badgeId, b.badgeName, b.imageUrl
+         FROM user_badges ub
+         JOIN badges b ON ub.badgeId = b.badgeId
+         WHERE ub.lineUserId = ?`,
+        [lineUserId]
+    );
+
+    res.json({ status: "success", data: { user, badges } });
+});
 
 // ======================================================
 // NOTIFICATIONS
