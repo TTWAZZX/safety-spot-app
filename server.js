@@ -290,6 +290,37 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 });
 
+// ================= USER BADGES (for profile page) =================
+app.get('/api/user/badges', async (req, res) => {
+    try {
+        const { lineUserId } = req.query;
+
+        // ดึงป้ายทั้งหมด
+        const [allBadges] = await db.query(
+            "SELECT badgeId, badgeName, description, imageUrl FROM badges ORDER BY badgeName ASC"
+        );
+
+        // ดึงป้ายที่ user ได้รับแล้ว
+        const [earned] = await db.query(
+            "SELECT badgeId FROM user_badges WHERE lineUserId = ?",
+            [lineUserId]
+        );
+
+        const earnedSet = new Set(earned.map(b => b.badgeId));
+
+        const result = allBadges.map(b => ({
+            ...b,
+            isEarned: earnedSet.has(b.badgeId)
+        }));
+
+        res.json({ status: "success", data: result });
+
+    } catch (err) {
+        console.error("GET /api/user/badges ERROR:", err);
+        res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
 // ======================================================
 // PART 3 — SUBMISSIONS / LIKE / COMMENT
 // ======================================================
