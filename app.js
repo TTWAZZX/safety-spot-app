@@ -763,6 +763,34 @@ function bindAdminTabEventListeners() {
     });
 }
 
+// แสดงรายชื่อผู้ใช้สำหรับมอบป้ายรางวัล
+function renderUserListForBadge(users) {
+    const listEl = $("#badge-user-list");
+    listEl.empty();
+
+    if (!users || users.length === 0) {
+        listEl.append(`<p class="text-center text-red-500">ไม่พบผู้ใช้</p>`);
+        return;
+    }
+
+    users.forEach(u => {
+        listEl.append(`
+            <div class="user-item flex justify-between items-center py-3 border-b cursor-pointer"
+                 onclick="viewUserBadgeDetail('${u.lineUserId}')">
+                <div>
+                    <div class="font-bold">${u.fullName || '-'}</div>
+                    <div class="text-sm text-gray-600">รหัส: ${u.employeeId || '-'}</div>
+                    <div class="text-sm text-yellow-600">คะแนน: ${u.totalPoints || 0}</div>
+                </div>
+                <div>
+                    <i class="fa-solid fa-chevron-right"></i>
+                </div>
+            </div>
+        `);
+    });
+}
+
+
 // ===============================================================
 //  EVENT HANDLER FUNCTIONS
 // ===============================================================
