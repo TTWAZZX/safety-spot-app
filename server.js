@@ -322,6 +322,35 @@ app.get('/api/user/badges', async (req, res) => {
 });
 
 // ======================================================
+// USER BADGES (frontend ต้องใช้ endpoint นี้)
+// ======================================================
+app.get('/api/user/badges', async (req, res) => {
+    const { lineUserId } = req.query;
+
+    const [allBadges] = await db.query(
+        "SELECT badgeId, badgeName, description, imageUrl FROM badges"
+    );
+
+    const [earned] = await db.query(
+        "SELECT badgeId FROM user_badges WHERE lineUserId = ?",
+        [lineUserId]
+    );
+
+    const earnedSet = new Set(earned.map(x => x.badgeId));
+
+    const result = allBadges.map(b => ({
+        id: b.badgeId,
+        name: b.badgeName,
+        desc: b.description,
+        img: b.imageUrl,
+        isEarned: earnedSet.has(b.badgeId)
+    }));
+
+    res.json({ status: "success", data: result });
+});
+
+
+// ======================================================
 // PART 3 — SUBMISSIONS / LIKE / COMMENT
 // ======================================================
 
@@ -1008,6 +1037,40 @@ app.post('/api/admin/revoke-badge', isAdmin, async (req, res) => {
 });
 
 // ======================================================
+// ADMIN: Users list for admin panel
+// ======================================================
+app.get('/api/admin/users', isAdmin, async (req, res) => {
+    try {
+        const search = req.query.search || "";
+        const sort = req.query.sort || "score"; // default frontend requires
+        const order = sort === "name" ? "fullName ASC" : "totalScore DESC";
+
+        let sql = `
+            SELECT lineUserId, fullName, employeeId, pictureUrl, totalScore
+            FROM users
+        `;
+
+        const params = [];
+
+        if (search) {
+            sql += " WHERE fullName LIKE ? OR employeeId LIKE ? ";
+            params.push(`%${search}%`, `%${search}%`);
+        }
+
+        sql += ` ORDER BY ${order}`;
+
+        const [rows] = await db.query(sql, params);
+
+        res.json({ status: "success", data: rows });
+
+    } catch (err) {
+        console.error("ADMIN /users ERROR:", err);
+        res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+
+// ======================================================
 // NOTIFICATIONS
 // ======================================================
 app.get('/api/notifications', async (req, res) => {
@@ -1028,8 +1091,10 @@ app.get('/api/notifications/unread-count', async (req, res) => {
         "SELECT COUNT(*) AS count FROM notifications WHERE recipientUserId = ? AND isRead = FALSE",
         [requesterId]
     );
-
-    res.json({ status: "success", data: rows[0] });
+    res.json({
+      status: "success",
+      data: { unreadCount: rows[0].count }
+    });
 });
 
 app.post('/api/notifications/mark-read', async (req, res) => {
