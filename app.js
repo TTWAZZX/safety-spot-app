@@ -1516,21 +1516,12 @@ async function fetchAdminUsers(page, query, isLoadMore = false) {
 }
 
 function renderUserListForAdmin(users, container) {
-    // เราจะไม่ .empty() ที่นี่แล้ว
     users.forEach(user => {
-
-        // --- คำนวณจำนวนป้ายแบบรองรับหลายชื่อ field ---
-        let badgeCount =
-            user.badgeCount ??
-            user.badge_count ??
-            user.totalBadges ??
-            user.total_badges ??
-            (Array.isArray(user.badges) ? user.badges.length : 0);
-
-        // ถ้าเป็น NaN หรือค่าประหลาด ๆ ให้รีเซ็ตเป็น 0
-        if (typeof badgeCount !== 'number' || isNaN(badgeCount)) {
-            badgeCount = 0;
-        }
+        // พยายามดึงจำนวนป้ายจากหลาย ๆ ฟิลด์ เผื่อ backend ใช้ชื่อไม่ตรงกัน
+        const badgeCount =
+            typeof user.badgeCount === 'number' ? user.badgeCount :
+            typeof user.badgesCount === 'number' ? user.badgesCount :
+            Array.isArray(user.badges) ? user.badges.length : 0;
 
         const html = `
             <div class="card shadow-sm mb-2 user-card" style="cursor: pointer;" data-userid="${user.lineUserId}">
@@ -1553,6 +1544,7 @@ function renderUserListForAdmin(users, container) {
         container.append(html);
     });
 }
+
 
 // ---- START: Notification Functions ----
 
