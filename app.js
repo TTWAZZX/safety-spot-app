@@ -1516,17 +1516,21 @@ async function fetchAdminUsers(page, query, isLoadMore = false) {
 }
 
 function renderUserListForAdmin(users, container) {
+    // เราจะไม่ .empty() ที่นี่แล้ว
     users.forEach(user => {
-        // ป้องกัน undefined / null ต่าง ๆ
-        const employeeId = sanitizeHTML(user.employeeId || '-');
-        const fullName = sanitizeHTML(user.fullName || '-');
-        const totalScore = typeof user.totalScore === 'number' ? user.totalScore : 0;
 
-        // ดึงจำนวนป้ายรางวัลให้ฉลาดขึ้น ถ้าไม่มีให้เป็น 0
-        const badgeCount =
-            typeof user.badgeCount === 'number' ? user.badgeCount :
-            typeof user.totalBadges === 'number' ? user.totalBadges :
+        // --- คำนวณจำนวนป้ายแบบรองรับหลายชื่อ field ---
+        let badgeCount =
+            user.badgeCount ??
+            user.badge_count ??
+            user.totalBadges ??
+            user.total_badges ??
             (Array.isArray(user.badges) ? user.badges.length : 0);
+
+        // ถ้าเป็น NaN หรือค่าประหลาด ๆ ให้รีเซ็ตเป็น 0
+        if (typeof badgeCount !== 'number' || isNaN(badgeCount)) {
+            badgeCount = 0;
+        }
 
         const html = `
             <div class="card shadow-sm mb-2 user-card" style="cursor: pointer;" data-userid="${user.lineUserId}">
@@ -1535,10 +1539,10 @@ function renderUserListForAdmin(users, container) {
                         <img src="${getFullImageUrl(user.pictureUrl) || 'https://placehold.co/45x45'}"
                              class="rounded-circle me-3" width="45" height="45" alt="Profile">
                         <div class="flex-grow-1">
-                            <h6 class="fw-bold mb-0">${fullName}</h6>
+                            <h6 class="fw-bold mb-0">${sanitizeHTML(user.fullName)}</h6>
                             <small class="text-muted">
-                                รหัส: ${employeeId}
-                                | คะแนน: ${totalScore}
+                                รหัส: ${sanitizeHTML(user.employeeId)}
+                                | คะแนน: ${user.totalScore}
                                 | <i class="fas fa-certificate text-warning"></i> ${badgeCount} ป้าย
                             </small>
                         </div>
