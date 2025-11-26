@@ -1591,6 +1591,51 @@ function renderUserListForAdmin(users, container) {
         container.append(html);
     });
 }
+// =============================
+// ADMIN: ปรับคะแนนผู้ใช้
+// =============================
+$('#adminApplyScoreBtn').on('click', async function () {
+
+    if (!adminSelectedUserId) {
+        alert("ไม่พบ user ที่เลือก");
+        return;
+    }
+
+    const amount = parseInt($('#adminScoreAmount').val(), 10);
+    const action = $('#adminScoreAction').val(); // 'add' หรือ 'subtract'
+
+    if (isNaN(amount)) {
+        alert("กรุณากรอกจำนวนคะแนน");
+        return;
+    }
+
+    const finalAmount = action === 'subtract' ? -Math.abs(amount) : Math.abs(amount);
+
+    try {
+        const res = await fetch(API_BASE + "/api/admin/users/update-score", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                requesterId: currentLineUserId,
+                targetUserId: adminSelectedUserId,
+                amount: finalAmount
+            })
+        });
+
+        const json = await res.json();
+        if (json.status !== "success") {
+            alert("เกิดข้อผิดพลาด: " + json.message);
+            return;
+        }
+
+        alert("อัปเดตคะแนนเรียบร้อย!");
+        loadAdminUserDetails(adminSelectedUserId);
+
+    } catch (err) {
+        console.error(err);
+        alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+    }
+});
 
 
 // ---- START: Notification Functions ----
