@@ -1222,6 +1222,81 @@ app.get('/api/admin/user-details', isAdmin, async (req, res) => {
     res.json({ status: "success", data: { user, badges } });
 });
 
+// =======================
+// ADMIN: update user score (+ / -) แล้วให้ backend ปรับป้าย auto ให้ด้วย
+// =======================
+$('#adminApplyScoreBtn').on('click', function () {
+  if (!adminSelectedUserId) {
+    alert('ไม่พบข้อมูลผู้ใช้ในหน้าต่างนี้');
+    return;
+  }
+
+  const raw = $('#adminScoreDeltaInput').val();
+  const delta = parseInt(raw, 10);
+
+  if (!raw || isNaN(delta) || delta <= 0) {
+    alert('กรุณากรอกจำนวนคะแนนที่มากกว่า 0');
+    return;
+  }
+
+  const mode = $('input[name="adminScoreMode"]:checked').val();
+  let deltaScore = delta;
+  if (mode === 'sub') {
+    deltaScore = -delta;
+  }
+
+  // ป้องกันกดซ้ำ
+  const $btn = $('#adminApplyScoreBtn');
+  $btn.prop('disabled', true).text('กำลังบันทึก...');
+
+  fetch(API_BASE + '/api/admin/users/update-score', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requesterId: currentLineUserId,    // ⭐ LINE ID แอดมิน
+      lineUserId: adminSelectedUserId,   // ⭐ คนที่กำลังปรับคะแนน
+      deltaScore: deltaScore             // บวกหรือลบตาม mode
+    })
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (res.status !== 'success') {
+        alert('อัปเดตคะแนนไม่สำเร็จ: ' + (res.message || 'ไม่ทราบสาเหตุ'));
+        return;
+      }
+
+      // หลังอัปเดตคะแนน ขอข้อมูล user ล่าสุดมาอัปเดตใน modal อีกรอบ
+      return fetch(API_BASE + '/api/admin/user-details?requesterId=' + currentLineUserId + '&lineUserId=' + adminSelectedUserId)
+        .then(r => r.json())
+        .then(detail => {
+          if (detail.status === 'success') {
+            const user = detail.data.user;
+            const badges = detail.data.badges;
+
+            // อัปเดตคะแนนปัจจุบันใน UI
+            $('#adminUserCurrentScore').text(user.totalScore);
+
+            // เรนเดอร์ป้ายใหม่ (เผื่อป้ายเปลี่ยนตามคะแนน)
+            renderUserBadgesInModal(badges);
+          }
+
+          // เคลียร์ช่องอินพุต + รีเซ็ตเป็นโหมด "เพิ่มคะแนน"
+          $('#adminScoreDeltaInput').val('');
+          $('input[name="adminScoreMode"][value="add"]').prop('checked', true);
+
+          alert('อัปเดตคะแนนเรียบร้อย');
+        });
+    })
+    .catch(err => {
+      console.error(err);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    })
+    .finally(() => {
+      $btn.prop('disabled', false).text('บันทึกคะแนน');
+    });
+});
+
+
 // ======================================================
 // NOTIFICATIONS
 // ======================================================

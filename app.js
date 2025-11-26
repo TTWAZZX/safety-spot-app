@@ -3,6 +3,8 @@
 // ===============================================================
 const API_BASE_URL = "https://shesafety-spot-appbackend.onrender.com";
 const LIFF_ID = "2007053300-9xLKdwZp";
+// ตัวแปร global ฝั่ง frontend
+let adminSelectedUserId = null;   // เก็บ lineUserId ของ user ที่เปิด modal อยู่ตอนนี้
 
 // Global variables
 const AppState = {
