@@ -101,13 +101,9 @@ async function showMainApp(userData) {
         // ---------------------------
         if (userData && userData.isAdmin) {
             $('#admin-nav-item').show();
-            bindAdminEventListeners();   // ฟังก์ชันจัดการ event ฝั่ง admin
+            bindAdminEventListeners();
         } else {
             $('#admin-nav-item').hide();
-            
-            // ซ่อนกล่องจัดการคะแนนผู้ใช้ (สำคัญมาก!!)
-            document.querySelectorAll('.score-update-box')
-                .forEach(el => el.style.display = 'none');
         }
 
         // โหลดกิจกรรม
@@ -718,6 +714,50 @@ function bindAdminEventListeners() {
     // ===== END: Event Listeners for Idea 3 =====
 }
 
+// เปิด modal ปรับคะแนน
+$('#manage-user-score-btn').on('click', function () {
+    AppState.allModals['update-score'].show();
+});
+
+// กดค้นหาผู้ใช้
+$('#score-user-search').on('input', async function () {
+    const q = $(this).val();
+    if (!q) return;
+
+    const users = await callApi('/api/admin/user-search', { q });
+    let html = '';
+    users.forEach(u => {
+        html += `
+            <div class="p-2 border rounded mb-2 user-item" data-id="${u.lineUserId}">
+                ${u.fullName} (${u.employeeId})
+            </div>`;
+    });
+
+    $('#score-user-result').html(html);
+});
+
+// เลือก user
+$(document).on('click', '.user-item', function () {
+    $('.user-item').removeClass('selected');
+    $(this).addClass('selected');
+    adminSelectedUserId = $(this).data('id');
+});
+
+// กดปรับคะแนน
+$('#btn-update-score').on('click', async function () {
+    if (!adminSelectedUserId) return alert("เลือกผู้ใช้ก่อน");
+    let amount = parseInt($('#score-amount').val());
+    if (!amount) return alert("ใส่จำนวนคะแนน");
+
+    await callApi('/api/admin/update-score', {
+        targetUserId: adminSelectedUserId,
+        amount
+    }, 'POST');
+
+    alert('อัปเดตคะแนนสำเร็จ');
+    AppState.allModals['update-score'].hide();
+});
+
 // ใช้ตอนแอดมินเปิดดูผู้ใช้คนหนึ่ง
 function showAdminScoreBox(score) {
     $("#adminUserCurrentScore").text(score);
@@ -1291,8 +1331,10 @@ async function handleViewUserDetails(lineUserId) {
     const modal = AppState.allModals['user-details'];
     if (!modal) return;
 
-    // ⭐ SET ตัวแปร global สำหรับใช้ตอนอัปเดตคะแนนผู้ใช้
+    // ⭐ ตั้งค่าผู้ใช้ที่เลือกไว้สำหรับปรับคะแนน
     adminSelectedUserId = lineUserId;
+
+    $("#admin-score-box").hide(); // ซ่อนไว้ก่อน
 
     $('#user-details-badges-container').html(
         '<div class="text-center"><div class="spinner-border"></div></div>'
@@ -1300,28 +1342,29 @@ async function handleViewUserDetails(lineUserId) {
     modal.show();
 
     try {
-        // 1) ดึง user + badges
+        // 1) โหลดข้อมูล user + badges
         const userData = await callApi('/api/admin/user-details', { lineUserId });
         const user = userData.user;
         const earnedBadges = Array.isArray(userData.badges) ? userData.badges : [];
 
-        // 2) ดึง badge ทั้งหมด
+        // 2) โหลด badge ทั้งหมด
         const allBadges = await callApi('/api/admin/badges');
 
-        $('#user-details-pic').attr('src', getFullImageUrl(user.pictureUrl));
-        $('#user-details-name').text(user.fullName);
-        $('#user-details-info').text(`รหัส: ${user.employeeId}`);
+        // 3) แสดงข้อมูลผู้ใช้
+        $("#detailUserName").text(user.fullName);
+        $("#detailUserEmployeeId").text(user.employeeId);
+        $("#detailUserScore").text(user.totalScore);
+        $("#detailUserPicture").attr("src", user.pictureUrl || "https://placehold.co/60x60");
 
-        // ⭐ อัปเดตคะแนนปัจจุบันบน UI
-        showAdminScoreBox(user.totalScore);
+        // ⭐⭐ แสดง admin-score-box เฉพาะแอดมิน ⭐⭐
+        if (AppState.currentUser && AppState.currentUser.isAdmin) {
+            $("#admin-score-box").show();
+            $("#adminUserCurrentScore").text(user.totalScore);
+        }
 
+        // 4) แสดง badge
         const badgesContainer = $('#user-details-badges-container');
         badgesContainer.empty();
-
-        if (!allBadges || allBadges.length === 0) {
-            badgesContainer.html('<p class="text-center text-muted">ยังไม่มีป้ายรางวัล</p>');
-            return;
-        }
 
         const earnedIds = new Set(earnedBadges.map(b => b.badgeId));
 
@@ -1337,18 +1380,17 @@ async function handleViewUserDetails(lineUserId) {
                         <i class="fas ${isEarned ? 'fa-times' : 'fa-check'} me-1"></i>
                         ${isEarned ? 'เพิกถอน' : 'มอบรางวัล'}
                     </button>
-                </div>
-            `;
+                </div>`;
         }).join('');
 
         badgesContainer.html(badgesHtml);
+
     } catch (e) {
         console.error('handleViewUserDetails error:', e);
         showError(e.message || 'ไม่สามารถโหลดข้อมูลได้');
         $('#user-details-badges-container').html('<p class="text-danger">ไม่สามารถโหลดข้อมูลได้</p>');
     }
 }
-
 
 async function handleToggleBadge() {
     const btn = $(this);
@@ -1665,51 +1707,51 @@ function renderUserListForAdmin(users, container) {
     });
 }
 // =============================
-// ADMIN: ปรับคะแนนผู้ใช้
+// ADMIN: ปรับคะแนนผู้ใช้ (เวอร์ชันสมบูรณ์)
 // =============================
-$('#adminApplyScoreBtn').on('click', async function () {
-
+$(document).on("click", "#adminApplyScoreBtn", async function () {
     if (!adminSelectedUserId) {
-        alert("ไม่พบ user ที่เลือก");
-        return;
+        return Swal.fire("ไม่พบผู้ใช้ที่เลือก", "", "warning");
     }
 
-    const amount = parseInt($('#adminScoreAmount').val(), 10);
-    const action = $('#adminScoreAction').val(); // 'add' หรือ 'subtract'
+    const delta = Number($("#adminScoreDeltaInput").val());
+    const mode = $("input[name='adminScoreMode']:checked").val(); // add / sub
 
-    if (isNaN(amount)) {
-        alert("กรุณากรอกจำนวนคะแนน");
-        return;
+    if (!delta || delta <= 0) {
+        return Swal.fire("กรุณากรอกจำนวนคะแนนให้ถูกต้อง", "", "warning");
     }
 
-    const finalAmount = action === 'subtract' ? -Math.abs(amount) : Math.abs(amount);
+    const deltaScore = mode === "sub" ? -Math.abs(delta) : Math.abs(delta);
+
+    const applyBtnText = $("#adminScoreBtnText");
+    const loadingIcon = $("#adminScoreBtnLoading");
+    applyBtnText.addClass("d-none");
+    loadingIcon.removeClass("d-none");
 
     try {
-        const res = await fetch(API_BASE + "/api/admin/users/update-score", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                requesterId: currentLineUserId,
-                targetUserId: adminSelectedUserId,
-                amount: finalAmount
-            })
+        const result = await callApi('/api/admin/update-score', {
+            lineUserId: adminSelectedUserId,
+            deltaScore: deltaScore
+        }, 'POST');
+
+        // อัปเดตคะแนนบน UI
+        $("#adminUserCurrentScore").text(result.newScore);
+
+        Swal.fire({
+            icon: "success",
+            title: "อัปเดตคะแนนสำเร็จ!",
+            timer: 1500,
+            showConfirmButton: false
         });
 
-        const json = await res.json();
-        if (json.status !== "success") {
-            alert("เกิดข้อผิดพลาด: " + json.message);
-            return;
-        }
-
-        alert("อัปเดตคะแนนเรียบร้อย!");
-        loadAdminUserDetails(adminSelectedUserId);
-
     } catch (err) {
-        console.error(err);
-        alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+        Swal.fire("เกิดข้อผิดพลาด", err.message, "error");
+        console.error("Score update failed:", err);
     }
-});
 
+    applyBtnText.removeClass("d-none");
+    loadingIcon.addClass("d-none");
+});
 
 // ---- START: Notification Functions ----
 

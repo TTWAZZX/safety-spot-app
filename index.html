@@ -321,61 +321,72 @@
 
     <div class="modal fade" id="user-details-modal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="user-details-modal-title">จัดการป้ายรางวัล</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-content p-3">
+
+                <!-- Header -->
+                <div class="text-center mb-3">
+                    <img id="detailUserPicture" src="https://placehold.co/60x60"
+                    class="rounded-circle mb-2" width="60" height="60">
+                    <h5 id="detailUserName" class="fw-bold mb-0">...</h5>
+                    <small id="detailUserEmployeeId" class="text-muted">...</small>
                 </div>
-                <div class="modal-body">
-                    <div class="text-center mb-3">
-                        <img id="user-details-pic" src="https://placehold.co/60x60" class="rounded-circle mb-2" width="60" height="60">
-                        <h5 id="user-details-name" class="fw-bold mb-0">...</h5>
-                        <small id="user-details-info" class="text-muted">...</small>
-                    </div>
-                    <hr class="mt-4">
 
-                    <!-- จัดการคะแนนผู้ใช้ -->
-                    <div id="admin-score-box" class="mt-4" style="display:none;">
-                        <h6 class="fw-bold mb-3">
-                            <i class="fas fa-star text-warning me-2"></i>จัดการคะแนนผู้ใช้
-                        </h6>
-
-                        <div class="mb-2">
-                            คะแนนปัจจุบัน:
-                            <span id="adminUserCurrentScore"
-                                class="fw-bold text-primary">0</span>
-                            คะแนน
-                        </div>
-
-                        <div class="btn-group w-100 mb-3" role="group">
-                            <input type="radio" class="btn-check" name="adminScoreMode" id="modeAdd" value="add" checked>
-                            <label class="btn btn-outline-success" for="modeAdd"><i class="fas fa-plus"></i> เพิ่มคะแนน</label>
-
-                            <input type="radio" class="btn-check" name="adminScoreMode" id="modeSub" value="sub">
-                            <label class="btn btn-outline-danger" for="modeSub"><i class="fas fa-minus"></i> หักคะแนน</label>
-                        </div>
-
-                        <div class="input-group mb-3">
-                            <input type="number" id="adminScoreDeltaInput" class="form-control"
-                                placeholder="จำนวนคะแนน" min="1">
-                            <button id="adminApplyScoreBtn" class="btn btn-primary">
-                                <span id="adminScoreBtnText">บันทึกคะแนน</span>
-                                <span id="adminScoreBtnLoading" class="spinner-border spinner-border-sm d-none"></span>
-                            </button>
-                        </div>
-
-                        <small class="text-muted">
-                            ระบบจะปรับป้ายรางวัลตามคะแนนล่าสุดให้อัตโนมัติ
-                        </small>
-                    </div>
-                    </div>
-                    <div id="user-details-badges-container">
-                        <div class="text-center"><div class="spinner-border"></div></div>
-                    </div>
+                <div class="mb-3">
+                    คะแนนสะสมปัจจุบัน:
+                    <span id="detailUserScore" class="fw-bold text-success">0</span> คะแนน
                 </div>
+
+                <hr>
+
+                <!-- ADMIN SCORE BOX -->
+                <div id="admin-score-box" class="mt-4" style="display:none;">
+
+                    <h6 class="fw-bold mb-3">
+                    <i class="fas fa-star text-warning me-2"></i>
+                    จัดการคะแนนผู้ใช้
+                    </h6>
+
+                    <div class="mb-2">
+                    คะแนนปัจจุบัน:
+                    <span id="adminUserCurrentScore" class="fw-bold text-primary">0</span> คะแนน
+                    </div>
+
+                    <div class="btn-group w-100 mb-3" role="group">
+                    <input type="radio" class="btn-check" name="adminScoreMode" id="modeAdd" value="add" checked>
+                    <label class="btn btn-outline-success" for="modeAdd">
+                        <i class="fas fa-plus"></i> เพิ่มคะแนน
+                    </label>
+
+                    <input type="radio" class="btn-check" name="adminScoreMode" id="modeSub" value="sub">
+                    <label class="btn btn-outline-danger" for="modeSub">
+                        <i class="fas fa-minus"></i> หักคะแนน
+                    </label>
+                    </div>
+
+                    <div class="input-group mb-3">
+                    <input type="number" id="adminScoreDeltaInput" class="form-control"
+                        placeholder="จำนวนคะแนน" min="1">
+
+                    <button id="adminApplyScoreBtn" class="btn btn-primary">
+                        <span id="adminScoreBtnText">บันทึกคะแนน</span>
+                        <span id="adminScoreBtnLoading" class="spinner-border spinner-border-sm d-none"></span>
+                    </button>
+                    </div>
+
+                    <small class="text-muted">
+                    ระบบจะปรับป้ายรางวัลตามคะแนนล่าสุดให้อัตโนมัติ
+                    </small>
+                </div>
+
+                <!-- USER BADGES -->
+                <div id="user-details-badges-container" class="mt-4">
+                    <div class="text-center"><div class="spinner-border"></div></div>
+                </div>
+
             </div>
         </div>
     </div>
+
     <div class="modal fade" id="notification-modal" tabindex="-1">
     <div class="modal-dialog modal-fullscreen">
         <div class="modal-content">
