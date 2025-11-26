@@ -39,6 +39,47 @@ app.use(cors({
 app.use(express.json());
 
 // -----------------------------
+//   Helper for MySQL style API
+// -----------------------------
+const handleRequest = (handler) => async (req, res) => {
+    try {
+        const [data] = await handler(req, res);
+        res.json({ status: "success", data: data || null });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
+};
+
+// -----------------------------
+//   Auto award badges by score
+// -----------------------------
+async function autoAwardBadgesForUser(lineUserId, connOptional) {
+    // ถ้าเรียกจาก transaction ให้ส่ง conn เข้ามา
+    // ถ้าไม่ส่งมา ใช้ db ปกติ (pool)
+    const conn = connOptional || db;
+
+    await conn.query(
+        `
+        INSERT INTO user_badges (lineUserId, badgeId, earnedAt)
+        SELECT 
+            u.lineUserId,
+            b.badgeId,
+            NOW()
+        FROM users u
+        JOIN badges b
+          ON b.minScore IS NOT NULL          -- เอาเฉพาะป้าย auto
+         AND u.totalScore >= b.minScore      -- คะแนนถึง
+        LEFT JOIN user_badges ub
+          ON ub.lineUserId = u.lineUserId
+         AND ub.badgeId   = b.badgeId        -- ถ้ามีป้ายนี้แล้วจะเจอใน ub
+        WHERE u.lineUserId = ?
+          AND ub.badgeId IS NULL;            -- แทรกเฉพาะป้ายที่ยังไม่มี
+        `,
+        [lineUserId]
+    );
+}
+
+// -----------------------------
 //   LOCAL STATIC FOLDER
 // -----------------------------
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -89,18 +130,6 @@ async function uploadToR2(buffer, mime = "image/jpeg") {
 
     return `${R2_PUBLIC_BASE_URL}/${key}`;
 }
-
-// -----------------------------
-//   Helper for MySQL style API
-// -----------------------------
-const handleRequest = (handler) => async (req, res) => {
-    try {
-        const [data] = await handler(req, res);
-        res.json({ status: "success", data: data || null });
-    } catch (err) {
-        res.status(500).json({ status: "error", message: err.message });
-    }
-};
 
 // -----------------------------
 //   Admin Checker
@@ -780,6 +809,7 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
     try {
         await conn.beginTransaction();
 
+        // หาว่ารายงานนี้เป็นของใคร
         const [sub] = await conn.query(
             "SELECT lineUserId FROM submissions WHERE submissionId = ?",
             [submissionId]
@@ -788,16 +818,19 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
 
         const ownerId = sub[0].lineUserId;
 
+        // อัปเดตสถานะ + ให้คะแนนในตาราง submissions
         await conn.query(
             "UPDATE submissions SET status = 'approved', points = ? WHERE submissionId = ?",
             [score, submissionId]
         );
 
+        // เพิ่มคะแนนให้ user
         await conn.query(
             "UPDATE users SET totalScore = totalScore + ? WHERE lineUserId = ?",
             [score, ownerId]
         );
 
+        // แจ้งเตือน
         await conn.query(`
             INSERT INTO notifications 
             (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
@@ -810,15 +843,20 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
             requesterId
         ]);
 
+        // 🔥 เรียก autoAwardBadgesForUser ภายใต้ transaction เดียวกัน
+        await autoAwardBadgesForUser(ownerId, conn);
+
         await conn.commit();
         res.json({ status: "success", data: { message: "Approved." } });
     } catch (err) {
         await conn.rollback();
+        console.error("/api/admin/submissions/approve error:", err);
         res.status(500).json({ status: "error", message: err.message });
     } finally {
         conn.release();
     }
 });
+
 
 // ======================================================
 // ADMIN: Reject Submission
@@ -1030,6 +1068,47 @@ app.post('/api/admin/revoke-badge', isAdmin, async (req, res) => {
 
     res.json({ status: "success", data: { revoked: true } });
 });
+
+// ======================================================
+// ADMIN: Recalculate auto badges for all users
+// ======================================================
+app.post('/api/admin/recalculate-badges', isAdmin, async (req, res) => {
+    const conn = await db.getClient();
+    try {
+        await conn.beginTransaction();
+
+        // 1) ลบป้ายที่เป็นแบบ auto ทั้งหมด (minScore ไม่ใช่ NULL)
+        await conn.query(`
+            DELETE ub
+            FROM user_badges ub
+            JOIN badges b ON ub.badgeId = b.badgeId
+            WHERE b.minScore IS NOT NULL
+        `);
+
+        // 2) ดึงรายชื่อ user ทั้งหมด
+        const [users] = await conn.query(
+            "SELECT lineUserId FROM users"
+        );
+
+        // 3) วนให้ป้ายใหม่ตามคะแนนปัจจุบัน
+        for (const u of users) {
+            await autoAwardBadgesForUser(u.lineUserId, conn);
+        }
+
+        await conn.commit();
+        res.json({
+            status: "success",
+            data: { recalculated: true, userCount: users.length }
+        });
+    } catch (err) {
+        await conn.rollback();
+        console.error("/api/admin/recalculate-badges error:", err);
+        res.status(500).json({ status: "error", message: err.message });
+    } finally {
+        conn.release();
+    }
+});
+
 
 // ======================================================
 // ADMIN: Users list for admin panel
