@@ -51,13 +51,30 @@ const handleRequest = (handler) => async (req, res) => {
 };
 
 // -----------------------------
-//   Auto award badges by score
+//   Auto award badges by score (ADD + REMOVE)
 // -----------------------------
 async function autoAwardBadgesForUser(lineUserId, connOptional) {
-    // ถ้าเรียกจาก transaction ให้ส่ง conn เข้ามา
+    // ถ้ามีส่ง connection จาก transaction เข้ามาให้ใช้ตัวนั้น
     // ถ้าไม่ส่งมา ใช้ db ปกติ (pool)
     const conn = connOptional || db;
 
+    // 1) ลบป้าย auto ที่คะแนน "ไม่ถึงเกณฑ์แล้ว"
+    //    - ป้าย auto: badges.minScore IS NOT NULL
+    //    - ผู้ใช้คะแนนปัจจุบัน < minScore  ⇒ ต้องถูกลบออก
+    await conn.query(
+        `
+        DELETE ub
+        FROM user_badges ub
+        JOIN badges b ON ub.badgeId = b.badgeId
+        JOIN users u  ON ub.lineUserId = u.lineUserId
+        WHERE ub.lineUserId = ?
+          AND b.minScore IS NOT NULL
+          AND u.totalScore < b.minScore
+        `,
+        [lineUserId]
+    );
+
+    // 2) เพิ่มป้าย auto ที่คะแนนถึงเกณฑ์ แต่ยังไม่มีใน user_badges
     await conn.query(
         `
         INSERT INTO user_badges (lineUserId, badgeId, earnedAt)
@@ -67,17 +84,18 @@ async function autoAwardBadgesForUser(lineUserId, connOptional) {
             NOW()
         FROM users u
         JOIN badges b
-          ON b.minScore IS NOT NULL          -- เอาเฉพาะป้าย auto
-         AND u.totalScore >= b.minScore      -- คะแนนถึง
+          ON b.minScore IS NOT NULL          -- เฉพาะป้าย auto
+         AND u.totalScore >= b.minScore      -- คะแนนถึงเกณฑ์
         LEFT JOIN user_badges ub
           ON ub.lineUserId = u.lineUserId
-         AND ub.badgeId   = b.badgeId        -- ถ้ามีป้ายนี้แล้วจะเจอใน ub
+         AND ub.badgeId   = b.badgeId        -- ถ้ามีป้ายนี้อยู่แล้วจะเจอใน ub
         WHERE u.lineUserId = ?
           AND ub.badgeId IS NULL;            -- แทรกเฉพาะป้ายที่ยังไม่มี
         `,
         [lineUserId]
     );
 }
+
 
 // -----------------------------
 //   LOCAL STATIC FOLDER
@@ -1077,20 +1095,12 @@ app.post('/api/admin/recalculate-badges', isAdmin, async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // 1) ลบป้ายที่เป็นแบบ auto ทั้งหมด (minScore ไม่ใช่ NULL)
-        await conn.query(`
-            DELETE ub
-            FROM user_badges ub
-            JOIN badges b ON ub.badgeId = b.badgeId
-            WHERE b.minScore IS NOT NULL
-        `);
-
-        // 2) ดึงรายชื่อ user ทั้งหมด
+        // ดึง user ทั้งหมด
         const [users] = await conn.query(
             "SELECT lineUserId FROM users"
         );
 
-        // 3) วนให้ป้ายใหม่ตามคะแนนปัจจุบัน
+        // วนทุกคนแล้วให้ autoAwardBadgesForUser จัดการให้
         for (const u of users) {
             await autoAwardBadgesForUser(u.lineUserId, conn);
         }
@@ -1109,6 +1119,55 @@ app.post('/api/admin/recalculate-badges', isAdmin, async (req, res) => {
     }
 });
 
+// ======================================================
+// ADMIN: Update user score (add / subtract) + recalc badges
+// ======================================================
+app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
+    const { lineUserId, deltaScore } = req.body;
+
+    // ตรวจค่าพื้นฐาน
+    if (!lineUserId || typeof deltaScore !== 'number' || isNaN(deltaScore)) {
+        return res.status(400).json({
+            status: "error",
+            message: "ต้องระบุ lineUserId และ deltaScore (ตัวเลข)"
+        });
+    }
+
+    const conn = await db.getClient();
+    try {
+        await conn.beginTransaction();
+
+        // ปรับคะแนน (ป้องกันคะแนนติดลบ ด้วย GREATEST)
+        await conn.query(
+            `
+            UPDATE users
+            SET totalScore = GREATEST(totalScore + ?, 0)
+            WHERE lineUserId = ?
+            `,
+            [deltaScore, lineUserId]
+        );
+
+        // หลังอัปเดตคะแนนแล้ว ให้ปรับป้าย auto ตามคะแนนใหม่
+        await autoAwardBadgesForUser(lineUserId, conn);
+
+        await conn.commit();
+
+        res.json({
+            status: "success",
+            data: {
+                updated: true,
+                lineUserId,
+                deltaScore
+            }
+        });
+    } catch (err) {
+        await conn.rollback();
+        console.error("/api/admin/users/update-score error:", err);
+        res.status(500).json({ status: "error", message: err.message });
+    } finally {
+        conn.release();
+    }
+});
 
 // ======================================================
 // ADMIN: Users list for admin panel
