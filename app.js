@@ -1469,51 +1469,96 @@ async function searchUsersForAdmin(query) {
     await fetchAdminUsers(1, query); // เรียกใช้ฟังก์ชันใหม่เพื่อโหลดหน้า 1 ของผลการค้นหา
 }
 
+// ===== START: แทนที่ฟังก์ชัน fetchAdminUsers เดิมทั้งหมดด้วยอันนี้ =====
 async function fetchAdminUsers(page, query, isLoadMore = false) {
     const resultsContainer = $('#user-search-results');
     const loadMoreContainer = $('#users-load-more-container');
     const loadMoreBtn = $('#users-load-more-btn');
 
+    // โหลดครั้งแรก (ไม่ใช่ load more)
     if (!isLoadMore) {
-        // ถ้าเป็นการโหลดครั้งแรก ให้แสดง Spinner และรีเซ็ตค่า
-        resultsContainer.html('<div class="text-center my-4"><div class="spinner-border text-success"></div></div>');
+        resultsContainer.html(
+            '<div class="text-center my-4"><div class="spinner-border text-success"></div></div>'
+        );
         AppState.adminUsers.currentPage = 1;
         AppState.adminUsers.hasMore = true;
     }
 
-    if (!AppState.adminUsers.hasMore) return; // ถ้าไม่มีข้อมูลให้โหลดแล้ว ก็หยุด
+    // ถ้า set ว่าไม่มีข้อมูลเพิ่มแล้ว ก็ไม่ต้องโหลด
+    if (!AppState.adminUsers.hasMore) return;
+
     loadMoreBtn.prop('disabled', true);
 
     try {
-        // เรียก API พร้อมส่ง page และ search query ไปด้วย
-        const users = await callApi('/api/admin/users', { search: query, page: page, sortBy: AppState.adminUsers.currentSort });
+        // 1) ดึงรายชื่อผู้ใช้จาก /api/admin/users (ยังไม่มีจำนวนป้าย)
+        const users = await callApi('/api/admin/users', {
+            search: query,
+            page: page,
+            sortBy: AppState.adminUsers.currentSort
+        });
 
-        if (!isLoadMore) resultsContainer.empty(); // ถ้าเป็นการโหลดครั้งแรก ให้ล้างข้อมูลเก่าทิ้ง
+        if (!isLoadMore) {
+            resultsContainer.empty();
+        }
 
-        if (users.length === 0 && !isLoadMore) {
-            resultsContainer.html('<p class="text-center text-muted my-4">ไม่พบผู้ใช้งาน</p>');
-            loadMoreContainer.hide();
+        if (!users || users.length === 0) {
+            if (!isLoadMore) {
+                resultsContainer.html('<p class="text-center text-muted my-4">ไม่พบผู้ใช้งาน</p>');
+                loadMoreContainer.hide();
+            }
+            AppState.adminUsers.hasMore = false;
             return;
         }
 
-        renderUserListForAdmin(users, resultsContainer); // เรียกใช้ฟังก์ชันแสดงผล
+        // 2) ดึง badge ของแต่ละคนจาก /api/admin/user-details แล้วนับจำนวนป้าย
+        const usersWithBadgeCounts = await Promise.all(
+            users.map(async (u) => {
+                try {
+                    const detail = await callApi('/api/admin/user-details', {
+                        lineUserId: u.lineUserId
+                    });
+                    const badgesArr = Array.isArray(detail.badges) ? detail.badges : [];
+                    const badgeCount = badgesArr.length;
 
+                    // รวมค่าเดิม + badgeCount ใหม่เข้าไป
+                    return {
+                        ...u,
+                        badgeCount
+                    };
+                } catch (err) {
+                    console.error('โหลดจำนวนป้ายของผู้ใช้ไม่สำเร็จ', u.lineUserId, err);
+                    return {
+                        ...u,
+                        badgeCount: 0
+                    };
+                }
+            })
+        );
+
+        // 3) แสดงผลใน list (ตอนนี้แต่ละ user จะมี field badgeCount แน่นอนแล้ว)
+        renderUserListForAdmin(usersWithBadgeCounts, resultsContainer);
+
+        // 4) จัดการ state สำหรับปุ่ม "โหลดเพิ่มเติม"
         if (users.length < 30) {
-            // ถ้าข้อมูลที่ได้กลับมาน้อยกว่า 30 แสดงว่าหมดแล้ว
             AppState.adminUsers.hasMore = false;
             loadMoreContainer.hide();
         } else {
-            // ถ้ายังมีข้อมูลอีก ก็ให้เพิ่มหมายเลขหน้าและแสดงปุ่ม "โหลดเพิ่มเติม"
             AppState.adminUsers.currentPage++;
             loadMoreContainer.show();
         }
-
     } catch (e) {
-        if (!isLoadMore) resultsContainer.html('<p class="text-center text-danger my-4">ไม่สามารถโหลดข้อมูลได้</p>');
+        console.error('fetchAdminUsers error:', e);
+        if (!isLoadMore) {
+            resultsContainer.html(
+                '<p class="text-center text-danger my-4">ไม่สามารถโหลดข้อมูลได้</p>'
+            );
+        }
     } finally {
         loadMoreBtn.prop('disabled', false);
     }
 }
+// ===== END: แทนที่ฟังก์ชัน fetchAdminUsers เดิมด้วยอันนี้ =====
+
 
 function renderUserListForAdmin(users, container) {
     users.forEach(user => {
