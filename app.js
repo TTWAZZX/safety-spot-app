@@ -91,38 +91,49 @@ async function initializeApp() {
     }
 }
 
-async function showMainApp(userData) {
+async function showMainApp(userData) { 
     try {
         AppState.currentUser = userData;
         updateUserInfoUI(AppState.currentUser);
         
+        // ---------------------------
+        // แสดงเมนู Admin เฉพาะแอดมิน
+        // ---------------------------
         if (userData && userData.isAdmin) {
             $('#admin-nav-item').show();
-            bindAdminEventListeners();
+            bindAdminEventListeners();   // ฟังก์ชันจัดการ event ฝั่ง admin
+        } else {
+            $('#admin-nav-item').hide();
+            
+            // ซ่อนกล่องจัดการคะแนนผู้ใช้ (สำคัญมาก!!)
+            document.querySelectorAll('.score-update-box')
+                .forEach(el => el.style.display = 'none');
         }
 
-        const activities = await callApi('/api/activities', { lineUserId: AppState.lineProfile.userId });
+        // โหลดกิจกรรม
+        const activities = await callApi('/api/activities', { 
+            lineUserId: AppState.lineProfile.userId 
+        });
+
         displayActivitiesUI(activities, 'latest-activities-list');
         displayActivitiesUI(activities, 'all-activities-list');
         
         $('#main-app').fadeIn();
-        // ===== START: เพิ่มโค้ดเรียกใช้ Pull to Refresh ตรงนี้ =====
+
+        // Pull To Refresh
         PullToRefresh.init({
-            mainElement: 'body', // Element หลักที่อนุญาตให้ดึง
-            onRefresh: async function(done) { // ฟังก์ชันที่จะทำงานเมื่อผู้ใช้ปล่อยนิ้ว
-                await refreshHomePageData(); // เรียกใช้ฟังก์ชันรีเฟรชที่เราสร้างไว้
-                done(); // บอก Library ว่ารีเฟรชเสร็จแล้ว (Spinner จะหายไป)
+            mainElement: 'body',
+            onRefresh: async function(done) {
+                await refreshHomePageData();
+                done();
             },
-            // ตั้งค่าไอคอนให้เข้ากับแอป (ใช้ Font Awesome)
             iconArrow: '<i class="fas fa-arrow-down"></i>',
-            iconRefreshing: '<div class="spinner-border spinner-border-sm text-success" role="status"></div>',
-            distThreshold: 80, // ระยะที่ต้องดึงลงมา (pixel)
+            iconRefreshing: '<div class="spinner-border spinner-border-sm text-success"></div>',
+            distThreshold: 80,
             distMax: 100
         });
-        // ===== END: เพิ่มโค้ดเรียกใช้ Pull to Refresh =====
-         // highlight-start
-        checkUnreadNotifications(); // เช็คการแจ้งเตือนที่ยังไม่ได้อ่าน
-        // highlight-end
+
+        checkUnreadNotifications();
 
     } catch (error) {
         console.error("Error during showMainApp:", error);
@@ -707,6 +718,62 @@ function bindAdminEventListeners() {
     // ===== END: Event Listeners for Idea 3 =====
 }
 
+// ใช้ตอนแอดมินเปิดดูผู้ใช้คนหนึ่ง
+function showAdminScoreBox(score) {
+    $("#adminUserCurrentScore").text(score);
+    $("#admin-score-box").show();
+}
+
+// Event: กดบันทึกคะแนน
+$(document).on("click", "#adminApplyScoreBtn", async function () {
+    const delta = Number($("#adminScoreDeltaInput").val());
+    if (!delta || delta <= 0) {
+        return Swal.fire("กรุณากรอกจำนวนคะแนนให้ถูกต้อง", "", "warning");
+    }
+
+    const mode = $("input[name='adminScoreMode']:checked").val();
+    const applyBtnText = $("#adminScoreBtnText");
+    const loadingIcon = $("#adminScoreBtnLoading");
+
+    applyBtnText.addClass("d-none");
+    loadingIcon.removeClass("d-none");
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/update-score`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                lineUserId: window.adminSelectedUserId,
+                mode,
+                delta
+            })
+        });
+
+        const data = await res.json();
+
+        if (data.status === "success") {
+            // อัปเดตคะแนนใน UI
+            $("#adminUserCurrentScore").text(data.newScore);
+
+            Swal.fire({
+                icon: "success",
+                title: "อัปเดตคะแนนสำเร็จ!",
+                timer: 1500,
+                showConfirmButton: false,
+            });
+        } else {
+            Swal.fire("เกิดข้อผิดพลาด", data.message, "error");
+        }
+
+    } catch (err) {
+        console.error(err);
+        Swal.fire("เกิดข้อผิดพลาดในการเชื่อมต่อ API", "", "error");
+    }
+
+    applyBtnText.removeClass("d-none");
+    loadingIcon.addClass("d-none");
+});
+
 function bindAdminTabEventListeners() {
     $('.admin-tab-btn').on('click', function(e) {
         e.preventDefault();
@@ -1224,36 +1291,41 @@ async function handleViewUserDetails(lineUserId) {
     const modal = AppState.allModals['user-details'];
     if (!modal) return;
 
+    // ⭐ SET ตัวแปร global สำหรับใช้ตอนอัปเดตคะแนนผู้ใช้
+    adminSelectedUserId = lineUserId;
+
     $('#user-details-badges-container').html(
         '<div class="text-center"><div class="spinner-border"></div></div>'
     );
     modal.show();
 
     try {
-        // 1) ดึงข้อมูลผู้ใช้ + ป้ายรางวัลที่ได้แล้ว
+        // 1) ดึง user + badges
         const userData = await callApi('/api/admin/user-details', { lineUserId });
-        // userData = { user, badges }
         const user = userData.user;
         const earnedBadges = Array.isArray(userData.badges) ? userData.badges : [];
 
-        // 2) ดึงรายการป้ายรางวัลทั้งหมด
+        // 2) ดึง badge ทั้งหมด
         const allBadges = await callApi('/api/admin/badges');
 
         $('#user-details-pic').attr('src', getFullImageUrl(user.pictureUrl));
         $('#user-details-name').text(user.fullName);
-        $('#user-details-info').text(`รหัส: ${user.employeeId} | คะแนน: ${user.totalScore}`);
+        $('#user-details-info').text(`รหัส: ${user.employeeId}`);
+
+        // ⭐ อัปเดตคะแนนปัจจุบันบน UI
+        showAdminScoreBox(user.totalScore);
 
         const badgesContainer = $('#user-details-badges-container');
         badgesContainer.empty();
 
         if (!allBadges || allBadges.length === 0) {
-            badgesContainer.html('<p class="text-center text-muted">ยังไม่มีป้ายรางวัลในระบบ</p>');
+            badgesContainer.html('<p class="text-center text-muted">ยังไม่มีป้ายรางวัล</p>');
             return;
         }
 
         const earnedIds = new Set(earnedBadges.map(b => b.badgeId));
 
-        const badgesHtml = allBadges.map((badge) => {
+        const badgesHtml = allBadges.map(badge => {
             const isEarned = earnedIds.has(badge.badgeId);
             return `
                 <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
@@ -1276,6 +1348,7 @@ async function handleViewUserDetails(lineUserId) {
         $('#user-details-badges-container').html('<p class="text-danger">ไม่สามารถโหลดข้อมูลได้</p>');
     }
 }
+
 
 async function handleToggleBadge() {
     const btn = $(this);
