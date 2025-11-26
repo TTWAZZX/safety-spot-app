@@ -1707,7 +1707,7 @@ function renderUserListForAdmin(users, container) {
     });
 }
 // =============================
-// ADMIN: ปรับคะแนนผู้ใช้ (เวอร์ชันสมบูรณ์)
+// ADMIN: ปรับคะแนนผู้ใช้ (เวอร์ชันแก้ไขสมบูรณ์)
 // =============================
 $(document).on("click", "#adminApplyScoreBtn", async function () {
     if (!adminSelectedUserId) {
@@ -1723,19 +1723,26 @@ $(document).on("click", "#adminApplyScoreBtn", async function () {
 
     const deltaScore = mode === "sub" ? -Math.abs(delta) : Math.abs(delta);
 
+    // UI Loading
     const applyBtnText = $("#adminScoreBtnText");
     const loadingIcon = $("#adminScoreBtnLoading");
     applyBtnText.addClass("d-none");
     loadingIcon.removeClass("d-none");
 
     try {
-        const result = await callApi('/api/admin/update-score', {
+        // ⭐ ใช้ endpoint ที่ถูกต้องแล้ว
+        const res = await callApi('/api/admin/users/update-score', {
+            requesterId: AppState.lineProfile.userId,
             lineUserId: adminSelectedUserId,
             deltaScore: deltaScore
         }, 'POST');
 
-        // อัปเดตคะแนนบน UI
-        $("#adminUserCurrentScore").text(result.newScore);
+        if (res.status !== "success") {
+            throw new Error("API error");
+        }
+
+        // ⭐ โหลดข้อมูลผู้ใช้ใหม่หลังปรับคะแนน
+        await loadAdminUserDetails(adminSelectedUserId);
 
         Swal.fire({
             icon: "success",
@@ -1749,6 +1756,7 @@ $(document).on("click", "#adminApplyScoreBtn", async function () {
         console.error("Score update failed:", err);
     }
 
+    // UI revert
     applyBtnText.removeClass("d-none");
     loadingIcon.addClass("d-none");
 });
