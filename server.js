@@ -863,22 +863,7 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
 
         // 🔥 เรียก autoAwardBadgesForUser ภายใต้ transaction เดียวกัน
         await autoAwardBadgesForUser(ownerId, conn);
-                // หลังจากระบบปรับป้าย auto ตามคะแนนใหม่ ให้แจ้งเตือนผู้ใช้
-        const autoBadgeMessage = "ระบบได้ตรวจสอบและอัปเดตป้ายรางวัลของคุณจากการอนุมัติรายงานครั้งนี้แล้ว";
-        await client.query(
-            `
-            INSERT INTO notifications
-                (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
-            VALUES (?, ?, ?, 'badge', ?, ?, NOW())
-            `,
-            [
-                "NOTI" + uuidv4(),
-                ownerId,
-                autoBadgeMessage,
-                submissionId,
-                requesterId || null
-            ]
-        );
+
         await conn.commit();
         res.json({ status: "success", data: { message: "Approved." } });
     } catch (err) {
