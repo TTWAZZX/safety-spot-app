@@ -1708,6 +1708,12 @@ $(document).on("click", "#adminApplyScoreBtn", async function () {
     loadingIcon.addClass("d-none");
 });
 
+// ปุ่มกากบาทปิดกล่องจัดการคะแนน (ซ่อนเฉพาะกล่องนี้ ไม่ได้ปิด modal ทั้งหมด)
+$(document).on('click', '#admin-score-box-close', function () {
+    $('#admin-score-box').slideUp(150);
+});
+
+
 // ---- START: Notification Functions ----
 
 async function checkUnreadNotifications() {
@@ -1765,10 +1771,11 @@ function renderNotifications(notifications, container) {
     notifications.forEach(notif => {
         // ใส่ icon ตามประเภทของ notification
         let icon = 'fa-info-circle text-primary';
-        if (notif.type === 'like') icon = 'fa-heart text-danger';
-        if (notif.type === 'comment') icon = 'fa-comment text-info';
+        if (notif.type === 'like') icon = 'fa-thumbs-up text-primary';
+        if (notif.type === 'comment') icon = 'fa-comment-dots text-success';
         if (notif.type === 'approved') icon = 'fa-check-circle text-success';
-        if (notif.type === 'badge') icon = 'fa-certificate text-warning';
+        if (notif.type === 'score') icon = 'fa-star-half-alt text-warning';
+        if (notif.type === 'badge') icon = 'fa-award text-warning';
 
         const isUnreadClass = notif.isRead ? '' : 'list-group-item-light';
         const timeAgo = new Date(notif.createdAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short'});

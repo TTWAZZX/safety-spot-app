@@ -863,7 +863,22 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
 
         // 🔥 เรียก autoAwardBadgesForUser ภายใต้ transaction เดียวกัน
         await autoAwardBadgesForUser(ownerId, conn);
-
+                // หลังจากระบบปรับป้าย auto ตามคะแนนใหม่ ให้แจ้งเตือนผู้ใช้
+        const autoBadgeMessage = "ระบบได้ตรวจสอบและอัปเดตป้ายรางวัลของคุณจากการอนุมัติรายงานครั้งนี้แล้ว";
+        await client.query(
+            `
+            INSERT INTO notifications
+                (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+            VALUES (?, ?, ?, 'badge', ?, ?, NOW())
+            `,
+            [
+                "NOTI" + uuidv4(),
+                ownerId,
+                autoBadgeMessage,
+                submissionId,
+                requesterId || null
+            ]
+        );
         await conn.commit();
         res.json({ status: "success", data: { message: "Approved." } });
     } catch (err) {
@@ -1066,14 +1081,76 @@ app.delete('/api/admin/badges/:badgeId', isAdmin, async (req, res) => {
 
 // Award/revoke badge
 app.post('/api/admin/award-badge', isAdmin, async (req, res) => {
-    const { lineUserId, badgeId } = req.body;
+    const { lineUserId, badgeId, requesterId } = req.body;
+
+    // หา badgeName เพื่อใช้ในข้อความแจ้งเตือน
+    const [[badge]] = await db.query(
+        "SELECT badgeName FROM badges WHERE badgeId = ?",
+        [badgeId]
+    );
 
     await db.query(
         "INSERT IGNORE INTO user_badges (lineUserId, badgeId) VALUES (?, ?)",
         [lineUserId, badgeId]
     );
 
+    // แจ้งเตือนว่าถูกมอบป้ายโดยแอดมิน
+    const msg = badge
+        ? `คุณได้รับป้ายรางวัลใหม่จากผู้ดูแลระบบ: ${badge.badgeName}`
+        : "คุณได้รับป้ายรางวัลใหม่จากผู้ดูแลระบบ";
+
+    await db.query(
+        `
+        INSERT INTO notifications
+            (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+        VALUES (?, ?, ?, 'badge', ?, ?, NOW())
+        `,
+        [
+            "NOTI" + uuidv4(),
+            lineUserId,
+            msg,
+            badgeId,
+            requesterId || null
+        ]
+    );
+
     res.json({ status: "success", data: { awarded: true } });
+});
+
+app.post('/api/admin/revoke-badge', isAdmin, async (req, res) => {
+    const { lineUserId, badgeId, requesterId } = req.body;
+
+    const [[badge]] = await db.query(
+        "SELECT badgeName FROM badges WHERE badgeId = ?",
+        [badgeId]
+    );
+
+    await db.query(
+        "DELETE FROM user_badges WHERE lineUserId = ? AND badgeId = ?",
+        [lineUserId, badgeId]
+    );
+
+    // แจ้งเตือนว่าป้ายถูกเพิกถอน
+    const msg = badge
+        ? `ป้ายรางวัลของคุณถูกเพิกถอน: ${badge.badgeName}`
+        : "ป้ายรางวัลบางรายการของคุณถูกเพิกถอนโดยผู้ดูแลระบบ";
+
+    await db.query(
+        `
+        INSERT INTO notifications
+            (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+        VALUES (?, ?, ?, 'badge', ?, ?, NOW())
+        `,
+        [
+            "NOTI" + uuidv4(),
+            lineUserId,
+            msg,
+            badgeId,
+            requesterId || null
+        ]
+    );
+
+    res.json({ status: "success", data: { revoked: true } });
 });
 
 app.post('/api/admin/revoke-badge', isAdmin, async (req, res) => {
@@ -1120,10 +1197,10 @@ app.post('/api/admin/recalculate-badges', isAdmin, async (req, res) => {
 });
 
 // ======================================================
-// ADMIN: Update user score (add / subtract) + recalc badges
+// ADMIN: Update user score (add / subtract) + recalc badges + notifications
 // ======================================================
 app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
-    const { lineUserId, deltaScore } = req.body;
+    const { lineUserId, deltaScore, requesterId } = req.body;
 
     // ตรวจค่าพื้นฐาน
     if (!lineUserId || typeof deltaScore !== 'number' || isNaN(deltaScore)) {
@@ -1134,10 +1211,11 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
     }
 
     const conn = await db.getClient();
+
     try {
         await conn.beginTransaction();
 
-        // ปรับคะแนน (ป้องกันคะแนนติดลบ ด้วย GREATEST)
+        // 1) อัปเดตคะแนน (ไม่ให้ติดลบ)
         await conn.query(
             `
             UPDATE users
@@ -1147,25 +1225,89 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
             [deltaScore, lineUserId]
         );
 
-        // หลังอัปเดตคะแนนแล้ว ให้ปรับป้าย auto ตามคะแนนใหม่
-        await autoAwardBadgesForUser(lineUserId, conn);
+        // 2) ดึงคะแนนรวมล่าสุด
+        const [[userRow]] = await conn.query(
+            "SELECT totalScore FROM users WHERE lineUserId = ?",
+            [lineUserId]
+        );
+        const newTotalScore = userRow ? userRow.totalScore : 0;
+
+        // 3) บันทึก history การปรับคะแนน (เผื่อดูย้อนหลัง)
+        await conn.query(
+            `
+            INSERT INTO user_score_history
+                (lineUserId, deltaScore, newTotalScore, reason, createdBy, createdAt)
+            VALUES (?, ?, ?, ?, ?, NOW())
+            `,
+            [
+                lineUserId,
+                deltaScore,
+                newTotalScore,
+                'ADMIN_UPDATE',
+                requesterId || 'ADMIN'
+            ]
+        );
 
         await conn.commit();
+        conn.release();
+
+        // 4) หลัง commit แล้วค่อยให้ระบบเช็กป้าย auto ตามคะแนนใหม่
+        await autoAwardBadgesForUser(lineUserId);
+
+        // 5) แจ้งเตือนเรื่องคะแนน
+        const messageScore =
+            deltaScore > 0
+                ? `คะแนนของคุณถูกเพิ่ม ${Math.abs(deltaScore)} คะแนน (รวมเป็น ${newTotalScore} คะแนน)`
+                : `คะแนนของคุณถูกลด ${Math.abs(deltaScore)} คะแนน (เหลือ ${newTotalScore} คะแนน)`;
+
+        await db.query(
+            `
+            INSERT INTO notifications
+                (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, NOW())
+            `,
+            [
+                "NOTI" + uuidv4(),
+                lineUserId,
+                messageScore,
+                "score",
+                null,
+                requesterId || null
+            ]
+        );
+
+        // 6) แจ้งเตือนว่าระบบตรวจสอบ/อัปเดตป้ายให้แล้ว (auto badge)
+        const messageBadgeAuto = "ระบบได้ตรวจสอบและอัปเดตป้ายรางวัลของคุณตามคะแนนล่าสุดแล้ว";
+        await db.query(
+            `
+            INSERT INTO notifications
+                (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, NOW())
+            `,
+            [
+                "NOTI" + uuidv4(),
+                lineUserId,
+                messageBadgeAuto,
+                "badge",
+                null,
+                null
+            ]
+        );
 
         res.json({
             status: "success",
             data: {
                 updated: true,
                 lineUserId,
-                deltaScore
+                deltaScore,
+                newTotalScore
             }
         });
     } catch (err) {
-        await conn.rollback();
+        try { await conn.rollback(); } catch {}
+        conn.release();
         console.error("/api/admin/users/update-score error:", err);
         res.status(500).json({ status: "error", message: err.message });
-    } finally {
-        conn.release();
     }
 });
 
