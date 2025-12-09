@@ -2277,22 +2277,23 @@ function startDailyQuiz() {
     loadGamePage(); 
 }
 
-// 3. ฟังก์ชันหมุนกาชา (ผูกกับปุ่ม "หมุนตู้เลย")
+// 3. ฟังก์ชันหมุนกาชา (แก้ไขลิงก์ Animation ให้ใหม่)
 async function pullGacha() {
     const currentCoins = parseInt($('#coin-display').text()) || 0;
     if(currentCoins < 100) {
-        triggerHaptic('heavy'); // สั่นเตือนเงินไม่พอ
+        triggerHaptic('heavy'); 
         return Swal.fire({ icon: 'warning', title: 'เหรียญไม่พอ', text: 'ต้องการ 100 เหรียญ', confirmButtonText: 'โอเค' });
     }
 
-    triggerHaptic('medium'); // สั่นตอนกด
+    triggerHaptic('medium'); 
 
     // Animation: กล่องของขวัญกำลังสั่น (Waiting)
+    // ⚠️ แก้ไขลิงก์ตรง src ด้านล่างนี้ครับ
     Swal.fire({
         title: 'กำลังสุ่ม...',
         html: `
             <div class="d-flex justify-content-center">
-                <lottie-player src="https://lottie.host/93297ee4-4e76-4706-932d-20129734d32e/8j1j1V8j1.json" background="transparent" speed="1" style="width: 200px; height: 200px;" loop autoplay></lottie-player>
+                <lottie-player src="https://assets6.lottiefiles.com/packages/lf20_amc4yq5b.json" background="transparent" speed="1" style="width: 200px; height: 200px;" loop autoplay></lottie-player>
             </div>
             <p class="text-muted mt-2">ขอให้โชคดี!</p>
         `,
@@ -2306,7 +2307,6 @@ async function pullGacha() {
         $('#coin-display').text(res.remainingCoins);
         if(AppState.currentUser) AppState.currentUser.coinBalance = res.remainingCoins;
 
-        // Effect: สั่นแรงๆ เพราะได้ของ!
         triggerHaptic('heavy'); 
 
         // Animation: พลุแตกแสดงความยินดี (Success)
