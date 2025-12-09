@@ -1847,8 +1847,10 @@ async function loadGamePage() {
             
             if(q.image) {
                 $('#question-image').attr('src', q.image).show();
+                $('#no-image-icon').hide();
             } else {
                 $('#question-image').hide();
+                $('#no-image-icon').show(); // โชว์ไอคอนแทนที่โล่งๆ
             }
             
             // Reset ปุ่ม

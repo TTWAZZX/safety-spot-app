@@ -256,3 +256,121 @@ body {
 .answer-btn:hover { background-color: var(--line-green); color: white; border-color: var(--line-green); }
 .answer-btn.wrong { background-color: #dc3545 !important; color: white; }
 .answer-btn.correct { background-color: #198754 !important; color: white; }
+
+/* --- Game Page Specific Styles --- */
+
+/* 1. พื้นหลังหน้าเกม: ให้ดูมีมิติ ไม่ใช่สีขาวล้วน */
+#game-page {
+    background-color: #f0f2f5; /* สีเทาอ่อนถนอมสายตา */
+    min-height: 80vh;
+}
+
+/* 2. การ์ดโจทย์: เพิ่มเงาและความโค้งมน */
+.game-card {
+    border-radius: 24px;
+    border: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); /* เงาฟุ้งๆ แบบโมเดิร์น */
+    background: #ffffff;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 3. Header ของการ์ด: สีสดขึ้น + ใส่ Pattern */
+.game-header-bg {
+    background: linear-gradient(135deg, #06C755 0%, #048a3b 100%);
+    color: white;
+    padding: 30px 20px;
+    border-radius: 0 0 30px 30px; /* โค้งด้านล่าง */
+    margin-bottom: -40px; /* ดึงการ์ดคำถามให้เกยขึ้นไป */
+    position: relative;
+    z-index: 0;
+}
+
+/* ตกแต่งพื้นหลัง Header ให้ดูมีลาย (Optional) */
+.game-header-bg::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: radial-gradient(circle at 10% 20%, rgba(255,255,255,0.1) 0%, transparent 20%),
+                      radial-gradient(circle at 90% 80%, rgba(255,255,255,0.1) 0%, transparent 20%);
+    z-index: -1;
+}
+
+/* 4. กล่องคำถาม: ยกให้ลอยขึ้นมา */
+.question-box {
+    background: white;
+    border-radius: 20px;
+    padding: 25px;
+    margin: 0 20px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    position: relative;
+    z-index: 1; /* อยู่เหนือ Header */
+}
+
+/* 5. ปุ่มตัวเลือก (Answer Buttons): หัวใจสำคัญ! */
+.answer-btn {
+    border: 2px solid #e9ecef;
+    background-color: #f8f9fa;
+    color: #333;
+    border-radius: 16px;
+    padding: 15px 20px;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative;
+    display: flex; /* จัด icon กับ text */
+    align-items: center;
+    justify-content: flex-start;
+    gap: 15px;
+    text-align: left;
+}
+
+/* ไอคอน A/B ในปุ่ม */
+.choice-badge {
+    background: #e9ecef;
+    color: #6c757d;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    flex-shrink: 0; /* ไม่ให้หด */
+}
+
+/* Effect ตอนเอาเมาส์ชี้ หรือแตะ */
+.answer-btn:hover, .answer-btn:active {
+    background-color: #fff;
+    border-color: var(--line-green);
+    transform: translateY(-2px); /* ลอยขึ้นนิดนึง */
+    box-shadow: 0 5px 15px rgba(6, 199, 85, 0.2);
+}
+
+.answer-btn:hover .choice-badge {
+    background-color: var(--line-green);
+    color: white;
+}
+
+/* Effect ตอนตอบถูก/ผิด (JS จะมาเติม Class นี้) */
+.answer-btn.correct {
+    background-color: #d1e7dd !important;
+    border-color: #198754 !important;
+    color: #0f5132 !important;
+}
+.answer-btn.correct .choice-badge {
+    background-color: #198754;
+    color: white;
+}
+
+.answer-btn.wrong {
+    background-color: #f8d7da !important;
+    border-color: #dc3545 !important;
+    color: #842029 !important;
+}
+.answer-btn.wrong .choice-badge {
+    background-color: #dc3545;
+    color: white;
+}

@@ -67,36 +67,62 @@
             </div>
 
             <div id="game-page" class="page">
-                <div class="card border-0 shadow-sm text-center p-4 mb-3" style="background: linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%);">
-                    <h3 class="fw-bold text-success mb-0">Daily Safety Quiz</h3>
-                    <p class="text-dark small">ตอบถูกลุ้นรับการ์ดสะสมหายาก!</p>
+                
+                <div class="game-header-bg text-center">
+                    <h3 class="fw-bold mb-1"><i class="fas fa-shield-alt me-2"></i>Daily Safety Quiz</h3>
+                    <p class="small opacity-75 mb-4">ภารกิจความปลอดภัยประจำวัน</p>
                 </div>
 
-                <div id="game-container" class="card shadow-sm border-0">
-                    <div class="card-body text-center p-4">
-                        <div id="game-loading">
-                            <div class="spinner-border text-success"></div>
-                            <p class="mt-2 text-muted">กำลังโหลดคำถาม...</p>
-                        </div>
+                <div class="container" style="margin-top: -30px; padding-bottom: 80px;"> <div id="game-container" class="game-card">
+                        <div class="card-body p-0 pb-4"> <div id="game-loading" class="text-center py-5">
+                                <div class="spinner-border text-success" style="width: 3rem; height: 3rem;"></div>
+                                <p class="mt-3 text-muted fw-bold">กำลังเตรียมโจทย์...</p>
+                            </div>
 
-                        <div id="game-content" style="display:none;">
-                            <img id="question-image" src="" class="img-fluid rounded mb-3" style="max-height: 200px; display:none;">
-                            <h5 id="question-text" class="fw-bold mb-4 lh-base">...</h5>
-                            
-                            <div class="d-grid gap-3">
-                                <button class="btn btn-outline-dark py-3 answer-btn" data-choice="A">
-                                    <span class="fw-bold">A.</span> <span id="option-a">...</span>
-                                </button>
-                                <button class="btn btn-outline-dark py-3 answer-btn" data-choice="B">
-                                    <span class="fw-bold">B.</span> <span id="option-b">...</span>
+                            <div id="game-content" style="display:none;">
+                                
+                                <div class="text-center bg-light mb-3" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
+                                    <img id="question-image" src="" class="img-fluid w-100" style="object-fit: cover; max-height: 250px; display:none;">
+                                    <i id="no-image-icon" class="fas fa-clipboard-question text-secondary fa-3x opacity-25" style="display:none;"></i>
+                                </div>
+
+                                <div class="question-box mx-3 mt-n5">
+                                    <span class="badge bg-warning text-dark mb-2">คำถามวัดกึ๋น</span>
+                                    <h5 id="question-text" class="fw-bold lh-base mb-0" style="color: #2c3e50;">
+                                        ...
+                                    </h5>
+                                </div>
+                                
+                                <div class="d-grid gap-3 px-4 mt-4">
+                                    <button class="answer-btn" data-choice="A">
+                                        <span class="choice-badge">A</span>
+                                        <span id="option-a" class="flex-grow-1">...</span>
+                                        <i class="fas fa-chevron-right text-muted small"></i>
+                                    </button>
+
+                                    <button class="answer-btn" data-choice="B">
+                                        <span class="choice-badge">B</span>
+                                        <span id="option-b" class="flex-grow-1">...</span>
+                                        <i class="fas fa-chevron-right text-muted small"></i>
+                                    </button>
+                                </div>
+
+                                <div class="text-center mt-4">
+                                    <small class="text-muted"><i class="fas fa-info-circle me-1"></i>ตอบถูกรับคะแนนสะสมทันที</small>
+                                </div>
+                            </div>
+
+                            <div id="game-played" class="text-center py-5" style="display:none;">
+                                <div class="mb-3">
+                                    <i class="fas fa-check-circle text-success" style="font-size: 5rem; filter: drop-shadow(0 10px 10px rgba(25, 135, 84, 0.3));"></i>
+                                </div>
+                                <h3 class="fw-bold text-dark">เยี่ยมมาก!</h3>
+                                <p class="text-muted px-4">คุณทำภารกิจวันนี้สำเร็จแล้ว<br>กลับมาใหม่พรุ่งนี้นะครับ</p>
+                                <button class="btn btn-outline-success rounded-pill px-4 mt-2" onclick="location.href='#leaderboard'">
+                                    ดูอันดับคะแนน
                                 </button>
                             </div>
-                        </div>
 
-                        <div id="game-played" style="display:none;">
-                            <i class="fas fa-check-circle text-success fa-4x mb-3"></i>
-                            <h4>เยี่ยมมาก!</h4>
-                            <p class="text-muted">วันนี้คุณทำภารกิจสำเร็จแล้ว<br>กลับมาใหม่พรุ่งนี้นะครับ</p>
                         </div>
                     </div>
                 </div>
