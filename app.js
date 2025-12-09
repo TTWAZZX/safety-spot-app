@@ -2277,7 +2277,7 @@ function startDailyQuiz() {
     loadGamePage(); 
 }
 
-// 3. ฟังก์ชันหมุนกาชา (Final Fix: ใช้ iframe Embed ชัวร์ที่สุด)
+// 3. ฟังก์ชันหมุนกาชา (Final Fix: ใช้ CSS Animation แทน Lottie เพื่อแก้ปัญหา 403 ถาวร)
 async function pullGacha() {
     const currentCoins = parseInt($('#coin-display').text()) || 0;
     if(currentCoins < 100) {
@@ -2287,18 +2287,22 @@ async function pullGacha() {
 
     triggerHaptic('medium'); 
 
-    // Animation: กล่องของขวัญ (ใช้ iframe Embed)
-    // ลิงก์นี้เป็นหน้า Embed ของ Lottie ไม่ใช่ไฟล์ JSON
-    const loadingUrl = "https://lottie.host/embed/93297ee4-4e76-4706-932d-20129734d32e/8j1j1V8j1.json";
-
+    // --- Animation 1: กล่องของขวัญสั่น (Waiting) ---
+    // ใช้ไอคอน FontAwesome + animate.css (มีในโปรเจกต์อยู่แล้ว)
+    // animate__shakeY: สั่นแนวตั้ง, animate__infinite: สั่นไม่หยุด
     Swal.fire({
         title: 'กำลังสุ่ม...',
         html: `
-            <div class="d-flex justify-content-center" style="height: 200px; overflow: hidden;">
-                <iframe src="${loadingUrl}" style="width: 200px; height: 200px; border: none; overflow: hidden;"></iframe>
+            <div class="py-4">
+                <i class="fas fa-gift text-danger" style="font-size: 8rem;"></i>
             </div>
-            <p class="text-muted mt-2">ขอให้โชคดี!</p>
+            <p class="text-muted mt-2 fw-bold">ขอให้โชคดี!</p>
         `,
+        didOpen: () => {
+            // เพิ่ม class animation หลังจาก render เสร็จเพื่อให้มันสั่น
+            const icon = Swal.getHtmlContainer().querySelector('.fa-gift');
+            icon.classList.add('animate__animated', 'animate__shakeY', 'animate__infinite');
+        },
         showConfirmButton: false,
         allowOutsideClick: false
     });
@@ -2311,23 +2315,22 @@ async function pullGacha() {
 
         triggerHaptic('heavy'); 
 
-        // Animation: พลุแตก (Success - ใช้ iframe Embed)
-        const successUrl = "https://lottie.host/embed/b8c00539-7569-4246-9372-76332140407d/D8R898t898.json";
-
+        // --- Animation 2: ของรางวัลเด้งออกมา (Success) ---
+        // ใช้ animate__zoomInDown หรือ animate__jackInTheBox
         Swal.fire({
             title: '<span class="text-success">✨ ยินดีด้วย! ✨</span>',
             html: `
-                <div class="d-flex justify-content-center mb-2" style="height: 150px; overflow: hidden;">
-                     <iframe src="${successUrl}" style="width: 300px; height: 300px; border: none; transform: translateY(-50px);"></iframe>
+                <div class="py-3">
+                    <div class="animate__animated animate__zoomInDown">
+                        <img src="${getFullImageUrl(res.badge.imageUrl)}" class="rounded shadow border border-3 border-warning" style="width: 140px; height: 140px; object-fit: cover;">
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <img src="${getFullImageUrl(res.badge.imageUrl)}" class="rounded shadow-sm border" style="width: 120px; height: 120px; object-fit: cover;">
-                </div>
-                <h5>${res.badge.badgeName}</h5>
-                <span class="badge bg-warning text-dark mb-3">${res.badge.rarity || 'Common'}</span>
+                <h4 class="fw-bold mt-2">${res.badge.badgeName}</h4>
+                <span class="badge bg-warning text-dark fs-6 px-3 py-2 rounded-pill shadow-sm">${res.badge.rarity || 'Common'}</span>
             `,
             confirmButtonText: 'เก็บใส่สมุด',
-            confirmButtonColor: '#06C755'
+            confirmButtonColor: '#06C755',
+            backdrop: `rgba(0,0,123,0.4) url("https://media.tenor.com/On7kvXhzml4AAAAj/love-hearts.gif") left top no-repeat` // (Optional) ใส่ effect พลุกระดาษถ้าต้องการ หรือลบบรรทัดนี้ออกถ้าชอบคลีนๆ
         }).then(() => {
             loadGameDashboard();
         });
