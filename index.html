@@ -146,6 +146,51 @@
                         </div>
                     </div>
 
+                    <div class="card border-0 shadow-sm rounded-4 mb-3" style="background: linear-gradient(135deg, #434343 0%, #000000 100%); color: white;">
+                        <div class="card-body p-3 d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-dark border border-secondary rounded-circle d-flex align-items-center justify-content-center shadow-sm me-3" style="width: 50px; height: 50px;">
+                                    <i class="fas fa-recycle text-success fa-lg"></i>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold mb-0 text-white">โรงงานรีไซเคิล</h6>
+                                    <small class="text-white-50">ย่อยการ์ดซ้ำ 5 ใบ <i class="fas fa-arrow-right mx-1"></i> สุ่มเหรียญ</small>
+                                </div>
+                            </div>
+                            <button class="btn btn-outline-light rounded-pill px-3 fw-bold btn-sm" onclick="openRecycleModal()">
+                                เริ่มงาน
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="modal fade" id="recycle-modal" tabindex="-1">
+                        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                            <div class="modal-content border-0 shadow-lg">
+                                <div class="modal-header border-0 bg-dark text-white">
+                                    <h5 class="modal-title"><i class="fas fa-industry me-2"></i>เลือกการ์ดซ้ำมาย่อย</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body bg-light">
+                                    <div class="alert alert-secondary small mb-3">
+                                        <i class="fas fa-info-circle me-1"></i> เลือกการ์ดให้ครบ <b>5 ใบ</b> เพื่อเริ่มเดินเครื่องจักร
+                                    </div>
+                                    
+                                    <div class="d-flex justify-content-center mb-4 gap-2">
+                                        <div id="recycle-slot-count" class="badge bg-danger rounded-pill fs-5 shadow">0 / 5</div>
+                                    </div>
+
+                                    <div id="recycle-list" class="list-group">
+                                        </div>
+                                </div>
+                                <div class="modal-footer border-0 bg-white">
+                                    <button id="btn-confirm-recycle" class="btn btn-dark w-100 py-2 rounded-pill" disabled onclick="confirmRecycle()">
+                                        <i class="fas fa-fire me-2"></i> เดินเครื่องจักร (ย่อยการ์ด)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between align-items-center mb-2 px-1">
                         <h6 class="fw-bold m-0 text-secondary">การ์ดของฉัน</h6>
                         <a href="#" class="small text-decoration-none" onclick="openCardAlbum()">ดูทั้งหมด ></a>
@@ -770,6 +815,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/pulltorefreshjs@0.1.22/dist/index.css">
     <script src="https://unpkg.com/pulltorefreshjs@0.1.22/dist/index.umd.js"></script>
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
     <script src="app.js"></script>
     
 </body>

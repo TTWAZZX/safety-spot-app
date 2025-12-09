@@ -18,6 +18,18 @@ const AppState = {
     // highlight-end
 };
 
+// --- UTILS: HAPTIC FEEDBACK ---
+function triggerHaptic(pattern = 'medium') {
+    // เช็คว่ามือถือรองรับการสั่นไหม (Android ได้เกือบหมด, iOS ได้บางเวอร์ชัน)
+    if (navigator.vibrate) {
+        try {
+            if (pattern === 'light') navigator.vibrate(15); // สั่นเบา (กดปุ่ม)
+            else if (pattern === 'medium') navigator.vibrate(40); // สั่นกลาง (สำเร็จ)
+            else if (pattern === 'heavy') navigator.vibrate([50, 30, 50, 30, 100]); // สั่นแรง (ได้รางวัลใหญ่/เตือน)
+        } catch(e) { /* Ignore error on some devices */ }
+    }
+}
+
 // ===============================================================
 //  INITIALIZATION
 // ===============================================================
@@ -1885,6 +1897,10 @@ async function loadGamePage() {
 
 // --- แก้ไข Event Listener ตอบคำถามใน app.js ---
 $(document).on('click', '.answer-btn', async function() {
+
+    // ✨ จุดที่ 1: ใส่ตรงนี้ (สั่นเบาๆ เมื่อนิ้วแตะปุ่ม)
+    triggerHaptic('light');
+
     const btn = $(this);
     const choice = btn.data('choice');
     const qid = $('#game-content').data('qid');
@@ -1911,6 +1927,8 @@ $(document).on('click', '.answer-btn', async function() {
         // ==========================================
 
         if (res.isCorrect) {
+            // ✨ จุดที่ 2: ใส่ในเงื่อนไขตอบถูก (สั่นกลางๆ ยินดีด้วย)
+            triggerHaptic('medium');
             // --- กรณีตอบถูก ---
             btn.addClass('correct');
             Swal.fire({
@@ -1921,16 +1939,20 @@ $(document).on('click', '.answer-btn', async function() {
                 confirmButtonColor: '#06C755'
             });
         } else {
+            // ✨ จุดที่ 3: สั่นแรง เตือนว่าผิด
+            triggerHaptic('heavy');
+            
             // --- กรณีตอบผิด ---
             btn.addClass('wrong');
-            // เฉลยข้อถูกให้ดูด้วย
-            $(`.answer-btn[data-choice="${res.correctOption}"]`).addClass('correct');
+            
+            // ❌ ลบบรรทัดเฉลยปุ่มเขียวออก เพราะเราไม่รู้ข้อถูกแล้ว
+            // $(`.answer-btn[data-choice="${res.correctOption}"]`).addClass('correct'); 
             
             Swal.fire({
                 icon: 'error',
                 title: 'ยังไม่ถูกนะ...',
-                // แจ้งว่าได้รางวัลปลอบใจ
-                html: `ข้อที่ถูกคือ <b>${res.correctOption}</b><br>แต่ไม่ต้องเสียใจ รับรางวัลปลอบใจไป <b class="text-warning">${res.earnedCoins} เหรียญ</b> 💰`,
+                // ✅ แก้ข้อความ ไม่ต้องบอกข้อถูก
+                html: `คำตอบยังไม่ถูกต้อง<br>รับรางวัลปลอบใจไป <b class="text-warning">${res.earnedCoins} เหรียญ</b> 💰`,
                 confirmButtonText: 'ไปต่อ',
                 confirmButtonColor: '#6c757d'
             });
@@ -2183,47 +2205,52 @@ function startDailyQuiz() {
 
 // 3. ฟังก์ชันหมุนกาชา (ผูกกับปุ่ม "หมุนตู้เลย")
 async function pullGacha() {
-    // เช็คเหรียญก่อน (Client side check)
     const currentCoins = parseInt($('#coin-display').text()) || 0;
     if(currentCoins < 100) {
-        return Swal.fire({
-            icon: 'warning',
-            title: 'เหรียญไม่พอ',
-            text: 'ต้องการ 100 เหรียญเพื่อหมุนตู้\nไปทำภารกิจตอบคำถามก่อนนะ!',
-            confirmButtonText: 'โอเค'
-        });
+        triggerHaptic('heavy'); // สั่นเตือนเงินไม่พอ
+        return Swal.fire({ icon: 'warning', title: 'เหรียญไม่พอ', text: 'ต้องการ 100 เหรียญ', confirmButtonText: 'โอเค' });
     }
 
-    // Animation หมุนตู้
+    triggerHaptic('medium'); // สั่นตอนกด
+
+    // Animation: กล่องของขวัญกำลังสั่น (Waiting)
     Swal.fire({
         title: 'กำลังสุ่ม...',
-        html: '<div class="my-3"><i class="fas fa-sync fa-spin fa-3x text-warning"></i></div><p>ขอให้โชคดี!</p>',
+        html: `
+            <div class="d-flex justify-content-center">
+                <lottie-player src="https://lottie.host/93297ee4-4e76-4706-932d-20129734d32e/8j1j1V8j1.json" background="transparent" speed="1" style="width: 200px; height: 200px;" loop autoplay></lottie-player>
+            </div>
+            <p class="text-muted mt-2">ขอให้โชคดี!</p>
+        `,
         showConfirmButton: false,
         allowOutsideClick: false
     });
 
     try {
-        // เรียก API Gacha (ต้องมี Backend รองรับตามที่คุยกันรอบที่แล้ว)
-        // *ถ้ายังไม่ได้ทำ Backend ส่วน gacha-pull ให้ใช้บรรทัดล่างนี้แทนเพื่อทดสอบ UI*
-        // const res = { remainingCoins: currentCoins - 100, badge: { badgeName: 'Test Badge', imageUrl: '' } }; await new Promise(r => setTimeout(r, 1500)); 
-        
         const res = await callApi('/api/game/gacha-pull', { lineUserId: AppState.lineProfile.userId }, 'POST');
         
-        // Update UI
         $('#coin-display').text(res.remainingCoins);
         if(AppState.currentUser) AppState.currentUser.coinBalance = res.remainingCoins;
 
-        // Show Reward
+        // Effect: สั่นแรงๆ เพราะได้ของ!
+        triggerHaptic('heavy'); 
+
+        // Animation: พลุแตกแสดงความยินดี (Success)
         Swal.fire({
-            title: '✨ ยินดีด้วย! ✨',
-            html: `คุณได้รับ <b>${res.badge.badgeName}</b>`,
-            imageUrl: getFullImageUrl(res.badge.imageUrl),
-            imageWidth: 150,
-            imageAlt: 'Reward',
+            title: '<span class="text-success">✨ ยินดีด้วย! ✨</span>',
+            html: `
+                <div class="d-flex justify-content-center mb-2">
+                    <lottie-player src="https://assets10.lottiefiles.com/packages/lf20_u4yrau.json" background="transparent" speed="1" style="width: 150px; height: 150px;" autoplay></lottie-player>
+                </div>
+                <div class="mb-3">
+                    <img src="${getFullImageUrl(res.badge.imageUrl)}" class="rounded shadow-sm border" style="width: 120px; height: 120px; object-fit: cover;">
+                </div>
+                <h5>${res.badge.badgeName}</h5>
+                <span class="badge bg-warning text-dark mb-3">${res.badge.rarity || 'Common'}</span>
+            `,
             confirmButtonText: 'เก็บใส่สมุด',
             confirmButtonColor: '#06C755'
         }).then(() => {
-            // โหลด Mini Collection ใหม่
             loadGameDashboard();
         });
 
@@ -2575,40 +2602,187 @@ async function exchangeCoinsToScore() {
     });
 
     if (result.isConfirmed) {
-        // Loading
+        triggerHaptic('medium'); // สั่นตอบรับ
+
+        // Animation: เหรียญหมุน
         Swal.fire({
             title: 'กำลังแลกเปลี่ยน...',
-            timerProgressBar: true,
-            didOpen: () => { Swal.showLoading() }
+            html: '<lottie-player src="https://assets10.lottiefiles.com/packages/lf20_p8bfn5to.json" background="transparent" speed="1" style="width: 150px; height: 150px; margin: 0 auto;" loop autoplay></lottie-player>',
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            timer: 1500 // หน่วงเวลาหน่อยให้ดูสมจริง
         });
 
         try {
-            // 3. ยิง API
             const res = await callApi('/api/game/exchange-coins', { lineUserId: AppState.lineProfile.userId }, 'POST');
             
-            // 4. อัปเดต UI ทันที
-            $('#coin-display').text(res.remainingCoins);
-            // ถ้าหน้า Profile เปิดอยู่ หรือมีการเก็บตัวแปร Global
-            if(AppState.currentUser) {
-                AppState.currentUser.coinBalance = res.remainingCoins;
-                AppState.currentUser.totalScore = res.newTotalScore;
-            }
-            
-            // อัปเดตคะแนนที่ Header หน้า Home (ถ้ามี Element Id นี้)
-            $('#user-score').text(res.newTotalScore);
-            $('#profile-page-score').text(res.newTotalScore);
+            // ... (โค้ดอัปเดต UI เดิม) ...
 
-            // 5. Success Message
+            triggerHaptic('heavy'); // สั่นสำเร็จ
+
             Swal.fire({
                 icon: 'success',
                 title: 'แลกสำเร็จ!',
-                html: `ยอดคงเหลือ: <b>${res.remainingCoins} เหรียญ</b><br>คะแนนสะสมใหม่: <b class="text-success">${res.newTotalScore} คะแนน</b>`,
-                timer: 2000,
-                showConfirmButton: false
+                html: `
+                    <div class="d-flex justify-content-center">
+                        <lottie-player src="https://assets9.lottiefiles.com/packages/lf20_lk80fpsm.json" background="transparent" speed="1" style="width: 120px; height: 120px;" autoplay></lottie-player>
+                    </div>
+                    <p>ยอดคงเหลือ: <b>${res.remainingCoins} เหรียญ</b><br>คะแนนสะสมใหม่: <b class="text-success">${res.newTotalScore} คะแนน</b></p>
+                `,
+                confirmButtonText: 'ตกลง',
+                confirmButtonColor: '#06C755'
             });
 
         } catch (e) {
             Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
         }
+    }
+}
+
+// --- RECYCLE SYSTEM ---
+
+let selectedRecycleCards = {}; // เก็บ state การเลือก { 'CARD_001': 2 }
+
+async function openRecycleModal() {
+    selectedRecycleCards = {};
+    updateRecycleUI();
+    
+    const modal = new bootstrap.Modal(document.getElementById('recycle-modal'));
+    modal.show();
+    
+    const list = $('#recycle-list');
+    list.html('<div class="text-center py-4"><div class="spinner-border"></div></div>');
+
+    try {
+        // ดึงการ์ดทั้งหมด
+        const cards = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
+        
+        // กรองเอาเฉพาะที่มีซ้ำ (count > 1)
+        const duplicates = cards.filter(c => c.count > 1);
+        
+        list.empty();
+        
+        if (duplicates.length === 0) {
+            list.html('<div class="text-center text-muted py-4"><i class="fas fa-box-open fa-3x mb-2"></i><br>ไม่มีการ์ดซ้ำให้ย่อย</div>');
+            return;
+        }
+
+        duplicates.forEach(c => {
+            const spareCount = c.count - 1; // จำนวนที่ย่อยได้ (เก็บไว้ 1 ใบเสมอ)
+            
+            list.append(`
+                <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 shadow-sm mb-2 rounded">
+                    <div class="d-flex align-items-center">
+                        <img src="${getFullImageUrl(c.imageUrl)}" class="rounded me-3 border" style="width: 50px; height: 50px; object-fit: cover;">
+                        <div>
+                            <h6 class="mb-0 fw-bold">${c.cardName}</h6>
+                            <small class="text-muted">มีซ้ำ ${spareCount} ใบ</small>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-outline-secondary rounded-circle" style="width:32px; height:32px;" 
+                                onclick="adjustRecycle('${c.cardId}', -1, ${spareCount})"><i class="fas fa-minus"></i></button>
+                        <span class="fw-bold" id="qty-${c.cardId}" style="width: 20px; text-align: center;">0</span>
+                        <button class="btn btn-sm btn-outline-success rounded-circle" style="width:32px; height:32px;" 
+                                onclick="adjustRecycle('${c.cardId}', 1, ${spareCount})"><i class="fas fa-plus"></i></button>
+                    </div>
+                </div>
+            `);
+        });
+
+    } catch (e) {
+        list.html('<p class="text-danger text-center">โหลดข้อมูลไม่สำเร็จ</p>');
+    }
+}
+
+function adjustRecycle(cardId, delta, max) {
+    const current = selectedRecycleCards[cardId] || 0;
+    let next = current + delta;
+    
+    // เช็คขอบเขต
+    if (next < 0) next = 0;
+    if (next > max) next = max;
+
+    // เช็ครวมไม่เกิน 5
+    const totalSelected = Object.values(selectedRecycleCards).reduce((a, b) => a + b, 0);
+    if (delta > 0 && (totalSelected >= 5) && next > current) {
+        return; // ห้ามเลือกเกิน 5
+    }
+
+    if (next === 0) delete selectedRecycleCards[cardId];
+    else selectedRecycleCards[cardId] = next;
+
+    // Update UI
+    $(`#qty-${cardId}`).text(next);
+    updateRecycleUI();
+}
+
+function updateRecycleUI() {
+    const total = Object.values(selectedRecycleCards).reduce((a, b) => a + b, 0);
+    $('#recycle-slot-count').text(`${total} / 5`);
+    
+    const btn = $('#btn-confirm-recycle');
+    if (total === 5) {
+        btn.prop('disabled', false).removeClass('btn-dark').addClass('btn-danger');
+        $('#recycle-slot-count').removeClass('bg-secondary').addClass('bg-success');
+    } else {
+        btn.prop('disabled', true).removeClass('btn-danger').addClass('btn-dark');
+        $('#recycle-slot-count').removeClass('bg-success').addClass('bg-secondary');
+    }
+}
+
+async function confirmRecycle() {
+    // แปลงข้อมูลส่ง API
+    const cardsToRecycle = Object.keys(selectedRecycleCards).map(id => ({
+        cardId: id,
+        count: selectedRecycleCards[id]
+    }));
+
+    triggerHaptic('medium'); // สั่นตอนกดเริ่ม
+
+    // Animation: ไฟลุกโรงงาน
+    Swal.fire({
+        title: 'กำลังหลอมรวม...',
+        html: `
+            <div class="d-flex justify-content-center">
+                <lottie-player src="https://assets5.lottiefiles.com/packages/lf20_o75swmuk.json" background="transparent" speed="1" style="width: 200px; height: 200px;" loop autoplay></lottie-player>
+            </div>
+            <p class="text-danger fw-bold">เครื่องจักรกำลังทำงาน...</p>
+        `,
+        showConfirmButton: false,
+        allowOutsideClick: false,
+        timer: 2500
+    });
+
+    try {
+        await new Promise(r => setTimeout(r, 2500)); // รอ Animation จบ
+
+        const res = await callApi('/api/game/recycle-cards', { lineUserId: AppState.lineProfile.userId, cardsToRecycle }, 'POST');
+
+        // --- ส่วนนี้คือที่ต้องเติมกลับเข้าไปครับ ---
+        // 1. ปิด Modal
+        $('#recycle-modal').modal('hide');
+        
+        // 2. อัปเดตเหรียญที่หน้าจอ
+        $('#coin-display').text(res.newCoinBalance);
+        if(AppState.currentUser) AppState.currentUser.coinBalance = res.newCoinBalance;
+        // -------------------------------------
+
+        triggerHaptic('heavy'); // สั่นแรงตอนได้รางวัล
+
+        Swal.fire({
+            title: 'รีไซเคิลสำเร็จ!',
+            html: `
+                <div class="d-flex justify-content-center">
+                    <lottie-player src="https://assets3.lottiefiles.com/packages/lf20_5w2kxcpn.json" background="transparent" speed="1" style="width: 150px; height: 150px;" autoplay></lottie-player>
+                </div>
+                <h3>คุณได้รับ <b class="text-warning">+${res.rewardCoins}</b> เหรียญ</h3>
+            `,
+            confirmButtonText: 'เยี่ยมเลย',
+            confirmButtonColor: '#ffc107'
+        });
+
+    } catch (e) {
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
     }
 }

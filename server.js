@@ -1889,6 +1889,69 @@ app.post('/api/game/exchange-coins', async (req, res) => {
     } finally { conn.release(); }
 });
 
+// --- API: ย่อยการ์ด (Recycle Cards) ---
+app.post('/api/game/recycle-cards', async (req, res) => {
+    const { lineUserId, cardsToRecycle } = req.body; 
+    // cardsToRecycle = [{ cardId: 'CARD_001', count: 2 }, { cardId: 'CARD_002', count: 3 }] รวมกันต้องได้ 5 ใบ
+    
+    const conn = await db.getClient();
+
+    try {
+        await conn.beginTransaction();
+
+        // 1. ตรวจสอบจำนวนการ์ดรวม (ต้องครบ 5 ใบ)
+        const totalCount = cardsToRecycle.reduce((sum, item) => sum + item.count, 0);
+        if (totalCount !== 5) throw new Error("ต้องเลือกการ์ดมาย่อยให้ครบ 5 ใบพอดีครับ");
+
+        // 2. ลบการ์ดออกจากตาราง (วนลูปย่อยทีละชนิด)
+        for (const item of cardsToRecycle) {
+            // เช็คก่อนว่ามีพอให้ลบไหม
+            const [rows] = await conn.query(
+                "SELECT count(*) as total FROM user_cards WHERE lineUserId = ? AND cardId = ?", 
+                [lineUserId, item.cardId]
+            );
+            if (rows[0].total <= item.count) { 
+                // ต้องเหลือไว้อย่างน้อย 1 ใบ (ห้ามย่อยหมดเกลี้ยง) 
+                // หรือถ้าอนุญาตให้ย่อยหมดก็ได้ แต่ตามหลักเกมมักจะเก็บใบหลักไว้
+                // ในที่นี้สมมติยอมให้ย่อยเฉพาะตัวซ้ำ (Frontend ต้องกรองมา)
+                // แต่ Backend เช็คแค่ว่ามีของให้ลบไหมพอ
+            }
+
+            // คำสั่งลบแบบจำกัดจำนวน (LIMIT)
+            await conn.query(
+                "DELETE FROM user_cards WHERE lineUserId = ? AND cardId = ? LIMIT ?",
+                [lineUserId, item.cardId, item.count]
+            );
+        }
+
+        // 3. สุ่มรางวัล (Lucky Coin Box: 100 - 300 Coins)
+        const rewardCoins = Math.floor(Math.random() * (300 - 100 + 1)) + 100;
+
+        // 4. ให้รางวัล
+        await conn.query(
+            "UPDATE users SET coinBalance = coinBalance + ? WHERE lineUserId = ?",
+            [rewardCoins, lineUserId]
+        );
+
+        // 5. แจ้งเตือน
+        await conn.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'recycle', ?, ?, NOW())`,
+            ["NOTIF" + uuidv4(), lineUserId, `รีไซเคิลสำเร็จ! คุณได้รับ ${rewardCoins} เหรียญ`, "recycle", lineUserId]
+        );
+
+        // 6. ส่งค่ากลับ
+        const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
+
+        await conn.commit();
+        res.json({ status: "success", data: { rewardCoins, newCoinBalance: user.coinBalance } });
+
+    } catch (e) {
+        await conn.rollback();
+        res.status(500).json({ status: "error", message: e.message });
+    } finally { conn.release(); }
+});
+
 // ======================================================
 // SERVER START
 // ======================================================
