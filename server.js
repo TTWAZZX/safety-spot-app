@@ -1828,6 +1828,67 @@ app.post('/api/notifications/mark-read', async (req, res) => {
     res.json({ status: "success", data: { updated: true } });
 });
 
+// --- API: แลกเหรียญเป็นคะแนน (Exchange Coins to Score) ---
+app.post('/api/game/exchange-coins', async (req, res) => {
+    const { lineUserId } = req.body;
+    const COIN_COST = 10;  // จ่าย 10 เหรียญ
+    const POINT_GAIN = 2;  // ได้ 2 คะแนน
+    
+    const conn = await db.getClient();
+
+    try {
+        await conn.beginTransaction();
+
+        // 1. เช็คยอดเงินปัจจุบัน
+        const [[user]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
+        if (!user || user.coinBalance < COIN_COST) {
+            throw new Error(`เหรียญไม่พอครับ (มี ${user.coinBalance || 0} เหรียญ, ต้องการ ${COIN_COST} เหรียญ)`);
+        }
+
+        // 2. หักเหรียญ และ เพิ่มคะแนน
+        await conn.query(
+            "UPDATE users SET coinBalance = coinBalance - ?, totalScore = totalScore + ? WHERE lineUserId = ?", 
+            [COIN_COST, POINT_GAIN, lineUserId]
+        );
+
+        // 3. แจ้งเตือน (Notification)
+        await conn.query(
+            `INSERT INTO notifications 
+            (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'exchange', ?, ?, NOW())`,
+            [
+                "NOTIF" + uuidv4(),
+                lineUserId,
+                `แลกเปลี่ยนสำเร็จ! คุณใช้ ${COIN_COST} เหรียญ แลกรับ ${POINT_GAIN} คะแนนเรียบร้อยแล้ว`,
+                "exchange", // type ใหม่
+                null,
+                lineUserId
+            ]
+        );
+
+        // 4. เช็ค Badge อัตโนมัติ (เผื่อคะแนนถึงเกณฑ์แล้วได้โล่)
+        // (ฟังก์ชัน autoAwardBadgesForUser ต้องมีอยู่แล้วใน server.js ตามโค้ดเก่า)
+        // await autoAwardBadgesForUser(lineUserId, conn); 
+
+        // 5. ดึงค่าล่าสุดส่งกลับ
+        const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
+
+        await conn.commit();
+        
+        res.json({ 
+            status: "success", 
+            data: { 
+                remainingCoins: updatedUser.coinBalance,
+                newTotalScore: updatedUser.totalScore
+            } 
+        });
+
+    } catch (e) {
+        await conn.rollback();
+        res.status(500).json({ status: "error", message: e.message });
+    } finally { conn.release(); }
+});
+
 // ======================================================
 // SERVER START
 // ======================================================

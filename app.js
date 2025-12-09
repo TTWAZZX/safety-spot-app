@@ -1807,6 +1807,8 @@ function renderNotifications(notifications, container) {
         // --- ✨ ของใหม่ (เพิ่มตรงนี้) ✨ ---
         if (notif.type === 'game_quiz') icon = 'fa-puzzle-piece text-info'; // ไอคอนจิ๊กซอว์สีฟ้า
         if (notif.type === 'game_gacha') icon = 'fa-gift text-danger';      // ไอคอนกล่องของขวัญสีแดง
+        // ✨ เพิ่มบรรทัดนี้
+        if (notif.type === 'exchange') icon = 'fa-exchange-alt text-warning';
 
         const isUnreadClass = notif.isRead ? '' : 'list-group-item-light';
         const timeAgo = new Date(notif.createdAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short'});
@@ -2543,3 +2545,70 @@ async function handleDeleteCard() {
     }
 }
 
+// --- EXCHANGE SYSTEM ---
+
+async function exchangeCoinsToScore() {
+    // 1. ดึงค่าเหรียญปัจจุบันจากหน้าจอมาเช็คเบื้องต้น
+    const currentCoins = parseInt($('#coin-display').text()) || 0;
+    
+    if (currentCoins < 10) {
+        return Swal.fire({
+            icon: 'warning',
+            title: 'เหรียญไม่พอ!',
+            text: 'ต้องใช้ 10 เหรียญ เพื่อแลก 2 คะแนน\nไปเล่นเกมสะสมเหรียญก่อนนะ',
+            confirmButtonText: 'โอเค',
+            confirmButtonColor: '#6c757d'
+        });
+    }
+
+    // 2. ถามยืนยัน (Confirmation)
+    const result = await Swal.fire({
+        title: 'ยืนยันการแลก?',
+        html: `คุณต้องการใช้ <b class="text-warning">10 เหรียญ</b><br>เพื่อแลกรับ <b class="text-success">2 คะแนน</b> ใช่ไหม?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'แลกเลย!',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#FFC107', // สีทอง
+        cancelButtonColor: '#d33',
+        reverseButtons: true
+    });
+
+    if (result.isConfirmed) {
+        // Loading
+        Swal.fire({
+            title: 'กำลังแลกเปลี่ยน...',
+            timerProgressBar: true,
+            didOpen: () => { Swal.showLoading() }
+        });
+
+        try {
+            // 3. ยิง API
+            const res = await callApi('/api/game/exchange-coins', { lineUserId: AppState.lineProfile.userId }, 'POST');
+            
+            // 4. อัปเดต UI ทันที
+            $('#coin-display').text(res.remainingCoins);
+            // ถ้าหน้า Profile เปิดอยู่ หรือมีการเก็บตัวแปร Global
+            if(AppState.currentUser) {
+                AppState.currentUser.coinBalance = res.remainingCoins;
+                AppState.currentUser.totalScore = res.newTotalScore;
+            }
+            
+            // อัปเดตคะแนนที่ Header หน้า Home (ถ้ามี Element Id นี้)
+            $('#user-score').text(res.newTotalScore);
+            $('#profile-page-score').text(res.newTotalScore);
+
+            // 5. Success Message
+            Swal.fire({
+                icon: 'success',
+                title: 'แลกสำเร็จ!',
+                html: `ยอดคงเหลือ: <b>${res.remainingCoins} เหรียญ</b><br>คะแนนสะสมใหม่: <b class="text-success">${res.newTotalScore} คะแนน</b>`,
+                timer: 2000,
+                showConfirmButton: false
+            });
+
+        } catch (e) {
+            Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+        }
+    }
+}
