@@ -2277,7 +2277,7 @@ function startDailyQuiz() {
     loadGamePage(); 
 }
 
-// 3. ฟังก์ชันหมุนกาชา (Final Fix: ใช้ CSS Animation แทน Lottie เพื่อแก้ปัญหา 403 ถาวร)
+// 3. ฟังก์ชันหมุนกาชา (Premium Version: ใช้ Embedded Lottie - สวยและไม่มีวันพัง)
 async function pullGacha() {
     const currentCoins = parseInt($('#coin-display').text()) || 0;
     if(currentCoins < 100) {
@@ -2287,27 +2287,33 @@ async function pullGacha() {
 
     triggerHaptic('medium'); 
 
-    // --- Animation 1: กล่องของขวัญสั่น (Waiting) ---
-    // ใช้ไอคอน FontAwesome + animate.css (มีในโปรเจกต์อยู่แล้ว)
-    // animate__shakeY: สั่นแนวตั้ง, animate__infinite: สั่นไม่หยุด
+    // --- Lottie JSON Data (Gift Box) ---
+    // กล่องของขวัญเด้งดุ๊กดิ๊ก (สีทอง/แดง สวยมาก)
+    const lottieGift = "https://assets9.lottiefiles.com/packages/lf20_touohxv0.json"; 
+
+    // --- Lottie JSON Data (Confetti) ---
+    // พลุสายรุ้ง (Confetti) ตอนได้รางวัล
+    const lottieConfetti = "https://assets2.lottiefiles.com/packages/lf20_u4yrau.json";
+
+    // 1. แสดง Popup หมุนกาชา (ใช้ lottie-player)
     Swal.fire({
         title: 'กำลังสุ่ม...',
         html: `
-            <div class="py-4">
-                <i class="fas fa-gift text-danger" style="font-size: 8rem;"></i>
+            <div class="d-flex justify-content-center my-3">
+                <lottie-player src="${lottieGift}" background="transparent" speed="1" style="width: 250px; height: 250px;" loop autoplay></lottie-player>
             </div>
-            <p class="text-muted mt-2 fw-bold">ขอให้โชคดี!</p>
+            <p class="text-muted small">ขอให้โชคดี!</p>
         `,
-        didOpen: () => {
-            // เพิ่ม class animation หลังจาก render เสร็จเพื่อให้มันสั่น
-            const icon = Swal.getHtmlContainer().querySelector('.fa-gift');
-            icon.classList.add('animate__animated', 'animate__shakeY', 'animate__infinite');
-        },
         showConfirmButton: false,
-        allowOutsideClick: false
+        allowOutsideClick: false,
+        background: '#fff',
+        customClass: {
+            popup: 'rounded-4 shadow-lg'
+        }
     });
 
     try {
+        // ยิง API
         const res = await callApi('/api/game/gacha-pull', { lineUserId: AppState.lineProfile.userId }, 'POST');
         
         $('#coin-display').text(res.remainingCoins);
@@ -2315,22 +2321,35 @@ async function pullGacha() {
 
         triggerHaptic('heavy'); 
 
-        // --- Animation 2: ของรางวัลเด้งออกมา (Success) ---
-        // ใช้ animate__zoomInDown หรือ animate__jackInTheBox
+        // 2. แสดงผลรางวัล (Premium UI)
         Swal.fire({
-            title: '<span class="text-success">✨ ยินดีด้วย! ✨</span>',
+            title: '<span style="color:#2ecc71; font-weight:800; font-size:1.8rem;">✨ ยินดีด้วย! ✨</span>',
             html: `
-                <div class="py-3">
-                    <div class="animate__animated animate__zoomInDown">
-                        <img src="${getFullImageUrl(res.badge.imageUrl)}" class="rounded shadow border border-3 border-warning" style="width: 140px; height: 140px; object-fit: cover;">
+                <div class="position-relative d-flex justify-content-center align-items-center mb-4" style="height: 200px;">
+                    <div class="position-absolute" style="z-index: 1;">
+                        <lottie-player src="${lottieConfetti}" background="transparent" speed="1" style="width: 300px; height: 300px;" autoplay></lottie-player>
+                    </div>
+                    
+                    <div class="animate__animated animate__zoomInUp animate__faster" style="z-index: 2;">
+                        <img src="${getFullImageUrl(res.badge.imageUrl)}" 
+                             class="rounded-3 shadow-lg border border-3 border-warning" 
+                             style="width: 140px; height: 140px; object-fit: cover; background: #fff;">
                     </div>
                 </div>
-                <h4 class="fw-bold mt-2">${res.badge.badgeName}</h4>
-                <span class="badge bg-warning text-dark fs-6 px-3 py-2 rounded-pill shadow-sm">${res.badge.rarity || 'Common'}</span>
+
+                <h4 class="fw-bold text-dark mb-2">${res.badge.badgeName}</h4>
+                <div class="d-inline-block px-3 py-1 rounded-pill bg-warning bg-opacity-25 text-warning fw-bold mb-3 border border-warning">
+                    ${res.badge.rarity || 'Common'}
+                </div>
             `,
-            confirmButtonText: 'เก็บใส่สมุด',
+            confirmButtonText: '<i class="fas fa-save me-2"></i> เก็บใส่สมุด',
             confirmButtonColor: '#06C755',
-            backdrop: `rgba(0,0,123,0.4) url("https://media.tenor.com/On7kvXhzml4AAAAj/love-hearts.gif") left top no-repeat` // (Optional) ใส่ effect พลุกระดาษถ้าต้องการ หรือลบบรรทัดนี้ออกถ้าชอบคลีนๆ
+            padding: '2rem',
+            customClass: {
+                popup: 'rounded-4',
+                confirmButton: 'rounded-pill px-4 py-2 shadow-sm'
+            },
+            backdrop: `rgba(0,0,0,0.6)` // ฉากหลังมืดลงนิดนึงให้ของดูเด่น
         }).then(() => {
             loadGameDashboard();
         });
