@@ -809,8 +809,28 @@ app.post('/api/game/submit-answer', async (req, res) => {
             [earnedScore, earnedCoins, lineUserId]
         );
 
-        // 7. ดึงยอดเหรียญล่าสุดมาส่งกลับ (สำคัญมาก!)
+        // 7. ดึงยอดเหรียญล่าสุดมาส่งกลับ
         const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
+
+        // ==========================================
+        // ✨ เพิ่มแจ้งเตือน: ผลการเล่นเกม ✨
+        // ==========================================
+        const notifMsg = isCorrect 
+            ? `ภารกิจสำเร็จ! คุณได้รับ ${earnedCoins} เหรียญจากการตอบคำถามประจำวัน`
+            : `ตอบผิดรับรางวัลปลอบใจ ${earnedCoins} เหรียญ`;
+
+        await conn.query(
+            `INSERT INTO notifications 
+            (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'game_quiz', ?, ?, NOW())`,
+            [
+                "NOTIF" + uuidv4(),
+                lineUserId,
+                notifMsg,
+                questionId, // relatedItemId (ใช้เก็บ ID คำถามที่เล่น)
+                lineUserId  // triggeringUserId (ตัวเองเป็นคนทำ)
+            ]
+        );
 
         await conn.commit();
 
@@ -1589,6 +1609,22 @@ app.post('/api/game/gacha-pull', async (req, res) => {
 
         // 4. ให้ของ
         await conn.query("INSERT IGNORE INTO user_badges (lineUserId, badgeId) VALUES (?, ?)", [lineUserId, badge.badgeId]);
+
+        // ==========================================
+        // ✨ เพิ่มแจ้งเตือน: ได้การ์ดใหม่ ✨
+        // ==========================================
+        await conn.query(
+            `INSERT INTO notifications 
+            (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'game_gacha', ?, ?, NOW())`,
+            [
+                "NOTIF" + uuidv4(),
+                lineUserId,
+                `คุณได้รับ Safety Card ระดับ ${badge.rarity || 'ทั่วไป'}: "${badge.badgeName}" จากตู้กาชา`,
+                badge.badgeId, // relatedItemId (เก็บ ID การ์ดที่ได้)
+                lineUserId
+            ]
+        );
 
         await conn.commit();
         res.json({ status: "success", data: { badge, remainingCoins: user.coinBalance - GACHA_COST } });

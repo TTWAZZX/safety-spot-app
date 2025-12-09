@@ -1786,11 +1786,18 @@ function renderNotifications(notifications, container) {
     notifications.forEach(notif => {
         // ใส่ icon ตามประเภทของ notification
         let icon = 'fa-info-circle text-primary';
+        
+        // --- ของเดิม ---
         if (notif.type === 'like') icon = 'fa-thumbs-up text-primary';
         if (notif.type === 'comment') icon = 'fa-comment-dots text-success';
         if (notif.type === 'approved') icon = 'fa-check-circle text-success';
+        if (notif.type === 'rejected') icon = 'fa-times-circle text-danger'; // เพิ่มให้เผื่อไว้
         if (notif.type === 'score') icon = 'fa-star-half-alt text-warning';
         if (notif.type === 'badge') icon = 'fa-award text-warning';
+
+        // --- ✨ ของใหม่ (เพิ่มตรงนี้) ✨ ---
+        if (notif.type === 'game_quiz') icon = 'fa-puzzle-piece text-info'; // ไอคอนจิ๊กซอว์สีฟ้า
+        if (notif.type === 'game_gacha') icon = 'fa-gift text-danger';      // ไอคอนกล่องของขวัญสีแดง
 
         const isUnreadClass = notif.isRead ? '' : 'list-group-item-light';
         const timeAgo = new Date(notif.createdAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short'});
