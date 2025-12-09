@@ -49,10 +49,11 @@ $(document).ready(function() {
     bindAdminTabEventListeners();
 });
 
+// ในไฟล์ app.js ค้นหา function initializeAllModals()
 function initializeAllModals() {
-    // highlight-start
-    const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form', 'user-details', 'notification'];
-    // highlight-end
+    // เพิ่ม 'quiz' เข้าไปใน array นี้ครับ
+    const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form', 'user-details', 'notification', 'quiz'];
+    
     modalIds.forEach(id => {
         const modalElement = document.getElementById(`${id}-modal`);
         if (modalElement) {
@@ -1961,10 +1962,19 @@ $(document).on('click', '.answer-btn', async function() {
             });
         }
 
-        // รีเฟรชหน้าเกมเพื่อเปลี่ยนสถานะเป็น "เล่นจบแล้ว"
+        // ในไฟล์ app.js ส่วน event click ของ .answer-btn ท่อนล่างสุด
         setTimeout(() => {
-            $('#quiz-modal').modal('hide'); // ปิด Modal
-            loadGameDashboard(); // โหลดหน้า Dashboard ใหม่ (Streak/Coin จะไม่อัปเดตถ้าไม่เรียกอันนี้)
+            // แก้จาก $('#quiz-modal').modal('hide'); เป็น:
+            if (AppState.allModals['quiz']) {
+                AppState.allModals['quiz'].hide();
+            } else {
+                // Fallback
+                const modalEl = document.getElementById('quiz-modal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if(modal) modal.hide();
+            }
+            
+            loadGameDashboard(); 
         }, 2500);
 
     } catch (e) {
@@ -2268,12 +2278,19 @@ async function loadGameDashboard() {
 }
 
 // 2. ฟังก์ชันเริ่ม Quiz (ผูกกับปุ่ม "เริ่มเล่นเลย")
+// ในไฟล์ app.js ค้นหา function startDailyQuiz() และแก้เป็นแบบนี้ครับ
 function startDailyQuiz() {
-    // เปิด Modal Quiz
-    const quizModal = new bootstrap.Modal(document.getElementById('quiz-modal'));
-    quizModal.show();
+    // เรียกใช้จาก AppState แทนการ new bootstrap.Modal ใหม่
+    if (AppState.allModals['quiz']) {
+        AppState.allModals['quiz'].show();
+    } else {
+        // กันเหนียว เผื่อยังไม่ได้ init
+        const quizModal = new bootstrap.Modal(document.getElementById('quiz-modal'));
+        AppState.allModals['quiz'] = quizModal;
+        quizModal.show();
+    }
     
-    // โหลดคำถาม (ใช้ฟังก์ชันเดิมที่มีอยู่แล้ว)
+    // โหลดคำถาม
     loadGamePage(); 
 }
 
