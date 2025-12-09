@@ -94,10 +94,18 @@
 
                 <div class="bento-container pt-4">
                     
-                    <div class="bento-card theme-gacha span-row-2" onclick="pullGacha()">
-                        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/gift-box-4886619-4076329.png" class="bento-img-3d mb-3" style="width: 110px;">
+                    <div class="bento-card theme-hunter span-2 flex-row justify-content-between px-4 py-3" onclick="openHunterMenu()" style="min-height: 120px;">
+                        <div class="d-flex align-items-center">
+                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/target-4036049-3342332.png" class="bento-img-3d me-3" style="width: 75px;"> <div class="text-start">
+                                <div class="bento-title text-start" style="color: var(--text-main); font-size: 1.2rem;">Safety Hunter</div> <div class="bento-sub text-start">ค้นหาจุดเสี่ยงหน้างาน</div>
+                            </div>
+                        </div>
+                        <button class="btn-hunter-play shadow-lg align-self-center py-3">เล่นเลย</button> </div>
+
+                    <div class="bento-card theme-gacha" onclick="pullGacha()">
+                        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/gift-box-4886619-4076329.png" class="bento-img-3d mb-2" style="width: 70px;">
                         <div class="bento-title">ตู้สุ่มรางวัล</div>
-                        <div class="bento-sub mb-4">ลุ้นการ์ดแรร์!<br>100 Coins</div>
+                        <div class="bento-sub">ลุ้นการ์ดแรร์!<br>100 Coins</div>
                         <div class="btn-circle-soft" style="color: #d63384;"><i class="fas fa-play"></i></div>
                     </div>
 
@@ -105,23 +113,6 @@
                         <img src="https://cdn3d.iconscout.com/3d/premium/thumb/trophy-5650454-4708003.png" class="bento-img-3d mb-2" style="width: 60px;">
                         <div class="bento-title">ภารกิจ</div>
                         <div class="badge bg-success bg-opacity-10 text-success rounded-pill px-2 fw-bold">+50 Coins</div>
-                    </div>
-
-                    <div class="bento-card theme-exchange" onclick="exchangeCoinsToScore()">
-                        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/exchange-4841570-4043918.png" class="bento-img-3d mb-2" style="width: 60px;">
-                        <div class="bento-title">แลกแต้ม</div>
-                        <div class="bento-sub fw-bold">10 : 2</div>
-                    </div>
-
-                    <div class="bento-card theme-hunter span-2 flex-row justify-content-between px-4 py-3" onclick="openHunterMenu()">
-                        <div class="d-flex align-items-center">
-                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/target-4036049-3342332.png" class="bento-img-3d me-3" style="width: 65px;">
-                            <div class="text-start">
-                                <div class="bento-title text-start" style="color: var(--text-main);">Safety Hunter</div>
-                                <div class="bento-sub text-start">ค้นหาจุดเสี่ยงหน้างาน</div>
-                            </div>
-                        </div>
-                        <button class="btn-hunter-play shadow-lg">เล่นเลย</button>
                     </div>
 
                     <div class="bento-card theme-dark-utility span-2 flex-row justify-content-between px-4 py-3" onclick="openRecycleModal()">
@@ -137,12 +128,18 @@
                         <i class="fas fa-chevron-right opacity-75 fs-5"></i>
                     </div>
 
-                    <div class="span-2 mt-2">
+                    <div class="bento-card theme-exchange" onclick="exchangeCoinsToScore()">
+                        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/exchange-4841570-4043918.png" class="bento-img-3d mb-2" style="width: 60px;">
+                        <div class="bento-title">แลกแต้ม</div>
+                        <div class="bento-sub fw-bold">10 : 2</div>
+                    </div>
+
+                    <div class="span-1">
                         <div class="d-flex justify-content-between align-items-center mb-2 px-1">
-                            <small class="text-muted fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.7rem;">INVENTORY</small>
+                            <small class="text-muted fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.7rem;">MY CARDS</small>
                             <a href="#" class="text-decoration-none small fw-bold text-primary" onclick="openCardAlbum()">View All</a>
                         </div>
-                        <div class="inventory-grid">
+                        <div class="inventory-grid p-2">
                             <div class="d-flex gap-2 overflow-auto" id="mini-collection-list" style="grid-column: span 5; scrollbar-width: none;">
                                 <div class="text-center w-100 text-muted small py-2">Loading...</div>
                             </div>
@@ -151,6 +148,7 @@
 
                 </div>
             </div>
+
             <div id="activities-page" class="page">
                 <h4 class="mb-3 fw-bold">กิจกรรมทั้งหมด</h4>
                 <div id="all-activities-list"></div>
