@@ -2054,27 +2054,44 @@ function handleAddQuestion() {
 }
 
 function handleEditQuestion() {
-    const data = JSON.parse(decodeURIComponent($(this).data('q')));
-    
+    // ดึงข้อมูลจากปุ่ม Edit
+    const data = JSON.parse(decodeURIComponent($(this).data('question'))); 
+    // (หมายเหตุ: ตรวจสอบว่าปุ่ม Edit ใน HTML ส่ง data-question มาถูกต้องไหม)
+
     $('#question-form-title').text('แก้ไขคำถาม');
     $('#q-id').val(data.questionId);
     $('#q-text').val(data.questionText);
+    
+    // Set Options A-H
     $('#q-opt-a').val(data.optionA); $('#q-opt-b').val(data.optionB);
     $('#q-opt-c').val(data.optionC); $('#q-opt-d').val(data.optionD);
     $('#q-opt-e').val(data.optionE); $('#q-opt-f').val(data.optionF);
     $('#q-opt-g').val(data.optionG); $('#q-opt-h').val(data.optionH);
-    $(`input[name="correctOption"][value="${data.correctOption}"]`).prop('checked', true);
-    $('#q-score').val(data.scoreReward);
     
-    $('#q-image-url').val(data.imageUrl || '');
-    if (data.imageUrl) {
-        $('#q-image-preview').attr('src', getFullImageUrl(data.imageUrl)).show();
+    // Set Correct Option
+    $(`input[name="correctOption"][value="${data.correctOption}"]`).prop('checked', true);
+    
+    $('#q-score').val(data.scoreReward || 10);
+
+    // --- ส่วนจัดการรูปภาพ (Updated) ---
+    const currentImg = data.imageUrl || '';
+    $('#q-image-final-url').val(currentImg);
+    $('#q-image-url-text').val(currentImg); // ใส่ในช่อง URL เผื่อแก้ไข
+
+    // Show Preview
+    if (currentImg) {
+        $('#q-image-preview').attr('src', getFullImageUrl(currentImg)).show();
+        $('#q-no-preview-text').hide();
     } else {
         $('#q-image-preview').hide();
+        $('#q-no-preview-text').show();
     }
 
-    AppState.allModals['question-form'] = new bootstrap.Modal(document.getElementById('question-form-modal'));
-    AppState.allModals['question-form'].show();
+    // Reset กลับไปโหมด Upload เป็นค่าเริ่มต้น
+    $('#q-sourceUpload').prop('checked', true).trigger('change');
+    $('#q-image-input').val(''); 
+
+    new bootstrap.Modal(document.getElementById('question-form-modal')).show();
 }
 
 async function handleSaveQuestion(e) {
@@ -2083,13 +2100,24 @@ async function handleSaveQuestion(e) {
     btn.prop('disabled', true).text('กำลังบันทึก...');
 
     try {
-        // Handle Image Upload
-        const fileInput = $('#q-image-input')[0];
-        let finalImageUrl = $('#q-image-url').val();
+        // --- ส่วนจัดการรูปภาพ (Logic ใหม่) ---
+        const mode = $('input[name="q-imgSource"]:checked').val();
+        let finalImageUrl = $('#q-image-final-url').val(); // ค่าเดิม
 
-        if (fileInput.files.length > 0) {
-            finalImageUrl = await uploadImage(fileInput.files[0]);
+        if (mode === 'upload') {
+            // โหมดอัปโหลด: ถ้ามีไฟล์ใหม่ให้อัปโหลด
+            const fileInput = $('#q-image-input')[0];
+            if (fileInput.files.length > 0) {
+                finalImageUrl = await uploadImage(fileInput.files[0]);
+            }
+        } else {
+            // โหมดลิงก์: ใช้ค่าจากช่อง Text
+            const urlInput = $('#q-image-url-text').val().trim();
+            if (urlInput) {
+                finalImageUrl = urlInput;
+            }
         }
+        // ----------------------------------
 
         const payload = {
             questionId: $('#q-id').val(),
@@ -2100,14 +2128,20 @@ async function handleSaveQuestion(e) {
             optionG: $('#q-opt-g').val(), optionH: $('#q-opt-h').val(),
             correctOption: $('input[name="correctOption"]:checked').val(),
             scoreReward: $('#q-score').val(),
-            imageUrl: finalImageUrl
+            imageUrl: finalImageUrl // ส่ง URL รูปที่ได้
         };
 
         await callApi('/api/admin/questions', payload, 'POST');
         
-        AppState.allModals['question-form'].hide();
+        // ปิด Modal
+        const modalEl = document.getElementById('question-form-modal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+
         showSuccess('บันทึกข้อมูลเรียบร้อย');
-        handleManageQuestions(); // Refresh list
+        
+        // Refresh List (ถ้ามีฟังก์ชันโหลดรายการคำถาม ให้เรียกตรงนี้)
+        // loadAdminQuestions(); 
 
     } catch (e) {
         showError(e.message);
@@ -2786,3 +2820,41 @@ async function confirmRecycle() {
         Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
     }
 }
+
+// --- ADMIN QUESTION: Image Toggle Logic ---
+
+// สลับโหมด Upload / URL
+$(document).on('change', 'input[name="q-imgSource"]', function() {
+    const mode = $(this).val();
+    if(mode === 'upload') {
+        $('#q-input-group-upload').show();
+        $('#q-input-group-url').hide();
+    } else {
+        $('#q-input-group-upload').hide();
+        $('#q-input-group-url').show();
+    }
+});
+
+// Preview เมื่อใส่ URL Text
+$('#q-image-url-text').on('input', function() {
+    const url = $(this).val().trim();
+    if(url) {
+        $('#q-image-preview').attr('src', url).show();
+        $('#q-no-preview-text').hide();
+    } else {
+        $('#q-image-preview').hide();
+        $('#q-no-preview-text').show();
+    }
+});
+
+// Preview เมื่อเลือกไฟล์ (File Input)
+$('#q-image-input').on('change', function() {
+    if (this.files && this.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) { 
+            $('#q-image-preview').attr('src', e.target.result).show();
+            $('#q-no-preview-text').hide();
+        }
+        reader.readAsDataURL(this.files[0]);
+    }
+});

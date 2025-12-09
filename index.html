@@ -68,139 +68,111 @@
 
             <div id="game-page" class="page">
                 
-                <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-4" 
-                    style="background: linear-gradient(to right, #06C755, #049d43); border-radius: 0 0 25px 25px; color: white;">
+                <div class="d-flex justify-content-between align-items-center px-4 pt-4 pb-4 premium-hud-header">
                     
                     <div class="d-flex align-items-center">
-                        <div class="bg-white text-success rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 40px; height: 40px;">
-                            <i class="fas fa-fire fa-lg"></i>
+                        <div class="hud-icon-box me-3">
+                            <i class="fas fa-fire fa-lg text-danger"></i>
                         </div>
                         <div>
-                            <small class="d-block opacity-75" style="font-size: 0.7rem;">ต่อเนื่อง</small>
-                            <span class="fw-bold" id="streak-display">0 วัน</span>
+                            <small class="label-premium">ต่อเนื่อง</small>
+                            <div class="premium-number" id="streak-display">0 วัน</div>
                         </div>
                     </div>
 
                     <div class="d-flex align-items-center">
-                        <div class="text-end me-2">
-                            <small class="d-block opacity-75" style="font-size: 0.7rem;">เหรียญสะสม</small>
-                            <span class="fw-bold" id="coin-display">0</span>
+                        <div class="text-end me-3">
+                            <small class="label-premium">เหรียญสะสม</small>
+                            <div class="premium-number text-warning" id="coin-display">0</div>
                         </div>
-                        <div class="bg-warning text-dark rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);">
-                            <i class="fas fa-coins fa-lg"></i>
+                        <div class="hud-icon-box">
+                            <i class="fas fa-coins fa-lg text-warning"></i>
                         </div>
                     </div>
                 </div>
 
-                <div class="container mt-n4" style="padding-bottom: 80px;">
+                <div class="container mt-n4" style="padding-bottom: 90px; position: relative; z-index: 20;">
                     
-                    <div class="card border-0 shadow-sm rounded-4 mb-3 overflow-hidden">
-                        <div class="card-body p-0">
-                            <div class="row g-0">
-                                <div class="col-4 bg-light d-flex align-items-center justify-content-center">
-                                    <img src="https://cdn-icons-png.flaticon.com/512/2936/2936886.png" width="60" alt="Quiz">
+                    <div class="card premium-card card-mission mb-3">
+                        <div class="card-body p-2">
+                            <div class="row g-0 align-items-center">
+                                <div class="col-4 text-center">
+                                    <div class="position-relative d-inline-block">
+                                        <div class="position-absolute top-50 start-50 translate-middle bg-success rounded-circle opacity-25" style="width: 60px; height: 60px; filter: blur(8px);"></div>
+                                        <img src="https://cdn-icons-png.flaticon.com/512/2936/2936886.png" width="65" style="position: relative; z-index: 2;">
+                                    </div>
                                 </div>
-                                <div class="col-8 p-3">
-                                    <h6 class="fw-bold mb-1">ภารกิจประจำวัน</h6>
-                                    <p class="small text-muted mb-2">ตอบคำถามรับ 50 เหรียญ</p>
-                                    <button class="btn btn-sm btn-success w-100 rounded-pill" onclick="startDailyQuiz()">
-                                        <i class="fas fa-play me-1"></i> เริ่มเล่นเลย
+                                <div class="col-8 p-3 ps-0">
+                                    <h6 class="fw-bold mb-1 text-dark">ภารกิจประจำวัน</h6>
+                                    <p class="small text-muted mb-3">ตอบคำถามรับ 50 เหรียญ</p>
+                                    <button class="btn btn-action-pill btn-play w-100" onclick="startDailyQuiz()">
+                                        <i class="fas fa-play me-2"></i> เริ่มเล่น
                                     </button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="card border-0 shadow-sm rounded-4 mb-3" style="background: linear-gradient(135deg, #FF9966 0%, #FF5E62 100%); color: white;">
+                    <div class="card premium-card card-gacha mb-3">
                         <div class="card-body text-center py-4 position-relative overflow-hidden">
-                            <i class="fas fa-star position-absolute opacity-25" style="top: 10px; left: 10px; font-size: 2rem;"></i>
-                            <i class="fas fa-gift position-absolute opacity-25" style="bottom: 10px; right: 10px; font-size: 3rem;"></i>
+                            <i class="fas fa-gift position-absolute text-danger opacity-10" style="right: -10px; bottom: -10px; font-size: 5rem; transform: rotate(-15deg);"></i>
 
-                            <h4 class="fw-bold mb-1">ตู้สุ่ม Safety Gacha</h4>
-                            <p class="small opacity-75 mb-3">ลุ้นรับการ์ดแรร์ระดับตำนาน!</p>
+                            <h4 class="fw-bold text-dark mb-1">ตู้สุ่ม Safety Gacha</h4>
+                            <p class="small text-muted mb-3">ลุ้นรับการ์ดแรร์ระดับตำนาน!</p>
                             
-                            <div class="bg-white text-dark d-inline-block px-3 py-1 rounded-pill mb-3 shadow-sm">
-                                <small>ใช้ <i class="fas fa-coins text-warning"></i> 100 เหรียญ / ครั้ง</small>
+                            <div class="bg-white border d-inline-block px-3 py-1 rounded-pill mb-3 shadow-sm">
+                                <small class="text-secondary fw-bold">ใช้ <i class="fas fa-coins text-warning"></i> 100 เหรียญ</small>
                             </div>
 
-                            <button class="btn btn-light text-danger fw-bold w-100 rounded-pill shadow" onclick="pullGacha()">
+                            <div class="mb-3">
+                                <i class="fas fa-gem text-danger fa-3x animate__animated animate__tada animate__infinite animate__slow"></i>
+                            </div>
+
+                            <button class="btn btn-action-pill btn-gacha w-75" onclick="pullGacha()">
                                 หมุนตู้เลย!
                             </button>
                         </div>
                     </div>
 
-                    <div class="card border-0 shadow-sm rounded-4 mb-3" style="background: linear-gradient(135deg, #FFD700 0%, #FDB931 100%); color: #5a4a07;">
-                        <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                            <div class="d-flex align-items-center">
-                                <div class="bg-white rounded-circle d-flex align-items-center justify-content-center shadow-sm me-3" style="width: 50px; height: 50px;">
-                                    <i class="fas fa-exchange-alt text-warning fa-lg"></i>
-                                </div>
-                                <div>
-                                    <h6 class="fw-bold mb-0">แลกคะแนนพิเศษ</h6>
-                                    <small style="opacity: 0.8;">10 เหรียญ <i class="fas fa-arrow-right mx-1" style="font-size: 0.7em;"></i> 2 คะแนน</small>
-                                </div>
-                            </div>
-                            <button class="btn btn-dark rounded-pill px-3 fw-bold shadow-sm" onclick="exchangeCoinsToScore()">
-                                แลกเลย
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="card border-0 shadow-sm rounded-4 mb-3" style="background: linear-gradient(135deg, #434343 0%, #000000 100%); color: white;">
-                        <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                            <div class="d-flex align-items-center">
-                                <div class="bg-dark border border-secondary rounded-circle d-flex align-items-center justify-content-center shadow-sm me-3" style="width: 50px; height: 50px;">
-                                    <i class="fas fa-recycle text-success fa-lg"></i>
-                                </div>
-                                <div>
-                                    <h6 class="fw-bold mb-0 text-white">โรงงานรีไซเคิล</h6>
-                                    <small class="text-white-50">ย่อยการ์ดซ้ำ 5 ใบ <i class="fas fa-arrow-right mx-1"></i> สุ่มเหรียญ</small>
-                                </div>
-                            </div>
-                            <button class="btn btn-outline-light rounded-pill px-3 fw-bold btn-sm" onclick="openRecycleModal()">
-                                เริ่มงาน
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="modal fade" id="recycle-modal" tabindex="-1">
-                        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-                            <div class="modal-content border-0 shadow-lg">
-                                <div class="modal-header border-0 bg-dark text-white">
-                                    <h5 class="modal-title"><i class="fas fa-industry me-2"></i>เลือกการ์ดซ้ำมาย่อย</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body bg-light">
-                                    <div class="alert alert-secondary small mb-3">
-                                        <i class="fas fa-info-circle me-1"></i> เลือกการ์ดให้ครบ <b>5 ใบ</b> เพื่อเริ่มเดินเครื่องจักร
+                    <div class="row g-3 mb-3">
+                        
+                        <div class="col-6">
+                            <div class="card premium-card card-gold h-100">
+                                <div class="card-body p-3 text-center d-flex flex-column justify-content-between">
+                                    <div>
+                                        <div class="mb-2"><i class="fas fa-exchange-alt fa-2x text-warning"></i></div>
+                                        <h6 class="fw-bold text-dark mb-0">แลกคะแนน</h6>
+                                        <small class="text-muted" style="font-size: 0.7rem;">10 เหรียญ = 2 แต้ม</small>
                                     </div>
-                                    
-                                    <div class="d-flex justify-content-center mb-4 gap-2">
-                                        <div id="recycle-slot-count" class="badge bg-danger rounded-pill fs-5 shadow">0 / 5</div>
-                                    </div>
-
-                                    <div id="recycle-list" class="list-group">
-                                        </div>
-                                </div>
-                                <div class="modal-footer border-0 bg-white">
-                                    <button id="btn-confirm-recycle" class="btn btn-dark w-100 py-2 rounded-pill" disabled onclick="confirmRecycle()">
-                                        <i class="fas fa-fire me-2"></i> เดินเครื่องจักร (ย่อยการ์ด)
-                                    </button>
+                                    <button class="btn btn-action-pill btn-exchange w-100 mt-2 btn-sm" onclick="exchangeCoinsToScore()">แลก</button>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center mb-2 px-1">
-                        <h6 class="fw-bold m-0 text-secondary">การ์ดของฉัน</h6>
-                        <a href="#" class="small text-decoration-none" onclick="openCardAlbum()">ดูทั้งหมด ></a>
+                        
+                        <div class="col-6">
+                            <div class="card premium-card card-recycle h-100">
+                                <div class="card-body p-3 text-center d-flex flex-column justify-content-between">
+                                    <div>
+                                        <div class="mb-2"><i class="fas fa-recycle fa-2x text-secondary"></i></div>
+                                        <h6 class="fw-bold text-dark mb-0">รีไซเคิล</h6>
+                                        <small class="text-muted" style="font-size: 0.7rem;">ย่อยการ์ดซ้ำ</small>
+                                    </div>
+                                    <button class="btn btn-action-pill btn-recycle w-100 mt-2 btn-sm" onclick="openRecycleModal()">เริ่ม</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="card border-0 shadow-sm rounded-4">
-                        <div class="card-body">
-                            <div class="d-flex gap-2 overflow-auto" id="mini-collection-list">
-                                <div class="bg-light rounded text-center p-3" style="min-width: 80px;">
-                                    <small class="text-muted">Loading...</small>
+                    <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                        <h6 class="fw-bold text-dark m-0">การ์ดของฉัน</h6>
+                        <a href="#" class="small text-muted text-decoration-none" onclick="openCardAlbum()">ดูทั้งหมด ></a>
+                    </div>
+                    
+                    <div class="card premium-card border-0">
+                        <div class="card-body p-3">
+                            <div class="d-flex gap-2 overflow-auto" id="mini-collection-list" style="scrollbar-width: none;">
+                                <div class="mini-card-slot">
+                                    <small class="text-muted" style="font-size: 0.6rem;">Loading</small>
                                 </div>
                             </div>
                         </div>
@@ -673,10 +645,29 @@
 
                         <div class="mb-3">
                             <label class="form-label">รูปประกอบ (ถ้ามี)</label>
-                            <input type="file" class="form-control" id="q-image-input" accept="image/*">
-                            <input type="hidden" id="q-image-url">
-                            <div class="mt-2 text-center">
-                                <img id="q-image-preview" src="" style="max-height: 100px; display:none;" class="rounded border">
+                            
+                            <div class="btn-group w-100 mb-2" role="group">
+                                <input type="radio" class="btn-check" name="q-imgSource" id="q-sourceUpload" value="upload" checked>
+                                <label class="btn btn-outline-success" for="q-sourceUpload"><i class="fas fa-upload me-1"></i> อัปโหลดไฟล์</label>
+
+                                <input type="radio" class="btn-check" name="q-imgSource" id="q-sourceUrl" value="url">
+                                <label class="btn btn-outline-primary" for="q-sourceUrl"><i class="fas fa-link me-1"></i> ใส่ลิงก์รูป</label>
+                            </div>
+
+                            <div id="q-input-group-upload">
+                                <input type="file" class="form-control" id="q-image-input" accept="image/*">
+                                <div class="form-text small">รองรับไฟล์ .png, .jpg</div>
+                            </div>
+
+                            <div id="q-input-group-url" style="display:none;">
+                                <input type="text" class="form-control" id="q-image-url-text" placeholder="https://example.com/image.png">
+                                <div class="form-text small">วางลิงก์รูปภาพโดยตรงจากเว็บอื่น</div>
+                            </div>
+
+                            <input type="hidden" id="q-image-final-url"> <div class="mt-3 text-center bg-light rounded p-2 border" style="min-height: 100px;">
+                                <p class="text-muted small mb-1">ตัวอย่างรูปภาพ</p>
+                                <img id="q-image-preview" src="" style="max-height: 150px; max-width: 100%; display:none;" class="rounded">
+                                <span id="q-no-preview-text" class="text-muted small">- ยังไม่มีรูป -</span>
                             </div>
                         </div>
                         

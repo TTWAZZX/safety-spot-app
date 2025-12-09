@@ -435,3 +435,117 @@ body {
     white-space: normal;     /* อนุญาตให้ตัดคำขึ้นบรรทัดใหม่ */
     /* -------------------------------- */
 }
+
+/* =========================================
+   MODERN CLEAN UI (Light & Premium)
+   ========================================= */
+
+/* 1. พื้นหลังหน้าเกม: สะอาด สบายตา */
+#game-page {
+    background-color: #f3f5f9; /* เทาฟ้าอ่อนๆ ดูแพง */
+    background-image: radial-gradient(#e3e6ec 1px, transparent 1px); /* ลายจุดจางๆ */
+    background-size: 20px 20px;
+    min-height: 100vh;
+    color: #2c3e50; /* ตัวหนังสือสีเข้มอ่านง่าย */
+}
+
+/* 2. ส่วนหัว HUD (ปรับให้เข้ากับธีมสว่าง) */
+.premium-hud-header {
+    background: #ffffff !important;
+    border-radius: 0 0 30px 30px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); /* เงาฟุ้งๆ */
+    padding-bottom: 30px;
+    position: relative;
+    z-index: 10;
+}
+
+.hud-icon-box {
+    width: 48px; height: 48px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 16px; /* เหลี่ยมมน ทันสมัยกว่าวงกลม */
+    background: #f8f9fa;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); /* เงาบุ๋มลงไป */
+}
+
+/* ตัวเลขขนาดใหญ่ */
+.premium-number {
+    font-family: 'Kanit', sans-serif;
+    font-weight: 700;
+    font-size: 1.4rem;
+    color: #2c3e50;
+    line-height: 1.2;
+}
+.label-premium {
+    font-size: 0.7rem;
+    color: #95a5a6;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* 3. การ์ดพรีเมียมแบบคลีน (White Cards) */
+.premium-card {
+    background: #ffffff;
+    border: none;
+    border-radius: 24px;
+    /* เงาแบบ Soft UI */
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 5px 10px -5px rgba(0, 0, 0, 0.02);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    overflow: hidden;
+    position: relative;
+}
+
+.premium-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* การ์ดสีพิเศษ (ใช้ Gradient อ่อนๆ สบายตา) */
+.card-mission {
+    background: linear-gradient(135deg, #ffffff 0%, #f0fff4 100%); /* ขาวอมเขียว */
+    border: 1px solid rgba(6, 199, 85, 0.1);
+}
+.card-gacha {
+    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%); /* ขาวอมชมพู */
+    border: 1px solid rgba(255, 94, 98, 0.1);
+}
+.card-gold {
+    background: linear-gradient(135deg, #fffcf0 0%, #ffffff 100%); /* ขาวอมเหลือง */
+    border: 1px solid rgba(255, 215, 0, 0.1);
+}
+.card-recycle {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); /* ขาวเทา */
+    border: 1px solid rgba(0,0,0,0.05);
+}
+.card-hunter {
+    background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); /* ขาวอมฟ้า */
+    border: 1px solid rgba(30, 60, 114, 0.1);
+}
+
+/* 4. ปุ่ม Action สวยๆ */
+.btn-action-pill {
+    border-radius: 50px;
+    padding: 8px 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+    border: none;
+}
+.btn-action-pill:active { transform: scale(0.95); }
+
+/* สีปุ่ม */
+.btn-play { background: linear-gradient(90deg, #06C755, #049d43); color: white; }
+.btn-gacha { background: linear-gradient(90deg, #FF5E62, #FF9966); color: white; }
+.btn-exchange { background: linear-gradient(90deg, #FFD700, #FDB931); color: #5a4a07; }
+.btn-recycle { background: linear-gradient(90deg, #2c3e50, #434343); color: white; }
+.btn-hunter { background: linear-gradient(90deg, #2a5298, #1e3c72); color: white; }
+
+/* 5. Mini Collection แบบใส */
+.mini-card-slot {
+    background: #f1f3f5;
+    border-radius: 16px;
+    min-width: 70px; height: 70px;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px dashed #dee2e6;
+}
