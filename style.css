@@ -549,3 +549,67 @@ body {
     display: flex; align-items: center; justify-content: center;
     border: 2px dashed #dee2e6;
 }
+
+/* --- PREMIUM GACHA OVERLAY --- */
+.gacha-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85); /* พื้นหลังมืดสนิท */
+    z-index: 9999;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    backdrop-filter: blur(5px);
+}
+
+/* แสงรัศมีหมุนๆ ด้านหลัง (Sunburst) */
+.gacha-burst {
+    position: absolute; width: 600px; height: 600px;
+    background: conic-gradient(from 0deg, transparent 0%, rgba(255,215,0,0.3) 10%, transparent 20%, rgba(255,215,0,0.3) 30%, transparent 40%, rgba(255,215,0,0.3) 50%, transparent 60%, rgba(255,215,0,0.3) 70%, transparent 80%, rgba(255,215,0,0.3) 90%, transparent 100%);
+    animation: spin 10s linear infinite;
+    z-index: -1;
+    border-radius: 50%;
+    filter: blur(20px);
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* การ์ด 3D */
+.gacha-card-container {
+    perspective: 1000px; width: 220px; height: 300px; margin-bottom: 20px;
+}
+.gacha-card {
+    width: 100%; height: 100%; position: relative;
+    transform-style: preserve-3d; transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.gacha-card.flipped { transform: rotateY(180deg); }
+
+.gacha-face {
+    position: absolute; width: 100%; height: 100%;
+    backface-visibility: hidden; border-radius: 15px;
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+    display: flex; align-items: center; justify-content: center;
+}
+
+/* หลังการ์ด (ลาย Safety) */
+.gacha-back {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    border: 4px solid #ffd700;
+}
+.gacha-back::after {
+    content: "SAFETY"; font-weight: 900; color: rgba(255,255,255,0.1);
+    font-size: 2rem; transform: rotate(-45deg);
+}
+
+/* หน้าการ์ด (รูปรางวัล) */
+.gacha-front {
+    background: white; transform: rotateY(180deg);
+    border: 4px solid #ffd700; flex-direction: column; padding: 10px;
+}
+
+/* ปุ่มปิดแบบเท่ๆ */
+.btn-claim {
+    background: linear-gradient(90deg, #FFD700, #ffb900);
+    border: none; color: #5a4a07; font-weight: bold;
+    padding: 12px 40px; border-radius: 50px;
+    font-size: 1.2rem; margin-top: 20px;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    opacity: 0; transition: opacity 0.5s ease 0.5s; /* โผล่มาช้ากว่าเพื่อน */
+}
+.btn-claim.show { opacity: 1; pointer-events: all; }

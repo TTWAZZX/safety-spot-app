@@ -2277,7 +2277,7 @@ function startDailyQuiz() {
     loadGamePage(); 
 }
 
-// 3. ฟังก์ชันหมุนกาชา (Premium Version: ใช้ Embedded Lottie - สวยและไม่มีวันพัง)
+// 3. ฟังก์ชันหมุนกาชา (Ultra Premium: Card Reveal Style)
 async function pullGacha() {
     const currentCoins = parseInt($('#coin-display').text()) || 0;
     if(currentCoins < 100) {
@@ -2287,74 +2287,74 @@ async function pullGacha() {
 
     triggerHaptic('medium'); 
 
-    // --- Lottie JSON Data (Gift Box) ---
-    // กล่องของขวัญเด้งดุ๊กดิ๊ก (สีทอง/แดง สวยมาก)
-    const lottieGift = "https://assets9.lottiefiles.com/packages/lf20_touohxv0.json"; 
-
-    // --- Lottie JSON Data (Confetti) ---
-    // พลุสายรุ้ง (Confetti) ตอนได้รางวัล
-    const lottieConfetti = "https://assets2.lottiefiles.com/packages/lf20_u4yrau.json";
-
-    // 1. แสดง Popup หมุนกาชา (ใช้ lottie-player)
-    Swal.fire({
-        title: 'กำลังสุ่ม...',
-        html: `
-            <div class="d-flex justify-content-center my-3">
-                <lottie-player src="${lottieGift}" background="transparent" speed="1" style="width: 250px; height: 250px;" loop autoplay></lottie-player>
+    // 1. สร้าง Overlay มารอไว้ก่อน (ยังไม่ใส่ข้อมูล)
+    const overlayId = 'gacha-' + Date.now();
+    const overlayHtml = `
+        <div id="${overlayId}" class="gacha-overlay animate__animated animate__fadeIn">
+            <div class="gacha-burst"></div>
+            
+            <h2 class="text-white fw-bold mb-4 animate__animated animate__pulse animate__infinite">กำลังสุ่ม...</h2>
+            
+            <div class="gacha-card-container">
+                <div class="gacha-card" id="card-${overlayId}">
+                    <div class="gacha-face gacha-back">
+                        <i class="fas fa-shield-alt text-warning" style="font-size: 4rem;"></i>
+                    </div>
+                    <div class="gacha-face gacha-front">
+                        <img id="img-${overlayId}" src="" class="img-fluid mb-2" style="max-height: 150px;">
+                        <div class="badge bg-warning text-dark mb-1" id="rarity-${overlayId}">...</div>
+                        <h5 class="fw-bold text-dark text-center" id="name-${overlayId}">...</h5>
+                    </div>
+                </div>
             </div>
-            <p class="text-muted small">ขอให้โชคดี!</p>
-        `,
-        showConfirmButton: false,
-        allowOutsideClick: false,
-        background: '#fff',
-        customClass: {
-            popup: 'rounded-4 shadow-lg'
-        }
-    });
+
+            <button class="btn-claim" id="btn-${overlayId}">เก็บใส่สมุด</button>
+        </div>
+    `;
+    $('body').append(overlayHtml);
 
     try {
-        // ยิง API
+        // 2. ยิง API ขอข้อมูล
         const res = await callApi('/api/game/gacha-pull', { lineUserId: AppState.lineProfile.userId }, 'POST');
         
+        // อัปเดตเหรียญ background
         $('#coin-display').text(res.remainingCoins);
         if(AppState.currentUser) AppState.currentUser.coinBalance = res.remainingCoins;
 
-        triggerHaptic('heavy'); 
+        // 3. ใส่ข้อมูลลงในการ์ด (แต่ยังไม่พลิก)
+        $(`#img-${overlayId}`).attr('src', getFullImageUrl(res.badge.imageUrl));
+        $(`#name-${overlayId}`).text(res.badge.badgeName);
+        $(`#rarity-${overlayId}`).text(res.badge.rarity || 'Common');
+        
+        // เปลี่ยนข้อความเป็น "แตะเพื่อเปิด!"
+        $(`#${overlayId} h2`).text("แตะเพื่อเปิด!");
 
-        // 2. แสดงผลรางวัล (Premium UI)
-        Swal.fire({
-            title: '<span style="color:#2ecc71; font-weight:800; font-size:1.8rem;">✨ ยินดีด้วย! ✨</span>',
-            html: `
-                <div class="position-relative d-flex justify-content-center align-items-center mb-4" style="height: 200px;">
-                    <div class="position-absolute" style="z-index: 1;">
-                        <lottie-player src="${lottieConfetti}" background="transparent" speed="1" style="width: 300px; height: 300px;" autoplay></lottie-player>
-                    </div>
-                    
-                    <div class="animate__animated animate__zoomInUp animate__faster" style="z-index: 2;">
-                        <img src="${getFullImageUrl(res.badge.imageUrl)}" 
-                             class="rounded-3 shadow-lg border border-3 border-warning" 
-                             style="width: 140px; height: 140px; object-fit: cover; background: #fff;">
-                    </div>
-                </div>
+        // 4. รอให้ user แตะการ์ดเพื่อพลิก (เพิ่ม Interactive)
+        $(`#${overlayId}`).one('click', function() {
+            triggerHaptic('heavy');
+            $(`#card-${overlayId}`).addClass('flipped'); // พลิกการ์ด
+            $(`#${overlayId} h2`).text("ยินดีด้วย!").addClass('text-warning'); // เปลี่ยนหัวข้อ
+            $(`#btn-${overlayId}`).addClass('show'); // โชว์ปุ่มรับ
+            
+            // เอฟเฟกต์พลุ (Confetti)
+            Swal.fire({
+                title: '',
+                width: 0, padding: 0, background: 'transparent',
+                backdrop: `rgba(0,0,0,0) url("https://assets2.lottiefiles.com/packages/lf20_u4yrau.json") center center no-repeat`,
+                timer: 2000, showConfirmButton: false
+            });
+        });
 
-                <h4 class="fw-bold text-dark mb-2">${res.badge.badgeName}</h4>
-                <div class="d-inline-block px-3 py-1 rounded-pill bg-warning bg-opacity-25 text-warning fw-bold mb-3 border border-warning">
-                    ${res.badge.rarity || 'Common'}
-                </div>
-            `,
-            confirmButtonText: '<i class="fas fa-save me-2"></i> เก็บใส่สมุด',
-            confirmButtonColor: '#06C755',
-            padding: '2rem',
-            customClass: {
-                popup: 'rounded-4',
-                confirmButton: 'rounded-pill px-4 py-2 shadow-sm'
-            },
-            backdrop: `rgba(0,0,0,0.6)` // ฉากหลังมืดลงนิดนึงให้ของดูเด่น
-        }).then(() => {
+        // 5. ปุ่มปิด
+        $(`#btn-${overlayId}`).on('click', function(e) {
+            e.stopPropagation(); // กันไปทับ click overlay
+            $(`#${overlayId}`).removeClass('animate__fadeIn').addClass('animate__fadeOut');
+            setTimeout(() => $(`#${overlayId}`).remove(), 500); // ลบ HTML ทิ้ง
             loadGameDashboard();
         });
 
     } catch (e) {
+        $(`#${overlayId}`).remove();
         Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
     }
 }
