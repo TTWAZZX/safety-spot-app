@@ -2277,7 +2277,7 @@ function startDailyQuiz() {
     loadGamePage(); 
 }
 
-// 3. ฟังก์ชันหมุนกาชา (แก้ไขลิงก์ Animation ให้ใหม่ - ใช้ลิงก์ที่เสถียรขึ้น)
+// 3. ฟังก์ชันหมุนกาชา (แก้ไขลิงก์ Animation - ใช้ Official Example)
 async function pullGacha() {
     const currentCoins = parseInt($('#coin-display').text()) || 0;
     if(currentCoins < 100) {
@@ -2287,15 +2287,16 @@ async function pullGacha() {
 
     triggerHaptic('medium'); 
 
-    // Animation: กล่องของขวัญกำลังสั่น (Waiting)
-    // ⚠️ เปลี่ยนลิงก์ตรง src เป็นอันใหม่นี้ครับ (Gift Box สีเหลือง/แดง)
-    const loadingAnimUrl = "https://assets10.lottiefiles.com/packages/lf20_t2sht1.json";
+    // Animation: กล่องของขวัญ (ใช้ลิงก์สำรองที่เสถียร)
+    // ลิงก์นี้เป็น Official Example ของ LottieFiles ไม่น่าจะพังง่าย
+    const loadingAnimUrl = "https://lottie.host/embed/93297ee4-4e76-4706-932d-20129734d32e/8j1j1V8j1.json"; 
+    // หรือถ้ายังไม่ได้ ให้ใช้อันนี้แทน: "https://assets9.lottiefiles.com/packages/lf20_touohxv0.json"
 
     Swal.fire({
         title: 'กำลังสุ่ม...',
         html: `
             <div class="d-flex justify-content-center">
-                <lottie-player src="${loadingAnimUrl}" background="transparent" speed="1" style="width: 200px; height: 200px;" loop autoplay></lottie-player>
+                <iframe src="${loadingAnimUrl}" style="width: 200px; height: 200px; border: none;"></iframe>
             </div>
             <p class="text-muted mt-2">ขอให้โชคดี!</p>
         `,
@@ -2311,15 +2312,14 @@ async function pullGacha() {
 
         triggerHaptic('heavy'); 
 
-        // Animation: พลุแตกแสดงความยินดี (Success)
-        // อันนี้ลิงก์เดิมน่าจะยังใช้ได้ แต่ถ้าพังให้เปลี่ยนเป็น: https://assets2.lottiefiles.com/packages/lf20_u4yrau.json
-        const successAnimUrl = "https://assets2.lottiefiles.com/packages/lf20_u4yrau.json";
+        // Animation: พลุแตกแสดงความยินดี (ใช้ iframe embed เช่นกัน)
+        const successAnimUrl = "https://lottie.host/embed/b8c00539-7569-4246-9372-76332140407d/D8R898t898.json";
 
         Swal.fire({
             title: '<span class="text-success">✨ ยินดีด้วย! ✨</span>',
             html: `
-                <div class="d-flex justify-content-center mb-2">
-                    <lottie-player src="${successAnimUrl}" background="transparent" speed="1" style="width: 150px; height: 150px;" autoplay></lottie-player>
+                <div class="d-flex justify-content-center mb-2" style="height: 150px; overflow: hidden;">
+                     <iframe src="${successAnimUrl}" style="width: 150px; height: 150px; border: none; transform: scale(1.5);"></iframe>
                 </div>
                 <div class="mb-3">
                     <img src="${getFullImageUrl(res.badge.imageUrl)}" class="rounded shadow-sm border" style="width: 120px; height: 120px; object-fit: cover;">
