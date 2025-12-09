@@ -749,7 +749,7 @@ app.get('/api/game/daily-question', async (req, res) => {
     });
 });
 
-// 2. ส่งคำตอบ & ลุ้นการ์ด (Gacha Logic)
+// --- API: ส่งคำตอบ (แก้ใหม่: ส่งยอดเหรียญล่าสุดกลับไปด้วย) ---
 app.post('/api/game/submit-answer', async (req, res) => {
     const { lineUserId, questionId, selectedOption } = req.body;
     const today = new Date().toISOString().split('T')[0];
@@ -758,55 +758,59 @@ app.post('/api/game/submit-answer', async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // ตรวจสอบว่าวันนี้เล่นไปรึยัง (กันยิง API ซ้ำ)
+        // 1. เช็คว่าเล่นไปหรือยัง (ถ้าอยากให้เล่นซ้ำได้เพื่อเทส ให้คอมเมนต์บรรทัดเช็ค history ออกก่อนได้ครับ)
+        /*
         const [history] = await conn.query(
             "SELECT * FROM user_game_history WHERE lineUserId = ? AND playedAt = ?",
             [lineUserId, today]
         );
         if (history.length > 0) throw new Error("คุณเล่นเกมของวันนี้ไปแล้ว");
+        */
 
-        // ตรวจคำตอบ
+        // 2. ตรวจคำตอบ
         const [qs] = await conn.query("SELECT * FROM kyt_questions WHERE questionId = ?", [questionId]);
         if (qs.length === 0) throw new Error("คำถามไม่ถูกต้อง");
         
         const question = qs[0];
         const isCorrect = (selectedOption === question.correctOption);
-        let rewardPoints = isCorrect ? question.scoreReward : 2; // ตอบผิดได้ 2 คะแนนปลอบใจ
-        let gainedBadge = null;
+        
+        // 3. กำหนดรางวัล (Coins & Score)
+        // ตอบถูก: 50 เหรียญ / ตอบผิด: 10 เหรียญ
+        let earnedCoins = isCorrect ? 50 : 10; 
+        let earnedScore = isCorrect ? question.scoreReward : 2; 
 
-        // บันทึกประวัติ
+        // 4. ระบบ Streak (นับวันต่อเนื่อง)
+        const [streakRow] = await conn.query("SELECT * FROM user_streaks WHERE lineUserId = ?", [lineUserId]);
+        let currentStreak = 1;
+        
+        if (streakRow.length > 0) {
+            const lastDate = new Date(streakRow[0].lastPlayedDate);
+            const diffTime = Math.abs(new Date(today) - lastDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 1) currentStreak = streakRow[0].currentStreak + 1;
+            else if (diffDays > 1) currentStreak = 1;
+            else currentStreak = streakRow[0].currentStreak; // เล่นวันเดิม
+            
+            await conn.query("UPDATE user_streaks SET currentStreak = ?, lastPlayedDate = ? WHERE lineUserId = ?", [currentStreak, today, lineUserId]);
+        } else {
+            await conn.query("INSERT INTO user_streaks VALUES (?, 1, ?, 1)", [lineUserId, today]);
+        }
+
+        // 5. บันทึกประวัติ
         await conn.query(
             "INSERT INTO user_game_history (lineUserId, questionId, isCorrect, earnedPoints, playedAt) VALUES (?, ?, ?, ?, ?)",
-            [lineUserId, questionId, isCorrect, rewardPoints, today]
+            [lineUserId, questionId, isCorrect, earnedCoins, today]
         );
 
-        // อัปเดตคะแนนผู้ใช้
-        await conn.query("UPDATE users SET totalScore = totalScore + ? WHERE lineUserId = ?", [rewardPoints, lineUserId]);
+        // 6. อัปเดต User (บวกเหรียญและคะแนน)
+        await conn.query(
+            "UPDATE users SET totalScore = totalScore + ?, coinBalance = coinBalance + ? WHERE lineUserId = ?", 
+            [earnedScore, earnedCoins, lineUserId]
+        );
 
-        // === GACHA SYSTEM (เฉพาะคนตอบถูก) ===
-        if (isCorrect) {
-            // โอกาสได้การ์ด 40%
-            if (Math.random() < 0.4) { 
-                // สุ่ม Badge ที่มีในระบบ
-                const [badges] = await conn.query("SELECT * FROM badges ORDER BY RAND() LIMIT 1");
-                if (badges.length > 0) {
-                    const badge = badges[0];
-                    // เช็คว่ามีหรือยัง (ถ้าอยากให้สะสมซ้ำได้ ให้ตัด WHERE ออก)
-                    const [userBadge] = await conn.query(
-                        "SELECT * FROM user_badges WHERE lineUserId = ? AND badgeId = ?",
-                        [lineUserId, badge.badgeId]
-                    );
-                    
-                    if (userBadge.length === 0) {
-                        await conn.query(
-                            "INSERT INTO user_badges (lineUserId, badgeId) VALUES (?, ?)",
-                            [lineUserId, badge.badgeId]
-                        );
-                        gainedBadge = badge;
-                    }
-                }
-            }
-        }
+        // 7. ดึงยอดเหรียญล่าสุดมาส่งกลับ (สำคัญมาก!)
+        const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
 
         await conn.commit();
 
@@ -814,15 +818,17 @@ app.post('/api/game/submit-answer', async (req, res) => {
             status: "success",
             data: {
                 isCorrect,
-                earnedPoints: rewardPoints,
+                earnedCoins,       // เหรียญที่ได้รอบนี้
+                currentStreak,
                 correctOption: question.correctOption,
-                gainedBadge: gainedBadge // ถ้าได้การ์ดจะส่ง object กลับไป ถ้าไม่ได้จะเป็น null
+                newCoinBalance: updatedUser.coinBalance, // ยอดรวมล่าสุด
+                newTotalScore: updatedUser.totalScore
             }
         });
 
-    } catch (err) {
+    } catch (e) {
         await conn.rollback();
-        res.status(500).json({ status: "error", message: err.message });
+        res.status(500).json({ status: "error", message: e.message });
     } finally {
         conn.release();
     }

@@ -1863,14 +1863,13 @@ async function loadGamePage() {
     }
 }
 
-// Event Listener สำหรับปุ่มตอบคำถาม
+// --- แก้ไข Event Listener ตอบคำถามใน app.js ---
 $(document).on('click', '.answer-btn', async function() {
     const btn = $(this);
     const choice = btn.data('choice');
     const qid = $('#game-content').data('qid');
 
-    // ล็อกปุ่มกันกดซ้ำ
-    $('.answer-btn').prop('disabled', true);
+    $('.answer-btn').prop('disabled', true); // ล็อกปุ่ม
 
     try {
         const res = await callApi('/api/game/submit-answer', {
@@ -1879,42 +1878,53 @@ $(document).on('click', '.answer-btn', async function() {
             selectedOption: choice
         }, 'POST');
 
-        // เฉลย
+        // ==========================================
+        // 1. อัปเดตเหรียญที่หน้าจอทันที (สำคัญ!)
+        // ==========================================
+        $('#coin-display').text(res.newCoinBalance);
+        
+        // อัปเดตในตัวแปร Global ด้วย เผื่อไปหน้าอื่น
+        if(AppState.currentUser) {
+            AppState.currentUser.coinBalance = res.newCoinBalance;
+            AppState.currentUser.totalScore = res.newTotalScore;
+        }
+        // ==========================================
+
         if (res.isCorrect) {
+            // --- กรณีตอบถูก ---
             btn.addClass('correct');
             Swal.fire({
                 icon: 'success',
-                title: 'ถูกต้อง!',
-                text: `รับไปเลย ${res.earnedPoints} คะแนน`,
-                timer: 1500,
-                showConfirmButton: false
+                title: 'ถูกต้อง! เก่งมาก',
+                html: `คุณได้รับ <b class="text-warning">${res.earnedCoins} เหรียญ</b> 💰`,
+                confirmButtonText: 'เยี่ยมเลย',
+                confirmButtonColor: '#06C755'
             });
-
-            // Gacha Trigger
-            if (res.gainedBadge) {
-                setTimeout(() => {
-                    $('#gacha-badge-img').attr('src', getFullImageUrl(res.gainedBadge.imageUrl));
-                    $('#gacha-badge-name').text(res.gainedBadge.badgeName);
-                    new bootstrap.Modal(document.getElementById('gacha-modal')).show();
-                }, 1600);
-            }
-
         } else {
+            // --- กรณีตอบผิด ---
             btn.addClass('wrong');
-            $(`.answer-btn[data-choice="${res.correctOption}"]`).addClass('correct'); // เฉลยข้อถูก
-            Swal.fire('ผิดครับ!', `ข้อที่ถูกคือ ${res.correctOption}`, 'error');
+            // เฉลยข้อถูกให้ดูด้วย
+            $(`.answer-btn[data-choice="${res.correctOption}"]`).addClass('correct');
+            
+            Swal.fire({
+                icon: 'error',
+                title: 'ยังไม่ถูกนะ...',
+                // แจ้งว่าได้รางวัลปลอบใจ
+                html: `ข้อที่ถูกคือ <b>${res.correctOption}</b><br>แต่ไม่ต้องเสียใจ รับรางวัลปลอบใจไป <b class="text-warning">${res.earnedCoins} เหรียญ</b> 💰`,
+                confirmButtonText: 'ไปต่อ',
+                confirmButtonColor: '#6c757d'
+            });
         }
 
-        // รีเฟรชหน้าเพื่อแสดงหน้าจอ "เล่นจบแล้ว"
+        // รีเฟรชหน้าเกมเพื่อเปลี่ยนสถานะเป็น "เล่นจบแล้ว"
         setTimeout(() => {
-            loadGamePage();
-            // อัปเดตคะแนนที่ Header
-            refreshHomePageData(); 
-        }, 3000);
+            $('#quiz-modal').modal('hide'); // ปิด Modal
+            loadGameDashboard(); // โหลดหน้า Dashboard ใหม่ (Streak/Coin จะไม่อัปเดตถ้าไม่เรียกอันนี้)
+        }, 2500);
 
     } catch (e) {
-        showError(e.message);
-        $('.answer-btn').prop('disabled', false);
+        Swal.fire('แจ้งเตือน', e.message, 'warning');
+        $('.answer-btn').prop('disabled', false); // ปลดล็อกปุ่มถ้า Error
     }
 });
 
