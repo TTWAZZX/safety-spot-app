@@ -148,14 +148,67 @@
             </div>
 
             <div class="modal fade" id="quiz-modal" tabindex="-1">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header border-0 pb-0">
-                            <h5 class="modal-title fw-bold">Daily Quiz</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-dialog modal-dialog-centered modal-lg"> <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+                        
+                        <div class="modal-header border-0 text-white p-4" style="background: linear-gradient(135deg, #06C755 0%, #048a3b 100%);">
+                            <div>
+                                <h5 class="modal-title fw-bold"><i class="fas fa-gamepad me-2"></i>Daily Safety Quiz</h5>
+                                <p class="mb-0 small opacity-75">ตอบถูกรับ 50 เหรียญ / ตอบผิดรับ 10 เหรียญ</p>
+                            </div>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
-                        <div class="modal-body">
-                            <div id="quiz-content-placeholder"></div>
+
+                        <div class="modal-body p-0 bg-light">
+                            
+                            <div id="game-container" class="p-4">
+                                
+                                <div id="game-loading" class="text-center py-5">
+                                    <div class="spinner-border text-success" style="width: 3rem; height: 3rem;"></div>
+                                    <p class="mt-3 text-muted fw-bold">กำลังโหลดคำถาม...</p>
+                                </div>
+
+                                <div id="game-content" style="display:none;">
+                                    
+                                    <div class="text-center mb-4 rounded-3 overflow-hidden bg-white shadow-sm position-relative" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
+                                        <img id="question-image" src="" class="img-fluid w-100" style="object-fit: contain; max-height: 250px; display:none;">
+                                        <div id="no-image-icon" style="display:none;">
+                                            <i class="fas fa-clipboard-question text-secondary fa-3x opacity-25"></i>
+                                            <p class="small text-muted mt-2">ไม่มีรูปภาพประกอบ</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="card border-0 shadow-sm mb-4">
+                                        <div class="card-body p-4 text-center">
+                                            <span class="badge bg-warning text-dark mb-2">คำถาม</span>
+                                            <h5 id="question-text" class="fw-bold lh-base mb-0" style="color: #2c3e50;">...</h5>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-grid gap-3">
+                                        <button class="answer-btn shadow-sm" data-choice="A">
+                                            <span class="choice-badge">A</span>
+                                            <span id="option-a" class="flex-grow-1 text-start">...</span>
+                                        </button>
+
+                                        <button class="answer-btn shadow-sm" data-choice="B">
+                                            <span class="choice-badge">B</span>
+                                            <span id="option-b" class="flex-grow-1 text-start">...</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="game-played" class="text-center py-5" style="display:none;">
+                                    <div class="mb-3 animate__animated animate__bounceIn">
+                                        <i class="fas fa-check-circle text-success" style="font-size: 5rem; filter: drop-shadow(0 10px 10px rgba(25, 135, 84, 0.3));"></i>
+                                    </div>
+                                    <h3 class="fw-bold text-dark">เยี่ยมมาก!</h3>
+                                    <p class="text-muted px-4">คุณทำภารกิจวันนี้สำเร็จแล้ว<br>กลับมาใหม่พรุ่งนี้นะครับ</p>
+                                    <button class="btn btn-outline-secondary rounded-pill px-4 mt-2" data-bs-dismiss="modal">
+                                        ปิดหน้าต่าง
+                                    </button>
+                                </div>
+
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -374,3 +374,43 @@ body {
     background-color: #dc3545;
     color: white;
 }
+
+/* Styling สำหรับปุ่มคำตอบใน Modal */
+.answer-btn {
+    border: 2px solid #e9ecef;
+    background-color: #ffffff;
+    color: #333;
+    border-radius: 12px;
+    padding: 15px 20px;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%; /* ให้เต็มความกว้าง */
+}
+
+.answer-btn:hover {
+    background-color: #f8f9fa;
+    border-color: var(--line-green);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.choice-badge {
+    background: #e9ecef;
+    color: #6c757d;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+/* สถานะตอบถูก/ผิด */
+.answer-btn.correct { background-color: #d1e7dd !important; border-color: #198754 !important; }
+.answer-btn.wrong { background-color: #f8d7da !important; border-color: #dc3545 !important; }
