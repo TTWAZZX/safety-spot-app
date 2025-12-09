@@ -2214,3 +2214,95 @@ async function pullGacha() {
         Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
     }
 }
+
+// --- CARD ALBUM LOGIC ---
+
+async function openCardAlbum() {
+    const modal = new bootstrap.Modal(document.getElementById('card-album-modal'));
+    modal.show();
+    
+    const container = $('#album-grid');
+    container.html('<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div></div>');
+
+    try {
+        const res = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
+        const cards = res; // API คืนค่าเป็น Array ใน data
+
+        container.empty();
+        
+        let ownedCount = 0;
+        cards.forEach(c => {
+            if (c.isOwned) ownedCount++;
+            
+            // กำหนดสีตาม Rarity
+            let borderColor = '#dee2e6'; // Common
+            let bgBadge = 'bg-secondary';
+            if (c.rarity === 'R') { borderColor = '#0dcaf0'; bgBadge = 'bg-info'; }
+            if (c.rarity === 'SR') { borderColor = '#d63384'; bgBadge = 'bg-danger'; }
+            if (c.rarity === 'UR') { borderColor = '#ffc107'; bgBadge = 'bg-warning text-dark'; }
+
+            // Effect การ์ดที่ยังไม่มี (Greyscale)
+            const imgFilter = c.isOwned ? '' : 'filter: grayscale(100%); opacity: 0.5;';
+            const countBadge = c.count > 1 ? `<span class="position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger border border-white">+${c.count}</span>` : '';
+
+            const html = `
+                <div class="col-4 col-sm-3 mb-2">
+                    <div class="card h-100 border-0 shadow-sm position-relative" style="overflow: visible;">
+                        ${countBadge}
+                        <div class="card-body p-2 text-center d-flex flex-column align-items-center">
+                            <div class="rounded-3 mb-2 d-flex align-items-center justify-content-center" 
+                                 style="width: 100%; aspect-ratio: 1/1; border: 2px solid ${borderColor}; background: #fff; overflow: hidden;">
+                                <img src="${getFullImageUrl(c.imageUrl)}" class="img-fluid" style="${imgFilter}" onerror="this.src='https://placehold.co/100?text=?'">
+                            </div>
+                            <span class="badge ${bgBadge} mb-1" style="font-size: 0.6rem;">${c.rarity}</span>
+                            <small class="d-block text-truncate w-100 fw-bold" style="font-size: 0.7rem;">${c.cardName}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.append(html);
+        });
+
+        // Update Progress
+        const progress = Math.round((ownedCount / cards.length) * 100);
+        $('#album-progress-text').text(`${ownedCount}/${cards.length}`);
+        $('#album-progress-bar').css('width', `${progress}%`);
+
+    } catch (e) {
+        console.error(e);
+        container.html('<p class="text-danger text-center">โหลดข้อมูลไม่สำเร็จ</p>');
+    }
+}
+
+// อัปเดตฟังก์ชัน loadGameDashboard ให้ดึง Card แทน Badge
+async function loadGameDashboard() {
+    // ... (โค้ดเดิมส่วน Coin/Streak) ...
+    const user = AppState.currentUser;
+    $('#coin-display').text(user.coinBalance || 0);
+    $('#streak-display').text((user.currentStreak || 0) + " วัน");
+
+    // --- ส่วนที่แก้: ดึง Safety Cards แทน Badges ---
+    try {
+        // ใช้ API ใหม่ที่เราเพิ่งสร้าง
+        const cards = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
+        const recentCards = cards.filter(c => c.isOwned).slice(0, 5); // เอา 5 ใบแรก (หรือจะ sort by obtainedAt ถ้าทำได้)
+        
+        const list = $('#mini-collection-list');
+        list.empty();
+        
+        if(recentCards.length === 0) {
+            list.html('<div class="text-muted small p-2">ยังไม่มีการ์ด</div>');
+        } else {
+            recentCards.forEach(c => {
+                let borderColor = '#dee2e6';
+                if (c.rarity === 'UR') borderColor = '#ffc107';
+                
+                list.append(`
+                    <img src="${getFullImageUrl(c.imageUrl)}" class="rounded border bg-white" 
+                         style="width: 50px; height: 50px; object-fit: cover; border-color: ${borderColor} !important;" 
+                         data-bs-toggle="tooltip" title="${c.cardName}">
+                `);
+            });
+        }
+    } catch (e) { console.error(e); }
+}

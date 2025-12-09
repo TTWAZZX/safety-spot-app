@@ -131,7 +131,7 @@
 
                     <div class="d-flex justify-content-between align-items-center mb-2 px-1">
                         <h6 class="fw-bold m-0 text-secondary">การ์ดของฉัน</h6>
-                        <a href="#profile" class="small text-decoration-none" onclick="$('[data-page=profile-page]').click()">ดูทั้งหมด ></a>
+                        <a href="#" class="small text-decoration-none" onclick="openCardAlbum()">ดูทั้งหมด ></a>
                     </div>
                     
                     <div class="card border-0 shadow-sm rounded-4">
@@ -614,6 +614,35 @@
 
                         <button type="submit" class="btn btn-primary w-100 py-2">บันทึกข้อมูล</button>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="card-album-modal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header border-0 bg-white shadow-sm">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-book-open text-primary me-2"></i>สมุดสะสมการ์ด</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light p-3">
+                    
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-body py-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <small class="fw-bold text-muted">ความคืบหน้าการสะสม</small>
+                                <small class="fw-bold text-primary" id="album-progress-text">0/0</small>
+                            </div>
+                            <div class="progress" style="height: 10px; border-radius: 10px;">
+                                <div id="album-progress-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="album-grid" class="row g-2">
+                        </div>
+
                 </div>
             </div>
         </div>

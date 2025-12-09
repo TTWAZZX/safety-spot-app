@@ -1580,6 +1580,7 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
 });
 
 // --- API: หมุนกาชา (ใช้ Coin แลกของ) ---
+// --- API: หมุนกาชา (ฉบับอัปเดต: ใช้ safety_cards) ---
 app.post('/api/game/gacha-pull', async (req, res) => {
     const { lineUserId } = req.body;
     const GACHA_COST = 100; // ค่าหมุน 100 เหรียญ
@@ -1595,20 +1596,29 @@ app.post('/api/game/gacha-pull', async (req, res) => {
         // 2. หักเงิน
         await conn.query("UPDATE users SET coinBalance = coinBalance - ? WHERE lineUserId = ?", [GACHA_COST, lineUserId]);
 
-        // 3. สุ่มของ (Logic เกลือ)
-        // Rate: UR=1%, SR=5%, R=20%, C=74%
+        // 3. สุ่มการ์ด (แยกตาม Rarity)
         const rand = Math.random() * 100;
-        let rarity = 'C';
-        if (rand < 1) rarity = 'UR';
-        else if (rand < 6) rarity = 'SR';
-        else if (rand < 26) rarity = 'R';
+        let rarityPool = ['C']; // Default
+        if (rand < 5) rarityPool = ['UR'];        // 5% (0-4)
+        else if (rand < 20) rarityPool = ['SR'];  // 15% (5-19)
+        else if (rand < 50) rarityPool = ['R'];   // 30% (20-49)
+        else rarityPool = ['C'];                  // 50% (50-99)
 
-        // ดึงการ์ดตาม Rarity (ต้องมี column rarity ใน DB badges ด้วยนะครับ หรือสุ่มมั่วไปก่อนก็ได้)
-        const [badges] = await conn.query("SELECT * FROM badges ORDER BY RAND() LIMIT 1"); // สมมติสุ่มมั่วก่อน
-        const badge = badges[0];
+        // ดึงการ์ดสุ่มจาก Rarity ที่ได้ จากตาราง safety_cards
+        const [cards] = await conn.query("SELECT * FROM safety_cards WHERE rarity IN (?) ORDER BY RAND() LIMIT 1", [rarityPool]);
+        
+        let card;
+        if (cards.length > 0) {
+            card = cards[0];
+        } else {
+            // กันเหนียว: ถ้าไม่มีการ์ดใน Rarity นั้น ให้สุ่มมั่วๆ มาใบหนึ่งจากทั้งหมด
+            const [backup] = await conn.query("SELECT * FROM safety_cards ORDER BY RAND() LIMIT 1");
+            if (backup.length === 0) throw new Error("ระบบยังไม่มีข้อมูลการ์ด");
+            card = backup[0];
+        }
 
-        // 4. ให้ของ
-        await conn.query("INSERT IGNORE INTO user_badges (lineUserId, badgeId) VALUES (?, ?)", [lineUserId, badge.badgeId]);
+        // 4. บันทึกว่าได้การ์ด (Insert ลง user_cards แทน user_badges)
+        await conn.query("INSERT INTO user_cards (lineUserId, cardId) VALUES (?, ?)", [lineUserId, card.cardId]);
 
         // ==========================================
         // ✨ เพิ่มแจ้งเตือน: ได้การ์ดใหม่ ✨
@@ -1620,19 +1630,50 @@ app.post('/api/game/gacha-pull', async (req, res) => {
             [
                 "NOTIF" + uuidv4(),
                 lineUserId,
-                `คุณได้รับ Safety Card ระดับ ${badge.rarity || 'ทั่วไป'}: "${badge.badgeName}" จากตู้กาชา`,
-                badge.badgeId, // relatedItemId (เก็บ ID การ์ดที่ได้)
+                `คุณได้รับ Safety Card ระดับ ${card.rarity || 'ทั่วไป'}: "${card.cardName}" จากตู้กาชา`,
+                card.cardId, // relatedItemId (เก็บ ID การ์ดที่ได้)
                 lineUserId
             ]
         );
 
         await conn.commit();
-        res.json({ status: "success", data: { badge, remainingCoins: user.coinBalance - GACHA_COST } });
+        
+        // ส่งข้อมูลกลับ (Mapping ชื่อให้ Frontend เข้าใจง่าย โดยส่ง badgeName ไปด้วยเผื่อ Frontend เดิมใช้ชื่อนี้)
+        res.json({ 
+            status: "success", 
+            data: { 
+                badge: { ...card, badgeName: card.cardName }, 
+                remainingCoins: user.coinBalance - GACHA_COST 
+            } 
+        });
 
     } catch (e) {
         await conn.rollback();
         res.status(500).json({message: e.message});
     } finally { conn.release(); }
+});
+
+// --- API: ดึงการ์ดสะสมของผู้ใช้ (แยกจาก Badges) ---
+app.get('/api/user/cards', async (req, res) => {
+    const { lineUserId } = req.query;
+    
+    // ดึงการ์ดทั้งหมดที่มีในระบบ
+    const [allCards] = await db.query("SELECT * FROM safety_cards ORDER BY rarity DESC, cardName ASC");
+    
+    // ดึงการ์ดที่ user มี
+    const [userCards] = await db.query("SELECT cardId, COUNT(*) as count FROM user_cards WHERE lineUserId = ? GROUP BY cardId", [lineUserId]);
+    
+    // แปลงเป็น Map เพื่อเช็คว่ามีกี่ใบ
+    const ownedMap = {};
+    userCards.forEach(c => ownedMap[c.cardId] = c.count);
+
+    const result = allCards.map(c => ({
+        ...c,
+        isOwned: !!ownedMap[c.cardId], // มีหรือไม่มี
+        count: ownedMap[c.cardId] || 0 // จำนวนที่ซ้ำ
+    }));
+
+    res.json({ status: "success", data: result });
 });
 
 // ======================================================
