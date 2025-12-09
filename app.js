@@ -2375,16 +2375,55 @@ async function handleManageCards() {
     }
 }
 
+// ==========================================
+//  ADMIN: CARD MANAGEMENT LOGIC (UPDATED)
+// ==========================================
+
+// 1. ฟังก์ชันสลับโหมด Upload / URL (ใส่ไว้ที่ Global Scope หรือใน bindAdminEventListeners)
+$(document).ready(function() {
+    // เมื่อกดเปลี่ยน Radio Button
+    $(document).on('change', 'input[name="imgSource"]', function() {
+        const mode = $(this).val();
+        if(mode === 'upload') {
+            $('#input-group-upload').show();
+            $('#input-group-url').hide();
+        } else {
+            $('#input-group-upload').hide();
+            $('#input-group-url').show();
+        }
+    });
+
+    // Preview เมื่อใส่ URL ในช่อง Text
+    $('#card-image-url-text').on('input', function() {
+        const url = $(this).val().trim();
+        if(url) {
+            $('#card-image-preview').attr('src', url).show();
+            $('#no-preview-text').hide();
+        } else {
+            $('#card-image-preview').hide();
+            $('#no-preview-text').show();
+        }
+    });
+});
+
+// 2. ฟังก์ชันเตรียมฟอร์มเพิ่มการ์ดใหม่
 function handleAddCard() {
     $('#card-form-title').text('เพิ่มการ์ดใหม่');
     $('#card-form')[0].reset();
     $('#card-id').val('');
+    $('#card-image-final-url').val('');
+    
+    // รีเซ็ต Preview
     $('#card-image-preview').hide().attr('src', '');
-    $('#card-image-url').val('');
+    $('#no-preview-text').show();
+    
+    // รีเซ็ตกลับไปโหมด Upload
+    $('#sourceUpload').prop('checked', true).trigger('change');
     
     new bootstrap.Modal(document.getElementById('card-form-modal')).show();
 }
 
+// 3. ฟังก์ชันเตรียมฟอร์มแก้ไขการ์ด
 function handleEditCard() {
     const data = JSON.parse(decodeURIComponent($(this).data('card')));
     
@@ -2394,27 +2433,49 @@ function handleEditCard() {
     $('#card-desc').val(data.description);
     $('#card-rarity').val(data.rarity);
     
-    $('#card-image-url').val(data.imageUrl || '');
-    if (data.imageUrl) {
-        $('#card-image-preview').attr('src', getFullImageUrl(data.imageUrl)).show();
+    // เก็บค่ารูปเดิมไว้
+    const currentImg = data.imageUrl || '';
+    $('#card-image-final-url').val(currentImg);
+    $('#card-image-url-text').val(currentImg); // ใส่ในช่อง URL เผื่อแอดมินอยากแก้ลิงก์
+
+    // แสดง Preview
+    if (currentImg) {
+        $('#card-image-preview').attr('src', getFullImageUrl(currentImg)).show();
+        $('#no-preview-text').hide();
     } else {
         $('#card-image-preview').hide();
+        $('#no-preview-text').show();
     }
+
+    // Default เป็น Upload mode แต่ถ้าอยากให้ฉลาดกว่านี้ อาจจะเช็คว่าถ้าเป็น http ให้เด้งไป URL mode ก็ได้
+    $('#sourceUpload').prop('checked', true).trigger('change');
+    $('#card-image-input').val(''); // ล้างค่า input file
 
     new bootstrap.Modal(document.getElementById('card-form-modal')).show();
 }
 
+// 4. ฟังก์ชันบันทึกข้อมูล (Save)
 async function handleSaveCard(e) {
     e.preventDefault();
     const btn = $(this).find('button[type="submit"]');
     btn.prop('disabled', true).text('กำลังบันทึก...');
 
     try {
-        const fileInput = $('#card-image-input')[0];
-        let finalImageUrl = $('#card-image-url').val();
+        const mode = $('input[name="imgSource"]:checked').val();
+        let finalImageUrl = $('#card-image-final-url').val(); // ค่าตั้งต้น = รูปเดิม
 
-        if (fileInput.files.length > 0) {
-            finalImageUrl = await uploadImage(fileInput.files[0]);
+        if (mode === 'upload') {
+            // โหมดอัปโหลด: ถ้ามีการเลือกไฟล์ใหม่ ให้อัปโหลด
+            const fileInput = $('#card-image-input')[0];
+            if (fileInput.files.length > 0) {
+                finalImageUrl = await uploadImage(fileInput.files[0]);
+            }
+        } else {
+            // โหมดลิงก์: ใช้ค่าจากช่อง Text
+            const urlInput = $('#card-image-url-text').val().trim();
+            if (urlInput) {
+                finalImageUrl = urlInput;
+            }
         }
 
         const payload = {
@@ -2427,20 +2488,19 @@ async function handleSaveCard(e) {
 
         await callApi('/api/admin/cards', payload, 'POST');
         
-        // ปิด Modal Form
-        const formModalEl = document.getElementById('card-form-modal');
-        const formModal = bootstrap.Modal.getInstance(formModalEl);
-        formModal.hide();
+        // ปิด Modal และ Refresh
+        const modalEl = document.getElementById('card-form-modal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
 
         showSuccess('บันทึกข้อมูลเรียบร้อย');
         
-        // รีเฟรชหน้าลิสต์ (ต้องปิด Modal List ก่อนแล้วเปิดใหม่ หรือเรียกฟังก์ชันซ้ำ)
-        // เนื่องจาก Bootstrap Modal ซ้อนกันอาจมีปัญหาเรื่อง backdrop ให้ปิดอันเดิมก่อน
+        // ปิด Modal List ตัวเก่าก่อน แล้วค่อยเปิดใหม่เพื่อรีเฟรช (ป้องกัน Backdrop ค้าง)
         const listModalEl = document.getElementById('admin-cards-modal');
         const listModal = bootstrap.Modal.getInstance(listModalEl);
         listModal.hide();
         
-        setTimeout(() => handleManageCards(), 500); // เปิดใหม่
+        setTimeout(() => handleManageCards(), 500);
 
     } catch (e) {
         showError(e.message);
@@ -2476,3 +2536,4 @@ async function handleDeleteCard() {
         }
     }
 }
+

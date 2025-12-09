@@ -701,10 +701,29 @@
 
                         <div class="mb-3">
                             <label class="form-label">รูปภาพการ์ด</label>
-                            <input type="file" class="form-control" id="card-image-input" accept="image/*">
-                            <input type="hidden" id="card-image-url">
-                            <div class="mt-2 text-center">
-                                <img id="card-image-preview" src="" style="max-height: 150px; display:none;" class="rounded border shadow-sm">
+                            
+                            <div class="btn-group w-100 mb-2" role="group">
+                                <input type="radio" class="btn-check" name="imgSource" id="sourceUpload" value="upload" checked>
+                                <label class="btn btn-outline-success" for="sourceUpload"><i class="fas fa-upload me-1"></i> อัปโหลดไฟล์</label>
+
+                                <input type="radio" class="btn-check" name="imgSource" id="sourceUrl" value="url">
+                                <label class="btn btn-outline-primary" for="sourceUrl"><i class="fas fa-link me-1"></i> ใส่ลิงก์รูป</label>
+                            </div>
+
+                            <div id="input-group-upload">
+                                <input type="file" class="form-control" id="card-image-input" accept="image/*">
+                                <div class="form-text small">รองรับไฟล์ .png, .jpg (แนะนำ .png พื้นใส 512x512px)</div>
+                            </div>
+
+                            <div id="input-group-url" style="display:none;">
+                                <input type="text" class="form-control" id="card-image-url-text" placeholder="https://example.com/image.png">
+                                <div class="form-text small">วางลิงก์รูปภาพโดยตรงจากเว็บอื่น</div>
+                            </div>
+
+                            <input type="hidden" id="card-image-final-url"> <div class="mt-3 text-center bg-light rounded p-2 border" style="min-height: 100px;">
+                                <p class="text-muted small mb-1">ตัวอย่างรูปภาพ</p>
+                                <img id="card-image-preview" src="" style="max-height: 150px; max-width: 100%; display:none;" class="rounded">
+                                <span id="no-preview-text" class="text-muted small">- ยังไม่มีรูป -</span>
                             </div>
                         </div>
 
