@@ -733,7 +733,7 @@ function bindAdminEventListeners() {
     $(document).on('click', '.btn-delete-card', handleDeleteCard);
 
     // Event สำหรับปุ่มในรายการคำถาม (Edit/Delete/Toggle)
-    $(document).on('click', '.btn-edit-q', handleEditQuestion);
+    $(document).on('click', '.btn-edit-question', handleEditQuestion);
     $(document).on('click', '.btn-delete-q', handleDeleteQuestion);
     $(document).on('click', '.btn-toggle-q', handleToggleQuestion);
     $(document).on('click', '.btn-approve, .btn-reject', handleApprovalAction);
@@ -1974,22 +1974,21 @@ $(document).on('click', '.answer-btn', async function() {
 });
 
 // ==========================================
-// --- ADMIN: QUESTION MANAGEMENT (FIXED) ---
+// --- ADMIN: QUESTION MANAGEMENT (FIXED V.2) ---
 // ==========================================
 
-// 1. เปิด Modal และโหลดข้อมูล
+// 1. ฟังก์ชันเปิด Modal หลัก (เรียกใช้ loadAdminQuestions)
 function handleManageQuestions() {
-    // เตรียม Modal
     if (!AppState.allModals['admin-questions']) {
         AppState.allModals['admin-questions'] = new bootstrap.Modal(document.getElementById('admin-questions-modal'));
     }
     AppState.allModals['admin-questions'].show();
     
-    // เรียกฟังก์ชันโหลดข้อมูล (แยกออกมาแล้ว)
+    // โหลดข้อมูล
     loadAdminQuestions();
 }
 
-// 2. ฟังก์ชันโหลดรายการคำถาม (แยกออกมาเพื่อ reuse)
+// 2. ฟังก์ชันดึงรายการคำถามมาแสดง (แยกออกมาเพื่อ reuse ตอนบันทึกเสร็จ)
 async function loadAdminQuestions() {
     const list = $('#questions-list-admin');
     list.html('<div class="col-12 text-center my-5"><div class="spinner-border text-success"></div></div>');
@@ -2011,7 +2010,7 @@ async function loadAdminQuestions() {
             const statusBtnClass = isActive ? 'btn-outline-secondary' : 'btn-outline-success';
             const statusBtnText = isActive ? 'ปิด' : 'เปิด';
             
-            // ✨ Encode ข้อมูลให้ปลอดภัยสำหรับใส่ในปุ่ม
+            // ✨ Encode ข้อมูลให้ปลอดภัยสำหรับใส่ในปุ่ม (แก้ปัญหา JSON Error)
             const qData = encodeURIComponent(JSON.stringify(q));
             
             const imgHtml = q.imageUrl 
@@ -2060,14 +2059,19 @@ async function loadAdminQuestions() {
     }
 }
 
+// 3. ฟังก์ชันกดปุ่ม "เพิ่มคำถามใหม่"
 function handleAddQuestion() {
     $('#question-form-title').text('เพิ่มคำถามใหม่');
     $('#question-form')[0].reset();
     $('#q-id').val('');
-    $('#q-image-preview').hide().attr('src', '');
-    $('#q-image-url').val('');
     
-    // Reset รูปแบบ input file/url กลับเป็นค่าเริ่มต้น
+    // Reset รูปภาพ
+    $('#q-image-final-url').val('');
+    $('#q-image-url-text').val('');
+    $('#q-image-preview').hide().attr('src', '');
+    $('#q-no-preview-text').show();
+    
+    // Reset กลับไปโหมด Upload
     $('#q-sourceUpload').prop('checked', true).trigger('change');
     
     if (!AppState.allModals['question-form']) {
@@ -2076,27 +2080,85 @@ function handleAddQuestion() {
     AppState.allModals['question-form'].show();
 }
 
+// 4. ฟังก์ชันกดปุ่ม "แก้ไข" (ในรายการ)
+function handleEditQuestion() {
+    // ดึงข้อมูลจากปุ่ม (แก้ปัญหา JSON Parse Error)
+    const rawData = $(this).attr('data-question');
+    if (!rawData) {
+        return Swal.fire('Error', 'ไม่พบข้อมูลคำถาม', 'error');
+    }
+
+    try {
+        const data = JSON.parse(decodeURIComponent(rawData));
+
+        $('#question-form-title').text('แก้ไขคำถาม');
+        $('#q-id').val(data.questionId);
+        $('#q-text').val(data.questionText);
+        
+        // ใส่ข้อมูลตัวเลือก A-H
+        $('#q-opt-a').val(data.optionA); $('#q-opt-b').val(data.optionB);
+        $('#q-opt-c').val(data.optionC || ''); $('#q-opt-d').val(data.optionD || '');
+        $('#q-opt-e').val(data.optionE || ''); $('#q-opt-f').val(data.optionF || '');
+        $('#q-opt-g').val(data.optionG || ''); $('#q-opt-h').val(data.optionH || '');
+        
+        // เลือกเฉลย
+        $(`input[name="correctOption"][value="${data.correctOption}"]`).prop('checked', true);
+        $('#q-score').val(data.scoreReward || 10);
+
+        // --- จัดการรูปภาพ (URL / Upload) ---
+        const currentImg = data.imageUrl || '';
+        $('#q-image-final-url').val(currentImg);
+        $('#q-image-url-text').val(currentImg);
+
+        if (currentImg) {
+            $('#q-image-preview').attr('src', getFullImageUrl(currentImg)).show();
+            $('#q-no-preview-text').hide();
+        } else {
+            $('#q-image-preview').hide();
+            $('#q-no-preview-text').show();
+        }
+
+        // รีเซ็ตกลับไปโหมด Upload (แต่ถ้ามีลิงก์อยู่ อาจจะอยากให้โชว์ URL ก็ได้ แล้วแต่ชอบ)
+        $('#q-sourceUpload').prop('checked', true).trigger('change');
+        $('#q-image-input').val('');
+
+        // เปิด Modal
+        if (!AppState.allModals['question-form']) {
+            AppState.allModals['question-form'] = new bootstrap.Modal(document.getElementById('question-form-modal'));
+        }
+        AppState.allModals['question-form'].show();
+
+    } catch (e) {
+        console.error(e);
+        Swal.fire('Error', 'ข้อมูลคำถามผิดพลาด', 'error');
+    }
+}
+
+// 5. ฟังก์ชันบันทึก (Save)
 async function handleSaveQuestion(e) {
     e.preventDefault();
     const btn = $(this).find('button[type="submit"]');
     btn.prop('disabled', true).text('กำลังบันทึก...');
 
     try {
-        // --- จัดการรูปภาพ (URL / Upload) ---
+        // --- จัดการรูปภาพ (Logic ใหม่) ---
         const mode = $('input[name="q-imgSource"]:checked').val();
         let finalImageUrl = $('#q-image-final-url').val(); // ค่าเดิม
 
         if (mode === 'upload') {
+            // โหมดอัปโหลด: ถ้ามีไฟล์ใหม่ให้อัปโหลด
             const fileInput = $('#q-image-input')[0];
             if (fileInput.files.length > 0) {
                 finalImageUrl = await uploadImage(fileInput.files[0]);
             }
         } else {
+            // โหมดลิงก์: ใช้ค่าจากช่อง Text
             const urlInput = $('#q-image-url-text').val().trim();
             if (urlInput) {
                 finalImageUrl = urlInput;
             }
         }
+        // ----------------------------------
 
         const payload = {
             questionId: $('#q-id').val(),
@@ -2107,15 +2169,16 @@ async function handleSaveQuestion(e) {
             optionG: $('#q-opt-g').val(), optionH: $('#q-opt-h').val(),
             correctOption: $('input[name="correctOption"]:checked').val(),
             scoreReward: $('#q-score').val(),
-            imageUrl: finalImageUrl
+            imageUrl: finalImageUrl // ส่ง URL รูปที่ได้
         };
 
         await callApi('/api/admin/questions', payload, 'POST');
         
+        // ปิด Modal
         AppState.allModals['question-form'].hide();
         showSuccess('บันทึกข้อมูลเรียบร้อย');
         
-        // รีเฟรชรายการคำถามทันที
+        // Refresh List (เรียกฟังก์ชันที่เราสร้างใหม่)
         loadAdminQuestions(); 
 
     } catch (e) {
@@ -2125,18 +2188,7 @@ async function handleSaveQuestion(e) {
     }
 }
 
-async function handleToggleQuestion() {
-    const btn = $(this);
-    btn.prop('disabled', true);
-    try {
-        await callApi('/api/admin/questions/toggle', { questionId: btn.data('id') }, 'POST');
-        loadAdminQuestions(); // Refresh UI โดยไม่เปิด Modal ใหม่
-    } catch (e) {
-        showError('ไม่สามารถเปลี่ยนสถานะได้');
-        btn.prop('disabled', false);
-    }
-}
-
+// 6. ฟังก์ชันลบ
 async function handleDeleteQuestion() {
     const id = $(this).data('id');
     const result = await Swal.fire({
@@ -2156,6 +2208,19 @@ async function handleDeleteQuestion() {
         } catch (e) {
             showError(e.message);
         }
+    }
+}
+
+// 7. ฟังก์ชันเปิด/ปิดใช้งาน
+async function handleToggleQuestion() {
+    const btn = $(this);
+    btn.prop('disabled', true);
+    try {
+        await callApi('/api/admin/questions/toggle', { questionId: btn.data('id') }, 'POST');
+        loadAdminQuestions(); // Refresh UI
+    } catch (e) {
+        showError('ไม่สามารถเปลี่ยนสถานะได้');
+        btn.prop('disabled', false);
     }
 }
 
@@ -2773,7 +2838,7 @@ async function confirmRecycle() {
 
 // --- ADMIN QUESTION: Image Toggle Logic ---
 
-// สลับโหมด Upload / URL
+// ใส่ไว้ใน document.ready หรือที่ไหนก็ได้ที่รันทีเดียว
 $(document).on('change', 'input[name="q-imgSource"]', function() {
     const mode = $(this).val();
     if(mode === 'upload') {
@@ -2785,7 +2850,6 @@ $(document).on('change', 'input[name="q-imgSource"]', function() {
     }
 });
 
-// Preview เมื่อใส่ URL Text
 $('#q-image-url-text').on('input', function() {
     const url = $(this).val().trim();
     if(url) {
