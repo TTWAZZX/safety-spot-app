@@ -72,17 +72,17 @@
                     <div>
                         <div class="d-flex align-items-center mb-1">
                             <span class="level-badge me-2">LV. 1</span>
-                            <small class="text-muted fw-bold">SAFETY RANK</small>
+                            <small class="text-muted fw-bold" style="letter-spacing: 0.5px;">SAFETY RANK</small>
                         </div>
                         <div class="d-flex align-items-baseline">
-                            <span class="display-6 fw-bold text-dark" id="coin-display" style="font-family: 'Kanit';">0</span>
-                            <span class="ms-2 text-warning"><i class="fas fa-coins"></i></span>
+                            <span class="display-6 fw-bold text-dark" id="coin-display" style="font-family: 'Kanit'; font-weight: 800;">0</span>
+                            <span class="ms-2 text-warning fs-4"><i class="fas fa-coins"></i></span>
                         </div>
                     </div>
                     <div class="text-end">
                         <div class="d-flex flex-column align-items-end">
                             <small class="text-muted mb-1" style="font-size: 0.7rem;">STREAK</small>
-                            <div class="badge bg-danger bg-opacity-10 text-danger px-3 py-2 rounded-pill">
+                            <div class="badge bg-danger bg-opacity-10 text-danger px-3 py-2 rounded-pill border border-danger border-opacity-25">
                                 <i class="fas fa-fire me-1"></i> <span id="streak-display">0 วัน</span>
                             </div>
                         </div>
@@ -95,7 +95,7 @@
                         <div class="d-flex flex-column align-items-center text-center h-100 justify-content-center">
                             <img src="https://cdn3d.iconscout.com/3d/premium/thumb/gift-box-4886619-4076329.png" class="bento-img-3d mb-2" style="width: 100px; height: 100px;">
                             <div class="card-title text-danger">ตู้สุ่มรางวัล</div>
-                            <div class="card-sub">ลุ้นรับการ์ดแรร์!<br>100 เหรียญ/ครั้ง</div>
+                            <div class="card-sub text-danger opacity-75">ลุ้นการ์ดแรร์!<br>100 เหรียญ</div>
                         </div>
                         <div class="btn-circle-go text-danger"><i class="fas fa-play"></i></div>
                     </div>
@@ -104,31 +104,31 @@
                         <div class="d-flex align-items-center justify-content-between h-100">
                             <div>
                                 <div class="card-title text-success">ภารกิจ</div>
-                                <div class="card-sub text-success">+50 Coins</div>
+                                <div class="card-sub text-success opacity-75">+50 Coins</div>
                             </div>
-                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/checklist-4036014-3342297.png" class="bento-img-3d" style="width: 60px; height: 60px;">
+                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/checklist-4036014-3342297.png" class="bento-img-3d" style="width: 70px;">
                         </div>
                     </div>
 
                     <div class="bento-card card-exchange" onclick="exchangeCoinsToScore()">
                         <div class="d-flex align-items-center justify-content-between h-100">
                             <div>
-                                <div class="card-title text-warning" style="color: #d4a017;">แลกแต้ม</div>
-                                <div class="card-sub" style="color: #d4a017;">10 เหรียญ = 2 แต้ม</div>
+                                <div class="card-title text-warning" style="color: #f39c12;">แลกแต้ม</div>
+                                <div class="card-sub text-warning opacity-75" style="color: #f39c12;">10 : 2</div>
                             </div>
-                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/money-bag-4036017-3342300.png" class="bento-img-3d" style="width: 60px; height: 60px;">
+                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/money-bag-4036017-3342300.png" class="bento-img-3d" style="width: 70px;">
                         </div>
                     </div>
 
                     <div class="bento-card card-hunter span-2 flex-row justify-content-between align-items-center px-4" onclick="openHunterMenu()">
                         <div class="d-flex align-items-center">
-                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/map-location-4036018-3342301.png" class="bento-img-3d me-3" style="width: 55px; height: 55px;">
+                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/map-location-4036018-3342301.png" class="bento-img-3d me-3" style="width: 60px; height: 60px;">
                             <div>
                                 <div class="card-title text-primary">Safety Hunter</div>
-                                <div class="card-sub">ค้นหาจุดเสี่ยงหน้างานจริง</div>
+                                <div class="card-sub text-primary opacity-75">ค้นหาจุดเสี่ยงหน้างานจริง</div>
                             </div>
                         </div>
-                        <button class="btn btn-primary rounded-pill btn-sm px-3 fw-bold" style="pointer-events: none;">เล่นเลย</button>
+                        <button class="btn btn-primary rounded-pill btn-sm px-3 fw-bold border-0" style="background: #2196f3; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.4);">เล่นเลย</button>
                     </div>
 
                     <div class="bento-card card-recycle span-2 flex-row justify-content-between align-items-center px-4" onclick="openRecycleModal()">
@@ -147,7 +147,7 @@
                             <small class="text-muted fw-bold" style="letter-spacing: 1px;">MY COLLECTION</small>
                             <a href="#" class="text-decoration-none small fw-bold text-primary" onclick="openCardAlbum()">ดูทั้งหมด</a>
                         </div>
-                        <div class="bg-white rounded-4 p-3 shadow-sm border-0">
+                        <div class="collection-card">
                             <div class="d-flex gap-2 overflow-auto" id="mini-collection-list" style="scrollbar-width: none;">
                                 <div class="text-center w-100 text-muted small py-2">Loading...</div>
                             </div>

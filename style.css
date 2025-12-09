@@ -257,282 +257,67 @@ body {
 .answer-btn.wrong { background-color: #dc3545 !important; color: white; }
 .answer-btn.correct { background-color: #198754 !important; color: white; }
 
-/* --- Game Page Specific Styles --- */
-
-/* 1. พื้นหลังหน้าเกม: ให้ดูมีมิติ ไม่ใช่สีขาวล้วน */
-#game-page {
-    background-color: #f0f2f5; /* สีเทาอ่อนถนอมสายตา */
-    min-height: 80vh;
-}
-
-/* 2. การ์ดโจทย์: เพิ่มเงาและความโค้งมน */
-.game-card {
-    border-radius: 24px;
-    border: none;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); /* เงาฟุ้งๆ แบบโมเดิร์น */
-    background: #ffffff;
-    overflow: hidden;
-    position: relative;
-}
-
-/* 3. Header ของการ์ด: สีสดขึ้น + ใส่ Pattern */
-.game-header-bg {
-    background: linear-gradient(135deg, #06C755 0%, #048a3b 100%);
-    color: white;
-    padding: 30px 20px;
-    border-radius: 0 0 30px 30px; /* โค้งด้านล่าง */
-    margin-bottom: -40px; /* ดึงการ์ดคำถามให้เกยขึ้นไป */
-    position: relative;
-    z-index: 0;
-}
-
-/* ตกแต่งพื้นหลัง Header ให้ดูมีลาย (Optional) */
-.game-header-bg::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background-image: radial-gradient(circle at 10% 20%, rgba(255,255,255,0.1) 0%, transparent 20%),
-                      radial-gradient(circle at 90% 80%, rgba(255,255,255,0.1) 0%, transparent 20%);
-    z-index: -1;
-}
-
-/* 4. กล่องคำถาม: ยกให้ลอยขึ้นมา */
-.question-box {
-    background: white;
-    border-radius: 20px;
-    padding: 25px;
-    margin: 0 20px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-    position: relative;
-    z-index: 1; /* อยู่เหนือ Header */
-}
-
-/* 5. ปุ่มตัวเลือก (Answer Buttons): หัวใจสำคัญ! */
-.answer-btn {
-    border: 2px solid #e9ecef;
-    background-color: #f8f9fa;
-    color: #333;
-    border-radius: 16px;
-    padding: 15px 20px;
-    font-size: 1rem;
-    font-weight: 500;
-    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-    position: relative;
-    display: flex; /* จัด icon กับ text */
-    align-items: center;
-    justify-content: flex-start;
-    gap: 15px;
-    text-align: left;
-}
-
-/* ไอคอน A/B ในปุ่ม */
-.choice-badge {
-    background: #e9ecef;
-    color: #6c757d;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    flex-shrink: 0; /* ไม่ให้หด */
-}
-
-/* Effect ตอนเอาเมาส์ชี้ หรือแตะ */
-.answer-btn:hover, .answer-btn:active {
-    background-color: #fff;
-    border-color: var(--line-green);
-    transform: translateY(-2px); /* ลอยขึ้นนิดนึง */
-    box-shadow: 0 5px 15px rgba(6, 199, 85, 0.2);
-}
-
-.answer-btn:hover .choice-badge {
-    background-color: var(--line-green);
-    color: white;
-}
-
-/* Effect ตอนตอบถูก/ผิด (JS จะมาเติม Class นี้) */
-.answer-btn.correct {
-    background-color: #d1e7dd !important;
-    border-color: #198754 !important;
-    color: #0f5132 !important;
-}
-.answer-btn.correct .choice-badge {
-    background-color: #198754;
-    color: white;
-}
-
-.answer-btn.wrong {
-    background-color: #f8d7da !important;
-    border-color: #dc3545 !important;
-    color: #842029 !important;
-}
-.answer-btn.wrong .choice-badge {
-    background-color: #dc3545;
-    color: white;
-}
-
-/* Styling สำหรับปุ่มคำตอบใน Modal */
-.answer-btn {
-    border: 2px solid #e9ecef;
-    background-color: #ffffff;
-    color: #333;
-    border-radius: 12px;
-    padding: 15px 20px;
-    font-size: 1rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    width: 100%; /* ให้เต็มความกว้าง */
-}
-
-.answer-btn:hover {
-    background-color: #f8f9fa;
-    border-color: var(--line-green);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-
-.choice-badge {
-    background: #e9ecef;
-    color: #6c757d;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    flex-shrink: 0;
-}
-
-/* สถานะตอบถูก/ผิด */
-.answer-btn.correct { background-color: #d1e7dd !important; border-color: #198754 !important; }
-.answer-btn.wrong { background-color: #f8d7da !important; border-color: #dc3545 !important; }
-
-.answer-btn {
-    border: 2px solid #e9ecef;
-    background-color: #ffffff;
-    color: #333;
-    border-radius: 12px;
-    padding: 10px 15px;
-    font-size: 1rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    
-    /* --- ชุดคำสั่งแก้ปัญหาข้อความยาว --- */
-    display: flex;
-    align-items: center;      /* จัดกึ่งกลางแนวตั้ง */
-    gap: 10px;               /* ระยะห่างระหว่าง Icon กับ Text */
-    width: 100%;
-    height: auto;            /* ให้สูงตามเนื้อหา */
-    min-height: 60px;        /* ความสูงขั้นต่ำ */
-    white-space: normal;     /* อนุญาตให้ตัดคำขึ้นบรรทัดใหม่ */
-    /* -------------------------------- */
-}
-
-/* แสงรัศมีหมุนๆ ด้านหลัง (Sunburst) */
-.gacha-burst {
-    position: absolute; width: 600px; height: 600px;
-    background: conic-gradient(from 0deg, transparent 0%, rgba(255,215,0,0.3) 10%, transparent 20%, rgba(255,215,0,0.3) 30%, transparent 40%, rgba(255,215,0,0.3) 50%, transparent 60%, rgba(255,215,0,0.3) 70%, transparent 80%, rgba(255,215,0,0.3) 90%, transparent 100%);
-    animation: spin 10s linear infinite;
-    z-index: -1;
-    border-radius: 50%;
-    filter: blur(20px);
-}
-@keyframes spin { 100% { transform: rotate(360deg); } }
-
-/* การ์ด 3D */
-.gacha-card-container {
-    perspective: 1000px; width: 220px; height: 300px; margin-bottom: 20px;
-}
-.gacha-card {
-    width: 100%; height: 100%; position: relative;
-    transform-style: preserve-3d; transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.gacha-card.flipped { transform: rotateY(180deg); }
-
-.gacha-face {
-    position: absolute; width: 100%; height: 100%;
-    backface-visibility: hidden; border-radius: 15px;
-    box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
-    display: flex; align-items: center; justify-content: center;
-}
-
-/* หลังการ์ด (ลาย Safety) */
-.gacha-back {
-    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-    border: 4px solid #ffd700;
-}
-.gacha-back::after {
-    content: "SAFETY"; font-weight: 900; color: rgba(255,255,255,0.1);
-    font-size: 2rem; transform: rotate(-45deg);
-}
-
-/* หน้าการ์ด (รูปรางวัล) */
-.gacha-front {
-    background: white; transform: rotateY(180deg);
-    border: 4px solid #ffd700; flex-direction: column; padding: 10px;
-}
-
-/* ปุ่มปิดแบบเท่ๆ */
-.btn-claim {
-    background: linear-gradient(90deg, #FFD700, #ffb900);
-    border: none; color: #5a4a07; font-weight: bold;
-    padding: 12px 40px; border-radius: 50px;
-    font-size: 1.2rem; margin-top: 20px;
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-    opacity: 0; transition: opacity 0.5s ease 0.5s; /* โผล่มาช้ากว่าเพื่อน */
-}
-.btn-claim.show { opacity: 1; pointer-events: all; }
-
 /* =========================================
-   BENTO GRID UI (Modern Light & Safety Theme)
+   GAME UI: MODERN SAFETY (Light & 3D Theme)
    ========================================= */
 
+/* 1. พื้นหลังและฟอนต์ (สีสว่าง) */
 #game-page {
-    background-color: #f4f7f6; /* พื้นหลังสีเทาอมเขียวนิดๆ ให้ดูสบายตา */
+    background-color: #f0f4f8; /* สีฟ้าเทาอ่อนๆ สบายตา */
+    background-image: radial-gradient(#d9e2ec 1px, transparent 1px); /* ลายจุดจางๆ */
+    background-size: 24px 24px;
     min-height: 100vh;
     padding-bottom: 100px;
     font-family: 'Kanit', sans-serif;
     color: #333;
 }
 
-/* 1. Header: Clean Dashboard Style */
+/* 2. Header HUD (ขาวสะอาด) */
 .bento-header {
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
     padding: 20px 25px;
     border-radius: 0 0 35px 35px;
-    box-shadow: 0 10px 30px rgba(6, 199, 85, 0.08); /* เงาสีเขียวจางๆ */
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
     margin-bottom: 25px;
-    position: relative;
-    z-index: 10;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 
-/* 2. Grid System (โครงสร้างเดิม) */
+/* Badge บอก Level */
+.level-badge {
+    background: linear-gradient(135deg, #06C755, #049d43);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(6, 199, 85, 0.3);
+}
+
+/* 3. Grid Layout */
 .bento-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-auto-rows: minmax(130px, auto); /* เพิ่มความสูงการ์ดนิดนึงให้รูป 3D หายใจสะดวก */
+    grid-auto-rows: minmax(140px, auto); /* สูงขึ้นเพื่อให้รูป 3D ไม่เบียด */
     gap: 15px;
     padding: 0 20px;
 }
 
-/* 3. Card Style (Light & Soft Shadow) */
+/* 4. Card Style (การ์ดขาว เงานุ่ม) */
 .bento-card {
     background: #ffffff;
     border-radius: 24px;
     padding: 15px;
     position: relative;
     overflow: hidden;
-    /* เงานุ่มๆ ลอยออกมา */
-    box-shadow: 0 8px 20px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.02);
-    border: 1px solid rgba(0,0,0,0.02);
+    /* เงา 2 ชั้น ให้ดูลอยมีมิติ */
+    box-shadow: 
+        0 10px 15px -3px rgba(0, 0, 0, 0.05), 
+        0 4px 6px -2px rgba(0, 0, 0, 0.02);
+    border: 2px solid transparent; /* เตรียมเส้นขอบ */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -540,66 +325,67 @@ body {
     cursor: pointer;
 }
 
-.bento-card:active { transform: scale(0.97); }
+/* Effect กดแล้วยุบ */
+.bento-card:active { transform: scale(0.96); }
 
-/* รูปภาพ 3D */
+/* รูปภาพ 3D (หัวใจสำคัญ) */
 .bento-img-3d {
     width: 80px;
     height: 80px;
     object-fit: contain;
-    margin-bottom: 8px;
-    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1)); /* เงาใต้รูป */
-    transition: transform 0.3s ease;
+    margin-bottom: 5px;
+    filter: drop-shadow(0 8px 10px rgba(0,0,0,0.1)); /* เงาใต้รูป */
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-.bento-card:hover .bento-img-3d { transform: scale(1.1) rotate(3deg); }
+.bento-card:hover .bento-img-3d { transform: scale(1.1) translateY(-5px); }
 
-/* สไตล์เฉพาะการ์ด (สีพื้นหลังอ่อนๆ) */
+/* 5. ธีมสีการ์ด (แยกตามประเภท) */
 .card-gacha {
-    background: linear-gradient(135deg, #fff5f5 0%, #fff 100%); /* อมชมพู */
+    background: linear-gradient(to bottom right, #fff5f5, #fff);
     border-bottom: 4px solid #ff6b6b;
 }
 .card-quiz {
-    background: linear-gradient(135deg, #e8f5e9 0%, #fff 100%); /* อมเขียว */
+    background: linear-gradient(to bottom right, #e8f5e9, #fff);
     border-bottom: 4px solid #06c755;
 }
 .card-exchange {
-    background: linear-gradient(135deg, #fff8e1 0%, #fff 100%); /* อมเหลือง */
+    background: linear-gradient(to bottom right, #fff8e1, #fff);
     border-bottom: 4px solid #ffc107;
 }
 .card-hunter {
-    background: linear-gradient(135deg, #e3f2fd 0%, #fff 100%); /* อมฟ้า */
+    background: linear-gradient(to bottom right, #e3f2fd, #fff);
     border-bottom: 4px solid #2196f3;
 }
 .card-recycle {
-    background: linear-gradient(135deg, #eceff1 0%, #fff 100%); /* อมเทา */
-    border-bottom: 4px solid #546e7a;
+    background: linear-gradient(to bottom right, #eceff1, #fff);
+    border-bottom: 4px solid #78909c;
 }
 
 /* Typography */
 .card-title {
-    font-size: 1rem; font-weight: 800;
+    font-size: 1.1rem; font-weight: 800;
     color: #2c3e50; margin-bottom: 2px;
+    line-height: 1.2;
 }
 .card-sub {
-    font-size: 0.75rem; color: #7f8c8d; font-weight: 500;
+    font-size: 0.75rem; color: #95a5a6; font-weight: 500;
 }
 
-/* ปุ่มกลมเล็ก (Go Button) */
+/* ปุ่ม Play กลมๆ */
 .btn-circle-go {
-    width: 36px; height: 36px; border-radius: 50%;
+    width: 38px; height: 38px; border-radius: 50%;
     background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     color: #333; display: flex; align-items: center; justify-content: center;
-    position: absolute; bottom: 12px; right: 12px; font-size: 0.8rem;
+    position: absolute; bottom: 12px; right: 12px;
 }
 
 /* Grid Helpers */
 .span-2 { grid-column: span 2; }
 .span-row-2 { grid-row: span 2; }
 
-/* Badge Level */
-.level-badge {
-    background: #06c755; color: white;
-    padding: 5px 12px; border-radius: 15px;
-    font-size: 0.8rem; font-weight: bold;
-    box-shadow: 0 4px 10px rgba(6, 199, 85, 0.3);
+/* My Collection Area */
+.collection-card {
+    background: #fff; border-radius: 20px;
+    padding: 15px; border: 1px solid #eef2f5;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
 }
