@@ -2277,7 +2277,7 @@ function startDailyQuiz() {
     loadGamePage(); 
 }
 
-// 3. ฟังก์ชันหมุนกาชา (Final Fix: ใช้ลิงก์ Public JSON ที่เสถียรที่สุด)
+// 3. ฟังก์ชันหมุนกาชา (Final Fix: ใช้ iframe Embed ชัวร์ที่สุด)
 async function pullGacha() {
     const currentCoins = parseInt($('#coin-display').text()) || 0;
     if(currentCoins < 100) {
@@ -2287,14 +2287,15 @@ async function pullGacha() {
 
     triggerHaptic('medium'); 
 
-    // Animation: กล่องของขวัญ (ใช้ลิงก์ LottieFiles Public CDN)
-    const loadingAnimUrl = "https://lottie.host/5672d250-93ae-4c74-b43e-723223000673/P7f8s2Xy5m.json"; 
+    // Animation: กล่องของขวัญ (ใช้ iframe Embed)
+    // ลิงก์นี้เป็นหน้า Embed ของ Lottie ไม่ใช่ไฟล์ JSON
+    const loadingUrl = "https://lottie.host/embed/93297ee4-4e76-4706-932d-20129734d32e/8j1j1V8j1.json";
 
     Swal.fire({
         title: 'กำลังสุ่ม...',
         html: `
-            <div class="d-flex justify-content-center">
-                <lottie-player src="${loadingAnimUrl}" background="transparent" speed="1" style="width: 200px; height: 200px;" loop autoplay></lottie-player>
+            <div class="d-flex justify-content-center" style="height: 200px; overflow: hidden;">
+                <iframe src="${loadingUrl}" style="width: 200px; height: 200px; border: none; overflow: hidden;"></iframe>
             </div>
             <p class="text-muted mt-2">ขอให้โชคดี!</p>
         `,
@@ -2310,14 +2311,14 @@ async function pullGacha() {
 
         triggerHaptic('heavy'); 
 
-        // Animation: พลุแตก (Success)
-        const successAnimUrl = "https://lottie.host/9e671764-6f0a-4740-9721-a47d252d6c6e/2s9V9Y7X5m.json";
+        // Animation: พลุแตก (Success - ใช้ iframe Embed)
+        const successUrl = "https://lottie.host/embed/b8c00539-7569-4246-9372-76332140407d/D8R898t898.json";
 
         Swal.fire({
             title: '<span class="text-success">✨ ยินดีด้วย! ✨</span>',
             html: `
-                <div class="d-flex justify-content-center mb-2">
-                    <lottie-player src="${successAnimUrl}" background="transparent" speed="1" style="width: 150px; height: 150px;" autoplay></lottie-player>
+                <div class="d-flex justify-content-center mb-2" style="height: 150px; overflow: hidden;">
+                     <iframe src="${successUrl}" style="width: 300px; height: 300px; border: none; transform: translateY(-50px);"></iframe>
                 </div>
                 <div class="mb-3">
                     <img src="${getFullImageUrl(res.badge.imageUrl)}" class="rounded shadow-sm border" style="width: 120px; height: 120px; object-fit: cover;">
