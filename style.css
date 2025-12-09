@@ -492,91 +492,144 @@ body {
 .btn-claim.show { opacity: 1; pointer-events: all; }
 
 /* =========================================
-   BENTO GRID UI (New & Balanced)
+   TECH GAME UI (Pro & Neon Style)
    ========================================= */
 
+/* 1. Global Variables & Background */
+:root {
+    --bg-dark: #0f172a;       /* พื้นหลังหลัก (Navy เข้ม) */
+    --card-bg: #1e293b;       /* พื้นหลังการ์ด */
+    --neon-green: #39ff14;    /* สีปุ่ม Action หลัก */
+    --neon-pink: #ff007f;     /* สี Gacha */
+    --neon-blue: #00d4ff;     /* สีทั่วไป */
+    --neon-gold: #ffd700;     /* สี Rank/Level */
+    --text-main: #f8fafc;     /* สีตัวอักษร */
+    --text-muted: #94a3b8;
+}
+
 #game-page {
-    background-color: #f0f2f5; /* พื้นหลังสีเทาอ่อน สบายตา */
+    background-color: var(--bg-dark);
+    /* สร้างลายตาราง Grid เท่ๆ */
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), 
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
     min-height: 100vh;
     padding-bottom: 100px;
-    color: #333;
+    color: var(--text-main);
+    font-family: 'Kanit', sans-serif;
 }
 
-/* 1. Header HUD แบบเรียบหรู */
-.bento-header {
-    background: #ffffff;
+/* 2. Header: Rank & Level System */
+.tech-header {
+    background: rgba(30, 41, 59, 0.8);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding: 20px 25px;
     border-radius: 0 0 30px 30px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
     margin-bottom: 25px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
 }
 
-/* 2. Grid System (หัวใจหลักของ Bento) */
+/* วงแหวน Level */
+.level-ring-container {
+    position: relative; width: 60px; height: 60px;
+    display: flex; align-items: center; justify-content: center;
+}
+.level-ring {
+    position: absolute; width: 100%; height: 100%;
+    border-radius: 50%;
+    background: conic-gradient(var(--neon-gold) 70%, rgba(255,255,255,0.1) 0); /* 70% Progress */
+    mask: radial-gradient(transparent 55%, black 56%); /* เจาะรูตรงกลาง */
+    -webkit-mask: radial-gradient(transparent 55%, black 56%);
+}
+.level-number {
+    font-size: 1.5rem; font-weight: 800; color: var(--neon-gold);
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    z-index: 2;
+}
+
+/* Badge ไฟ Streak */
+.streak-badge {
+    background: linear-gradient(135deg, #ff4500, #ff8c00);
+    color: white; padding: 5px 15px; border-radius: 20px;
+    font-weight: bold; font-size: 0.9rem;
+    box-shadow: 0 0 15px rgba(255, 69, 0, 0.4); /* แสงฟุ้ง */
+    display: flex; align-items: center; gap: 5px;
+}
+
+/* 3. Grid & Cards */
 .bento-container {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* แบ่ง 2 คอลัมน์เท่ากัน */
-    grid-auto-rows: minmax(100px, auto); /* ความสูงแถว */
-    gap: 15px; /* ช่องว่างระหว่างกล่อง */
-    padding: 0 20px;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: minmax(120px, auto);
+    gap: 15px; padding: 0 20px;
 }
 
-/* 3. การ์ดพื้นฐาน */
 .bento-card {
-    background: #ffffff;
-    border-radius: 24px;
+    background: var(--card-bg);
+    border: 1px solid rgba(255, 255, 255, 0.05); /* เส้นขอบบางๆ */
+    border-radius: 20px;
     padding: 15px;
     position: relative;
     overflow: hidden;
-    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.04);
-    border: 1px solid rgba(255,255,255,0.5);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    display: flex; flex-direction: column; justify-content: center;
 }
 
-.bento-card:active { transform: scale(0.96); }
+.bento-card:active { transform: scale(0.98); }
 
-/* ขนาดพิเศษ */
-.span-2 { grid-column: span 2; } /* กว้างเต็มจอ (2 คอลัมน์) */
-.span-row-2 { grid-row: span 2; } /* สูง 2 เท่า */
-
-/* ธีมสี (ใช้ Gradient อ่อนๆ ดูแพง) */
-.theme-gacha { background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%); border-color: #ffcccc; }
-.theme-quiz { background: linear-gradient(135deg, #e3ffe7 0%, #d1f7d6 100%); border-color: #c3e6cb; }
-.theme-gold { background: linear-gradient(135deg, #fffcf0 0%, #fff4d9 100%); border-color: #ffeeba; }
-.theme-blue { background: linear-gradient(135deg, #f0f7ff 0%, #dceeff 100%); border-color: #cce5ff; }
-.theme-dark { background: linear-gradient(135deg, #343a40 0%, #212529 100%); color: white !important; }
-
-/* องค์ประกอบภายใน */
-.bento-title {
-    font-weight: 800; font-size: 1rem; margin-bottom: 2px;
-    color: #2c3e50; line-height: 1.2;
+/* สไตล์เฉพาะการ์ด */
+.card-gacha {
+    border: 1px solid rgba(255, 0, 127, 0.3);
+    background: linear-gradient(180deg, rgba(255,0,127,0.05) 0%, var(--card-bg) 100%);
 }
-.bento-sub {
-    font-size: 0.7rem; opacity: 0.7; font-weight: 500;
+.card-quiz { border-top: 3px solid var(--neon-blue); }
+.card-exchange { border-top: 3px solid var(--neon-gold); }
+.card-hunter { 
+    border: 1px solid rgba(57, 255, 20, 0.3);
+    background: linear-gradient(90deg, rgba(57,255,20,0.05) 0%, var(--card-bg) 100%);
 }
-.theme-dark .bento-title, 
-.theme-dark .bento-sub,
-.theme-dark i { color: white !important; }
 
-/* ปุ่มกลมเล็กๆ (Go Button) */
-.btn-circle-go {
-    width: 35px; height: 35px;
-    border-radius: 50%;
-    background: #ffffff;
-    color: #333;
+/* ไอคอนใน Card (แบบ Flat Pro) */
+.card-icon {
+    font-size: 2.2rem; margin-bottom: 10px;
+    filter: drop-shadow(0 0 5px currentColor); /* แสงเรืองรอบไอคอน */
+}
+
+/* Typography */
+.card-title { font-size: 1rem; font-weight: 700; color: white; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card-sub { font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
+.text-highlight { font-weight: 600; color: var(--neon-green); }
+
+/* ปุ่ม Play แบบสามเหลี่ยม (Gacha) */
+.btn-play-triangle {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--neon-pink); color: white;
     display: flex; align-items: center; justify-content: center;
-    position: absolute;
-    bottom: 12px; right: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    position: absolute; bottom: 15px; right: 15px;
+    box-shadow: 0 0 15px rgba(255, 0, 127, 0.6);
 }
 
-/* ไอคอนตกแต่ง */
-.bento-icon-img {
-    width: 60px; height: 60px;
-    object-fit: contain;
-    margin-bottom: 10px;
-    filter: drop-shadow(0 4px 4px rgba(0,0,0,0.1));
+/* ปุ่ม Action หลัก (Safety Hunter) */
+.btn-neon-action {
+    background: var(--neon-green); color: #000;
+    border: none; font-weight: 900;
+    text-transform: uppercase; letter-spacing: 1px;
+    padding: 8px 20px; border-radius: 50px;
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.4);
+    transition: transform 0.2s;
+}
+.btn-neon-action:active { transform: scale(0.95); box-shadow: 0 0 10px rgba(57, 255, 20, 0.2); }
+
+/* Grid Helpers */
+.span-2 { grid-column: span 2; }
+.span-row-2 { grid-row: span 2; }
+
+/* My Collection Section */
+.collection-box {
+    background: rgba(255,255,255,0.03);
+    border: 1px dashed rgba(255,255,255,0.1);
+    border-radius: 20px; padding: 15px;
 }
