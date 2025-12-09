@@ -12,6 +12,18 @@
     --text-medium-gray: #8A8A8E;
     --pastel-blue: #DCEAFE;
     --pastel-red: #FFD6D6;
+    
+    /* --- SOFT DIMENSIONAL UI VARIABLES --- */
+    --bg-base: #F7F9FC; /* พื้นหลังใหม่ */
+    --text-main: #2D3748;
+    --text-muted-game: #718096;
+    --accent-lime: #00E676; /* สีเขียวสว่างสำหรับ Action */
+    --accent-gold: #FFD700;
+    --card-surface: #FFFFFF;
+    /* เงาหลักสำหรับ Card */
+    --shadow-soft: 0 8px 25px -8px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.03); 
+    /* เงาด้านในสำหรับองค์ประกอบที่ดู "บุ๋ม" */
+    --shadow-inner: inset 0 2px 4px rgba(0,0,0,0.05); 
 }
 
 body { 
@@ -102,13 +114,11 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
-/* highlight-start */
 /* CSS Grid สำหรับจัดเรียงป้ายรางวัล */
 .badges-grid {
     display: grid;
-    /* แก้ไข: กำหนดให้มี 3 คอลัมน์ */
     grid-template-columns: repeat(3, 1fr);
-    gap: 1rem; /* ลดระยะห่างลงเล็กน้อย */
+    gap: 1rem; 
     justify-items: center;
 }
 
@@ -117,17 +127,15 @@ body {
     flex-direction: column;
     align-items: center;
     text-align: center;
-    width: 100%; /* ทำให้ item เต็มความกว้างของ grid cell */
+    width: 100%; 
 }
 
 .badge-item .badge-icon {
-    /* แก้ไข: ลดขนาดไอคอนลง */
     width: 50px;
     height: 50px;
     margin-bottom: 0.5rem;
     transition: transform 0.2s ease-in-out;
 }
-/* highlight-end */
 
 .badge-item:hover .badge-icon {
     transform: scale(1.1);
@@ -140,22 +148,19 @@ body {
 }
 
 /* =================================
-   Admin - Manage Badges
+   Admin - Manage Badges 
    ================================= */
 
-/* ทำให้การ์ดในหน้าจัดการป้ายรางวัล responsive */
 #badges-list .admin-badge-card .card-body {
-    padding: 0.75rem; /* ลด padding ภายในการ์ด */
+    padding: 0.75rem; 
 }
 
-/* ย่อขนาดรูปภาพป้ายรางวัลในหน้า admin */
 #badges-list .admin-badge-card .badge-icon {
-    width: 80px;  /* กำหนดขนาดใหม่ให้เล็กลง */
+    width: 80px; 
     height: 80px;
-    object-fit: cover; /* ทำให้รูปภาพพอดีกับกรอบ */
+    object-fit: cover; 
 }
 
-/* ย่อขนาดตัวอักษรและปุ่ม */
 #badges-list .admin-badge-card h6 {
     font-size: 0.9rem;
     margin-bottom: 0.25rem !important;
@@ -169,17 +174,15 @@ body {
     font-size: 0.75rem;
 }
 
-/* จัดการ Layout ของ Grid บนหน้าจอต่างๆ */
 @media (max-width: 576px) {
     #badges-list .col-6 {
-        /* บนหน้าจอเล็กมาก ให้แสดง 2 คอลัมน์ */
         flex: 0 0 auto;
         width: 50%;
     }
 }
 
 /* =================================
-   Submission Cards (in Detail Page)
+   Submission Cards (in Detail Page) 
    ================================= */
 .submission-card {
     border-radius: 16px;
@@ -189,7 +192,6 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-/* Utility class for preserving newlines in text */
 .preserve-whitespace {
     white-space: pre-line;
 }
@@ -209,7 +211,7 @@ body {
 
 .submission-card .points-badge {
     background-color: var(--pastel-blue) !important;
-    color: #3b5998 !important; /* Darker blue for contrast */
+    color: #3b5998 !important; 
     font-weight: 500;
     padding: 0.5em 0.85em;
     border-radius: 20px;
@@ -221,7 +223,7 @@ body {
 }
 
 /* =================================
-   Other Components
+   Other Components 
    ================================= */
 .page.active { 
     display: block; 
@@ -240,7 +242,7 @@ body {
     background-color: var(--line-green);
 }
 /* =================================
-   Loading Overlay
+   Loading Overlay 
    ================================= */
 #loading-overlay {
     position: fixed;
@@ -249,7 +251,7 @@ body {
     width: 100%;
     height: 100%;
     background-color: rgba(255, 255, 255, 0.95);
-    z-index: 9999; /* ให้แสดงทับทุกอย่าง */
+    z-index: 9999; 
     opacity: 1;
     transition: opacity 0.5s ease-in-out;
 }
@@ -258,23 +260,12 @@ body {
 .answer-btn.correct { background-color: #198754 !important; color: white; }
 
 /* =========================================
-   SOFT DIMENSIONAL UI (Corrected Version)
+   SOFT DIMENSIONAL UI (GAME PAGE STYLES)
    ========================================= */
-
-:root {
-    --bg-base: #F7F9FC;
-    --text-main: #2D3748;
-    --text-muted: #718096;
-    --accent-lime: #00E676;
-    --accent-gold: #FFD700;
-    --card-surface: #FFFFFF;
-    --shadow-soft: 0 10px 30px -5px rgba(0, 0, 0, 0.06);
-    --shadow-inner: inset 0 2px 5px rgba(0,0,0,0.05);
-}
 
 #game-page {
     background-color: var(--bg-base);
-    /* ใช้ลายจุดที่ถูกต้องตามมาตรฐาน */
+    /* Micro-Pattern: จุดเล็กๆ จางๆ สร้าง Texture */
     background-image: radial-gradient(circle, #CBD5E0 1px, transparent 1px);
     background-size: 30px 30px;
     min-height: 100vh;
@@ -283,7 +274,7 @@ body {
     color: var(--text-main);
 }
 
-/* 1. Header */
+/* 1. Header: Rank & Score (Professional Dashboard) */
 .bento-header {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(12px);
@@ -291,53 +282,45 @@ body {
     padding: 20px 25px;
     border-radius: 0 0 40px 40px;
     box-shadow: 0 15px 35px rgba(0,0,0,0.05);
-    position: sticky;
-    top: 0;
-    z-index: 50;
+    position: sticky; top: 0; z-index: 50;
     border-bottom: 1px solid rgba(255,255,255,0.5);
 }
 
-/* Rank Shield Badge */
+/* Rank Shield Badge (Soft Neumorphism) */
 .rank-badge-container {
-    position: relative;
-    width: 55px;
-    height: 55px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: relative; width: 55px; height: 55px;
+    display: flex; align-items: center; justify-content: center;
     background: linear-gradient(135deg, #ffffff 0%, #f0f2f5 100%);
     border-radius: 16px;
-    box-shadow: 5px 5px 10px rgba(163,177,198,0.2), -5px -5px 10px rgba(255,255,255,0.8);
+    /* Neumorphism Shadow */
+    box-shadow: 
+        5px 5px 10px rgba(163,177,198,0.2), 
+        -5px -5px 10px rgba(255,255,255,0.8); 
 }
-.rank-icon {
-    font-size: 1.8rem;
-    color: var(--accent-gold);
-    filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.4));
+.rank-icon { 
+    font-size: 1.8rem; 
+    color: var(--accent-gold); 
+    filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.4)); 
 }
 
-/* Coin Display */
+/* Coin Display (3D Token Look) */
 .coin-pill {
-    background: #fff;
+    background: var(--card-surface);
     padding: 5px 15px 5px 5px;
     border-radius: 30px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    box-shadow: var(--shadow-inner);
-    border: 1px solid rgba(0,0,0,0.03);
+    display: flex; align-items: center; gap: 10px;
+    /* Soft Shadow + Inner Shadow */
+    box-shadow: var(--shadow-inner), 0 1px 3px rgba(0,0,0,0.02); 
+    border: 1px solid rgba(220, 220, 220, 0.5); 
 }
 .coin-icon-3d {
-    width: 32px;
-    height: 32px;
+    width: 32px; height: 32px;
     background: radial-gradient(circle at 30% 30%, #ffd700, #f39c12);
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 0.9rem;
-    box-shadow: 0 4px 6px rgba(243, 156, 18, 0.4);
-    border: 2px solid #fff;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 0.9rem;
+    box-shadow: 0 4px 8px rgba(243, 156, 18, 0.5); /* เพิ่มความเข้มเงาลอย */
+    border: 3px solid #fff; /* ขอบขาวหนาขึ้น */
 }
 
 /* Streak Flame */
@@ -347,7 +330,6 @@ body {
 .streak-icon {
     font-size: 1.5rem;
     background: -webkit-linear-gradient(#ff4500, #ff8c00);
-    /* Standard properties เพื่อกัน Error */
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -355,49 +337,62 @@ body {
     filter: drop-shadow(0 4px 6px rgba(255, 69, 0, 0.2));
 }
 
-/* 2. Grid Layout */
+/* 2. Bento Grid Layout */
 .bento-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-auto-rows: minmax(140px, auto);
-    gap: 20px;
-    padding: 0 25px;
+    gap: 20px; padding: 0 25px;
 }
 
-/* 3. Card Styles */
+/* 3. Card Base Style (Soft Dimensional) */
 .bento-card {
     background: var(--card-surface);
     border-radius: 28px;
     padding: 20px;
     position: relative;
     overflow: hidden;
+    /* Soft Elevation Shadow ที่ปรับปรุงแล้ว */
     box-shadow: var(--shadow-soft);
     border: 1px solid rgba(255,255,255,0.8);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
     cursor: pointer;
 }
-.bento-card:active {
-    transform: scale(0.96);
+.bento-card:hover {
+    /* เงาชัดขึ้นเมื่อ hover */
+    box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+.bento-card:active { 
+    transform: scale(0.96); 
+    box-shadow: 0 4px 15px -8px rgba(0, 0, 0, 0.05); /* เงาจางลงเมื่อถูกกด */
 }
 
-/* ★ เพิ่มคลาสรูปภาพ 3D ที่ขาดไป (สำคัญ) ★ */
+/* รูปภาพ 3D Icons */
 .bento-img-3d {
     width: 80px;
     height: 80px;
     object-fit: contain;
     margin-bottom: 10px;
-    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1));
+    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1)); /* เพิ่มเงาให้ลอย */
     transition: transform 0.3s ease;
 }
 .bento-card:hover .bento-img-3d {
-    transform: scale(1.1) rotate(5deg);
+    transform: scale(1.1) rotate(0deg); /* ปรับเป็น 0deg เพื่อความสง่างาม */
 }
 
-/* Themed Cards */
+/* Typography */
+.bento-title { 
+    font-weight: 800; font-size: 1.1rem; 
+    color: var(--text-main); margin-bottom: 4px; 
+    line-height: 1.2; text-align: center; 
+}
+.bento-sub { 
+    font-size: 0.75rem; color: var(--text-muted-game); 
+    font-weight: 500; text-align: center; 
+}
+
+/* 4. Themed Cards */
 .theme-gacha {
     background: linear-gradient(135deg, #fff5f7 0%, #fff0f5 100%);
     border: 1px solid rgba(255, 0, 127, 0.1);
@@ -413,36 +408,37 @@ body {
 .theme-hunter {
     background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%);
     border: 2px solid rgba(0, 230, 118, 0.2);
-    box-shadow: 0 15px 40px -10px rgba(0, 230, 118, 0.2);
+    /* Green Glow */
+    box-shadow: 0 15px 40px -10px rgba(0, 230, 118, 0.3); 
 }
 
+/* Recycle: Dark Utility (Dark Mode Module) */
 .theme-dark-utility {
-    background: linear-gradient(145deg, #2d3436, #1e272e);
+    background: linear-gradient(145deg, #2D3748, #1A202C);
     color: white !important;
-    box-shadow: 0 10px 30px rgba(45, 52, 54, 0.3);
+    box-shadow: 0 15px 40px rgba(45, 52, 54, 0.4); /* เพิ่มความชัดเจนของเงา */
 }
-.theme-dark-utility .bento-title { color: #dfe6e9; }
-.theme-dark-utility .bento-sub { color: #b2bec3; }
-.theme-dark-utility i { color: #00cec9; }
-
-/* Text */
-.bento-title {
-    font-weight: 800; font-size: 1.1rem;
-    color: var(--text-main); margin-bottom: 4px;
-    line-height: 1.2; text-align: center;
+.theme-dark-utility .bento-title { 
+    color: #F7F9FC; 
+    opacity: 0.9;
 }
-.bento-sub {
-    font-size: 0.75rem; color: var(--text-muted);
-    font-weight: 500; text-align: center;
+.theme-dark-utility .bento-sub { 
+    color: #b2bec3; 
+    opacity: 0.9;
+}
+.theme-dark-utility i { 
+    color: #00cec9; 
+    text-shadow: 0 0 8px rgba(0, 206, 201, 0.5); /* แสงเรืองรอง */
 }
 
-/* 4. Elements */
+/* 5. Buttons & Elements */
 .btn-hunter-play {
     background: linear-gradient(135deg, #00E676, #00C853);
     color: white; border: none;
     padding: 10px 25px; border-radius: 50px;
     font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
-    box-shadow: 0 8px 20px rgba(0, 230, 118, 0.4);
+    /* High Elevation CTA */
+    box-shadow: 0 8px 20px rgba(0, 230, 118, 0.4); 
     transition: transform 0.2s;
 }
 .btn-hunter-play:active {
@@ -453,21 +449,24 @@ body {
 .btn-circle-soft {
     width: 40px; height: 40px; border-radius: 50%;
     background: #fff;
+    /* Neumorphism Shadow */
     box-shadow: 5px 5px 10px rgba(163,177,198,0.15), -5px -5px 10px rgba(255,255,255,0.8);
     display: flex; align-items: center; justify-content: center;
     position: absolute; bottom: 15px; right: 15px;
-    color: var(--text-muted);
+    color: var(--text-muted-game);
 }
 
-/* 5. Inventory */
+/* 6. Inventory */
 .inventory-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 8px;
-    background: #fff;
+    /* พื้นหลังที่ดูเป็น 'หลุม' */
+    background: #EAF0F6; 
     padding: 12px;
     border-radius: 20px;
-    box-shadow: var(--shadow-inner);
+    /* Shadow ที่บุ๋มลงไป */
+    box-shadow: inset 0 5px 10px rgba(0,0,0,0.05), inset 0 -5px 10px rgba(255,255,255,0.8);
     border: 1px solid rgba(0,0,0,0.05);
 }
 .inventory-slot {
@@ -478,6 +477,6 @@ body {
     display: flex; align-items: center; justify-content: center;
 }
 
-/* Helpers */
+/* 7. Grid Helpers */
 .span-2 { grid-column: span 2; }
 .span-row-2 { grid-row: span 2; }
