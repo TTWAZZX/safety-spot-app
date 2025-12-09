@@ -725,6 +725,9 @@ function bindAdminEventListeners() {
     $('#card-form').on('submit', handleSaveCard);
     $('#card-image-input').on('change', function() { handleImagePreview(this, '#card-image-preview'); $('#card-image-preview').show(); });
 
+    // Event Listener (วางไว้ใน bindAdminEventListeners หรือ document.ready)
+    $(document).on('click', '.btn-edit-question', handleEditQuestion);
+
     // ปุ่ม Edit/Delete ในลิสต์การ์ด
     $(document).on('click', '.btn-edit-card', handleEditCard);
     $(document).on('click', '.btn-delete-card', handleDeleteCard);
@@ -1970,13 +1973,26 @@ $(document).on('click', '.answer-btn', async function() {
     }
 });
 
-// --- ADMIN: QUESTION MANAGEMENT ---
+// ==========================================
+// --- ADMIN: QUESTION MANAGEMENT (FIXED) ---
+// ==========================================
 
-async function handleManageQuestions() {
+// 1. เปิด Modal และโหลดข้อมูล
+function handleManageQuestions() {
+    // เตรียม Modal
+    if (!AppState.allModals['admin-questions']) {
+        AppState.allModals['admin-questions'] = new bootstrap.Modal(document.getElementById('admin-questions-modal'));
+    }
+    AppState.allModals['admin-questions'].show();
+    
+    // เรียกฟังก์ชันโหลดข้อมูล (แยกออกมาแล้ว)
+    loadAdminQuestions();
+}
+
+// 2. ฟังก์ชันโหลดรายการคำถาม (แยกออกมาเพื่อ reuse)
+async function loadAdminQuestions() {
     const list = $('#questions-list-admin');
     list.html('<div class="col-12 text-center my-5"><div class="spinner-border text-success"></div></div>');
-    AppState.allModals['admin-questions'] = new bootstrap.Modal(document.getElementById('admin-questions-modal'));
-    AppState.allModals['admin-questions'].show();
 
     try {
         const questions = await callApi('/api/admin/questions');
@@ -1995,7 +2011,9 @@ async function handleManageQuestions() {
             const statusBtnClass = isActive ? 'btn-outline-secondary' : 'btn-outline-success';
             const statusBtnText = isActive ? 'ปิด' : 'เปิด';
             
+            // ✨ Encode ข้อมูลให้ปลอดภัยสำหรับใส่ในปุ่ม
             const qData = encodeURIComponent(JSON.stringify(q));
+            
             const imgHtml = q.imageUrl 
                 ? `<img src="${getFullImageUrl(q.imageUrl)}" class="rounded mb-2" style="height: 80px; object-fit: cover;">` 
                 : '';
@@ -2011,9 +2029,9 @@ async function handleManageQuestions() {
                         
                         <div class="d-flex gap-3">
                             ${imgHtml}
-                            <div>
-                                <h6 class="fw-bold mb-1 text-dark">${sanitizeHTML(q.questionText)}</h6>
-                                <p class="mb-0 small text-muted">
+                            <div style="min-width: 0;">
+                                <h6 class="fw-bold mb-1 text-dark text-truncate">${sanitizeHTML(q.questionText)}</h6>
+                                <p class="mb-0 small text-muted text-truncate">
                                     <span class="${q.correctOption === 'A' ? 'text-success fw-bold' : ''}">A: ${sanitizeHTML(q.optionA)}</span><br>
                                     <span class="${q.correctOption === 'B' ? 'text-success fw-bold' : ''}">B: ${sanitizeHTML(q.optionB)}</span>
                                 </p>
@@ -2024,7 +2042,7 @@ async function handleManageQuestions() {
                             <button class="btn btn-sm ${statusBtnClass} btn-toggle-q" data-id="${q.questionId}">
                                 ${statusBtnText}
                             </button>
-                            <button class="btn btn-sm btn-primary btn-edit-q" data-q='${qData}'>
+                            <button class="btn btn-sm btn-primary btn-edit-question" data-question="${qData}">
                                 <i class="fas fa-edit"></i>
                             </button>
                             <button class="btn btn-sm btn-danger btn-delete-q" data-id="${q.questionId}">
@@ -2049,49 +2067,13 @@ function handleAddQuestion() {
     $('#q-image-preview').hide().attr('src', '');
     $('#q-image-url').val('');
     
-    AppState.allModals['question-form'] = new bootstrap.Modal(document.getElementById('question-form-modal'));
-    AppState.allModals['question-form'].show();
-}
-
-function handleEditQuestion() {
-    // ดึงข้อมูลจากปุ่ม Edit
-    const data = JSON.parse(decodeURIComponent($(this).data('question'))); 
-    // (หมายเหตุ: ตรวจสอบว่าปุ่ม Edit ใน HTML ส่ง data-question มาถูกต้องไหม)
-
-    $('#question-form-title').text('แก้ไขคำถาม');
-    $('#q-id').val(data.questionId);
-    $('#q-text').val(data.questionText);
-    
-    // Set Options A-H
-    $('#q-opt-a').val(data.optionA); $('#q-opt-b').val(data.optionB);
-    $('#q-opt-c').val(data.optionC); $('#q-opt-d').val(data.optionD);
-    $('#q-opt-e').val(data.optionE); $('#q-opt-f').val(data.optionF);
-    $('#q-opt-g').val(data.optionG); $('#q-opt-h').val(data.optionH);
-    
-    // Set Correct Option
-    $(`input[name="correctOption"][value="${data.correctOption}"]`).prop('checked', true);
-    
-    $('#q-score').val(data.scoreReward || 10);
-
-    // --- ส่วนจัดการรูปภาพ (Updated) ---
-    const currentImg = data.imageUrl || '';
-    $('#q-image-final-url').val(currentImg);
-    $('#q-image-url-text').val(currentImg); // ใส่ในช่อง URL เผื่อแก้ไข
-
-    // Show Preview
-    if (currentImg) {
-        $('#q-image-preview').attr('src', getFullImageUrl(currentImg)).show();
-        $('#q-no-preview-text').hide();
-    } else {
-        $('#q-image-preview').hide();
-        $('#q-no-preview-text').show();
-    }
-
-    // Reset กลับไปโหมด Upload เป็นค่าเริ่มต้น
+    // Reset รูปแบบ input file/url กลับเป็นค่าเริ่มต้น
     $('#q-sourceUpload').prop('checked', true).trigger('change');
-    $('#q-image-input').val(''); 
-
-    new bootstrap.Modal(document.getElementById('question-form-modal')).show();
+    
+    if (!AppState.allModals['question-form']) {
+        AppState.allModals['question-form'] = new bootstrap.Modal(document.getElementById('question-form-modal'));
+    }
+    AppState.allModals['question-form'].show();
 }
 
 async function handleSaveQuestion(e) {
@@ -2100,24 +2082,21 @@ async function handleSaveQuestion(e) {
     btn.prop('disabled', true).text('กำลังบันทึก...');
 
     try {
-        // --- ส่วนจัดการรูปภาพ (Logic ใหม่) ---
+        // --- จัดการรูปภาพ (URL / Upload) ---
         const mode = $('input[name="q-imgSource"]:checked').val();
         let finalImageUrl = $('#q-image-final-url').val(); // ค่าเดิม
 
         if (mode === 'upload') {
-            // โหมดอัปโหลด: ถ้ามีไฟล์ใหม่ให้อัปโหลด
             const fileInput = $('#q-image-input')[0];
             if (fileInput.files.length > 0) {
                 finalImageUrl = await uploadImage(fileInput.files[0]);
             }
         } else {
-            // โหมดลิงก์: ใช้ค่าจากช่อง Text
             const urlInput = $('#q-image-url-text').val().trim();
             if (urlInput) {
                 finalImageUrl = urlInput;
             }
         }
-        // ----------------------------------
 
         const payload = {
             questionId: $('#q-id').val(),
@@ -2128,20 +2107,16 @@ async function handleSaveQuestion(e) {
             optionG: $('#q-opt-g').val(), optionH: $('#q-opt-h').val(),
             correctOption: $('input[name="correctOption"]:checked').val(),
             scoreReward: $('#q-score').val(),
-            imageUrl: finalImageUrl // ส่ง URL รูปที่ได้
+            imageUrl: finalImageUrl
         };
 
         await callApi('/api/admin/questions', payload, 'POST');
         
-        // ปิด Modal
-        const modalEl = document.getElementById('question-form-modal');
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        modal.hide();
-
+        AppState.allModals['question-form'].hide();
         showSuccess('บันทึกข้อมูลเรียบร้อย');
         
-        // Refresh List (ถ้ามีฟังก์ชันโหลดรายการคำถาม ให้เรียกตรงนี้)
-        // loadAdminQuestions(); 
+        // รีเฟรชรายการคำถามทันที
+        loadAdminQuestions(); 
 
     } catch (e) {
         showError(e.message);
@@ -2155,7 +2130,7 @@ async function handleToggleQuestion() {
     btn.prop('disabled', true);
     try {
         await callApi('/api/admin/questions/toggle', { questionId: btn.data('id') }, 'POST');
-        handleManageQuestions(); // Refresh UI
+        loadAdminQuestions(); // Refresh UI โดยไม่เปิด Modal ใหม่
     } catch (e) {
         showError('ไม่สามารถเปลี่ยนสถานะได้');
         btn.prop('disabled', false);
@@ -2177,7 +2152,7 @@ async function handleDeleteQuestion() {
         try {
             await callApi(`/api/admin/questions/${id}`, {}, 'DELETE');
             showSuccess('ลบเรียบร้อย');
-            handleManageQuestions();
+            loadAdminQuestions(); // Refresh UI
         } catch (e) {
             showError(e.message);
         }
@@ -2673,14 +2648,15 @@ async function exchangeCoinsToScore() {
     }
 }
 
-// --- RECYCLE SYSTEM ---
+// --- RECYCLE SYSTEM (ระบบย่อยการ์ด) ---
 
-let selectedRecycleCards = {}; // เก็บ state การเลือก { 'CARD_001': 2 }
+let selectedRecycleCards = {}; // ตัวแปรเก็บการ์ดที่เลือก
 
 async function openRecycleModal() {
     selectedRecycleCards = {};
     updateRecycleUI();
     
+    // เปิด Modal
     const modal = new bootstrap.Modal(document.getElementById('recycle-modal'));
     modal.show();
     
@@ -2702,7 +2678,7 @@ async function openRecycleModal() {
         }
 
         duplicates.forEach(c => {
-            const spareCount = c.count - 1; // จำนวนที่ย่อยได้ (เก็บไว้ 1 ใบเสมอ)
+            const spareCount = c.count - 1; // จำนวนที่ย่อยได้ (ต้องเหลือไว้ 1 ใบ)
             
             list.append(`
                 <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 shadow-sm mb-2 rounded">
@@ -2725,7 +2701,7 @@ async function openRecycleModal() {
         });
 
     } catch (e) {
-        list.html('<p class="text-danger text-center">โหลดข้อมูลไม่สำเร็จ</p>');
+        list.html(`<p class="text-danger text-center">Error: ${e.message}</p>`);
     }
 }
 
@@ -2733,20 +2709,15 @@ function adjustRecycle(cardId, delta, max) {
     const current = selectedRecycleCards[cardId] || 0;
     let next = current + delta;
     
-    // เช็คขอบเขต
     if (next < 0) next = 0;
     if (next > max) next = max;
 
-    // เช็ครวมไม่เกิน 5
     const totalSelected = Object.values(selectedRecycleCards).reduce((a, b) => a + b, 0);
-    if (delta > 0 && (totalSelected >= 5) && next > current) {
-        return; // ห้ามเลือกเกิน 5
-    }
+    if (delta > 0 && (totalSelected >= 5) && next > current) return; // ห้ามเกิน 5
 
     if (next === 0) delete selectedRecycleCards[cardId];
     else selectedRecycleCards[cardId] = next;
 
-    // Update UI
     $(`#qty-${cardId}`).text(next);
     updateRecycleUI();
 }
@@ -2766,58 +2737,37 @@ function updateRecycleUI() {
 }
 
 async function confirmRecycle() {
-    // แปลงข้อมูลส่ง API
     const cardsToRecycle = Object.keys(selectedRecycleCards).map(id => ({
         cardId: id,
         count: selectedRecycleCards[id]
     }));
 
-    triggerHaptic('medium'); // สั่นตอนกดเริ่ม
+    triggerHaptic('medium');
 
-    // Animation: ไฟลุกโรงงาน
+    // Animation
     Swal.fire({
         title: 'กำลังหลอมรวม...',
-        html: `
-            <div class="d-flex justify-content-center">
-                <lottie-player src="https://assets5.lottiefiles.com/packages/lf20_o75swmuk.json" background="transparent" speed="1" style="width: 200px; height: 200px;" loop autoplay></lottie-player>
-            </div>
-            <p class="text-danger fw-bold">เครื่องจักรกำลังทำงาน...</p>
-        `,
+        html: '<div class="spinner-border text-danger"></div><p class="mt-2">เครื่องจักรกำลังทำงาน...</p>',
         showConfirmButton: false,
-        allowOutsideClick: false,
-        timer: 2500
+        timer: 2000
     });
 
     try {
-        await new Promise(r => setTimeout(r, 2500)); // รอ Animation จบ
+        await new Promise(r => setTimeout(r, 2000));
+        const res = await callApi('/api/game/recycle-cards', { 
+            lineUserId: AppState.lineProfile.userId,
+            cardsToRecycle 
+        }, 'POST');
 
-        const res = await callApi('/api/game/recycle-cards', { lineUserId: AppState.lineProfile.userId, cardsToRecycle }, 'POST');
-
-        // --- ส่วนนี้คือที่ต้องเติมกลับเข้าไปครับ ---
-        // 1. ปิด Modal
         $('#recycle-modal').modal('hide');
-        
-        // 2. อัปเดตเหรียญที่หน้าจอ
         $('#coin-display').text(res.newCoinBalance);
         if(AppState.currentUser) AppState.currentUser.coinBalance = res.newCoinBalance;
-        // -------------------------------------
 
-        triggerHaptic('heavy'); // สั่นแรงตอนได้รางวัล
-
-        Swal.fire({
-            title: 'รีไซเคิลสำเร็จ!',
-            html: `
-                <div class="d-flex justify-content-center">
-                    <lottie-player src="https://assets3.lottiefiles.com/packages/lf20_5w2kxcpn.json" background="transparent" speed="1" style="width: 150px; height: 150px;" autoplay></lottie-player>
-                </div>
-                <h3>คุณได้รับ <b class="text-warning">+${res.rewardCoins}</b> เหรียญ</h3>
-            `,
-            confirmButtonText: 'เยี่ยมเลย',
-            confirmButtonColor: '#ffc107'
-        });
+        triggerHaptic('heavy');
+        Swal.fire('สำเร็จ!', `คุณได้รับ +${res.rewardCoins} เหรียญ`, 'success');
 
     } catch (e) {
-        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+        Swal.fire('Error', e.message, 'error');
     }
 }
 
