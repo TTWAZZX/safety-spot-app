@@ -69,94 +69,81 @@
             <div id="game-page" class="page">
                 
                 <div class="bento-header d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="d-flex align-items-center mb-1">
-                            <span class="level-badge me-2">LV. 1</span>
-                            <small class="text-muted fw-bold" style="letter-spacing: 0.5px;">SAFETY RANK</small>
+                    
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rank-badge-container">
+                            <i class="fas fa-shield-alt rank-icon"></i>
+                            <div style="position: absolute; font-weight: 900; font-size: 0.8rem; color: #333; margin-top: 3px;">LV.1</div>
                         </div>
-                        <div class="d-flex align-items-baseline">
-                            <span class="display-6 fw-bold text-dark" id="coin-display" style="font-family: 'Kanit'; font-weight: 800;">0</span>
-                            <span class="ms-2 text-warning fs-4"><i class="fas fa-coins"></i></span>
+                        <div>
+                            <small class="text-muted fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">SAFETY RANK</small>
+                            <div class="coin-pill mt-1">
+                                <div class="coin-icon-3d"><i class="fas fa-coins"></i></div>
+                                <span class="fw-bold fs-5 text-dark" id="coin-display">0</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="text-end">
-                        <div class="d-flex flex-column align-items-end">
-                            <small class="text-muted mb-1" style="font-size: 0.7rem;">STREAK</small>
-                            <div class="badge bg-danger bg-opacity-10 text-danger px-3 py-2 rounded-pill border border-danger border-opacity-25">
-                                <i class="fas fa-fire me-1"></i> <span id="streak-display">0 วัน</span>
-                            </div>
+
+                    <div class="streak-box">
+                        <i class="fas fa-fire streak-icon mb-1 animate__animated animate__pulse animate__infinite"></i>
+                        <div class="badge bg-white text-dark shadow-sm border px-3 rounded-pill">
+                            <span id="streak-display" class="fw-bold">0 วัน</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="bento-container">
                     
-                    <div class="bento-card card-gacha span-row-2" onclick="pullGacha()">
-                        <div class="d-flex flex-column align-items-center text-center h-100 justify-content-center">
-                            <img src="https://cdn-icons-png.flaticon.com/512/9415/9415693.png" 
-                                class="bento-img-3d mb-3" 
-                                style="width: 110px; height: 110px; filter: drop-shadow(0 8px 8px rgba(255, 107, 107, 0.3));"
-                                alt="Gift Box">
-                                
-                            <div class="card-title text-danger" style="font-size: 1.2rem;">ตู้สุ่มรางวัล</div>
-                            <div class="card-sub text-danger opacity-75">
-                                <i class="fas fa-star me-1"></i> ลุ้นการ์ดแรร์
-                                <br>
-                                <span class="badge bg-white text-danger mt-2 shadow-sm px-3 rounded-pill">100 เหรียญ</span>
-                            </div>
-                        </div>
-                        <div class="btn-circle-go text-danger"><i class="fas fa-play"></i></div>
+                    <div class="bento-card theme-gacha span-row-2" onclick="pullGacha()">
+                        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/gift-box-4886619-4076329.png" class="bento-img-3d mb-3" style="width: 110px;">
+                        <div class="bento-title">ตู้สุ่มรางวัล</div>
+                        <div class="bento-sub mb-4">ลุ้นการ์ดแรร์!<br>100 Coins</div>
+                        <div class="btn-circle-soft" style="color: #d63384;"><i class="fas fa-play"></i></div>
                     </div>
 
-                    <div class="bento-card card-quiz" onclick="startDailyQuiz()">
-                        <div class="d-flex align-items-center justify-content-between h-100">
-                            <div>
-                                <div class="card-title text-success">ภารกิจ</div>
-                                <div class="card-sub text-success opacity-75">+50 Coins</div>
-                            </div>
-                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/checklist-4036014-3342297.png" class="bento-img-3d" style="width: 70px;">
-                        </div>
+                    <div class="bento-card theme-quiz" onclick="startDailyQuiz()">
+                        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/trophy-5650454-4708003.png" class="bento-img-3d mb-2" style="width: 60px;">
+                        <div class="bento-title">ภารกิจ</div>
+                        <div class="badge bg-success bg-opacity-10 text-success rounded-pill px-2">+50 Coins</div>
                     </div>
 
-                    <div class="bento-card card-exchange" onclick="exchangeCoinsToScore()">
-                        <div class="d-flex align-items-center justify-content-between h-100">
-                            <div>
-                                <div class="card-title text-warning" style="color: #f39c12;">แลกแต้ม</div>
-                                <div class="card-sub text-warning opacity-75" style="color: #f39c12;">10 : 2</div>
-                            </div>
-                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/money-bag-4036017-3342300.png" class="bento-img-3d" style="width: 70px;">
-                        </div>
+                    <div class="bento-card theme-exchange" onclick="exchangeCoinsToScore()">
+                        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/exchange-4841570-4043918.png" class="bento-img-3d mb-2" style="width: 60px;">
+                        <div class="bento-title">แลกแต้ม</div>
+                        <div class="bento-sub">10 : 2</div>
                     </div>
 
-                    <div class="bento-card card-hunter span-2 flex-row justify-content-between align-items-center px-4" onclick="openHunterMenu()">
+                    <div class="bento-card theme-hunter span-2 flex-row justify-content-between px-4 py-3" onclick="openHunterMenu()">
                         <div class="d-flex align-items-center">
-                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/map-location-4036018-3342301.png" class="bento-img-3d me-3" style="width: 60px; height: 60px;">
-                            <div>
-                                <div class="card-title text-primary">Safety Hunter</div>
-                                <div class="card-sub text-primary opacity-75">ค้นหาจุดเสี่ยงหน้างานจริง</div>
+                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/target-4036049-3342332.png" class="bento-img-3d me-3" style="width: 65px;">
+                            <div class="text-start">
+                                <div class="bento-title text-start" style="color: #2D3748;">Safety Hunter</div>
+                                <div class="bento-sub text-start">ค้นหาจุดเสี่ยงหน้างาน</div>
                             </div>
                         </div>
-                        <button class="btn btn-primary rounded-pill btn-sm px-3 fw-bold border-0" style="background: #2196f3; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.4);">เล่นเลย</button>
+                        <button class="btn-hunter-play shadow-lg">เล่นเลย</button>
                     </div>
 
-                    <div class="bento-card card-recycle span-2 flex-row justify-content-between align-items-center px-4" onclick="openRecycleModal()">
+                    <div class="bento-card theme-dark-utility span-2 flex-row justify-content-between px-4 py-3" onclick="openRecycleModal()">
                         <div class="d-flex align-items-center">
-                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/recycle-sign-4036038-3342321.png" class="bento-img-3d me-3" style="width: 50px; height: 50px;">
-                            <div>
-                                <div class="card-title text-secondary">โรงงานรีไซเคิล</div>
-                                <div class="card-sub">เปลี่ยนการ์ดซ้ำเป็นเหรียญ</div>
+                            <div class="bg-white bg-opacity-10 p-2 rounded-circle me-3">
+                                <i class="fas fa-recycle fs-4"></i>
+                            </div>
+                            <div class="text-start">
+                                <div class="bento-title text-start">โรงงานรีไซเคิล</div>
+                                <div class="bento-sub text-start opacity-50">เปลี่ยนการ์ดซ้ำเป็นเหรียญ</div>
                             </div>
                         </div>
-                        <i class="fas fa-chevron-right text-muted"></i>
+                        <i class="fas fa-chevron-right opacity-50"></i>
                     </div>
 
                     <div class="span-2 mt-2">
                         <div class="d-flex justify-content-between align-items-center mb-2 px-1">
-                            <small class="text-muted fw-bold" style="letter-spacing: 1px;">MY COLLECTION</small>
-                            <a href="#" class="text-decoration-none small fw-bold text-primary" onclick="openCardAlbum()">ดูทั้งหมด</a>
+                            <small class="text-muted fw-bold" style="letter-spacing: 1px; font-size: 0.7rem;">INVENTORY</small>
+                            <a href="#" class="text-decoration-none small fw-bold text-primary" onclick="openCardAlbum()">View All</a>
                         </div>
-                        <div class="collection-card">
-                            <div class="d-flex gap-2 overflow-auto" id="mini-collection-list" style="scrollbar-width: none;">
+                        <div class="inventory-grid">
+                            <div class="d-flex gap-2 overflow-auto" id="mini-collection-list" style="grid-column: span 5; scrollbar-width: none;">
                                 <div class="text-center w-100 text-muted small py-2">Loading...</div>
                             </div>
                         </div>
