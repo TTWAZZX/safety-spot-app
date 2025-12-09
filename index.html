@@ -9,8 +9,8 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.1">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -69,83 +69,153 @@
             <div id="game-page" class="page">
                 
                 <div class="bento-header d-flex justify-content-between align-items-center">
-                    
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="rank-badge-container">
-                            <i class="fas fa-shield-alt rank-icon"></i>
-                            <div class="fw-bolder" style="position: absolute; font-size: 0.9rem; color: #333; margin-top: 3px;">LV.1</div>
-                        </div>
-                        <div>
-                            <small class="text-muted fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">SAFETY RANK</small>
-                            <div class="coin-pill mt-1">
-                                <div class="coin-icon-3d"><i class="fas fa-coins"></i></div>
-                                <span class="fw-bolder fs-5 text-dark" id="coin-display">0</span>
-                            </div>
+                    <div>
+                        <small class="text-muted fw-bold" style="letter-spacing: 1px; font-size: 0.7rem;">MY SCORE</small>
+                        <div class="d-flex align-items-baseline">
+                            <span class="display-6 fw-bold text-dark" id="coin-display" style="font-family: 'Kanit'; font-weight: 800;">0</span>
+                            <span class="ms-2 text-warning"><i class="fas fa-coins"></i></span>
                         </div>
                     </div>
-
-                    <div class="streak-box">
-                        <i class="fas fa-fire streak-icon mb-1 animate__animated animate__pulse animate__infinite"></i>
-                        <div class="badge bg-white text-dark shadow-sm border px-3 rounded-pill">
-                            <span id="streak-display" class="fw-bold">0 วัน</span>
+                    <div class="text-end">
+                        <div class="badge bg-danger bg-opacity-10 text-danger px-3 py-2 rounded-pill border border-danger border-opacity-25">
+                            <i class="fas fa-fire me-1"></i> <span id="streak-display">0 วัน</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="bento-container pt-4">
+                <div class="bento-container">
                     
-                    <div class="bento-card theme-hunter span-2 flex-row justify-content-between px-4 py-3" onclick="openHunterMenu()" style="min-height: 120px;">
-                        <div class="d-flex align-items-center">
-                            <img src="https://cdn3d.iconscout.com/3d/premium/thumb/target-4036049-3342332.png" class="bento-img-3d me-3" style="width: 75px;"> <div class="text-start">
-                                <div class="bento-title text-start" style="color: var(--text-main); font-size: 1.2rem;">Safety Hunter</div> <div class="bento-sub text-start">ค้นหาจุดเสี่ยงหน้างาน</div>
-                            </div>
+                    <div class="bento-card theme-gacha span-row-2" onclick="pullGacha()">
+                        <div class="d-flex flex-column align-items-center text-center h-100 justify-content-center">
+                            <img src="https://cdn-icons-png.flaticon.com/512/4525/4525679.png" class="bento-icon-img mb-3">
+                            <div class="bento-title text-danger">Gacha</div>
+                            <div class="bento-sub text-danger">สุ่มรางวัล<br>100 เหรียญ</div>
                         </div>
-                        <button class="btn-hunter-play shadow-lg align-self-center py-3">เล่นเลย</button> </div>
-
-                    <div class="bento-card theme-gacha" onclick="pullGacha()">
-                        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/gift-box-4886619-4076329.png" class="bento-img-3d mb-2" style="width: 70px;">
-                        <div class="bento-title">ตู้สุ่มรางวัล</div>
-                        <div class="bento-sub">ลุ้นการ์ดแรร์!<br>100 Coins</div>
-                        <div class="btn-circle-soft" style="color: #d63384;"><i class="fas fa-play"></i></div>
+                        <div class="btn-circle-go text-danger"><i class="fas fa-play"></i></div>
                     </div>
 
                     <div class="bento-card theme-quiz" onclick="startDailyQuiz()">
-                        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/trophy-5650454-4708003.png" class="bento-img-3d mb-2" style="width: 60px;">
-                        <div class="bento-title">ภารกิจ</div>
-                        <div class="badge bg-success bg-opacity-10 text-success rounded-pill px-2 fw-bold">+50 Coins</div>
+                        <div class="d-flex align-items-center justify-content-between h-100">
+                            <div>
+                                <div class="bento-title text-success">ภารกิจ</div>
+                                <div class="bento-sub text-success">+50 Coins</div>
+                            </div>
+                            <i class="fas fa-clipboard-check text-success fs-2 opacity-50"></i>
+                        </div>
                     </div>
 
-                    <div class="bento-card theme-dark-utility span-2 flex-row justify-content-between px-4 py-3" onclick="openRecycleModal()">
+                    <div class="bento-card theme-gold" onclick="exchangeCoinsToScore()">
+                        <div class="d-flex align-items-center justify-content-between h-100">
+                            <div>
+                                <div class="bento-title text-warning" style="color: #d4a017;">แลกแต้ม</div>
+                                <div class="bento-sub text-warning" style="color: #d4a017;">10:2</div>
+                            </div>
+                            <i class="fas fa-exchange-alt text-warning fs-2 opacity-50"></i>
+                        </div>
+                    </div>
+
+                    <div class="bento-card theme-blue span-2 flex-row justify-content-between align-items-center px-4" onclick="openHunterMenu()">
                         <div class="d-flex align-items-center">
-                            <div class="bg-white bg-opacity-10 p-2 rounded-circle me-3">
-                                <i class="fas fa-recycle fs-4"></i>
+                            <div class="bg-white rounded-circle p-2 me-3 shadow-sm text-primary">
+                                <i class="fas fa-crosshairs fs-4"></i>
                             </div>
-                            <div class="text-start">
-                                <div class="bento-title text-start">โรงงานรีไซเคิล</div>
-                                <div class="bento-sub text-start opacity-75">เปลี่ยนการ์ดซ้ำเป็นเหรียญ</div>
+                            <div>
+                                <div class="bento-title text-primary">Safety Hunter</div>
+                                <div class="bento-sub text-primary">ค้นหาจุดเสี่ยงหน้างาน</div>
                             </div>
                         </div>
-                        <i class="fas fa-chevron-right opacity-75 fs-5"></i>
+                        <button class="btn btn-primary rounded-pill btn-sm px-3 fw-bold" style="pointer-events: none;">เล่นเลย</button>
                     </div>
 
-                    <div class="bento-card theme-exchange" onclick="exchangeCoinsToScore()">
-                        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/exchange-4841570-4043918.png" class="bento-img-3d mb-2" style="width: 60px;">
-                        <div class="bento-title">แลกแต้ม</div>
-                        <div class="bento-sub fw-bold">10 : 2</div>
+                    <div class="bento-card theme-dark span-2 flex-row justify-content-between align-items-center px-4" onclick="openRecycleModal()">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-recycle fs-2 me-3 text-success"></i>
+                            <div>
+                                <div class="bento-title">โรงงานรีไซเคิล</div>
+                                <div class="bento-sub text-white-50">เปลี่ยนการ์ดซ้ำเป็นเหรียญ</div>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right text-white-50"></i>
                     </div>
 
-                    <div class="span-1">
+                    <div class="span-2 mt-2">
                         <div class="d-flex justify-content-between align-items-center mb-2 px-1">
-                            <small class="text-muted fw-bold text-uppercase" style="letter-spacing: 1px; font-size: 0.7rem;">MY CARDS</small>
-                            <a href="#" class="text-decoration-none small fw-bold text-primary" onclick="openCardAlbum()">View All</a>
+                            <small class="text-muted fw-bold">COLLECTION</small>
+                            <a href="#" class="text-decoration-none small fw-bold" onclick="openCardAlbum()">ดูทั้งหมด</a>
                         </div>
-                        <div class="inventory-grid p-2">
-                            <div class="d-flex gap-2 overflow-auto" id="mini-collection-list" style="grid-column: span 5; scrollbar-width: none;">
+                        <div class="bg-white rounded-4 p-3 shadow-sm border border-light">
+                            <div class="d-flex gap-2 overflow-auto" id="mini-collection-list" style="scrollbar-width: none;">
                                 <div class="text-center w-100 text-muted small py-2">Loading...</div>
                             </div>
                         </div>
                     </div>
 
+                </div>
+            </div>
+
+            <div class="modal fade" id="quiz-modal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+                        
+                        <div class="modal-header border-0 text-white p-4" style="background: linear-gradient(135deg, #06C755 0%, #048a3b 100%);">
+                            <div>
+                                <h5 class="modal-title fw-bold"><i class="fas fa-gamepad me-2"></i>Daily Safety Quiz</h5>
+                                <p class="mb-0 small opacity-75">ตอบถูกรับ 50 เหรียญ / ตอบผิดรับ 10 เหรียญ</p>
+                            </div>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+
+                        <div class="modal-body p-0 bg-light">
+                            <div id="game-container" class="p-4">
+                                
+                                <div id="game-loading" class="text-center py-5">
+                                    <div class="spinner-border text-success" style="width: 3rem; height: 3rem;"></div>
+                                    <p class="mt-3 text-muted fw-bold">กำลังโหลดคำถาม...</p>
+                                </div>
+                                
+                                <div id="game-content" style="display:none;">
+                                    <div class="text-center mb-4 rounded-3 overflow-hidden bg-white shadow-sm position-relative" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
+                                        <img id="question-image" src="" class="img-fluid w-100" style="object-fit: contain; max-height: 250px; display:none;">
+                                        <div id="no-image-icon" style="display:none;">
+                                            <i class="fas fa-clipboard-question text-secondary fa-3x opacity-25"></i>
+                                            <p class="small text-muted mt-2">ไม่มีรูปภาพประกอบ</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="card border-0 shadow-sm mb-4">
+                                        <div class="card-body p-4 text-center">
+                                            <span class="badge bg-warning text-dark mb-2">คำถาม</span>
+                                            <h5 id="question-text" class="fw-bold lh-base mb-0" style="color: #2c3e50;">...</h5>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row g-2">
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="A"><span class="choice-badge flex-shrink-0">A</span><span id="option-a" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="B"><span class="choice-badge flex-shrink-0">B</span><span id="option-b" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="C"><span class="choice-badge flex-shrink-0">C</span><span id="option-c" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="D"><span class="choice-badge flex-shrink-0">D</span><span id="option-d" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="E"><span class="choice-badge flex-shrink-0">E</span><span id="option-e" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="F"><span class="choice-badge flex-shrink-0">F</span><span id="option-f" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="G"><span class="choice-badge flex-shrink-0">G</span><span id="option-g" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="H"><span class="choice-badge flex-shrink-0">H</span><span id="option-h" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                    </div>
+                                </div>
+
+                                <div id="game-played" class="text-center py-5" style="display:none;">
+                                    <div class="mb-3 animate__animated animate__bounceIn">
+                                        <i class="fas fa-check-circle text-success" style="font-size: 5rem; filter: drop-shadow(0 10px 10px rgba(25, 135, 84, 0.3));"></i>
+                                    </div>
+                                    <h3 class="fw-bold text-dark">เยี่ยมมาก!</h3>
+                                    <p class="text-muted px-4">คุณทำภารกิจวันนี้สำเร็จแล้ว<br>กลับมาใหม่พรุ่งนี้นะครับ</p>
+                                    <button class="btn btn-outline-secondary rounded-pill px-4 mt-2" data-bs-dismiss="modal">ปิดหน้าต่าง</button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -256,11 +326,11 @@
         
         <nav class="navbar navbar-light bg-white fixed-bottom bottom-nav">
             <div class="container-fluid d-flex justify-content-around">
-                <a href="#home" class="nav-link active text-center" data-page="home-page"><i class="fas fa-home fs-5"></i><div style="font-size:0.7rem;">หน้าหลัก</div></a>
-                <a href="#activities" class="nav-link text-center" data-page="activities-page"><i class="fas fa-tasks fs-5"></i><div style="font-size:0.7rem;">กิจกรรม</div></a>
+                <a href="#home" class="nav-link active text-center" data-page="home-page"><i class="fas fa-home fs-4"></i><div style="font-size:0.7rem;">หน้าหลัก</div></a>
+                <a href="#activities" class="nav-link text-center" data-page="activities-page"><i class="fas fa-tasks fs-4"></i><div style="font-size:0.7rem;">กิจกรรม</div></a>
                 
                 <a href="#" class="nav-link text-center position-relative" id="notification-bell">
-                    <i class="fas fa-bell fs-5"></i>
+                    <i class="fas fa-bell fs-4"></i>
                     <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" id="notification-badge" style="display: none;">
                         <span class="visually-hidden">New alerts</span>
                     </span>
@@ -268,15 +338,15 @@
                 </a>
                 
                 <a href="#game" class="nav-link text-center" data-page="game-page">
-                    <i class="fas fa-gamepad fs-5"></i><div style="font-size:0.7rem;">เกม</div>
+                    <i class="fas fa-gamepad fs-4"></i><div style="font-size:0.7rem;">เกม</div>
                 </a>
 
-                <a href="#leaderboard" class="nav-link text-center" data-page="leaderboard-page"><i class="fas fa-trophy fs-5"></i><div style="font-size:0.7rem;">อันดับ</div></a>
-                <a href="#profile" class="nav-link text-center" data-page="profile-page"><i class="fas fa-user fs-5"></i><div style="font-size:0.7rem;">โปรไฟล์</div></a>
+                <a href="#leaderboard" class="nav-link text-center" data-page="leaderboard-page"><i class="fas fa-trophy fs-4"></i><div style="font-size:0.7rem;">อันดับ</div></a>
+                <a href="#profile" class="nav-link text-center" data-page="profile-page"><i class="fas fa-user fs-4"></i><div style="font-size:0.7rem;">โปรไฟล์</div></a>
                 <a href="#admin" class="nav-link text-center" data-page="admin-page" id="admin-nav-item" style="display:none; position: absolute; right: 10px; bottom: 80px;"><i class="fas fa-user-shield fs-3 p-3 bg-primary text-white rounded-circle shadow"></i></a>
             </div>
         </nav>
-        </div>
+    </div>
     
     <div class="modal fade" id="submission-modal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
