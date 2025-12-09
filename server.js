@@ -829,6 +829,75 @@ app.post('/api/game/submit-answer', async (req, res) => {
 });
 
 // ======================================================
+// PART 3.6 — ADMIN: Manage Game Questions
+// ======================================================
+
+// 1. ดึงคำถามทั้งหมด (Admin View)
+app.get('/api/admin/questions', isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM kyt_questions ORDER BY questionId DESC");
+        res.json({ status: "success", data: rows });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+// 2. เพิ่ม/แก้ไข คำถาม
+app.post('/api/admin/questions', isAdmin, async (req, res) => {
+    const { questionId, questionText, optionA, optionB, correctOption, imageUrl, scoreReward } = req.body;
+
+    try {
+        if (questionId) {
+            // Update
+            await db.query(
+                `UPDATE kyt_questions 
+                 SET questionText=?, optionA=?, optionB=?, correctOption=?, imageUrl=?, scoreReward=? 
+                 WHERE questionId=?`,
+                [questionText, optionA, optionB, correctOption, imageUrl, scoreReward || 10, questionId]
+            );
+            res.json({ status: "success", data: { message: "Updated" } });
+        } else {
+            // Create
+            await db.query(
+                `INSERT INTO kyt_questions (questionText, optionA, optionB, correctOption, imageUrl, scoreReward, isActive)
+                 VALUES (?, ?, ?, ?, ?, ?, TRUE)`,
+                [questionText, optionA, optionB, correctOption, imageUrl, scoreReward || 10]
+            );
+            res.json({ status: "success", data: { message: "Created" } });
+        }
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+// 3. ลบคำถาม
+app.delete('/api/admin/questions/:id', isAdmin, async (req, res) => {
+    try {
+        await db.query("DELETE FROM kyt_questions WHERE questionId = ?", [req.params.id]);
+        res.json({ status: "success", data: { deleted: true } });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+// 4. เปิด/ปิด คำถาม (Toggle Active)
+app.post('/api/admin/questions/toggle', isAdmin, async (req, res) => {
+    try {
+        const { questionId } = req.body;
+        // เช็คสถานะปัจจุบันก่อน
+        const [rows] = await db.query("SELECT isActive FROM kyt_questions WHERE questionId = ?", [questionId]);
+        if (rows.length === 0) return res.status(404).json({status:"error"});
+
+        const newStatus = !rows[0].isActive;
+        await db.query("UPDATE kyt_questions SET isActive = ? WHERE questionId = ?", [newStatus, questionId]);
+        
+        res.json({ status: "success", data: { isActive: newStatus } });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+// ======================================================
 // PART 4 — ADMIN PANEL / NOTIFICATIONS / SERVER START
 // ======================================================
 

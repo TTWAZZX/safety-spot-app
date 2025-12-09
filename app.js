@@ -701,6 +701,16 @@ function bindAdminEventListeners() {
     $('#manage-activities-btn').on('click', handleManageActivities);
     $('#manage-badges-btn').on('click', handleManageBadges);
     $('#create-activity-btn').on('click', handleCreateActivity);
+    // เพิ่มต่อจากรายการเดิม
+    $('#manage-questions-btn').on('click', handleManageQuestions);
+    $('#add-question-btn').on('click', handleAddQuestion);
+    $('#question-form').on('submit', handleSaveQuestion);
+    $('#q-image-input').on('change', function() { handleImagePreview(this, '#q-image-preview'); $('#q-image-preview').show(); });
+
+    // Event สำหรับปุ่มในรายการคำถาม (Edit/Delete/Toggle)
+    $(document).on('click', '.btn-edit-q', handleEditQuestion);
+    $(document).on('click', '.btn-delete-q', handleDeleteQuestion);
+    $(document).on('click', '.btn-toggle-q', handleToggleQuestion);
     $(document).on('click', '.btn-approve, .btn-reject', handleApprovalAction);
     $(document).on('click', '.btn-edit-activity', handleEditActivity);
     $(document).on('click', '.btn-toggle-activity', handleToggleActivity);
@@ -1904,3 +1914,179 @@ $(document).on('click', '.answer-btn', async function() {
         $('.answer-btn').prop('disabled', false);
     }
 });
+
+// --- ADMIN: QUESTION MANAGEMENT ---
+
+async function handleManageQuestions() {
+    const list = $('#questions-list-admin');
+    list.html('<div class="col-12 text-center my-5"><div class="spinner-border text-success"></div></div>');
+    AppState.allModals['admin-questions'] = new bootstrap.Modal(document.getElementById('admin-questions-modal'));
+    AppState.allModals['admin-questions'].show();
+
+    try {
+        const questions = await callApi('/api/admin/questions');
+        list.empty();
+
+        if (questions.length === 0) {
+            list.html('<div class="col-12 text-center text-muted mt-5">ยังไม่มีคำถามในระบบ</div>');
+            return;
+        }
+
+        questions.forEach(q => {
+            const isActive = q.isActive;
+            const statusBadge = isActive 
+                ? '<span class="badge bg-success">ใช้งาน</span>' 
+                : '<span class="badge bg-secondary">ปิด</span>';
+            const statusBtnClass = isActive ? 'btn-outline-secondary' : 'btn-outline-success';
+            const statusBtnText = isActive ? 'ปิด' : 'เปิด';
+            
+            const qData = encodeURIComponent(JSON.stringify(q));
+            const imgHtml = q.imageUrl 
+                ? `<img src="${getFullImageUrl(q.imageUrl)}" class="rounded mb-2" style="height: 80px; object-fit: cover;">` 
+                : '';
+
+            const html = `
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body position-relative">
+                        <div class="d-flex justify-content-between mb-2">
+                            ${statusBadge}
+                            <small class="text-muted"><i class="fas fa-star text-warning"></i> ${q.scoreReward} คะแนน</small>
+                        </div>
+                        
+                        <div class="d-flex gap-3">
+                            ${imgHtml}
+                            <div>
+                                <h6 class="fw-bold mb-1 text-dark">${sanitizeHTML(q.questionText)}</h6>
+                                <p class="mb-0 small text-muted">
+                                    <span class="${q.correctOption === 'A' ? 'text-success fw-bold' : ''}">A: ${sanitizeHTML(q.optionA)}</span><br>
+                                    <span class="${q.correctOption === 'B' ? 'text-success fw-bold' : ''}">B: ${sanitizeHTML(q.optionB)}</span>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3 d-flex gap-2 justify-content-end">
+                            <button class="btn btn-sm ${statusBtnClass} btn-toggle-q" data-id="${q.questionId}">
+                                ${statusBtnText}
+                            </button>
+                            <button class="btn btn-sm btn-primary btn-edit-q" data-q='${qData}'>
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger btn-delete-q" data-id="${q.questionId}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            list.append(html);
+        });
+
+    } catch (e) {
+        list.html(`<div class="col-12 text-center text-danger">เกิดข้อผิดพลาด: ${e.message}</div>`);
+    }
+}
+
+function handleAddQuestion() {
+    $('#question-form-title').text('เพิ่มคำถามใหม่');
+    $('#question-form')[0].reset();
+    $('#q-id').val('');
+    $('#q-image-preview').hide().attr('src', '');
+    $('#q-image-url').val('');
+    
+    AppState.allModals['question-form'] = new bootstrap.Modal(document.getElementById('question-form-modal'));
+    AppState.allModals['question-form'].show();
+}
+
+function handleEditQuestion() {
+    const data = JSON.parse(decodeURIComponent($(this).data('q')));
+    
+    $('#question-form-title').text('แก้ไขคำถาม');
+    $('#q-id').val(data.questionId);
+    $('#q-text').val(data.questionText);
+    $('#q-opt-a').val(data.optionA);
+    $('#q-opt-b').val(data.optionB);
+    $(`input[name="correctOption"][value="${data.correctOption}"]`).prop('checked', true);
+    $('#q-score').val(data.scoreReward);
+    
+    $('#q-image-url').val(data.imageUrl || '');
+    if (data.imageUrl) {
+        $('#q-image-preview').attr('src', getFullImageUrl(data.imageUrl)).show();
+    } else {
+        $('#q-image-preview').hide();
+    }
+
+    AppState.allModals['question-form'] = new bootstrap.Modal(document.getElementById('question-form-modal'));
+    AppState.allModals['question-form'].show();
+}
+
+async function handleSaveQuestion(e) {
+    e.preventDefault();
+    const btn = $(this).find('button[type="submit"]');
+    btn.prop('disabled', true).text('กำลังบันทึก...');
+
+    try {
+        // Handle Image Upload
+        const fileInput = $('#q-image-input')[0];
+        let finalImageUrl = $('#q-image-url').val();
+
+        if (fileInput.files.length > 0) {
+            finalImageUrl = await uploadImage(fileInput.files[0]);
+        }
+
+        const payload = {
+            questionId: $('#q-id').val(),
+            questionText: $('#q-text').val(),
+            optionA: $('#q-opt-a').val(),
+            optionB: $('#q-opt-b').val(),
+            correctOption: $('input[name="correctOption"]:checked').val(),
+            scoreReward: $('#q-score').val(),
+            imageUrl: finalImageUrl
+        };
+
+        await callApi('/api/admin/questions', payload, 'POST');
+        
+        AppState.allModals['question-form'].hide();
+        showSuccess('บันทึกข้อมูลเรียบร้อย');
+        handleManageQuestions(); // Refresh list
+
+    } catch (e) {
+        showError(e.message);
+    } finally {
+        btn.prop('disabled', false).text('บันทึกข้อมูล');
+    }
+}
+
+async function handleToggleQuestion() {
+    const btn = $(this);
+    btn.prop('disabled', true);
+    try {
+        await callApi('/api/admin/questions/toggle', { questionId: btn.data('id') }, 'POST');
+        handleManageQuestions(); // Refresh UI
+    } catch (e) {
+        showError('ไม่สามารถเปลี่ยนสถานะได้');
+        btn.prop('disabled', false);
+    }
+}
+
+async function handleDeleteQuestion() {
+    const id = $(this).data('id');
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบ?',
+        text: "ข้อมูลประวัติการเล่นของข้อนี้จะถูกลบไปด้วย",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'ลบเลย'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            await callApi(`/api/admin/questions/${id}`, {}, 'DELETE');
+            showSuccess('ลบเรียบร้อย');
+            handleManageQuestions();
+        } catch (e) {
+            showError(e.message);
+        }
+    }
+}

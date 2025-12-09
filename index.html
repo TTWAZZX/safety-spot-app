@@ -196,6 +196,9 @@
                     <a href="#" id="manage-activities-btn" class="list-group-item list-group-item-action"><i class="fas fa-tasks me-2"></i> จัดการกิจกรรม</a>
                     <a href="#" id="manage-badges-btn" class="list-group-item list-group-item-action"><i class="fas fa-certificate me-2"></i> จัดการผู้ใช้และป้ายรางวัล</a>
                     <a href="#" id="view-stats-btn" class="list-group-item list-group-item-action"><i class="fas fa-chart-line me-2"></i> ดูข้อมูลสรุป (Dashboard เก่า)</a>
+                    <a href="#" id="manage-questions-btn" class="list-group-item list-group-item-action">
+                        <i class="fas fa-question-circle me-2"></i> จัดการคำถามเกม (KYT)
+                    </a>
                 </div>
             </div>
 
@@ -424,6 +427,81 @@
                         <h5 id="gacha-badge-name" class="fw-bold text-primary">Name</h5>
                         <button class="btn btn-primary w-100 mt-3" data-bs-dismiss="modal">เก็บใส่สมุดสะสม</button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="admin-questions-modal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">คลังคำถาม KYT</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <button id="add-question-btn" class="btn btn-success mb-3 shadow-sm">
+                        <i class="fas fa-plus"></i> เพิ่มคำถามใหม่
+                    </button>
+                    <div id="questions-list-admin" class="row g-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="question-form-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="question-form-title">เพิ่มคำถามใหม่</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="question-form">
+                        <input type="hidden" id="q-id">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">โจทย์คำถาม</label>
+                            <textarea class="form-control" id="q-text" rows="2" required placeholder="เช่น ถังดับเพลิงสีแดงใช้ดับไฟประเภทใด?"></textarea>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">ตัวเลือก A</label>
+                                <input type="text" class="form-control" id="q-opt-a" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">ตัวเลือก B</label>
+                                <input type="text" class="form-control" id="q-opt-b" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">ข้อที่ถูกต้อง</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="correctOption" id="correct-a" value="A" checked>
+                                <label class="btn btn-outline-success" for="correct-a">ตอบ A</label>
+
+                                <input type="radio" class="btn-check" name="correctOption" id="correct-b" value="B">
+                                <label class="btn btn-outline-success" for="correct-b">ตอบ B</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">รูปประกอบ (ถ้ามี)</label>
+                            <input type="file" class="form-control" id="q-image-input" accept="image/*">
+                            <input type="hidden" id="q-image-url">
+                            <div class="mt-2 text-center">
+                                <img id="q-image-preview" src="" style="max-height: 100px; display:none;" class="rounded border">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">คะแนนรางวัล</label>
+                            <input type="number" class="form-control" id="q-score" value="10">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 py-2">บันทึกข้อมูล</button>
+                    </form>
                 </div>
             </div>
         </div>
