@@ -1487,6 +1487,112 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
     }
 });
 
+// --- API: จบเกม (คำนวณ Streak + แจก Coin) ---
+app.post('/api/game/submit-answer-v2', async (req, res) => {
+    const { lineUserId, questionId, selectedOption } = req.body;
+    const today = new Date().toISOString().split('T')[0];
+    const conn = await db.getClient();
+
+    try {
+        await conn.beginTransaction();
+        
+        // 1. ตรวจคำตอบ ... (เหมือนเดิม) ...
+        const [qs] = await conn.query("SELECT * FROM kyt_questions WHERE questionId = ?", [questionId]);
+        const question = qs[0];
+        const isCorrect = (selectedOption === question.correctOption);
+        
+        // 2. คำนวณรางวัล (ให้ Coin แทน)
+        let earnedCoins = isCorrect ? 50 : 10; // ถูกได้ 50, ผิดได้ 10
+        let earnedScore = isCorrect ? question.scoreReward : 2; 
+
+        // 3. ระบบ Streak (โบนัสความต่อเนื่อง)
+        const [streakRow] = await conn.query("SELECT * FROM user_streaks WHERE lineUserId = ?", [lineUserId]);
+        let currentStreak = 1;
+        
+        if (streakRow.length > 0) {
+            const lastDate = new Date(streakRow[0].lastPlayedDate);
+            const diffTime = Math.abs(new Date(today) - lastDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 1) { 
+                // มาเล่นต่อจากเมื่อวาน -> Streak ขึ้น
+                currentStreak = streakRow[0].currentStreak + 1;
+            } else if (diffDays === 0) {
+                // เล่นซ้ำวันเดิม -> Streak เท่าเดิม
+                currentStreak = streakRow[0].currentStreak;
+            } else {
+                // ขาดช่วง -> รีเซ็ตเหลือ 1
+                currentStreak = 1;
+            }
+            
+            // อัปเดต Streak
+            await conn.query(
+                "UPDATE user_streaks SET currentStreak = ?, lastPlayedDate = ? WHERE lineUserId = ?",
+                [currentStreak, today, lineUserId]
+            );
+        } else {
+            // เพิ่งเคยเล่นครั้งแรก
+            await conn.query("INSERT INTO user_streaks VALUES (?, 1, ?, 1)", [lineUserId, today]);
+        }
+
+        // Streak Bonus: ทุกๆ 7 วัน ได้เหรียญเพิ่ม 100
+        if (currentStreak > 0 && currentStreak % 7 === 0) {
+            earnedCoins += 100; 
+        }
+
+        // 4. บันทึกผลและอัปเดต User
+        // ... (บันทึก history เหมือนเดิม) ...
+        await conn.query("UPDATE users SET totalScore = totalScore + ?, coinBalance = coinBalance + ? WHERE lineUserId = ?", [earnedScore, earnedCoins, lineUserId]);
+
+        await conn.commit();
+        res.json({ status: "success", data: { isCorrect, earnedCoins, currentStreak } });
+
+    } catch (e) {
+        await conn.rollback();
+        res.status(500).json({message: e.message});
+    } finally { conn.release(); }
+});
+
+// --- API: หมุนกาชา (ใช้ Coin แลกของ) ---
+app.post('/api/game/gacha-pull', async (req, res) => {
+    const { lineUserId } = req.body;
+    const GACHA_COST = 100; // ค่าหมุน 100 เหรียญ
+    const conn = await db.getClient();
+
+    try {
+        await conn.beginTransaction();
+
+        // 1. เช็คเงิน
+        const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
+        if (user.coinBalance < GACHA_COST) throw new Error("เหรียญไม่พอครับ (ต้องการ 100 เหรียญ)");
+
+        // 2. หักเงิน
+        await conn.query("UPDATE users SET coinBalance = coinBalance - ? WHERE lineUserId = ?", [GACHA_COST, lineUserId]);
+
+        // 3. สุ่มของ (Logic เกลือ)
+        // Rate: UR=1%, SR=5%, R=20%, C=74%
+        const rand = Math.random() * 100;
+        let rarity = 'C';
+        if (rand < 1) rarity = 'UR';
+        else if (rand < 6) rarity = 'SR';
+        else if (rand < 26) rarity = 'R';
+
+        // ดึงการ์ดตาม Rarity (ต้องมี column rarity ใน DB badges ด้วยนะครับ หรือสุ่มมั่วไปก่อนก็ได้)
+        const [badges] = await conn.query("SELECT * FROM badges ORDER BY RAND() LIMIT 1"); // สมมติสุ่มมั่วก่อน
+        const badge = badges[0];
+
+        // 4. ให้ของ
+        await conn.query("INSERT IGNORE INTO user_badges (lineUserId, badgeId) VALUES (?, ?)", [lineUserId, badge.badgeId]);
+
+        await conn.commit();
+        res.json({ status: "success", data: { badge, remainingCoins: user.coinBalance - GACHA_COST } });
+
+    } catch (e) {
+        await conn.rollback();
+        res.status(500).json({message: e.message});
+    } finally { conn.release(); }
+});
+
 // ======================================================
 // ADMIN: Users list for admin panel
 // ======================================================

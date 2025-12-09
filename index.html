@@ -68,61 +68,94 @@
 
             <div id="game-page" class="page">
                 
-                <div class="game-header-bg text-center">
-                    <h3 class="fw-bold mb-1"><i class="fas fa-shield-alt me-2"></i>Daily Safety Quiz</h3>
-                    <p class="small opacity-75 mb-4">ภารกิจความปลอดภัยประจำวัน</p>
+                <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-4" 
+                    style="background: linear-gradient(to right, #06C755, #049d43); border-radius: 0 0 25px 25px; color: white;">
+                    
+                    <div class="d-flex align-items-center">
+                        <div class="bg-white text-success rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 40px; height: 40px;">
+                            <i class="fas fa-fire fa-lg"></i>
+                        </div>
+                        <div>
+                            <small class="d-block opacity-75" style="font-size: 0.7rem;">ต่อเนื่อง</small>
+                            <span class="fw-bold" id="streak-display">0 วัน</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center">
+                        <div class="text-end me-2">
+                            <small class="d-block opacity-75" style="font-size: 0.7rem;">เหรียญสะสม</small>
+                            <span class="fw-bold" id="coin-display">0</span>
+                        </div>
+                        <div class="bg-warning text-dark rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);">
+                            <i class="fas fa-coins fa-lg"></i>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="container" style="margin-top: -30px; padding-bottom: 80px;"> <div id="game-container" class="game-card">
-                        <div class="card-body p-0 pb-4"> <div id="game-loading" class="text-center py-5">
-                                <div class="spinner-border text-success" style="width: 3rem; height: 3rem;"></div>
-                                <p class="mt-3 text-muted fw-bold">กำลังเตรียมโจทย์...</p>
-                            </div>
-
-                            <div id="game-content" style="display:none;">
-                                
-                                <div class="text-center bg-light mb-3" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
-                                    <img id="question-image" src="" class="img-fluid w-100" style="object-fit: cover; max-height: 250px; display:none;">
-                                    <i id="no-image-icon" class="fas fa-clipboard-question text-secondary fa-3x opacity-25" style="display:none;"></i>
+                <div class="container mt-n4" style="padding-bottom: 80px;">
+                    
+                    <div class="card border-0 shadow-sm rounded-4 mb-3 overflow-hidden">
+                        <div class="card-body p-0">
+                            <div class="row g-0">
+                                <div class="col-4 bg-light d-flex align-items-center justify-content-center">
+                                    <img src="https://cdn-icons-png.flaticon.com/512/2936/2936886.png" width="60" alt="Quiz">
                                 </div>
-
-                                <div class="question-box mx-3 mt-n5">
-                                    <span class="badge bg-warning text-dark mb-2">คำถามวัดกึ๋น</span>
-                                    <h5 id="question-text" class="fw-bold lh-base mb-0" style="color: #2c3e50;">
-                                        ...
-                                    </h5>
-                                </div>
-                                
-                                <div class="d-grid gap-3 px-4 mt-4">
-                                    <button class="answer-btn" data-choice="A">
-                                        <span class="choice-badge">A</span>
-                                        <span id="option-a" class="flex-grow-1">...</span>
-                                        <i class="fas fa-chevron-right text-muted small"></i>
-                                    </button>
-
-                                    <button class="answer-btn" data-choice="B">
-                                        <span class="choice-badge">B</span>
-                                        <span id="option-b" class="flex-grow-1">...</span>
-                                        <i class="fas fa-chevron-right text-muted small"></i>
+                                <div class="col-8 p-3">
+                                    <h6 class="fw-bold mb-1">ภารกิจประจำวัน</h6>
+                                    <p class="small text-muted mb-2">ตอบคำถามรับ 50 เหรียญ</p>
+                                    <button class="btn btn-sm btn-success w-100 rounded-pill" onclick="startDailyQuiz()">
+                                        <i class="fas fa-play me-1"></i> เริ่มเล่นเลย
                                     </button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
 
-                                <div class="text-center mt-4">
-                                    <small class="text-muted"><i class="fas fa-info-circle me-1"></i>ตอบถูกรับคะแนนสะสมทันที</small>
-                                </div>
+                    <div class="card border-0 shadow-sm rounded-4 mb-3" style="background: linear-gradient(135deg, #FF9966 0%, #FF5E62 100%); color: white;">
+                        <div class="card-body text-center py-4 position-relative overflow-hidden">
+                            <i class="fas fa-star position-absolute opacity-25" style="top: 10px; left: 10px; font-size: 2rem;"></i>
+                            <i class="fas fa-gift position-absolute opacity-25" style="bottom: 10px; right: 10px; font-size: 3rem;"></i>
+
+                            <h4 class="fw-bold mb-1">ตู้สุ่ม Safety Gacha</h4>
+                            <p class="small opacity-75 mb-3">ลุ้นรับการ์ดแรร์ระดับตำนาน!</p>
+                            
+                            <div class="bg-white text-dark d-inline-block px-3 py-1 rounded-pill mb-3 shadow-sm">
+                                <small>ใช้ <i class="fas fa-coins text-warning"></i> 100 เหรียญ / ครั้ง</small>
                             </div>
 
-                            <div id="game-played" class="text-center py-5" style="display:none;">
-                                <div class="mb-3">
-                                    <i class="fas fa-check-circle text-success" style="font-size: 5rem; filter: drop-shadow(0 10px 10px rgba(25, 135, 84, 0.3));"></i>
-                                </div>
-                                <h3 class="fw-bold text-dark">เยี่ยมมาก!</h3>
-                                <p class="text-muted px-4">คุณทำภารกิจวันนี้สำเร็จแล้ว<br>กลับมาใหม่พรุ่งนี้นะครับ</p>
-                                <button class="btn btn-outline-success rounded-pill px-4 mt-2" onclick="location.href='#leaderboard'">
-                                    ดูอันดับคะแนน
-                                </button>
-                            </div>
+                            <button class="btn btn-light text-danger fw-bold w-100 rounded-pill shadow" onclick="pullGacha()">
+                                หมุนตู้เลย!
+                            </button>
+                        </div>
+                    </div>
 
+                    <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                        <h6 class="fw-bold m-0 text-secondary">การ์ดของฉัน</h6>
+                        <a href="#profile" class="small text-decoration-none" onclick="$('[data-page=profile-page]').click()">ดูทั้งหมด ></a>
+                    </div>
+                    
+                    <div class="card border-0 shadow-sm rounded-4">
+                        <div class="card-body">
+                            <div class="d-flex gap-2 overflow-auto" id="mini-collection-list">
+                                <div class="bg-light rounded text-center p-3" style="min-width: 80px;">
+                                    <small class="text-muted">Loading...</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="modal fade" id="quiz-modal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold">Daily Quiz</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="quiz-content-placeholder"></div>
                         </div>
                     </div>
                 </div>

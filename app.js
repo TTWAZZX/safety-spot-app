@@ -655,7 +655,8 @@ function bindStaticEventListeners() {
             }
             // เพิ่มเงื่อนไขนี้เข้าไป
             if (pageId === 'game-page') {
-                loadGamePage();
+                // เปลี่ยนมาโหลด Dashboard แทน
+                loadGameDashboard(); 
             }
         }
     });
@@ -2090,5 +2091,109 @@ async function handleDeleteQuestion() {
         } catch (e) {
             showError(e.message);
         }
+    }
+}
+
+// ===============================================================
+//  GAME DASHBOARD & GACHA LOGIC (NEW V.2)
+// ===============================================================
+
+// 1. โหลดข้อมูล Dashboard หน้าเกม (Coin & Streak)
+async function loadGameDashboard() {
+    console.log("Loading Game Dashboard...");
+    
+    // โหลดจำนวนเหรียญ (ถ้าใน User Profile ยังไม่มี field coin ให้ใช้คะแนนแทนไปก่อน หรือแก้ Backend)
+    // สมมติว่า Backend ส่ง coinBalance มากับ profile แล้ว
+    const user = AppState.currentUser; 
+    
+    // *หมายเหตุ: ถ้า Backend ยังไม่แก้ ให้ใช้ Dummy data ไปก่อนเพื่อดูผลลัพธ์ UI
+    const coins = user.coinBalance !== undefined ? user.coinBalance : 0; 
+    const streak = user.currentStreak !== undefined ? user.currentStreak : 0;
+
+    $('#coin-display').text(coins);
+    $('#streak-display').text(streak + " วัน");
+
+    // โหลด Mini Collection (การ์ด 5 ใบล่าสุด)
+    try {
+        const badges = await callApi('/api/user/badges', { lineUserId: AppState.lineProfile.userId });
+        const recentBadges = badges.filter(b => b.isEarned).slice(0, 5); // เอา 5 ใบแรกที่ได้
+        
+        const list = $('#mini-collection-list');
+        list.empty();
+        
+        if(recentBadges.length === 0) {
+            list.html('<div class="text-muted small p-2">ยังไม่มีการ์ด</div>');
+        } else {
+            recentBadges.forEach(b => {
+                list.append(`
+                    <img src="${getFullImageUrl(b.img)}" class="rounded border bg-white" 
+                         style="width: 50px; height: 50px; object-fit: cover;" 
+                         data-bs-toggle="tooltip" title="${b.name}">
+                `);
+            });
+        }
+    } catch (e) {
+        console.error("Load mini collection error:", e);
+    }
+}
+
+// 2. ฟังก์ชันเริ่ม Quiz (ผูกกับปุ่ม "เริ่มเล่นเลย")
+function startDailyQuiz() {
+    // เปิด Modal Quiz
+    const quizModal = new bootstrap.Modal(document.getElementById('quiz-modal'));
+    quizModal.show();
+    
+    // โหลดคำถาม (ใช้ฟังก์ชันเดิมที่มีอยู่แล้ว)
+    loadGamePage(); 
+}
+
+// 3. ฟังก์ชันหมุนกาชา (ผูกกับปุ่ม "หมุนตู้เลย")
+async function pullGacha() {
+    // เช็คเหรียญก่อน (Client side check)
+    const currentCoins = parseInt($('#coin-display').text()) || 0;
+    if(currentCoins < 100) {
+        return Swal.fire({
+            icon: 'warning',
+            title: 'เหรียญไม่พอ',
+            text: 'ต้องการ 100 เหรียญเพื่อหมุนตู้\nไปทำภารกิจตอบคำถามก่อนนะ!',
+            confirmButtonText: 'โอเค'
+        });
+    }
+
+    // Animation หมุนตู้
+    Swal.fire({
+        title: 'กำลังสุ่ม...',
+        html: '<div class="my-3"><i class="fas fa-sync fa-spin fa-3x text-warning"></i></div><p>ขอให้โชคดี!</p>',
+        showConfirmButton: false,
+        allowOutsideClick: false
+    });
+
+    try {
+        // เรียก API Gacha (ต้องมี Backend รองรับตามที่คุยกันรอบที่แล้ว)
+        // *ถ้ายังไม่ได้ทำ Backend ส่วน gacha-pull ให้ใช้บรรทัดล่างนี้แทนเพื่อทดสอบ UI*
+        // const res = { remainingCoins: currentCoins - 100, badge: { badgeName: 'Test Badge', imageUrl: '' } }; await new Promise(r => setTimeout(r, 1500)); 
+        
+        const res = await callApi('/api/game/gacha-pull', { lineUserId: AppState.lineProfile.userId }, 'POST');
+        
+        // Update UI
+        $('#coin-display').text(res.remainingCoins);
+        if(AppState.currentUser) AppState.currentUser.coinBalance = res.remainingCoins;
+
+        // Show Reward
+        Swal.fire({
+            title: '✨ ยินดีด้วย! ✨',
+            html: `คุณได้รับ <b>${res.badge.badgeName}</b>`,
+            imageUrl: getFullImageUrl(res.badge.imageUrl),
+            imageWidth: 150,
+            imageAlt: 'Reward',
+            confirmButtonText: 'เก็บใส่สมุด',
+            confirmButtonColor: '#06C755'
+        }).then(() => {
+            // โหลด Mini Collection ใหม่
+            loadGameDashboard();
+        });
+
+    } catch (e) {
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
     }
 }
