@@ -210,7 +210,8 @@
             </div>
 
             <div class="modal fade" id="quiz-modal" tabindex="-1">
-                <div class="modal-dialog modal-dialog-centered modal-lg"> <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
                         
                         <div class="modal-header border-0 text-white p-4" style="background: linear-gradient(135deg, #06C755 0%, #048a3b 100%);">
                             <div>
@@ -221,16 +222,14 @@
                         </div>
 
                         <div class="modal-body p-0 bg-light">
-                            
                             <div id="game-container" class="p-4">
                                 
                                 <div id="game-loading" class="text-center py-5">
                                     <div class="spinner-border text-success" style="width: 3rem; height: 3rem;"></div>
                                     <p class="mt-3 text-muted fw-bold">กำลังโหลดคำถาม...</p>
                                 </div>
-
+                                
                                 <div id="game-content" style="display:none;">
-                                    
                                     <div class="text-center mb-4 rounded-3 overflow-hidden bg-white shadow-sm position-relative" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
                                         <img id="question-image" src="" class="img-fluid w-100" style="object-fit: contain; max-height: 250px; display:none;">
                                         <div id="no-image-icon" style="display:none;">
@@ -247,20 +246,19 @@
                                     </div>
                                     
                                     <div class="row g-2">
-                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="A"><span class="choice-badge">A</span><span id="option-a" class="text-truncate ms-2">...</span></button></div>
-                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="B"><span class="choice-badge">B</span><span id="option-b" class="text-truncate ms-2">...</span></button></div>
-                                            
-                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="C"><span class="choice-badge">C</span><span id="option-c" class="text-truncate ms-2">...</span></button></div>
-                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="D"><span class="choice-badge">D</span><span id="option-d" class="text-truncate ms-2">...</span></button></div>
-                                            
-                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="E"><span class="choice-badge">E</span><span id="option-e" class="text-truncate ms-2">...</span></button></div>
-                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="F"><span class="choice-badge">F</span><span id="option-f" class="text-truncate ms-2">...</span></button></div>
-                                            
-                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="G"><span class="choice-badge">G</span><span id="option-g" class="text-truncate ms-2">...</span></button></div>
-                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="H"><span class="choice-badge">H</span><span id="option-h" class="text-truncate ms-2">...</span></button></div>
-                                        </div>
-
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="A"><span class="choice-badge flex-shrink-0">A</span><span id="option-a" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="B"><span class="choice-badge flex-shrink-0">B</span><span id="option-b" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="C"><span class="choice-badge flex-shrink-0">C</span><span id="option-c" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="D"><span class="choice-badge flex-shrink-0">D</span><span id="option-d" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="E"><span class="choice-badge flex-shrink-0">E</span><span id="option-e" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="F"><span class="choice-badge flex-shrink-0">F</span><span id="option-f" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="G"><span class="choice-badge flex-shrink-0">G</span><span id="option-g" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="H"><span class="choice-badge flex-shrink-0">H</span><span id="option-h" class="ms-2 text-start small lh-sm">...</span></button></div>
                                     </div>
+                                </div>
 
                                 <div id="game-played" class="text-center py-5" style="display:none;">
                                     <div class="mb-3 animate__animated animate__bounceIn">
@@ -268,9 +266,7 @@
                                     </div>
                                     <h3 class="fw-bold text-dark">เยี่ยมมาก!</h3>
                                     <p class="text-muted px-4">คุณทำภารกิจวันนี้สำเร็จแล้ว<br>กลับมาใหม่พรุ่งนี้นะครับ</p>
-                                    <button class="btn btn-outline-secondary rounded-pill px-4 mt-2" data-bs-dismiss="modal">
-                                        ปิดหน้าต่าง
-                                    </button>
+                                    <button class="btn btn-outline-secondary rounded-pill px-4 mt-2" data-bs-dismiss="modal">ปิดหน้าต่าง</button>
                                 </div>
 
                             </div>

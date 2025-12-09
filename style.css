@@ -414,3 +414,24 @@ body {
 /* สถานะตอบถูก/ผิด */
 .answer-btn.correct { background-color: #d1e7dd !important; border-color: #198754 !important; }
 .answer-btn.wrong { background-color: #f8d7da !important; border-color: #dc3545 !important; }
+
+.answer-btn {
+    border: 2px solid #e9ecef;
+    background-color: #ffffff;
+    color: #333;
+    border-radius: 12px;
+    padding: 10px 15px;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    
+    /* --- ชุดคำสั่งแก้ปัญหาข้อความยาว --- */
+    display: flex;
+    align-items: center;      /* จัดกึ่งกลางแนวตั้ง */
+    gap: 10px;               /* ระยะห่างระหว่าง Icon กับ Text */
+    width: 100%;
+    height: auto;            /* ให้สูงตามเนื้อหา */
+    min-height: 60px;        /* ความสูงขั้นต่ำ */
+    white-space: normal;     /* อนุญาตให้ตัดคำขึ้นบรรทัดใหม่ */
+    /* -------------------------------- */
+}
