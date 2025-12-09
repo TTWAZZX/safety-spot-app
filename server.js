@@ -924,6 +924,62 @@ app.post('/api/admin/questions/toggle', isAdmin, async (req, res) => {
 });
 
 // ======================================================
+// PART 3.7 — ADMIN: Manage Safety Cards
+// ======================================================
+
+// 1. ดึงการ์ดทั้งหมด (สำหรับ Admin)
+app.get('/api/admin/cards', isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM safety_cards ORDER BY createdAt DESC");
+        res.json({ status: "success", data: rows });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+// 2. เพิ่ม/แก้ไข การ์ด
+app.post('/api/admin/cards', isAdmin, async (req, res) => {
+    const { cardId, cardName, description, imageUrl, rarity } = req.body;
+
+    try {
+        if (cardId) {
+            // Update
+            await db.query(
+                "UPDATE safety_cards SET cardName=?, description=?, imageUrl=?, rarity=? WHERE cardId=?",
+                [cardName, description, imageUrl, rarity, cardId]
+            );
+            res.json({ status: "success", data: { message: "Updated" } });
+        } else {
+            // Create
+            // สร้าง ID แบบง่ายๆ (หรือจะใช้ UUID ก็ได้)
+            const newId = "CARD_" + Date.now(); 
+            await db.query(
+                "INSERT INTO safety_cards (cardId, cardName, description, imageUrl, rarity) VALUES (?, ?, ?, ?, ?)",
+                [newId, cardName, description, imageUrl, rarity]
+            );
+            res.json({ status: "success", data: { message: "Created" } });
+        }
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+// 3. ลบการ์ด
+app.delete('/api/admin/cards/:id', isAdmin, async (req, res) => {
+    try {
+        // ลบข้อมูลการครอบครองของผู้เล่นก่อน (เพื่อไม่ให้ติด Foreign Key)
+        await db.query("DELETE FROM user_cards WHERE cardId = ?", [req.params.id]);
+        
+        // ลบตัวการ์ด
+        await db.query("DELETE FROM safety_cards WHERE cardId = ?", [req.params.id]);
+        
+        res.json({ status: "success", data: { deleted: true } });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+// ======================================================
 // PART 4 — ADMIN PANEL / NOTIFICATIONS / SERVER START
 // ======================================================
 

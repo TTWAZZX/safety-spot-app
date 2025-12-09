@@ -707,6 +707,15 @@ function bindAdminEventListeners() {
     $('#add-question-btn').on('click', handleAddQuestion);
     $('#question-form').on('submit', handleSaveQuestion);
     $('#q-image-input').on('change', function() { handleImagePreview(this, '#q-image-preview'); $('#q-image-preview').show(); });
+    // Event Listener สำหรับจัดการการ์ด
+    $('#manage-cards-btn').on('click', handleManageCards);
+    $('#add-card-btn').on('click', handleAddCard);
+    $('#card-form').on('submit', handleSaveCard);
+    $('#card-image-input').on('change', function() { handleImagePreview(this, '#card-image-preview'); $('#card-image-preview').show(); });
+
+    // ปุ่ม Edit/Delete ในลิสต์การ์ด
+    $(document).on('click', '.btn-edit-card', handleEditCard);
+    $(document).on('click', '.btn-delete-card', handleDeleteCard);
 
     // Event สำหรับปุ่มในรายการคำถาม (Edit/Delete/Toggle)
     $(document).on('click', '.btn-edit-q', handleEditQuestion);
@@ -2305,4 +2314,165 @@ async function loadGameDashboard() {
             });
         }
     } catch (e) { console.error(e); }
+}
+
+// --- ADMIN: CARD MANAGEMENT ---
+
+async function handleManageCards() {
+    const list = $('#cards-list-admin');
+    list.html('<div class="col-12 text-center my-5"><div class="spinner-border text-success"></div></div>');
+    const modal = new bootstrap.Modal(document.getElementById('admin-cards-modal'));
+    modal.show();
+
+    try {
+        const cards = await callApi('/api/admin/cards');
+        list.empty();
+
+        if (cards.length === 0) {
+            list.html('<div class="col-12 text-center text-muted mt-5">ยังไม่มีการ์ดในระบบ</div>');
+            return;
+        }
+
+        cards.forEach(c => {
+            // สี Badge ตาม Rarity
+            let badgeClass = 'bg-secondary';
+            if (c.rarity === 'R') badgeClass = 'bg-info text-dark';
+            if (c.rarity === 'SR') badgeClass = 'bg-danger';
+            if (c.rarity === 'UR') badgeClass = 'bg-warning text-dark';
+
+            const cardData = encodeURIComponent(JSON.stringify(c));
+            const imgHtml = c.imageUrl 
+                ? `<img src="${getFullImageUrl(c.imageUrl)}" class="card-img-top" style="height: 140px; object-fit: contain; padding: 10px; background: #f8f9fa;">` 
+                : '<div class="bg-light" style="height:140px;"></div>';
+
+            const html = `
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="position-relative">
+                        ${imgHtml}
+                        <span class="position-absolute top-0 end-0 badge ${badgeClass} m-2 shadow-sm">${c.rarity}</span>
+                    </div>
+                    <div class="card-body p-2 text-center">
+                        <h6 class="fw-bold text-dark mb-1 text-truncate">${sanitizeHTML(c.cardName)}</h6>
+                        <small class="text-muted d-block text-truncate mb-2" style="font-size: 0.7rem;">${sanitizeHTML(c.description || '-')}</small>
+                        
+                        <div class="d-flex justify-content-center gap-2">
+                            <button class="btn btn-sm btn-outline-primary btn-edit-card" data-card='${cardData}'>
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger btn-delete-card" data-id="${c.cardId}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            list.append(html);
+        });
+
+    } catch (e) {
+        list.html(`<div class="col-12 text-center text-danger">เกิดข้อผิดพลาด: ${e.message}</div>`);
+    }
+}
+
+function handleAddCard() {
+    $('#card-form-title').text('เพิ่มการ์ดใหม่');
+    $('#card-form')[0].reset();
+    $('#card-id').val('');
+    $('#card-image-preview').hide().attr('src', '');
+    $('#card-image-url').val('');
+    
+    new bootstrap.Modal(document.getElementById('card-form-modal')).show();
+}
+
+function handleEditCard() {
+    const data = JSON.parse(decodeURIComponent($(this).data('card')));
+    
+    $('#card-form-title').text('แก้ไขการ์ด');
+    $('#card-id').val(data.cardId);
+    $('#card-name').val(data.cardName);
+    $('#card-desc').val(data.description);
+    $('#card-rarity').val(data.rarity);
+    
+    $('#card-image-url').val(data.imageUrl || '');
+    if (data.imageUrl) {
+        $('#card-image-preview').attr('src', getFullImageUrl(data.imageUrl)).show();
+    } else {
+        $('#card-image-preview').hide();
+    }
+
+    new bootstrap.Modal(document.getElementById('card-form-modal')).show();
+}
+
+async function handleSaveCard(e) {
+    e.preventDefault();
+    const btn = $(this).find('button[type="submit"]');
+    btn.prop('disabled', true).text('กำลังบันทึก...');
+
+    try {
+        const fileInput = $('#card-image-input')[0];
+        let finalImageUrl = $('#card-image-url').val();
+
+        if (fileInput.files.length > 0) {
+            finalImageUrl = await uploadImage(fileInput.files[0]);
+        }
+
+        const payload = {
+            cardId: $('#card-id').val(),
+            cardName: $('#card-name').val(),
+            description: $('#card-desc').val(),
+            rarity: $('#card-rarity').val(),
+            imageUrl: finalImageUrl
+        };
+
+        await callApi('/api/admin/cards', payload, 'POST');
+        
+        // ปิด Modal Form
+        const formModalEl = document.getElementById('card-form-modal');
+        const formModal = bootstrap.Modal.getInstance(formModalEl);
+        formModal.hide();
+
+        showSuccess('บันทึกข้อมูลเรียบร้อย');
+        
+        // รีเฟรชหน้าลิสต์ (ต้องปิด Modal List ก่อนแล้วเปิดใหม่ หรือเรียกฟังก์ชันซ้ำ)
+        // เนื่องจาก Bootstrap Modal ซ้อนกันอาจมีปัญหาเรื่อง backdrop ให้ปิดอันเดิมก่อน
+        const listModalEl = document.getElementById('admin-cards-modal');
+        const listModal = bootstrap.Modal.getInstance(listModalEl);
+        listModal.hide();
+        
+        setTimeout(() => handleManageCards(), 500); // เปิดใหม่
+
+    } catch (e) {
+        showError(e.message);
+    } finally {
+        btn.prop('disabled', false).text('บันทึกข้อมูล');
+    }
+}
+
+async function handleDeleteCard() {
+    const id = $(this).data('id');
+    const result = await Swal.fire({
+        title: 'ยืนยันการลบ?',
+        text: "ผู้เล่นที่มีการ์ดใบนี้อยู่ การ์ดจะหายไปจากสมุดสะสมของพวกเขาด้วย!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'ลบเลย'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            await callApi(`/api/admin/cards/${id}`, {}, 'DELETE');
+            showSuccess('ลบเรียบร้อย');
+            
+            // Refresh List
+            const listModalEl = document.getElementById('admin-cards-modal');
+            const listModal = bootstrap.Modal.getInstance(listModalEl);
+            listModal.hide();
+            setTimeout(() => handleManageCards(), 500);
+
+        } catch (e) {
+            showError(e.message);
+        }
+    }
 }

@@ -311,6 +311,9 @@
                     <a href="#" id="manage-questions-btn" class="list-group-item list-group-item-action">
                         <i class="fas fa-question-circle me-2"></i> จัดการคำถามเกม (KYT)
                     </a>
+                    <a href="#" id="manage-cards-btn" class="list-group-item list-group-item-action">
+                        <i class="fas fa-layer-group me-2"></i> จัดการ Safety Cards (กาชา)
+                    </a>
                 </div>
             </div>
 
@@ -643,6 +646,70 @@
                     <div id="album-grid" class="row g-2">
                         </div>
 
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="admin-cards-modal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">คลัง Safety Cards</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <button id="add-card-btn" class="btn btn-success mb-3 shadow-sm">
+                        <i class="fas fa-plus"></i> เพิ่มการ์ดใหม่
+                    </button>
+                    <div id="cards-list-admin" class="row g-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="card-form-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="card-form-title">เพิ่มการ์ดใหม่</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="card-form">
+                        <input type="hidden" id="card-id">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">ชื่อการ์ด</label>
+                            <input type="text" class="form-control" id="card-name" required placeholder="เช่น หมวกนิรภัย">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">ระดับความหายาก (Rarity)</label>
+                            <select class="form-select" id="card-rarity">
+                                <option value="C">Common (ทั่วไป - หาง่ายสุด)</option>
+                                <option value="R">Rare (หายาก)</option>
+                                <option value="SR">Super Rare (หายากมาก)</option>
+                                <option value="UR">Ultra Rare (ระดับตำนาน)</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">คำอธิบาย/ความรู้หลังการ์ด</label>
+                            <textarea class="form-control" id="card-desc" rows="3" placeholder="เช่น ใช้ป้องกันศีรษะจากวัสดุตกกระแทก..."></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">รูปภาพการ์ด</label>
+                            <input type="file" class="form-control" id="card-image-input" accept="image/*">
+                            <input type="hidden" id="card-image-url">
+                            <div class="mt-2 text-center">
+                                <img id="card-image-preview" src="" style="max-height: 150px; display:none;" class="rounded border shadow-sm">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 py-2">บันทึกข้อมูล</button>
+                    </form>
                 </div>
             </div>
         </div>
