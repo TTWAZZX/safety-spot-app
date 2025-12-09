@@ -511,72 +511,76 @@ body {
     margin-bottom: 25px;
 }
 
-/* 2. Grid System (หัวใจหลักของ Bento) */
+/* Grid System */
 .bento-container {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* แบ่ง 2 คอลัมน์เท่ากัน */
-    grid-auto-rows: minmax(100px, auto); /* ความสูงแถว */
-    gap: 15px; /* ช่องว่างระหว่างกล่อง */
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: minmax(110px, auto); /* เพิ่มความสูงขั้นต่ำนิดหน่อย */
+    gap: 18px; /* เพิ่มช่องว่างให้ดูไม่อึดอัด */
     padding: 0 20px;
 }
 
-/* 3. การ์ดพื้นฐาน */
+/* 3D Card Style */
 .bento-card {
-    background: #ffffff;
-    border-radius: 24px;
-    padding: 15px;
+    /* พื้นหลังแบบมี Gradient อ่อนๆ ช่วยเพิ่มมิติ */
+    background: linear-gradient(145deg, #ffffff, #f0f2f5);
+    border-radius: 28px;
+    padding: 18px;
     position: relative;
     overflow: hidden;
-    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.04);
-    border: 1px solid rgba(255,255,255,0.5);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    /* เทคนิคเงา 2 ชั้น ให้ความรู้สึกนูนและลอย */
+    box-shadow: 
+        6px 6px 12px rgba(163, 177, 198, 0.2), /* เงาหลัก */
+        -6px -6px 12px rgba(255, 255, 255, 0.8), /* แสงสะท้อนด้านบน */
+        inset 2px 2px 4px rgba(255, 255, 255, 0.5); /* ขอบใน */
+    /* ขอบหนาขึ้นเล็กน้อย */
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
     cursor: pointer;
 }
 
-.bento-card:active { transform: scale(0.96); }
-
-/* ขนาดพิเศษ */
-.span-2 { grid-column: span 2; } /* กว้างเต็มจอ (2 คอลัมน์) */
-.span-row-2 { grid-row: span 2; } /* สูง 2 เท่า */
-
-/* ธีมสี (ใช้ Gradient อ่อนๆ ดูแพง) */
-.theme-gacha { background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%); border-color: #ffcccc; }
-.theme-quiz { background: linear-gradient(135deg, #e3ffe7 0%, #d1f7d6 100%); border-color: #c3e6cb; }
-.theme-gold { background: linear-gradient(135deg, #fffcf0 0%, #fff4d9 100%); border-color: #ffeeba; }
-.theme-blue { background: linear-gradient(135deg, #f0f7ff 0%, #dceeff 100%); border-color: #cce5ff; }
-.theme-dark { background: linear-gradient(135deg, #343a40 0%, #212529 100%); color: white !important; }
-
-/* องค์ประกอบภายใน */
-.bento-title {
-    font-weight: 800; font-size: 1rem; margin-bottom: 2px;
-    color: #2c3e50; line-height: 1.2;
+/* กดแล้วยุบลงไปนิดนึง */
+.bento-card:active {
+    transform: scale(0.97);
+    box-shadow: 
+        2px 2px 6px rgba(163, 177, 198, 0.3),
+        -2px -2px 6px rgba(255, 255, 255, 0.9);
 }
-.bento-sub {
-    font-size: 0.7rem; opacity: 0.7; font-weight: 500;
-}
-.theme-dark .bento-title, 
-.theme-dark .bento-sub,
-.theme-dark i { color: white !important; }
 
-/* ปุ่มกลมเล็กๆ (Go Button) */
+/* รูปภาพ 3D */
+.bento-img-3d {
+    width: 75px; /* ใหญ่ขึ้น */
+    height: 75px;
+    object-fit: contain;
+    margin-bottom: 12px;
+    /* เงาใต้รูป 3D ทำให้รูปลอยออกมาจากการ์ด */
+    filter: drop-shadow(0 8px 8px rgba(0,0,0,0.15));
+    transition: transform 0.3s ease;
+}
+
+/* Hover แล้วรูปเด้งขึ้นนิดนึง */
+.bento-card:hover .bento-img-3d {
+    transform: translateY(-5px) scale(1.05);
+}
+
+/* Typography & Buttons */
+.bento-title { font-weight: 800; font-size: 1.1rem; margin-bottom: 2px; color: #2c3e50; line-height: 1.2; }
+.bento-sub { font-size: 0.75rem; opacity: 0.7; font-weight: 600; }
+
 .btn-circle-go {
-    width: 35px; height: 35px;
+    width: 38px; height: 38px;
     border-radius: 50%;
-    background: #ffffff;
+    background: linear-gradient(145deg, #ffffff, #e6e6e6); /* ปุ่มก็มีมิติ */
     color: #333;
     display: flex; align-items: center; justify-content: center;
     position: absolute;
-    bottom: 12px; right: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    bottom: 15px; right: 15px;
+    box-shadow: 3px 3px 8px rgba(0,0,0,0.1);
 }
 
-/* ไอคอนตกแต่ง */
-.bento-icon-img {
-    width: 60px; height: 60px;
-    object-fit: contain;
-    margin-bottom: 10px;
-    filter: drop-shadow(0 4px 4px rgba(0,0,0,0.1));
+/* ลบ Theme สีพื้นหลังแบบเดิมออก (เราใช้สีจากรูป 3D แทน) */
+.theme-dark {
+    background: linear-gradient(145deg, #343a40, #2c3e50) !important;
+    color: white !important;
+    box-shadow: 6px 6px 12px rgba(0,0,0,0.3) !important;
 }
