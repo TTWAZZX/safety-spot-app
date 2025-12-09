@@ -707,6 +707,128 @@ app.post('/api/submissions/comment', async (req, res) => {
 });
 
 // ======================================================
+// PART 3.5 — GAME API (Safety Card Gacha)
+// ======================================================
+
+// 1. ดึงคำถามประจำวัน (สุ่มมา 1 ข้อ ที่ยังไม่เคยตอบในวันนี้)
+app.get('/api/game/daily-question', async (req, res) => {
+    const { lineUserId } = req.query;
+    const today = new Date().toISOString().split('T')[0];
+
+    // เช็คว่าวันนี้เล่นไปหรือยัง
+    const [history] = await db.query(
+        "SELECT * FROM user_game_history WHERE lineUserId = ? AND playedAt = ?",
+        [lineUserId, today]
+    );
+
+    if (history.length > 0) {
+        return res.json({ status: "success", data: { played: true } });
+    }
+
+    // สุ่มคำถามมา 1 ข้อ
+    const [questions] = await db.query(
+        "SELECT * FROM kyt_questions WHERE isActive = TRUE ORDER BY RAND() LIMIT 1"
+    );
+
+    if (questions.length === 0) {
+        return res.json({ status: "error", message: "ไม่พบคำถามในระบบ" });
+    }
+
+    const q = questions[0];
+    res.json({
+        status: "success",
+        data: {
+            played: false,
+            question: {
+                questionId: q.questionId,
+                text: q.questionText,
+                image: q.imageUrl,
+                options: { A: q.optionA, B: q.optionB }
+            }
+        }
+    });
+});
+
+// 2. ส่งคำตอบ & ลุ้นการ์ด (Gacha Logic)
+app.post('/api/game/submit-answer', async (req, res) => {
+    const { lineUserId, questionId, selectedOption } = req.body;
+    const today = new Date().toISOString().split('T')[0];
+    const conn = await db.getClient();
+
+    try {
+        await conn.beginTransaction();
+
+        // ตรวจสอบว่าวันนี้เล่นไปรึยัง (กันยิง API ซ้ำ)
+        const [history] = await conn.query(
+            "SELECT * FROM user_game_history WHERE lineUserId = ? AND playedAt = ?",
+            [lineUserId, today]
+        );
+        if (history.length > 0) throw new Error("คุณเล่นเกมของวันนี้ไปแล้ว");
+
+        // ตรวจคำตอบ
+        const [qs] = await conn.query("SELECT * FROM kyt_questions WHERE questionId = ?", [questionId]);
+        if (qs.length === 0) throw new Error("คำถามไม่ถูกต้อง");
+        
+        const question = qs[0];
+        const isCorrect = (selectedOption === question.correctOption);
+        let rewardPoints = isCorrect ? question.scoreReward : 2; // ตอบผิดได้ 2 คะแนนปลอบใจ
+        let gainedBadge = null;
+
+        // บันทึกประวัติ
+        await conn.query(
+            "INSERT INTO user_game_history (lineUserId, questionId, isCorrect, earnedPoints, playedAt) VALUES (?, ?, ?, ?, ?)",
+            [lineUserId, questionId, isCorrect, rewardPoints, today]
+        );
+
+        // อัปเดตคะแนนผู้ใช้
+        await conn.query("UPDATE users SET totalScore = totalScore + ? WHERE lineUserId = ?", [rewardPoints, lineUserId]);
+
+        // === GACHA SYSTEM (เฉพาะคนตอบถูก) ===
+        if (isCorrect) {
+            // โอกาสได้การ์ด 40%
+            if (Math.random() < 0.4) { 
+                // สุ่ม Badge ที่มีในระบบ
+                const [badges] = await conn.query("SELECT * FROM badges ORDER BY RAND() LIMIT 1");
+                if (badges.length > 0) {
+                    const badge = badges[0];
+                    // เช็คว่ามีหรือยัง (ถ้าอยากให้สะสมซ้ำได้ ให้ตัด WHERE ออก)
+                    const [userBadge] = await conn.query(
+                        "SELECT * FROM user_badges WHERE lineUserId = ? AND badgeId = ?",
+                        [lineUserId, badge.badgeId]
+                    );
+                    
+                    if (userBadge.length === 0) {
+                        await conn.query(
+                            "INSERT INTO user_badges (lineUserId, badgeId) VALUES (?, ?)",
+                            [lineUserId, badge.badgeId]
+                        );
+                        gainedBadge = badge;
+                    }
+                }
+            }
+        }
+
+        await conn.commit();
+
+        res.json({
+            status: "success",
+            data: {
+                isCorrect,
+                earnedPoints: rewardPoints,
+                correctOption: question.correctOption,
+                gainedBadge: gainedBadge // ถ้าได้การ์ดจะส่ง object กลับไป ถ้าไม่ได้จะเป็น null
+            }
+        });
+
+    } catch (err) {
+        await conn.rollback();
+        res.status(500).json({ status: "error", message: err.message });
+    } finally {
+        conn.release();
+    }
+});
+
+// ======================================================
 // PART 4 — ADMIN PANEL / NOTIFICATIONS / SERVER START
 // ======================================================
 

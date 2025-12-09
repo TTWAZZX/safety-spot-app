@@ -653,6 +653,10 @@ function bindStaticEventListeners() {
             if (pageId === 'admin-page') {
                 loadAdminDashboard();
             }
+            // เพิ่มเงื่อนไขนี้เข้าไป
+            if (pageId === 'game-page') {
+                loadGamePage();
+            }
         }
     });
 
@@ -1809,3 +1813,94 @@ function sanitizeHTML(str) {
     temp.textContent = str;
     return temp.innerHTML;
 }
+
+// --- GAME LOGIC ---
+
+async function loadGamePage() {
+    $('#game-loading').show();
+    $('#game-content').hide();
+    $('#game-played').hide();
+    
+    try {
+        const result = await callApi('/api/game/daily-question', { lineUserId: AppState.lineProfile.userId });
+        
+        $('#game-loading').hide();
+
+        if (result.played) {
+            $('#game-played').fadeIn();
+        } else {
+            const q = result.question;
+            $('#game-content').data('qid', q.questionId);
+            $('#question-text').text(q.text);
+            $('#option-a').text(q.options.A);
+            $('#option-b').text(q.options.B);
+            
+            if(q.image) {
+                $('#question-image').attr('src', q.image).show();
+            } else {
+                $('#question-image').hide();
+            }
+            
+            // Reset ปุ่ม
+            $('.answer-btn').removeClass('correct wrong').prop('disabled', false);
+            $('#game-content').fadeIn();
+        }
+    } catch (e) {
+        $('#game-loading').html('<p class="text-danger">โหลดข้อมูลไม่สำเร็จ</p>');
+    }
+}
+
+// Event Listener สำหรับปุ่มตอบคำถาม
+$(document).on('click', '.answer-btn', async function() {
+    const btn = $(this);
+    const choice = btn.data('choice');
+    const qid = $('#game-content').data('qid');
+
+    // ล็อกปุ่มกันกดซ้ำ
+    $('.answer-btn').prop('disabled', true);
+
+    try {
+        const res = await callApi('/api/game/submit-answer', {
+            lineUserId: AppState.lineProfile.userId,
+            questionId: qid,
+            selectedOption: choice
+        }, 'POST');
+
+        // เฉลย
+        if (res.isCorrect) {
+            btn.addClass('correct');
+            Swal.fire({
+                icon: 'success',
+                title: 'ถูกต้อง!',
+                text: `รับไปเลย ${res.earnedPoints} คะแนน`,
+                timer: 1500,
+                showConfirmButton: false
+            });
+
+            // Gacha Trigger
+            if (res.gainedBadge) {
+                setTimeout(() => {
+                    $('#gacha-badge-img').attr('src', getFullImageUrl(res.gainedBadge.imageUrl));
+                    $('#gacha-badge-name').text(res.gainedBadge.badgeName);
+                    new bootstrap.Modal(document.getElementById('gacha-modal')).show();
+                }, 1600);
+            }
+
+        } else {
+            btn.addClass('wrong');
+            $(`.answer-btn[data-choice="${res.correctOption}"]`).addClass('correct'); // เฉลยข้อถูก
+            Swal.fire('ผิดครับ!', `ข้อที่ถูกคือ ${res.correctOption}`, 'error');
+        }
+
+        // รีเฟรชหน้าเพื่อแสดงหน้าจอ "เล่นจบแล้ว"
+        setTimeout(() => {
+            loadGamePage();
+            // อัปเดตคะแนนที่ Header
+            refreshHomePageData(); 
+        }, 3000);
+
+    } catch (e) {
+        showError(e.message);
+        $('.answer-btn').prop('disabled', false);
+    }
+});

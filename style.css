@@ -253,3 +253,6 @@ body {
     opacity: 1;
     transition: opacity 0.5s ease-in-out;
 }
+.answer-btn:hover { background-color: var(--line-green); color: white; border-color: var(--line-green); }
+.answer-btn.wrong { background-color: #dc3545 !important; color: white; }
+.answer-btn.correct { background-color: #198754 !important; color: white; }
