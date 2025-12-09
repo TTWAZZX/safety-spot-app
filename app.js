@@ -1859,8 +1859,10 @@ async function loadGamePage() {
             const q = result.question;
             $('#game-content').data('qid', q.questionId);
             $('#question-text').text(q.text);
-            $('#option-a').text(q.options.A);
-            $('#option-b').text(q.options.B);
+            $('#option-a').text(q.options.A); $('#option-b').text(q.options.B);
+            $('#option-c').text(q.options.C); $('#option-d').text(q.options.D);
+            $('#option-e').text(q.options.E); $('#option-f').text(q.options.F);
+            $('#option-g').text(q.options.G); $('#option-h').text(q.options.H);
             
             if(q.image) {
                 $('#question-image').attr('src', q.image).show();
@@ -2033,8 +2035,10 @@ function handleEditQuestion() {
     $('#question-form-title').text('แก้ไขคำถาม');
     $('#q-id').val(data.questionId);
     $('#q-text').val(data.questionText);
-    $('#q-opt-a').val(data.optionA);
-    $('#q-opt-b').val(data.optionB);
+    $('#q-opt-a').val(data.optionA); $('#q-opt-b').val(data.optionB);
+    $('#q-opt-c').val(data.optionC); $('#q-opt-d').val(data.optionD);
+    $('#q-opt-e').val(data.optionE); $('#q-opt-f').val(data.optionF);
+    $('#q-opt-g').val(data.optionG); $('#q-opt-h').val(data.optionH);
     $(`input[name="correctOption"][value="${data.correctOption}"]`).prop('checked', true);
     $('#q-score').val(data.scoreReward);
     
@@ -2066,8 +2070,10 @@ async function handleSaveQuestion(e) {
         const payload = {
             questionId: $('#q-id').val(),
             questionText: $('#q-text').val(),
-            optionA: $('#q-opt-a').val(),
-            optionB: $('#q-opt-b').val(),
+            optionA: $('#q-opt-a').val(), optionB: $('#q-opt-b').val(),
+            optionC: $('#q-opt-c').val(), optionD: $('#q-opt-d').val(),
+            optionE: $('#q-opt-e').val(), optionF: $('#q-opt-f').val(),
+            optionG: $('#q-opt-g').val(), optionH: $('#q-opt-h').val(),
             correctOption: $('input[name="correctOption"]:checked').val(),
             scoreReward: $('#q-score').val(),
             imageUrl: finalImageUrl

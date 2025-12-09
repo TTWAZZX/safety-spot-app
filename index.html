@@ -184,18 +184,21 @@
                                         </div>
                                     </div>
                                     
-                                    <div class="d-grid gap-3">
-                                        <button class="answer-btn shadow-sm" data-choice="A">
-                                            <span class="choice-badge">A</span>
-                                            <span id="option-a" class="flex-grow-1 text-start">...</span>
-                                        </button>
+                                    <div class="row g-2">
+                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="A"><span class="choice-badge">A</span><span id="option-a" class="text-truncate ms-2">...</span></button></div>
+                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="B"><span class="choice-badge">B</span><span id="option-b" class="text-truncate ms-2">...</span></button></div>
+                                            
+                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="C"><span class="choice-badge">C</span><span id="option-c" class="text-truncate ms-2">...</span></button></div>
+                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="D"><span class="choice-badge">D</span><span id="option-d" class="text-truncate ms-2">...</span></button></div>
+                                            
+                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="E"><span class="choice-badge">E</span><span id="option-e" class="text-truncate ms-2">...</span></button></div>
+                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="F"><span class="choice-badge">F</span><span id="option-f" class="text-truncate ms-2">...</span></button></div>
+                                            
+                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="G"><span class="choice-badge">G</span><span id="option-g" class="text-truncate ms-2">...</span></button></div>
+                                            <div class="col-6"><button class="answer-btn shadow-sm w-100" data-choice="H"><span class="choice-badge">H</span><span id="option-h" class="text-truncate ms-2">...</span></button></div>
+                                        </div>
 
-                                        <button class="answer-btn shadow-sm" data-choice="B">
-                                            <span class="choice-badge">B</span>
-                                            <span id="option-b" class="flex-grow-1 text-start">...</span>
-                                        </button>
                                     </div>
-                                </div>
 
                                 <div id="game-played" class="text-center py-5" style="display:none;">
                                     <div class="mb-3 animate__animated animate__bounceIn">
@@ -576,28 +579,37 @@
                         
                         <div class="mb-3">
                             <label class="form-label">โจทย์คำถาม</label>
-                            <textarea class="form-control" id="q-text" rows="2" required placeholder="เช่น ถังดับเพลิงสีแดงใช้ดับไฟประเภทใด?"></textarea>
+                            <textarea class="form-control" id="q-text" rows="2" required placeholder="ใส่โจทย์คำถาม..."></textarea>
                         </div>
 
+                        <div class="row g-2 mb-2">
+                            <div class="col-6"><label class="form-label">A</label><input type="text" class="form-control" id="q-opt-a" required></div>
+                            <div class="col-6"><label class="form-label">B</label><input type="text" class="form-control" id="q-opt-b" required></div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6"><label class="form-label">C</label><input type="text" class="form-control" id="q-opt-c" required></div>
+                            <div class="col-6"><label class="form-label">D</label><input type="text" class="form-control" id="q-opt-d" required></div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6"><label class="form-label">E</label><input type="text" class="form-control" id="q-opt-e" required></div>
+                            <div class="col-6"><label class="form-label">F</label><input type="text" class="form-control" id="q-opt-f" required></div>
+                        </div>
                         <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <label class="form-label">ตัวเลือก A</label>
-                                <input type="text" class="form-control" id="q-opt-a" required>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label">ตัวเลือก B</label>
-                                <input type="text" class="form-control" id="q-opt-b" required>
-                            </div>
+                            <div class="col-6"><label class="form-label">G</label><input type="text" class="form-control" id="q-opt-g" required></div>
+                            <div class="col-6"><label class="form-label">H</label><input type="text" class="form-control" id="q-opt-h" required></div>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">ข้อที่ถูกต้อง</label>
-                            <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="correctOption" id="correct-a" value="A" checked>
-                                <label class="btn btn-outline-success" for="correct-a">ตอบ A</label>
-
-                                <input type="radio" class="btn-check" name="correctOption" id="correct-b" value="B">
-                                <label class="btn btn-outline-success" for="correct-b">ตอบ B</label>
+                            <label class="form-label">ข้อที่ถูกต้อง (เฉลย)</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <input type="radio" class="btn-check" name="correctOption" id="correct-a" value="A" checked><label class="btn btn-outline-success btn-sm" style="width:40px" for="correct-a">A</label>
+                                <input type="radio" class="btn-check" name="correctOption" id="correct-b" value="B"><label class="btn btn-outline-success btn-sm" style="width:40px" for="correct-b">B</label>
+                                <input type="radio" class="btn-check" name="correctOption" id="correct-c" value="C"><label class="btn btn-outline-success btn-sm" style="width:40px" for="correct-c">C</label>
+                                <input type="radio" class="btn-check" name="correctOption" id="correct-d" value="D"><label class="btn btn-outline-success btn-sm" style="width:40px" for="correct-d">D</label>
+                                <input type="radio" class="btn-check" name="correctOption" id="correct-e" value="E"><label class="btn btn-outline-success btn-sm" style="width:40px" for="correct-e">E</label>
+                                <input type="radio" class="btn-check" name="correctOption" id="correct-f" value="F"><label class="btn btn-outline-success btn-sm" style="width:40px" for="correct-f">F</label>
+                                <input type="radio" class="btn-check" name="correctOption" id="correct-g" value="G"><label class="btn btn-outline-success btn-sm" style="width:40px" for="correct-g">G</label>
+                                <input type="radio" class="btn-check" name="correctOption" id="correct-h" value="H"><label class="btn btn-outline-success btn-sm" style="width:40px" for="correct-h">H</label>
                             </div>
                         </div>
 

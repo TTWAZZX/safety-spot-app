@@ -743,7 +743,11 @@ app.get('/api/game/daily-question', async (req, res) => {
                 questionId: q.questionId,
                 text: q.questionText,
                 image: q.imageUrl,
-                options: { A: q.optionA, B: q.optionB }
+                // ส่ง options ครบ 8 ตัว
+                options: { 
+                    A: q.optionA, B: q.optionB, C: q.optionC, D: q.optionD,
+                    E: q.optionE, F: q.optionF, G: q.optionG, H: q.optionH
+                }
             }
         }
     });
@@ -870,24 +874,25 @@ app.get('/api/admin/questions', isAdmin, async (req, res) => {
 
 // 2. เพิ่ม/แก้ไข คำถาม
 app.post('/api/admin/questions', isAdmin, async (req, res) => {
-    const { questionId, questionText, optionA, optionB, correctOption, imageUrl, scoreReward } = req.body;
+    // รับ option A-H
+    const { questionId, questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, imageUrl, scoreReward } = req.body;
 
     try {
         if (questionId) {
             // Update
             await db.query(
                 `UPDATE kyt_questions 
-                 SET questionText=?, optionA=?, optionB=?, correctOption=?, imageUrl=?, scoreReward=? 
+                 SET questionText=?, optionA=?, optionB=?, optionC=?, optionD=?, optionE=?, optionF=?, optionG=?, optionH=?, correctOption=?, imageUrl=?, scoreReward=? 
                  WHERE questionId=?`,
-                [questionText, optionA, optionB, correctOption, imageUrl, scoreReward || 10, questionId]
+                [questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, imageUrl, scoreReward || 10, questionId]
             );
             res.json({ status: "success", data: { message: "Updated" } });
         } else {
             // Create
             await db.query(
-                `INSERT INTO kyt_questions (questionText, optionA, optionB, correctOption, imageUrl, scoreReward, isActive)
-                 VALUES (?, ?, ?, ?, ?, ?, TRUE)`,
-                [questionText, optionA, optionB, correctOption, imageUrl, scoreReward || 10]
+                `INSERT INTO kyt_questions (questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, imageUrl, scoreReward, isActive)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                [questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, imageUrl, scoreReward || 10]
             );
             res.json({ status: "success", data: { message: "Created" } });
         }
