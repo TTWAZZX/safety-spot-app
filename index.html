@@ -68,34 +68,71 @@
 
             <div id="game-page" class="page">
 
-                <!-- GAME HUD / TOP BAR -->
-                <div class="bento-header d-flex justify-content-between align-items-center game-hud">
-                    <div class="game-hud-left">
-                        <div class="game-hud-label text-uppercase">Game Center</div>
-                        <div class="d-flex align-items-baseline gap-2 mt-1">
-                            <span class="game-hud-value" id="coin-display">0</span>
-                            <span class="game-hud-icon"><i class="fas fa-coins"></i></span>
-                        </div>
-                        <div class="game-hud-subtitle">ใช้เหรียญเล่นเกม / แลกแต้มสะสม</div>
-                    </div>
-                    <div class="game-hud-right text-end">
-                        <div class="hud-stat-chip mb-2">
-                            <span class="hud-stat-label"><i class="fas fa-fire me-1"></i>Streak</span>
-                            <span class="hud-stat-value" id="streak-display">0 วัน</span>
-                        </div>
-                        <div class="hud-stat-chip hud-stat-chip-secondary">
-                            <span class="hud-stat-label">
-                                <i class="fas fa-calendar-day me-1"></i>
-                                เล่นต่อเนื่องเพื่อรับโบนัสเหรียญ
-                            </span>
-                        </div>
-                    </div>
-                </div>
+                <!-- HERO BANNER -->
+                <section class="game-hero">
 
-                <!-- MINI COLLECTION SECTION -->
+                    <!-- HUD ด้านบน -->
+                    <div class="hero-hud d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="hero-hud-label">MY COINS</div>
+                            <div class="d-flex align-items-baseline gap-2 mt-1">
+                                <span class="hero-hud-value" id="coin-display">0</span>
+                                <span class="hero-hud-icon"><i class="fas fa-coins"></i></span>
+                            </div>
+                        </div>
+
+                        <div class="text-end">
+                            <div class="hero-hud-label">STREAK</div>
+                            <div class="hero-streak-chip">
+                                <i class="fas fa-fire me-1"></i>
+                                <span id="streak-display">0 วัน</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- เนื้อหา Hero -->
+                    <div class="hero-main d-flex">
+                        <div class="hero-text flex-grow-1">
+                            <h2 class="hero-title">Safety Spot Arcade</h2>
+                            <p class="hero-subtitle mb-3">
+                                ล็อบบี้เกมแห่งความปลอดภัย<br>สุ่มการ์ด สะสม แต้ม และล่าจุดเสี่ยง
+                            </p>
+
+                            <!-- ปุ่มลัดไปโหมดหลัก -->
+                            <div class="hero-quick-actions d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-light btn-sm rounded-pill hero-quick-btn" onclick="pullGacha()">
+                                    <i class="fas fa-wand-magic-sparkles me-1"></i> Gacha
+                                </button>
+                                <button type="button" class="btn btn-light btn-sm rounded-pill hero-quick-btn" onclick="startDailyQuiz()">
+                                    <i class="fas fa-helmet-safety me-1"></i> Quiz
+                                </button>
+                                <button type="button" class="btn btn-light btn-sm rounded-pill hero-quick-btn" onclick="openHunterMenu()">
+                                    <i class="fas fa-crosshairs me-1"></i> Hunter
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- การ์ด Gacha ใหญ่เป็นพระเอก -->
+                        <div class="hero-card-wrapper" onclick="pullGacha()">
+                            <div class="hero-card">
+                                <div class="hero-card-inner">
+                                    <div class="hero-card-icon">
+                                        <i class="fas fa-helmet-safety"></i>
+                                    </div>
+                                    <div class="hero-card-label">Safety Gacha</div>
+                                    <div class="hero-card-sub">สุ่มการ์ด 100 เหรียญ</div>
+                                </div>
+                                <div class="hero-card-glow"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </section>
+
+                <!-- MINI COLLECTION -->
                 <section class="game-section mt-3">
                     <div class="d-flex justify-content-between align-items-center mb-2 px-1">
-                        <small class="text-muted fw-bold text-uppercase">Mini Collection</small>
+                        <small class="text-muted fw-bold text-uppercase">Collection</small>
                         <a href="#" class="text-decoration-none small fw-bold" onclick="openCardAlbum()">ดูทั้งหมด</a>
                     </div>
                     <div class="mini-collection-card">
@@ -105,7 +142,7 @@
                     </div>
                 </section>
 
-                <!-- GAME MODES GRID -->
+                <!-- GAME MODES -->
                 <section class="game-section mt-4">
                     <div class="d-flex justify-content-between align-items-center mb-2 px-1">
                         <small class="text-muted fw-bold text-uppercase">Game Modes</small>
@@ -113,14 +150,13 @@
 
                     <div class="bento-container">
 
-                        <!-- GACHA -->
+                        <!-- Safety Gacha (ย้ำอีกครั้งแบบการ์ดเล็ก) -->
                         <div class="bento-card theme-gacha span-row-2" onclick="pullGacha()">
                             <div class="h-100 d-flex flex-column justify-content-between">
-                                <div class="d-flex flex-column align-items-start text-start">
+                                <div>
                                     <span class="badge bg-danger-subtle text-danger fw-semibold mb-2">
-                                        <i class="fas fa-random me-1"></i> Safety Gacha
+                                        Gacha
                                     </span>
-                                    <img src="https://cdn-icons-png.flaticon.com/512/4525/4525679.png" class="bento-icon-img mb-3" alt="Gacha">
                                     <div class="bento-title text-danger">Safety Gacha</div>
                                     <div class="bento-sub text-danger">สุ่มการ์ด 100 เหรียญ</div>
                                 </div>
@@ -130,23 +166,23 @@
                             </div>
                         </div>
 
-                        <!-- DAILY QUIZ -->
+                        <!-- Daily Quiz -->
                         <div class="bento-card theme-quiz" onclick="startDailyQuiz()">
                             <div class="d-flex flex-column justify-content-between h-100">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <span class="badge bg-success-subtle text-success fw-semibold">
-                                        Daily Quiz
+                                        Quiz
                                     </span>
                                     <i class="fas fa-helmet-safety text-success fs-4 opacity-50"></i>
                                 </div>
                                 <div>
-                                <div class="bento-title text-success">Daily Quiz</div>
-                                <div class="bento-sub text-success">ตอบ KYT รับเหรียญ</div>
+                                    <div class="bento-title text-success">Daily Quiz</div>
+                                    <div class="bento-sub text-success">ตอบ KYT รับเหรียญ</div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- EXCHANGE COINS -->
+                        <!-- Exchange -->
                         <div class="bento-card theme-gold" onclick="exchangeCoinsToScore()">
                             <div class="d-flex flex-column justify-content-between h-100">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -156,13 +192,13 @@
                                     <i class="fas fa-exchange-alt text-warning fs-4 opacity-50"></i>
                                 </div>
                                 <div>
-                                    <div class="bento-title" style="color:#d4a017;">Exchange</div>
-                                    <div class="bento-sub" style="color:#d4a017;">10 Coins → 2 คะแนน</div>
+                                    <div class="bento-title" style="color: #d4a017;">Exchange</div>
+                                    <div class="bento-sub" style="color: #d4a017;">10 Coins → 2 คะแนน</div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- SAFETY HUNTER -->
+                        <!-- Safety Hunter -->
                         <div class="bento-card theme-blue span-2 flex-row justify-content-between align-items-center px-3" onclick="openHunterMenu()">
                             <div class="d-flex align-items-center">
                                 <div class="bg-white rounded-circle p-2 me-3 shadow-sm text-primary">
@@ -178,14 +214,14 @@
                             </button>
                         </div>
 
-                        <!-- RECYCLE HOUSE -->
+                        <!-- Recycle House -->
                         <div class="bento-card theme-dark span-2 flex-row justify-content-between align-items-center px-3" onclick="openRecycleModal()">
                             <div class="d-flex align-items-center">
                                 <div class="bg-opacity-25 bg-success rounded-circle p-2 me-3">
                                     <i class="fas fa-recycle fs-4 text-success"></i>
                                 </div>
                                 <div>
-                                    <div class="bento-title">Recycle House</div>
+                                    <div class="bento-title text-white">Recycle House</div>
                                     <div class="bento-sub text-white-50">แปลงการ์ดซ้ำเป็นเหรียญ</div>
                                 </div>
                             </div>
