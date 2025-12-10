@@ -3141,12 +3141,13 @@ $(document).on('change', '#editor-file', function() {
     }
 });
 
-// Admin: จิ้มรูปเพื่อสร้างจุด (แก้ Logic พิกัดให้แม่นยำ)
+// ในไฟล์ app.js (ค้นหาบรรทัดที่มี #editor-preview-img)
+
 $(document).on('click', '#editor-preview-img', function(e) {
     const img = $(this);
     const offset = img.offset();
     
-    // คำนวณพิกัด % เทียบกับขนาดรูปจริง
+    // ... (โค้ดคำนวณ x, y เดิม ไม่ต้องแก้) ...
     const x = ((e.pageX - offset.left) / img.width()) * 100;
     const y = ((e.pageY - offset.top) / img.height()) * 100;
 
@@ -3154,6 +3155,11 @@ $(document).on('click', '#editor-preview-img', function(e) {
         title: 'เพิ่มจุดเสี่ยง',
         input: 'text',
         inputPlaceholder: 'เช่น สายไฟชำรุด',
+        
+        // ⭐⭐⭐ เพิ่มบรรทัดนี้ครับ! ⭐⭐⭐
+        target: '#hunter-editor-modal', 
+        // สั่งให้ SweetAlert ไปแปะตัวอยู่บน Modal นี้ แทนที่จะไปอยู่ที่ Body
+        
         showCancelButton: true,
         confirmButtonText: 'บันทึก'
     }).then((res) => {
