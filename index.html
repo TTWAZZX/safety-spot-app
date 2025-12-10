@@ -68,11 +68,11 @@
 
             <div id="game-page" class="page">
 
-                <!-- HERO BANNER -->
-                <section class="game-hero">
+                <!-- HERO LOBBY (DARK GLOW) -->
+                <section class="game-hero-dark">
 
                     <!-- HUD ด้านบน -->
-                    <div class="hero-hud d-flex justify-content-between align-items-center">
+                    <div class="game-hero-hud d-flex justify-content-between align-items-center">
                         <div>
                             <div class="hero-hud-label">MY COINS</div>
                             <div class="d-flex align-items-baseline gap-2 mt-1">
@@ -91,14 +91,15 @@
                     </div>
 
                     <!-- เนื้อหา Hero -->
-                    <div class="hero-main d-flex">
+                    <div class="game-hero-main d-flex">
+                        <!-- ด้านข้อความ -->
                         <div class="hero-text flex-grow-1">
-                            <h2 class="hero-title">Safety Spot Arcade</h2>
-                            <p class="hero-subtitle mb-3">
-                                ล็อบบี้เกมแห่งความปลอดภัย<br>สุ่มการ์ด สะสม แต้ม และล่าจุดเสี่ยง
+                            <h2 class="game-hero-title">Safety Spot Arcade</h2>
+                            <p class="game-hero-subtitle mb-3">
+                                ล็อบบี้เกมความปลอดภัย<br>สุ่มการ์ด สะสมเหรียญ และล่าจุดเสี่ยง
                             </p>
 
-                            <!-- ปุ่มลัดไปโหมดหลัก -->
+                            <!-- ปุ่มลัดโหมดหลัก -->
                             <div class="hero-quick-actions d-flex flex-wrap gap-2">
                                 <button type="button" class="btn btn-light btn-sm rounded-pill hero-quick-btn" onclick="pullGacha()">
                                     <i class="fas fa-wand-magic-sparkles me-1"></i> Gacha
@@ -112,17 +113,17 @@
                             </div>
                         </div>
 
-                        <!-- การ์ด Gacha ใหญ่เป็นพระเอก -->
-                        <div class="hero-card-wrapper" onclick="pullGacha()">
-                            <div class="hero-card">
-                                <div class="hero-card-inner">
-                                    <div class="hero-card-icon">
+                        <!-- การ์ด Gacha ใหญ่ (พระเอก) -->
+                        <div class="game-hero-card-wrapper" onclick="pullGacha()">
+                            <div class="game-hero-card">
+                                <div class="game-hero-card-inner">
+                                    <div class="game-hero-card-icon">
                                         <i class="fas fa-helmet-safety"></i>
                                     </div>
-                                    <div class="hero-card-label">Safety Gacha</div>
-                                    <div class="hero-card-sub">สุ่มการ์ด 100 เหรียญ</div>
+                                    <div class="game-hero-card-label">Safety Gacha</div>
+                                    <div class="game-hero-card-sub">สุ่มการ์ด 100 เหรียญ</div>
                                 </div>
-                                <div class="hero-card-glow"></div>
+                                <div class="game-hero-card-glow"></div>
                             </div>
                         </div>
                     </div>
@@ -149,16 +150,16 @@
                     </div>
 
                     <div class="bento-container">
-
-                        <!-- Safety Gacha (ย้ำอีกครั้งแบบการ์ดเล็ก) -->
+                        
+                        <!-- Safety Gacha -->
                         <div class="bento-card theme-gacha span-row-2" onclick="pullGacha()">
                             <div class="h-100 d-flex flex-column justify-content-between">
                                 <div>
                                     <span class="badge bg-danger-subtle text-danger fw-semibold mb-2">
                                         Gacha
                                     </span>
-                                    <div class="bento-title text-danger">Safety Gacha</div>
-                                    <div class="bento-sub text-danger">สุ่มการ์ด 100 เหรียญ</div>
+                                    <div class="bento-title text-danger">สุ่มการ์ด</div>
+                                    <div class="bento-sub text-danger">ใช้ 100 Coins</div>
                                 </div>
                                 <div class="btn-circle-go text-danger">
                                     <i class="fas fa-play"></i>
@@ -192,7 +193,7 @@
                                     <i class="fas fa-exchange-alt text-warning fs-4 opacity-50"></i>
                                 </div>
                                 <div>
-                                    <div class="bento-title" style="color: #d4a017;">Exchange</div>
+                                    <div class="bento-title" style="color: #d4a017;">แลกแต้ม</div>
                                     <div class="bento-sub" style="color: #d4a017;">10 Coins → 2 คะแนน</div>
                                 </div>
                             </div>
@@ -206,7 +207,7 @@
                                 </div>
                                 <div>
                                     <div class="bento-title text-primary">Safety Hunter</div>
-                                    <div class="bento-sub text-primary">ล่าจุดเสี่ยงในหน้างาน</div>
+                                    <div class="bento-sub text-primary">ล่าจุดเสี่ยงหน้างาน</div>
                                 </div>
                             </div>
                             <button class="btn btn-primary rounded-pill btn-sm px-3 fw-bold" style="pointer-events: none;">
