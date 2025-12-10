@@ -3183,3 +3183,85 @@ async function saveHunterLevel() {
 
     } catch (e) { Swal.fire('Error', e.message, 'error'); }
 }
+
+// อัปโหลดรูปใน Editor
+function handleEditorImageUpload(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            // แสดงรูปและโชว์พื้นที่ Editor
+            $('#editor-preview-img').attr('src', event.target.result).show();
+            $('#editor-area').show(); 
+            $('#editor-placeholder').hide();
+            
+            // ล้างจุดเก่าออก
+            editorHazards = [];
+            updateEditorHazardList();
+            $('.editor-marker').remove(); // ลบ Marker เก่าบนรูป (ถ้ามี)
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+// คลิกบนรูปเพื่อเพิ่มจุดเสี่ยง (เวอร์ชันแม่นยำ)
+function handleEditorClick(e) {
+    const img = $('#editor-preview-img'); // อ้างอิงที่รูปภาพ
+    const offset = img.offset();
+    const width = img.width();
+    const height = img.height();
+    
+    // คำนวณพิกัดสัมพัทธ์กับรูปภาพ
+    const clickX = e.pageX - offset.left;
+    const clickY = e.pageY - offset.top;
+    
+    // ถ้าคลิกนอกขอบรูป (กรณีมี Padding) ไม่ต้องทำอะไร
+    if (clickX < 0 || clickX > width || clickY < 0 || clickY > height) return;
+
+    // แปลงเป็น %
+    const percentX = parseFloat(((clickX / width) * 100).toFixed(2));
+    const percentY = parseFloat(((clickY / height) * 100).toFixed(2));
+    
+    Swal.fire({
+        title: 'เพิ่มจุดเสี่ยง',
+        input: 'text',
+        inputLabel: 'ระบุรายละเอียด (เช่น สายไฟชำรุด)',
+        inputPlaceholder: 'พิมพ์รายละเอียด...',
+        showCancelButton: true,
+        confirmButtonText: 'บันทึก',
+        confirmButtonColor: '#06C755',
+        preConfirm: (value) => {
+            if (!value) Swal.showValidationMessage('กรุณากรอกรายละเอียด');
+            return value;
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // เพิ่มข้อมูลลง Array
+            editorHazards.push({
+                x: percentX,
+                y: percentY,
+                description: result.value,
+                radius: 5.0
+            });
+            updateEditorHazardList();
+            
+            // แสดง Marker จุดแดงบนรูปทันที
+            const marker = $('<div class="editor-marker">!</div>').css({
+                position: 'absolute',
+                left: percentX + '%', 
+                top: percentY + '%',
+                width: '30px', height: '30px',
+                background: 'red', color: 'white',
+                borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 'bold', fontSize: '14px',
+                transform: 'translate(-50%, -50%)', // จัดกึ่งกลางจุดคลิก
+                boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+                pointerEvents: 'none' // ให้คลิกทะลุได้
+            });
+            $('#editor-area').append(marker);
+            
+            triggerHaptic('light');
+        }
+    });
+}
