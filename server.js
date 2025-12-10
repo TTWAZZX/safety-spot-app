@@ -189,6 +189,9 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 // -----------------------------
 //   USER PROFILE
 // -----------------------------
+// -----------------------------
+//   USER PROFILE (FIXED STREAK)
+// -----------------------------
 app.get('/api/user/profile', async (req, res) => {
     try {
         const { lineUserId } = req.query;
@@ -199,10 +202,16 @@ app.get('/api/user/profile', async (req, res) => {
             });
         }
 
-        const [rows] = await db.query(
-            "SELECT * FROM users WHERE lineUserId = ?",
-            [lineUserId]
-        );
+        // ⭐ แก้ตรงนี้: ใช้ LEFT JOIN เพื่อดึง currentStreak จากตาราง user_streaks
+        // ใช้ COALESCE เพื่อแปลงค่า NULL (ถ้ายังไม่เคยเล่น) ให้เป็น 0
+        const [rows] = await db.query(`
+            SELECT u.*, 
+                   COALESCE(us.currentStreak, 0) AS currentStreak
+            FROM users u
+            LEFT JOIN user_streaks us ON u.lineUserId = us.lineUserId
+            WHERE u.lineUserId = ?
+        `, [lineUserId]);
+
         if (rows.length === 0) {
             return res.json({
                 status: "success",
