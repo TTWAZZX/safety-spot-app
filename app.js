@@ -2315,7 +2315,7 @@ async function pullGacha() {
             <div class="gacha-card-container">
                 <div class="gacha-card" id="card-${overlayId}">
                     <div class="gacha-face gacha-back">
-                        <i class="fas fa-shield-alt text-warning" style="font-size: 4rem;"></i>
+                        <i class="fas fa-helmet-safety text-warning" style="font-size: 4rem;"></i>
                     </div>
                     <div class="gacha-face gacha-front">
                         <img id="img-${overlayId}" src="" class="img-fluid mb-2" style="max-height: 150px;">
