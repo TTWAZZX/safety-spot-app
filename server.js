@@ -2157,6 +2157,74 @@ app.post('/api/game/hunter/start-level', async (req, res) => {
     }
 });
 
+// --- API: ดึงรายละเอียดด่าน (รวมจุดเสี่ยง) เพื่อมาแก้ไข ---
+app.get('/api/admin/hunter/level/:id', isAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [levels] = await db.query("SELECT * FROM hunter_levels WHERE levelId = ?", [id]);
+        if (levels.length === 0) throw new Error("ไม่พบด่าน");
+
+        const [hazards] = await db.query("SELECT * FROM hunter_hazards WHERE levelId = ?", [id]);
+        
+        res.json({ status: "success", data: { ...levels[0], hazards } });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
+// --- API: อัปเดตด่าน (แก้ชื่อ + แก้จุดเสี่ยง) ---
+app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
+    const { levelId, title, hazards } = req.body; // เราจะไม่แก้รูปภาพเพื่อความง่าย (ถ้าจะแก้รูป ลบสร้างใหม่ง่ายกว่า)
+    
+    const conn = await db.getClient();
+    try {
+        await conn.beginTransaction();
+
+        // 1. อัปเดตชื่อและจำนวนจุด
+        await conn.query(
+            "UPDATE hunter_levels SET title = ?, totalHazards = ? WHERE levelId = ?",
+            [title, hazards.length, levelId]
+        );
+
+        // 2. ลบจุดเสี่ยงเก่าทิ้งทั้งหมด (แล้วใส่ใหม่ ง่ายกว่ามาเช็คทีละจุด)
+        await conn.query("DELETE FROM hunter_hazards WHERE levelId = ?", [levelId]);
+
+        // 3. ใส่จุดเสี่ยงใหม่
+        for (const h of hazards) {
+            await conn.query(
+                "INSERT INTO hunter_hazards (hazardId, levelId, description, knowledge, x, y, radius) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [
+                    "HZD_" + uuidv4(), 
+                    levelId, 
+                    h.description, 
+                    h.knowledge || '', 
+                    h.x, h.y, 
+                    5.0
+                ]
+            );
+        }
+
+        await conn.commit();
+        res.json({ status: "success", data: { updated: true } });
+    } catch (e) {
+        await conn.rollback();
+        res.status(500).json({ status: "error", message: e.message });
+    } finally {
+        conn.release();
+    }
+});
+
+// --- API: ลบด่าน ---
+app.delete('/api/admin/hunter/level/:id', isAdmin, async (req, res) => {
+    try {
+        // Cascade จะลบ hazards และ attempts ให้อัตโนมัติ (ตามที่เราแก้ DB ไป)
+        await db.query("DELETE FROM hunter_levels WHERE levelId = ?", [req.params.id]);
+        res.json({ status: "success", data: { deleted: true } });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
 // ======================================================
 // SERVER START
 // ======================================================
