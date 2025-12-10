@@ -2982,45 +2982,39 @@ async function openHunterMenu() {
 
         // 4. วนลูปสร้างการ์ดด่าน (ส่วนที่คุณถามถึง)
         levels.forEach(l => {
-            // --- ส่วนที่ 1: สร้าง Badge สถานะ (ดาว หรือ ใหม่) ---
+            // 1. Badge ดาว
             let badge = '<span class="badge bg-warning text-dark">ใหม่</span>';
             if (l.isCleared) {
                 let starsHtml = '';
-                // คำนวณดาว (1-3)
                 for(let i=1; i<=3; i++) {
                     starsHtml += i <= l.bestStars ? '<i class="fas fa-star text-warning"></i>' : '<i class="far fa-star text-muted"></i>';
                 }
                 badge = `<span class="badge bg-light border text-dark">${starsHtml}</span>`;
             }
             
-            // --- ส่วนที่ 2: สร้าง Badge นับจำนวนครั้ง (1/3) ---
+            // 2. Badge โควตา
             let quotaBadgeClass = 'bg-info text-dark';
-            // ถ้าเล่นครบ 3 ครั้งแล้ว ให้เปลี่ยนสีปุ่มเป็นสีเทา
             if(l.playedCount >= l.maxPlays) quotaBadgeClass = 'bg-secondary';
-            
             const quotaBadge = `<span class="badge ${quotaBadgeClass} ms-1"><i class="fas fa-history"></i> ${l.playedCount}/${l.maxPlays}</span>`;
 
             const safeTitle = sanitizeHTML(l.title);
-            
-            // --- ส่วนที่ 3: เช็คว่าล็อคด่านไหม (ถ้าครบ 3 ครั้งแล้ว) ---
             const isLocked = l.playedCount >= l.maxPlays;
-            // ถ้าล็อค ให้ทำภาพจางๆ ขาวดำ
             const cardOpacity = isLocked ? 'opacity: 0.7; filter: grayscale(80%);' : '';
             
-            // --- ส่วนที่ 4: สร้าง HTML การ์ด ---
+            // ⭐⭐⭐ แก้ตรงนี้: ลบ onclick ออก แล้วใส่ class กับ data-attributes แทน ⭐⭐⭐
             list.append(`
                 <div class="col-12 col-md-6">
-                    <div class="card shadow-sm h-100 border-0 overflow-hidden" 
-                        onclick="checkQuotaAndStart('${l.levelId}', '${l.imageUrl}', ${l.totalHazards}')" 
+                    <div class="card shadow-sm h-100 border-0 overflow-hidden btn-hunter-level" 
+                        data-level-id="${l.levelId}"
+                        data-image-url="${l.imageUrl}"
+                        data-hazards="${l.totalHazards}"
+                        data-locked="${isLocked}"
                         style="cursor: pointer; ${cardOpacity}">
+                        
                         <div class="position-relative">
                             <img src="${getFullImageUrl(l.imageUrl)}" class="card-img-top" style="height: 180px; object-fit: cover;">
-                            <div class="position-absolute top-0 end-0 m-2">
-                                ${badge}
-                            </div>
-                            <div class="position-absolute bottom-0 start-0 m-2">
-                                ${quotaBadge}
-                            </div>
+                            <div class="position-absolute top-0 end-0 m-2">${badge}</div>
+                            <div class="position-absolute bottom-0 start-0 m-2">${quotaBadge}</div>
                         </div>
                         <div class="card-body">
                             <h6 class="fw-bold mb-1">${safeTitle}</h6>
@@ -3389,3 +3383,27 @@ async function saveHunterLevel() {
         openHunterMenu();
     } catch (e) { Swal.fire('Error', e.message, 'error'); }
 }
+
+// ⭐ ตัวดักจับการคลิกการ์ดด่าน Hunter (ปลอดภัยกว่า onclick)
+$(document).on('click', '.btn-hunter-level', function() {
+    // 1. ดึงข้อมูลจาก data-attribute
+    const levelId = $(this).data('level-id');
+    const imageUrl = $(this).data('image-url');
+    const hazards = $(this).data('hazards');
+    const isLocked = $(this).data('locked');
+
+    // 2. ถ้าล็อคอยู่ (เล่นครบ 3 ครั้งแล้ว) ให้แจ้งเตือนและไม่ให้เข้า
+    if (isLocked === true || isLocked === "true") {
+        triggerHaptic('light');
+        Swal.fire({
+            icon: 'info',
+            title: 'สิทธิ์เต็มแล้ว',
+            text: 'คุณใช้โควตาสำหรับด่านนี้ครบแล้วครับ',
+            confirmButtonText: 'ตกลง'
+        });
+        return;
+    }
+
+    // 3. เรียกฟังก์ชันเช็คสิทธิ์และเริ่มเกม
+    checkQuotaAndStart(levelId, imageUrl, hazards);
+});
