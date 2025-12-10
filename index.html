@@ -150,40 +150,27 @@
                     </div>
 
                     <div class="bento-container">
-                        
-                        <!-- Safety Gacha -->
-                        <div class="bento-card theme-gacha span-row-2" onclick="pullGacha()">
-                            <div class="h-100 d-flex flex-column justify-content-between">
-                                <div>
-                                    <span class="badge bg-danger-subtle text-danger fw-semibold mb-2">
-                                        Gacha
-                                    </span>
-                                    <div class="bento-title text-danger">สุ่มการ์ด</div>
-                                    <div class="bento-sub text-danger">ใช้ 100 Coins</div>
-                                </div>
-                                <div class="btn-circle-go text-danger">
-                                    <i class="fas fa-play"></i>
-                                </div>
-                            </div>
-                        </div>
 
-                        <!-- Daily Quiz -->
-                        <div class="bento-card theme-quiz" onclick="startDailyQuiz()">
+                        <!-- DAILY QUIZ (การ์ดใหญ่ / ภารกิจประจำวัน) -->
+                        <div class="bento-card theme-quiz span-row-2" onclick="startDailyQuiz()">
                             <div class="d-flex flex-column justify-content-between h-100">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <span class="badge bg-success-subtle text-success fw-semibold">
-                                        Quiz
-                                    </span>
-                                    <i class="fas fa-helmet-safety text-success fs-4 opacity-50"></i>
-                                </div>
                                 <div>
+                                    <span class="badge bg-success-subtle text-success fw-semibold mb-2">
+                                        Daily Mission
+                                    </span>
                                     <div class="bento-title text-success">Daily Quiz</div>
-                                    <div class="bento-sub text-success">ตอบ KYT รับเหรียญ</div>
+                                    <div class="bento-sub text-success">ตอบ KYT วันนี้ รับเหรียญ</div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-end mt-2">
+                                    <small class="text-success fw-semibold opacity-75">
+                                        เล่นได้วันละครั้ง
+                                    </small>
+                                    <i class="fas fa-helmet-safety text-success fs-2 opacity-75"></i>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Exchange -->
+                        <!-- EXCHANGE -->
                         <div class="bento-card theme-gold" onclick="exchangeCoinsToScore()">
                             <div class="d-flex flex-column justify-content-between h-100">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
@@ -199,23 +186,23 @@
                             </div>
                         </div>
 
-                        <!-- Safety Hunter -->
-                        <div class="bento-card theme-blue span-2 flex-row justify-content-between align-items-center px-3" onclick="openHunterMenu()">
-                            <div class="d-flex align-items-center">
-                                <div class="bg-white rounded-circle p-2 me-3 shadow-sm text-primary">
-                                    <i class="fas fa-crosshairs fs-4"></i>
+                        <!-- SAFETY HUNTER -->
+                        <div class="bento-card theme-blue" onclick="openHunterMenu()">
+                            <div class="d-flex flex-column justify-content-between h-100">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="badge bg-primary-subtle text-primary fw-semibold">
+                                        Hunter
+                                    </span>
+                                    <i class="fas fa-crosshairs text-primary fs-4 opacity-60"></i>
                                 </div>
                                 <div>
                                     <div class="bento-title text-primary">Safety Hunter</div>
-                                    <div class="bento-sub text-primary">ล่าจุดเสี่ยงหน้างาน</div>
+                                    <div class="bento-sub text-primary">ล่าจุดเสี่ยงในหน้างาน</div>
                                 </div>
                             </div>
-                            <button class="btn btn-primary rounded-pill btn-sm px-3 fw-bold" style="pointer-events: none;">
-                                เล่นเลย
-                            </button>
                         </div>
 
-                        <!-- Recycle House -->
+                        <!-- RECYCLE HOUSE (เต็มแถวด้านล่าง) -->
                         <div class="bento-card theme-dark span-2 flex-row justify-content-between align-items-center px-3" onclick="openRecycleModal()">
                             <div class="d-flex align-items-center">
                                 <div class="bg-opacity-25 bg-success rounded-circle p-2 me-3">
@@ -223,7 +210,7 @@
                                 </div>
                                 <div>
                                     <div class="bento-title text-white">Recycle House</div>
-                                    <div class="bento-sub text-white-50">แปลงการ์ดซ้ำเป็นเหรียญ</div>
+                                    <div class="bento-sub text-white-50">แปลงการ์ดซ้ำให้กลายเป็นเหรียญเพิ่ม</div>
                                 </div>
                             </div>
                             <i class="fas fa-chevron-right text-white-50"></i>
