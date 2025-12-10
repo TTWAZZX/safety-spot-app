@@ -1953,6 +1953,133 @@ app.post('/api/game/recycle-cards', async (req, res) => {
 });
 
 // ======================================================
+// PART 5 — SAFETY HUNTER API (MySQL/TiDB Compatible)
+// ======================================================
+
+// 1. ADMIN: สร้างด่านใหม่ + บันทึกจุดเสี่ยง
+app.post('/api/admin/hunter/level', isAdmin, async (req, res) => {
+    const { title, imageUrl, hazards } = req.body; 
+    const levelId = "LVL_" + Date.now();
+    const conn = await db.getClient();
+    
+    try {
+        await conn.beginTransaction();
+
+        // 1. สร้าง Level
+        await conn.query(
+            "INSERT INTO hunter_levels (levelId, title, imageUrl, totalHazards) VALUES (?, ?, ?, ?)",
+            [levelId, title, imageUrl, hazards.length]
+        );
+
+        // 2. บันทึกจุดเสี่ยง (วนลูป Insert ทีละแถว เพื่อความชัวร์ใน MySQL)
+        if (Array.isArray(hazards) && hazards.length > 0) {
+            for (const h of hazards) {
+                await conn.query(
+                    "INSERT INTO hunter_hazards (hazardId, levelId, description, x, y, radius) VALUES (?, ?, ?, ?, ?, ?)",
+                    [
+                        "HZD_" + uuidv4(), 
+                        levelId, 
+                        h.description || 'จุดเสี่ยง', 
+                        h.x, 
+                        h.y, 
+                        5.0
+                    ]
+                );
+            }
+        }
+
+        await conn.commit();
+        res.json({ status: "success", data: { levelId } });
+    } catch (err) {
+        await conn.rollback();
+        res.status(500).json({ status: "error", message: err.message });
+    } finally {
+        conn.release();
+    }
+});
+
+// 2. USER: ดึงรายชื่อด่านทั้งหมด
+app.get('/api/game/hunter/levels', async (req, res) => {
+    const { lineUserId } = req.query;
+    
+    const [levels] = await db.query("SELECT * FROM hunter_levels ORDER BY createdAt DESC");
+    const [history] = await db.query("SELECT levelId FROM user_hunter_history WHERE lineUserId = ?", [lineUserId]);
+    
+    const clearedSet = new Set(history.map(h => h.levelId));
+
+    const result = levels.map(l => ({
+        ...l,
+        isCleared: clearedSet.has(l.levelId)
+    }));
+
+    res.json({ status: "success", data: result });
+});
+
+// 3. USER: ตรวจสอบพิกัด (Check Hit)
+app.post('/api/game/hunter/check', async (req, res) => {
+    const { levelId, x, y } = req.body; 
+
+    const [hazards] = await db.query("SELECT * FROM hunter_hazards WHERE levelId = ?", [levelId]);
+    
+    let hit = null;
+    for (const h of hazards) {
+        // คำนวณระยะห่าง
+        const dx = parseFloat(x) - parseFloat(h.x);
+        const dy = parseFloat(y) - parseFloat(h.y);
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist <= parseFloat(h.radius)) {
+            hit = h;
+            break; 
+        }
+    }
+
+    if (hit) {
+        res.json({ status: "success", data: { isHit: true, hazard: hit } });
+    } else {
+        res.json({ status: "success", data: { isHit: false } });
+    }
+});
+
+// 4. USER: จบเกม (รับรางวัล)
+app.post('/api/game/hunter/complete', async (req, res) => {
+    const { lineUserId, levelId } = req.body;
+    const REWARD = 150; 
+    const conn = await db.getClient();
+
+    try {
+        await conn.beginTransaction();
+
+        const [hist] = await conn.query("SELECT * FROM user_hunter_history WHERE lineUserId = ? AND levelId = ?", [lineUserId, levelId]);
+        
+        let earnedCoins = 0;
+        
+        if (hist.length === 0) {
+            earnedCoins = REWARD;
+            
+            await conn.query("INSERT INTO user_hunter_history (lineUserId, levelId) VALUES (?, ?)", [lineUserId, levelId]);
+            await conn.query("UPDATE users SET coinBalance = coinBalance + ? WHERE lineUserId = ?", [earnedCoins, lineUserId]);
+            
+            await conn.query(
+                "INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt) VALUES (?, ?, ?, ?, ?, ?, NOW())",
+                ["NOTIF" + uuidv4(), lineUserId, `สุดยอด! คุณค้นหาจุดเสี่ยงครบ รับ ${earnedCoins} เหรียญ`, 'game_hunter', levelId, lineUserId]
+            );
+        }
+
+        const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
+        await conn.commit();
+
+        res.json({ status: "success", data: { earnedCoins, newCoinBalance: user.coinBalance } });
+
+    } catch (e) {
+        await conn.rollback();
+        res.status(500).json({ message: e.message });
+    } finally {
+        conn.release();
+    }
+});
+
+// ======================================================
 // SERVER START
 // ======================================================
 app.get('/', (req, res) => {

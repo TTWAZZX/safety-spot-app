@@ -866,6 +866,85 @@
         </div>
     </div>
 
+    <div class="modal fade" id="hunter-menu-modal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content bg-light">
+                <div class="modal-header border-0 bg-white shadow-sm">
+                    <h5 class="modal-title fw-bold text-primary">ภารกิจล่าจุดเสี่ยง</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div id="hunter-levels-list" class="row g-3"></div>
+                </div>
+                <div id="hunter-admin-bar" class="p-3 bg-white border-top text-center" style="display:none;">
+                    <button class="btn btn-outline-dark w-100" onclick="openHunterEditor()">
+                        <i class="fas fa-plus-circle me-2"></i> สร้างด่านใหม่ (Admin)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="hunter-game-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content bg-dark">
+                <div class="d-flex justify-content-between align-items-center p-3 text-white fixed-top" style="background: rgba(0,0,0,0.8); z-index: 1050;">
+                    <div>
+                        <span class="badge bg-danger rounded-pill fs-6">หาจุดเสี่ยง</span>
+                        <span id="hunter-progress" class="ms-2 fw-bold fs-5">0 / 0</span>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-light rounded-circle" data-bs-dismiss="modal"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body p-0 d-flex align-items-center justify-content-center" style="overflow: auto;">
+                    <div id="hunter-game-area" style="position: relative; max-width: 100%;">
+                        <img id="hunter-target-img" src="" style="width: 100%; display: block; min-width: 350px;">
+                    </div>
+                </div>
+                <div class="fixed-bottom p-3 text-center text-white small" style="background: linear-gradient(transparent, rgba(0,0,0,0.9)); pointer-events: none;">
+                    แตะที่ภาพเพื่อระบุจุดอันตราย
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="hunter-editor-modal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">สร้างด่านใหม่</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <div class="row h-100">
+                        <div class="col-md-4 col-lg-3 bg-white border-end p-3 h-100 overflow-auto">
+                            <div class="mb-3">
+                                <label class="form-label">ชื่อด่าน</label>
+                                <input type="text" id="editor-title" class="form-control" placeholder="เช่น โรงงาน A">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">รูปภาพ</label>
+                                <input type="file" id="editor-file" class="form-control" accept="image/*">
+                            </div>
+                            <hr>
+                            <h6 class="fw-bold">จุดเสี่ยง (<span id="editor-count">0</span>)</h6>
+                            <ul id="editor-list" class="list-group small mb-3"></ul>
+                            <div class="alert alert-info small">คลิกที่รูปด้านขวาเพื่อเพิ่มจุด</div>
+                            <button class="btn btn-primary w-100" onclick="saveHunterLevel()">บันทึกด่าน</button>
+                        </div>
+                        <div class="col-md-8 col-lg-9 p-0 bg-secondary d-flex align-items-center justify-content-center overflow-auto position-relative">
+                            <div id="editor-area" style="position: relative; cursor: crosshair; display: none;">
+                                <img id="editor-img" src="" style="max-width: 100%; display: block;">
+                            </div>
+                            <div id="editor-placeholder" class="text-white text-center opacity-50">
+                                <i class="fas fa-image fa-3x mb-2"></i><br>เลือกรูปก่อนนะครับ
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
