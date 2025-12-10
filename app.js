@@ -2942,12 +2942,12 @@ $('#q-image-input').on('change', function() {
 });
 
 // ==========================================
-// --- SAFETY HUNTER SYSTEM (FIXED & FULL) ---
+// --- SAFETY HUNTER SYSTEM (FIXED) ---
 // ==========================================
 
 let hunterLevelData = null;
 let hunterFound = new Set();
-let editorHazards = []; // เก็บจุดเสี่ยงตอนสร้างด่าน
+let editorHazards = []; 
 
 // 1. เปิดเมนูเลือกด่าน
 async function openHunterMenu() {
@@ -2980,6 +2980,9 @@ async function openHunterMenu() {
                 ? '<span class="badge bg-success"><i class="fas fa-check"></i> ผ่านแล้ว</span>' 
                 : '<span class="badge bg-warning text-dark">ใหม่</span>';
             
+            // Fix: escape quotes in title
+            const safeTitle = sanitizeHTML(l.title);
+            
             const html = `
                 <div class="col-12 col-md-6">
                     <div class="card shadow-sm h-100 border-0 overflow-hidden" onclick="startHunterGame('${l.levelId}', '${l.imageUrl}', ${l.totalHazards})" style="cursor: pointer;">
@@ -2988,7 +2991,7 @@ async function openHunterMenu() {
                             <div class="position-absolute top-0 end-0 m-2">${badge}</div>
                         </div>
                         <div class="card-body">
-                            <h6 class="fw-bold mb-1">${l.title}</h6>
+                            <h6 class="fw-bold mb-1">${safeTitle}</h6>
                             <small class="text-muted"><i class="fas fa-bomb me-1"></i> หาจุดเสี่ยง ${l.totalHazards} จุด</small>
                         </div>
                     </div>
@@ -3001,7 +3004,7 @@ async function openHunterMenu() {
     }
 }
 
-// 2. เริ่มเล่นเกม
+// 2. เริ่มเล่นเกม (User)
 function startHunterGame(id, imgUrl, total) {
     hunterLevelData = { id, total };
     hunterFound.clear();
@@ -3017,15 +3020,15 @@ function startHunterGame(id, imgUrl, total) {
     AppState.allModals['hunter-game'].show();
 }
 
-// 3. User เล่น: จิ้มหาจุด (คำนวณแม่นยำ)
-$(document).on('click', '#hunter-game-area', async function(e) {
+// 3. User เล่น: จิ้มหาจุด (แก้ Logic พิกัดให้แม่นยำขึ้น)
+// เปลี่ยน Selector จาก #hunter-game-area เป็น #hunter-target-img โดยตรง
+$(document).on('click', '#hunter-target-img', async function(e) {
     if (hunterFound.size >= hunterLevelData.total) return;
 
-    // คำนวณพิกัด % จากรูปภาพ
-    const img = $('#hunter-target-img');
-    const offset = $(this).offset(); 
+    const img = $(this); // ตัวรูปภาพ
+    const offset = img.offset(); 
     
-    // ใช้ขนาดของรูปภาพจริงในการคำนวณ
+    // คำนวณพิกัด % จากรูปภาพโดยตรง (แก้ปัญหาขอบดำ)
     const x = ((e.pageX - offset.left) / img.width()) * 100;
     const y = ((e.pageY - offset.top) / img.height()) * 100;
 
@@ -3040,16 +3043,17 @@ $(document).on('click', '#hunter-game-area', async function(e) {
                 hunterFound.add(h.hazardId);
                 triggerHaptic('medium');
 
+                // แสดงวงกลมเขียวตรงตำแหน่งที่ถูกต้อง (ใช้ h.x, h.y จาก DB เพื่อความแม่นยำ)
                 const marker = $('<div class="hunter-marker"></div>').css({
                     position: 'absolute', left: h.x + '%', top: h.y + '%',
                     width: '40px', height: '40px', borderRadius: '50%',
                     border: '3px solid #00ff00', boxShadow: '0 0 10px #00ff00',
-                    transform: 'translate(-50%, -50%)', zIndex: 10
+                    transform: 'translate(-50%, -50%)', zIndex: 10, pointerEvents: 'none'
                 });
                 $('#hunter-game-area').append(marker);
 
                 Swal.fire({
-                    toast: true, position: 'top-end', icon: 'success',
+                    toast: true, position: 'top', icon: 'success',
                     title: h.description, showConfirmButton: false, timer: 1500
                 });
 
@@ -3061,9 +3065,10 @@ $(document).on('click', '#hunter-game-area', async function(e) {
             }
         } else {
             triggerHaptic('light');
+            // กากบาทแดงตรงจุดที่คลิก (x, y ที่คำนวณได้)
             const miss = $('<div class="fas fa-times text-danger fs-1"></div>').css({
                 position: 'absolute', left: x + '%', top: y + '%',
-                transform: 'translate(-50%, -50%)', pointerEvents: 'none'
+                transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 10
             }).fadeOut(1000, function() { $(this).remove(); });
             $('#hunter-game-area').append(miss);
         }
@@ -3075,6 +3080,7 @@ async function finishHunterGame() {
     triggerHaptic('heavy');
     Swal.fire({
         title: 'ภารกิจสำเร็จ!',
+        text: 'คุณค้นหาจุดเสี่ยงครบทั้งหมดแล้ว',
         icon: 'success',
         confirmButtonText: 'รับรางวัล',
         confirmButtonColor: '#06C755'
@@ -3098,11 +3104,14 @@ async function finishHunterGame() {
     });
 }
 
-// 5. Admin: เปิดหน้าสร้างด่าน
+// 5. Admin: เปิดหน้าสร้างด่าน (แก้ ID ให้ตรงกับ HTML)
 function openHunterEditor() {
     editorHazards = [];
     $('#editor-title').val('');
-    $('#editor-image-input').val(''); // แก้ ID ให้ตรงกับ JS
+    
+    // FIX: แก้ ID ให้ตรงกับ HTML (id="editor-file")
+    $('#editor-file').val(''); 
+    
     $('#editor-preview-img').attr('src', '').parent().hide();
     $('#editor-placeholder').show();
     renderEditorHazards();
@@ -3114,8 +3123,8 @@ function openHunterEditor() {
     AppState.allModals['hunter-editor'].show();
 }
 
-// Admin: อัปโหลดรูป (แก้ ID ให้ตรง HTML ใหม่)
-$('#editor-file').on('change', function() { // เช็ค HTML ว่า input id="editor-file" หรือ "editor-image-input"
+// Admin: อัปโหลดรูป (Event Listener นี้ต้องอยู่นอก function หรือใน bindStaticEventListeners)
+$(document).on('change', '#editor-file', function() {
     const file = this.files[0];
     if (file) {
         const reader = new FileReader();
@@ -3125,14 +3134,14 @@ $('#editor-file').on('change', function() { // เช็ค HTML ว่า input
             
             // รีเซ็ตจุดเก่า
             editorHazards = [];
-            updateEditorHazardList();
+            renderEditorHazards(); // เรียกฟังก์ชัน render ไม่ใช่ update
             $('.editor-marker').remove();
         };
         reader.readAsDataURL(file);
     }
 });
 
-// Admin: จิ้มรูปเพื่อสร้างจุด (แก้ให้จิ้มแม่น)
+// Admin: จิ้มรูปเพื่อสร้างจุด (แก้ Logic พิกัดให้แม่นยำ)
 $(document).on('click', '#editor-preview-img', function(e) {
     const img = $(this);
     const offset = img.offset();
@@ -3159,7 +3168,8 @@ $(document).on('click', '#editor-preview-img', function(e) {
                 width: '30px', height: '30px', 
                 background: 'red', color: 'white', borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold',
-                transform: 'translate(-50%, -50%)', pointerEvents: 'none'
+                transform: 'translate(-50%, -50%)', pointerEvents: 'none',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
             });
             $('#editor-area').append(marker);
         }
@@ -3170,7 +3180,7 @@ function renderEditorHazards() {
     const list = $('#editor-list');
     list.empty();
     $('#editor-count').text(editorHazards.length);
-    editorHazards.forEach((h, i) => list.append(`<li class="list-group-item">${i+1}. ${h.description}</li>`));
+    editorHazards.forEach((h, i) => list.append(`<li class="list-group-item small py-1">${i+1}. ${h.description}</li>`));
 }
 
 async function saveHunterLevel() {
@@ -3178,91 +3188,23 @@ async function saveHunterLevel() {
     const file = $('#editor-file')[0].files[0];
     
     if (!title || editorHazards.length === 0 || !file) {
-        return Swal.fire('ข้อมูลไม่ครบ', 'ต้องมีชื่อ รูปภาพ และจุดเสี่ยงอย่างน้อย 1 จุด', 'warning');
+        return Swal.fire('ข้อมูลไม่ครบ', 'ต้องมีชื่อด่าน, รูปภาพ และจุดเสี่ยงอย่างน้อย 1 จุด', 'warning');
     }
 
     Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading() });
 
     try {
         const imageUrl = await uploadImage(file);
-        await callApi('/api/admin/hunter/level', { title, imageUrl, hazards: editorHazards }, 'POST');
+        
+        await callApi('/api/admin/hunter/level', { 
+            title, 
+            imageUrl, 
+            hazards: editorHazards 
+        }, 'POST');
         
         Swal.fire('สำเร็จ', 'สร้างด่านเรียบร้อย', 'success');
         AppState.allModals['hunter-editor'].hide();
         openHunterMenu();
 
     } catch (e) { Swal.fire('Error', e.message, 'error'); }
-}
-
-// --- ADMIN EDITOR: อัปโหลดรูป ---
-function handleEditorImageUpload(e) {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            // โชว์รูป
-            $('#editor-preview-img').attr('src', event.target.result).show();
-            $('#editor-area').show(); 
-            $('#editor-placeholder').hide();
-            
-            // รีเซ็ตค่า
-            editorHazards = [];
-            updateEditorHazardList();
-            $('.editor-marker').remove(); 
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
-// --- ADMIN EDITOR: คลิกเพื่อระบุจุด (สูตรแม่นยำ) ---
-function handleEditorClick(e) {
-    // อ้างอิงที่ตัวรูปภาพโดยตรง เพื่อความแม่นยำ
-    const img = $('#editor-preview-img');
-    const offset = img.offset();
-    
-    // คำนวณพิกัดสัมพัทธ์กับรูป
-    const clickX = e.pageX - offset.left;
-    const clickY = e.pageY - offset.top;
-    
-    // แปลงเป็น % (เพื่อให้ Responsive บนมือถือได้)
-    const percentX = parseFloat(((clickX / img.width()) * 100).toFixed(2));
-    const percentY = parseFloat(((clickY / img.height()) * 100).toFixed(2));
-
-    // ป้องกันการคลิกนอกกรอบ
-    if (clickX < 0 || clickY < 0 || clickX > img.width() || clickY > img.height()) return;
-
-    Swal.fire({
-        title: 'เพิ่มจุดเสี่ยง',
-        input: 'text',
-        inputLabel: 'ระบุรายละเอียด',
-        inputPlaceholder: 'เช่น สายไฟชำรุด',
-        showCancelButton: true,
-        confirmButtonText: 'บันทึก',
-        confirmButtonColor: '#06C755',
-        preConfirm: (val) => val || Swal.showValidationMessage('กรุณากรอกข้อมูล')
-    }).then((result) => {
-        if (result.isConfirmed) {
-            // 1. บันทึกลงตัวแปร
-            editorHazards.push({
-                x: percentX,
-                y: percentY,
-                description: result.value,
-                radius: 5.0
-            });
-            updateEditorHazardList();
-            
-            // 2. แปะจุดแดงบนหน้าจอทันที
-            const marker = $('<div class="editor-marker">!</div>').css({
-                position: 'absolute',
-                left: percentX + '%', 
-                top: percentY + '%',
-                width: '30px', height: '30px',
-                background: 'red', color: 'white', borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 'bold', transform: 'translate(-50%, -50%)',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.5)', pointerEvents: 'none'
-            });
-            $('#editor-area').append(marker);
-        }
-    });
 }
