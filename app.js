@@ -2942,23 +2942,26 @@ $('#q-image-input').on('change', function() {
 });
 
 // ==========================================
-// --- SAFETY HUNTER SYSTEM (FIXED) ---
+// --- SAFETY HUNTER SYSTEM (FULL VERSION: Hearts + Timer + Education) ---
 // ==========================================
 
+// Global Variables
 let hunterLevelData = null;
 let hunterFound = new Set();
 let editorHazards = [];
-let hunterLives = 3; // ⭐ 1. ตัวแปรเก็บจำนวนหัวใจ
+let hunterLives = 3;
+let hunterTimerInterval = null;
+let hunterTimeLeft = 0; // วินาที
 
-// 1. เปิดเมนูเลือกด่าน
 async function openHunterMenu() {
-    // เช็คสิทธิ์ Admin
+    // 1. เช็คสิทธิ์ Admin
     if (AppState.currentUser && AppState.currentUser.isAdmin) {
         $('#hunter-admin-bar').show();
     } else {
         $('#hunter-admin-bar').hide();
     }
 
+    // 2. เปิด Modal
     if (!AppState.allModals['hunter-menu']) {
         AppState.allModals['hunter-menu'] = new bootstrap.Modal(document.getElementById('hunter-menu-modal'));
     }
@@ -2968,6 +2971,7 @@ async function openHunterMenu() {
     list.html('<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>');
 
     try {
+        // 3. ดึงข้อมูลด่าน
         const levels = await callApi('/api/game/hunter/levels', { lineUserId: AppState.lineProfile.userId });
         list.empty();
 
@@ -2976,72 +2980,170 @@ async function openHunterMenu() {
             return;
         }
 
+        // 4. วนลูปสร้างการ์ดด่าน (ส่วนที่คุณถามถึง)
         levels.forEach(l => {
-            const badge = l.isCleared 
-                ? '<span class="badge bg-success"><i class="fas fa-check"></i> ผ่านแล้ว</span>' 
-                : '<span class="badge bg-warning text-dark">ใหม่</span>';
+            // --- ส่วนที่ 1: สร้าง Badge สถานะ (ดาว หรือ ใหม่) ---
+            let badge = '<span class="badge bg-warning text-dark">ใหม่</span>';
+            if (l.isCleared) {
+                let starsHtml = '';
+                // คำนวณดาว (1-3)
+                for(let i=1; i<=3; i++) {
+                    starsHtml += i <= l.bestStars ? '<i class="fas fa-star text-warning"></i>' : '<i class="far fa-star text-muted"></i>';
+                }
+                badge = `<span class="badge bg-light border text-dark">${starsHtml}</span>`;
+            }
             
-            // Fix: escape quotes in title
+            // --- ส่วนที่ 2: สร้าง Badge นับจำนวนครั้ง (1/3) ---
+            let quotaBadgeClass = 'bg-info text-dark';
+            // ถ้าเล่นครบ 3 ครั้งแล้ว ให้เปลี่ยนสีปุ่มเป็นสีเทา
+            if(l.playedCount >= l.maxPlays) quotaBadgeClass = 'bg-secondary';
+            
+            const quotaBadge = `<span class="badge ${quotaBadgeClass} ms-1"><i class="fas fa-history"></i> ${l.playedCount}/${l.maxPlays}</span>`;
+
             const safeTitle = sanitizeHTML(l.title);
             
-            const html = `
+            // --- ส่วนที่ 3: เช็คว่าล็อคด่านไหม (ถ้าครบ 3 ครั้งแล้ว) ---
+            const isLocked = l.playedCount >= l.maxPlays;
+            // ถ้าล็อค ให้ทำภาพจางๆ ขาวดำ
+            const cardOpacity = isLocked ? 'opacity: 0.7; filter: grayscale(80%);' : '';
+            
+            // --- ส่วนที่ 4: สร้าง HTML การ์ด ---
+            list.append(`
                 <div class="col-12 col-md-6">
-                    <div class="card shadow-sm h-100 border-0 overflow-hidden" onclick="startHunterGame('${l.levelId}', '${l.imageUrl}', ${l.totalHazards})" style="cursor: pointer;">
+                    <div class="card shadow-sm h-100 border-0 overflow-hidden" 
+                        onclick="checkQuotaAndStart('${l.levelId}', '${l.imageUrl}', ${l.totalHazards}')" 
+                        style="cursor: pointer; ${cardOpacity}">
                         <div class="position-relative">
                             <img src="${getFullImageUrl(l.imageUrl)}" class="card-img-top" style="height: 180px; object-fit: cover;">
-                            <div class="position-absolute top-0 end-0 m-2">${badge}</div>
+                            <div class="position-absolute top-0 end-0 m-2">
+                                ${badge}
+                            </div>
+                            <div class="position-absolute bottom-0 start-0 m-2">
+                                ${quotaBadge}
+                            </div>
                         </div>
                         <div class="card-body">
                             <h6 class="fw-bold mb-1">${safeTitle}</h6>
-                            <small class="text-muted"><i class="fas fa-bomb me-1"></i> หาจุดเสี่ยง ${l.totalHazards} จุด</small>
+                            <small class="text-muted"><i class="fas fa-bomb me-1"></i> ${l.totalHazards} จุดเสี่ยง</small>
                         </div>
                     </div>
                 </div>
-            `;
-            list.append(html);
+            `);
         });
+
     } catch (e) {
         list.html(`<div class="text-center text-danger">Error: ${e.message}</div>`);
     }
 }
 
-// ⭐ 2. แก้ไขฟังก์ชันเริ่มเกม (Reset หัวใจ)
+// ⭐ เริ่มเกม (พร้อมจับเวลา)
 function startHunterGame(id, imgUrl, total) {
     hunterLevelData = { id, total };
     hunterFound.clear();
-    hunterLives = 3; // รีเซ็ตหัวใจเต็ม 3 ดวง
+    hunterLives = 3; 
+    
+    // ตั้งเวลา: ให้เวลา 15 วินาทีต่อ 1 จุด (เช่น 5 จุด = 75 วินาที)
+    hunterTimeLeft = total * 15; 
     
     $('#hunter-target-img').attr('src', getFullImageUrl(imgUrl));
     $('#hunter-progress').text(`0 / ${total}`);
-    updateHunterLivesUI(); // อัปเดตการแสดงผลหัวใจ
+    
+    updateHunterLivesUI();
+    updateHunterTimerUI();
     
     $('.hunter-marker').remove(); 
-    
     $('#hunter-menu-modal').modal('hide');
+
     if (!AppState.allModals['hunter-game']) {
         AppState.allModals['hunter-game'] = new bootstrap.Modal(document.getElementById('hunter-game-modal'));
     }
     AppState.allModals['hunter-game'].show();
+
+    // เริ่มนับถอยหลัง
+    clearInterval(hunterTimerInterval);
+    hunterTimerInterval = setInterval(() => {
+        hunterTimeLeft--;
+        updateHunterTimerUI();
+
+        if (hunterTimeLeft <= 0) {
+            endGameByTimeOut();
+        }
+    }, 1000);
 }
 
-// ⭐ 3. ฟังก์ชันอัปเดต UI หัวใจ (สร้างใหม่)
+// ⭐ ฟังก์ชันใหม่: เช็คสิทธิ์ก่อนเริ่มเล่น (ตัดโควตา)
+async function checkQuotaAndStart(id, imgUrl, total) {
+    // 1. แสดง Loading กัน User กดรัว
+    Swal.fire({
+        title: 'กำลังตรวจสอบสิทธิ์...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
+    try {
+        // 2. ยิง API ไปตัดโควตา (นับจำนวนครั้ง)
+        // สังเกตว่าเราเรียก API ตัวใหม่ที่เราเพิ่งสร้างใน server.js
+        await callApi('/api/game/hunter/start-level', { 
+            lineUserId: AppState.lineProfile.userId,
+            levelId: id 
+        }, 'POST');
+        
+        // 3. ถ้าผ่าน (ไม่ Error) ให้ปิด Loading แล้วเริ่มเกมจริง
+        Swal.close();
+        startHunterGame(id, imgUrl, total);
+
+    } catch (e) {
+        // 4. ถ้าโควตาเต็ม (Backend ส่ง Error กลับมา)
+        triggerHaptic('heavy');
+        Swal.fire({
+            icon: 'error',
+            title: 'สิทธิ์เต็มแล้ว!',
+            // ข้อความ Error จะมาจาก Backend ว่า "คุณใช้สิทธิ์เล่นด่านนี้ครบ 3 ครั้งแล้ว"
+            text: e.message, 
+            confirmButtonText: 'ตกลง',
+            confirmButtonColor: '#6c757d'
+        });
+    }
+}
+
+// อัปเดต UI นาฬิกา (MM:SS)
+function updateHunterTimerUI() {
+    const m = Math.floor(hunterTimeLeft / 60);
+    const s = hunterTimeLeft % 60;
+    const timeStr = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    $('#hunter-timer').text(timeStr);
+    
+    // เปลี่ยนสีถ้าเวลาน้อย
+    if(hunterTimeLeft <= 10) $('#hunter-timer').removeClass('bg-warning').addClass('bg-danger text-white');
+    else $('#hunter-timer').removeClass('bg-danger text-white').addClass('bg-warning text-dark');
+}
+
+// อัปเดต UI หัวใจ
 function updateHunterLivesUI() {
     let heartsHtml = '';
-    // วนลูปสร้างหัวใจ 3 ดวง
-    for(let i=0; i<3; i++) {
-        if (i < hunterLives) {
-            heartsHtml += '❤️'; // ยังมีชีวิต
-        } else {
-            heartsHtml += '🖤'; // ตายแล้ว (หัวใจดำ)
-        }
-    }
+    for(let i=0; i<3; i++) heartsHtml += i < hunterLives ? "❤️" : "🖤";
     $('#hunter-lives').html(heartsHtml);
 }
 
-// ⭐ 4. แก้ไข Logic การคลิก (ตัดหัวใจเมื่อพลาด)
+// หมดเวลา!
+function endGameByTimeOut() {
+    clearInterval(hunterTimerInterval);
+    triggerHaptic('heavy');
+    Swal.fire({
+        icon: 'error',
+        title: 'หมดเวลา!',
+        text: 'เสียดายจัง เวลาหมดซะก่อน',
+        confirmButtonText: 'เริ่มใหม่',
+        confirmButtonColor: '#d33',
+        allowOutsideClick: false
+    }).then(() => {
+        startHunterGame(hunterLevelData.id, $('#hunter-target-img').attr('src'), hunterLevelData.total);
+    });
+}
+
+// ⭐ User คลิกหารูป
 $(document).on('click', '#hunter-target-img', async function(e) {
-    // ถ้าตายแล้ว หรือ หาครบแล้ว ห้ามคลิกต่อ
-    if (hunterLives <= 0 || hunterFound.size >= hunterLevelData.total) return;
+    if (hunterLives <= 0 || hunterFound.size >= hunterLevelData.total || hunterTimeLeft <= 0) return;
 
     const img = $(this);
     const offset = img.offset(); 
@@ -3054,9 +3156,11 @@ $(document).on('click', '#hunter-target-img', async function(e) {
         }, 'POST');
 
         if (res.isHit) {
-            // --- กรณีเจอจุดเสี่ยง (เหมือนเดิม) ---
             const h = res.hazard;
             if (!hunterFound.has(h.hazardId)) {
+                // หยุดเวลาชั่วคราวขณะอ่านความรู้
+                clearInterval(hunterTimerInterval); 
+                
                 hunterFound.add(h.hazardId);
                 triggerHaptic('medium');
 
@@ -3067,42 +3171,58 @@ $(document).on('click', '#hunter-target-img', async function(e) {
                     transform: 'translate(-50%, -50%)', zIndex: 10, pointerEvents: 'none'
                 });
                 $('#hunter-game-area').append(marker);
-
-                Swal.fire({
-                    toast: true, position: 'top', icon: 'success',
-                    title: h.description, showConfirmButton: false, timer: 1500
-                });
-
                 $('#hunter-progress').text(`${hunterFound.size} / ${hunterLevelData.total}`);
 
+                // ⭐ Education Popup (แสดงความรู้)
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'เจอจุดเสี่ยง!',
+                    html: `
+                        <h5 class="fw-bold text-danger">${h.description}</h5>
+                        <div class="alert alert-info text-start mt-3">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            <small>${h.knowledge || 'ระมัดระวังและแจ้งหัวหน้างานทันที'}</small>
+                        </div>
+                    `,
+                    confirmButtonText: 'เข้าใจแล้ว (ไปต่อ)',
+                    confirmButtonColor: '#06C755',
+                    allowOutsideClick: false
+                });
+
+                // เล่นต่อได้ไหม?
                 if (hunterFound.size === hunterLevelData.total) {
-                    setTimeout(finishHunterGame, 1000);
+                    finishHunterGame();
+                } else {
+                    // เดินเวลาต่อ
+                    hunterTimerInterval = setInterval(() => {
+                        hunterTimeLeft--;
+                        updateHunterTimerUI();
+                        if (hunterTimeLeft <= 0) endGameByTimeOut();
+                    }, 1000);
                 }
             }
         } else {
-            // --- ⭐ กรณีจิ้มผิด (MISS) ⭐ ---
-            hunterLives--; // ลดหัวใจ
-            updateHunterLivesUI(); // อัปเดตหน้าจอ
-            triggerHaptic('heavy'); // สั่นเตือน
+            // ผิด
+            hunterLives--;
+            updateHunterLivesUI();
+            triggerHaptic('heavy');
 
-            // กากบาทแดง
             const miss = $('<div class="fas fa-times text-danger fs-1"></div>').css({
                 position: 'absolute', left: x + '%', top: y + '%',
                 transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 10
             }).fadeOut(1000, function() { $(this).remove(); });
             $('#hunter-game-area').append(miss);
 
-            // เช็คว่า Game Over หรือยัง?
             if (hunterLives <= 0) {
+                clearInterval(hunterTimerInterval); // หยุดเวลา
                 Swal.fire({
                     icon: 'error',
                     title: 'Game Over!',
-                    text: 'คุณจิ้มผิดเกิน 3 ครั้ง 😭',
+                    text: 'คุณจิ้มผิดเกิน 3 ครั้ง',
                     confirmButtonText: 'เริ่มใหม่',
                     confirmButtonColor: '#d33',
                     allowOutsideClick: false
                 }).then(() => {
-                    // รีเซ็ตเกมด่านเดิมใหม่ทันที
                     startHunterGame(hunterLevelData.id, $('#hunter-target-img').attr('src'), hunterLevelData.total);
                 });
             }
@@ -3110,26 +3230,74 @@ $(document).on('click', '#hunter-target-img', async function(e) {
     } catch (e) { console.error(e); }
 });
 
-// 5. Admin: เปิดหน้าสร้างด่าน (แก้ ID ให้ตรงกับ HTML)
+// จบเกม
+async function finishHunterGame() {
+    clearInterval(hunterTimerInterval); // หยุดเวลา
+    triggerHaptic('heavy');
+    
+    // ⭐ คำนวณดาว: เหลือ 3 หัวใจ = 3 ดาว, 2 หัวใจ = 2 ดาว, 1 หัวใจ = 1 ดาว
+    const stars = hunterLives; 
+    
+    // สร้าง HTML ดาวสำหรับโชว์ใน Popup
+    let starsDisplay = '';
+    for(let i=1; i<=3; i++) {
+        if(i <= stars) starsDisplay += '<i class="fas fa-star text-warning fa-2x mx-1"></i>';
+        else starsDisplay += '<i class="far fa-star text-muted fa-2x mx-1"></i>';
+    }
+
+    Swal.fire({
+        title: 'ภารกิจสำเร็จ!',
+        html: `
+            <div class="mb-3">${starsDisplay}</div>
+            <p>คุณค้นหาครบทุกจุดแล้ว!</p>
+            <p class="small text-muted">เวลาคงเหลือ: ${hunterTimeLeft} วินาที</p>
+        `,
+        icon: 'success',
+        confirmButtonText: 'รับรางวัล / จบเกม',
+        confirmButtonColor: '#06C755',
+        allowOutsideClick: false
+    }).then(async () => {
+        try {
+            // ส่ง stars ไปบันทึกด้วย
+            const res = await callApi('/api/game/hunter/complete', {
+                lineUserId: AppState.lineProfile.userId,
+                levelId: hunterLevelData.id,
+                stars: stars // ⭐ ส่งค่าดาวไป
+            }, 'POST');
+
+            if (res.earnedCoins > 0) {
+                Swal.fire('ยินดีด้วย!', `ได้รับรางวัลภารกิจครั้งแรก ${res.earnedCoins} เหรียญ`, 'success');
+                $('#coin-display').text(res.newCoinBalance);
+                if(AppState.currentUser) AppState.currentUser.coinBalance = res.newCoinBalance;
+            } else {
+                Swal.fire('บันทึกผลเรียบร้อย', 'คุณได้บันทึกสถิติดาวรอบนี้แล้ว', 'success');
+            }
+            AppState.allModals['hunter-game'].hide();
+            openHunterMenu(); // รีโหลดเมนูเพื่อโชว์ดาวใหม่
+        } catch (e) { Swal.fire('Error', e.message, 'error'); }
+    });
+}
+
+// ----------------------------------------------------
+// ⭐ ADMIN SECTION (Updated for Knowledge Input)
+// ----------------------------------------------------
+
 function openHunterEditor() {
     editorHazards = [];
     $('#editor-title').val('');
-    
-    // FIX: แก้ ID ให้ตรงกับ HTML (id="editor-file")
     $('#editor-file').val(''); 
-    
     $('#editor-preview-img').attr('src', '').parent().hide();
     $('#editor-placeholder').show();
     renderEditorHazards();
     
     $('#hunter-menu-modal').modal('hide');
     if (!AppState.allModals['hunter-editor']) {
-        AppState.allModals['hunter-editor'] = new bootstrap.Modal(document.getElementById('hunter-editor-modal'));
+        AppState.allModals['hunter-editor'] = new bootstrap.Modal(document.getElementById('hunter-editor-modal'), {focus: false});
     }
     AppState.allModals['hunter-editor'].show();
 }
 
-// Admin: อัปโหลดรูป (Event Listener นี้ต้องอยู่นอก function หรือใน bindStaticEventListeners)
+// Admin: อัปโหลดรูป
 $(document).on('change', '#editor-file', function() {
     const file = this.files[0];
     if (file) {
@@ -3137,51 +3305,52 @@ $(document).on('change', '#editor-file', function() {
         reader.onload = function(e) {
             $('#editor-preview-img').attr('src', e.target.result).parent().show();
             $('#editor-placeholder').hide();
-            
-            // รีเซ็ตจุดเก่า
             editorHazards = [];
-            renderEditorHazards(); // เรียกฟังก์ชัน render ไม่ใช่ update
+            renderEditorHazards();
             $('.editor-marker').remove();
         };
         reader.readAsDataURL(file);
     }
 });
 
-// ในไฟล์ app.js (ค้นหาบรรทัดที่มี #editor-preview-img)
-
+// Admin: คลิกเพิ่มจุด (แก้ให้กรอก Knowledge ได้)
 $(document).on('click', '#editor-preview-img', function(e) {
     const img = $(this);
     const offset = img.offset();
-    
-    // ... (โค้ดคำนวณ x, y เดิม ไม่ต้องแก้) ...
     const x = ((e.pageX - offset.left) / img.width()) * 100;
     const y = ((e.pageY - offset.top) / img.height()) * 100;
 
+    // ⭐ ใช้ HTML Form ใน SweetAlert เพื่อรับ 2 ค่า (ชื่อ + ความรู้)
     Swal.fire({
         title: 'เพิ่มจุดเสี่ยง',
-        input: 'text',
-        inputPlaceholder: 'เช่น สายไฟชำรุด',
-        
-        // ⭐⭐⭐ เพิ่มบรรทัดนี้ครับ! ⭐⭐⭐
-        target: '#hunter-editor-modal', 
-        // สั่งให้ SweetAlert ไปแปะตัวอยู่บน Modal นี้ แทนที่จะไปอยู่ที่ Body
-        
+        html: `
+            <input id="swal-input1" class="swal2-input" placeholder="ชื่อจุดเสี่ยง (เช่น สายไฟชำรุด)">
+            <textarea id="swal-input2" class="swal2-textarea" placeholder="ความรู้/วิธีแก้ไข (เช่น แจ้งช่างซ่อมทันที)"></textarea>
+        `,
+        focusConfirm: false,
+        target: '#hunter-editor-modal', // แก้ Focus Blocked
         showCancelButton: true,
-        confirmButtonText: 'บันทึก'
+        confirmButtonText: 'บันทึก',
+        preConfirm: () => {
+            const desc = document.getElementById('swal-input1').value;
+            const know = document.getElementById('swal-input2').value;
+            if (!desc) Swal.showValidationMessage('กรุณากรอกชื่อจุดเสี่ยง');
+            return { description: desc, knowledge: know };
+        }
     }).then((res) => {
-        if (res.isConfirmed && res.value) {
-            editorHazards.push({ x, y, description: res.value });
+        if (res.isConfirmed) {
+            editorHazards.push({ 
+                x, y, 
+                description: res.value.description,
+                knowledge: res.value.knowledge 
+            });
             renderEditorHazards();
             
-            // แสดงจุดแดงบนหน้าจอ Admin
             const marker = $('<div class="editor-marker">!</div>').css({
-                position: 'absolute', 
-                left: x + '%', top: y + '%',
-                width: '30px', height: '30px', 
-                background: 'red', color: 'white', borderRadius: '50%',
+                position: 'absolute', left: x + '%', top: y + '%',
+                width: '30px', height: '30px', background: 'red', color: 'white', borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold',
-                transform: 'translate(-50%, -50%)', pointerEvents: 'none',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                transform: 'translate(-50%, -50%)', pointerEvents: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
             });
             $('#editor-area').append(marker);
         }
@@ -3192,9 +3361,16 @@ function renderEditorHazards() {
     const list = $('#editor-list');
     list.empty();
     $('#editor-count').text(editorHazards.length);
-    editorHazards.forEach((h, i) => list.append(`<li class="list-group-item small py-1">${i+1}. ${h.description}</li>`));
+    editorHazards.forEach((h, i) => list.append(`
+        <li class="list-group-item small py-1">
+            <b>${i+1}. ${h.description}</b><br>
+            <span class="text-muted" style="font-size:0.8em">${h.knowledge || '-'}</span>
+        </li>
+    `));
 }
 
+// ... (ฟังก์ชัน saveHunterLevel ใช้ของเดิมได้เลย มันจะส่ง object ทั้งก้อนไปเอง) ...
+// แต่เพื่อความชัวร์ แปะทับไปเลยก็ได้ครับ
 async function saveHunterLevel() {
     const title = $('#editor-title').val();
     const file = $('#editor-file')[0].files[0];
@@ -3207,16 +3383,9 @@ async function saveHunterLevel() {
 
     try {
         const imageUrl = await uploadImage(file);
-        
-        await callApi('/api/admin/hunter/level', { 
-            title, 
-            imageUrl, 
-            hazards: editorHazards 
-        }, 'POST');
-        
+        await callApi('/api/admin/hunter/level', { title, imageUrl, hazards: editorHazards }, 'POST');
         Swal.fire('สำเร็จ', 'สร้างด่านเรียบร้อย', 'success');
         AppState.allModals['hunter-editor'].hide();
         openHunterMenu();
-
     } catch (e) { Swal.fire('Error', e.message, 'error'); }
 }

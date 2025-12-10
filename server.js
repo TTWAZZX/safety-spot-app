@@ -1998,18 +1998,41 @@ app.post('/api/admin/hunter/level', isAdmin, async (req, res) => {
     }
 });
 
-// 2. USER: ดึงรายชื่อด่านทั้งหมด
+// 2. USER: ดึงรายชื่อด่านทั้งหมด (พร้อมดาว + จำนวนครั้งที่เล่น)
 app.get('/api/game/hunter/levels', async (req, res) => {
     const { lineUserId } = req.query;
     
+    // ดึงด่านทั้งหมด
     const [levels] = await db.query("SELECT * FROM hunter_levels ORDER BY createdAt DESC");
-    const [history] = await db.query("SELECT levelId FROM user_hunter_history WHERE lineUserId = ?", [lineUserId]);
     
-    const clearedSet = new Set(history.map(h => h.levelId));
+    // ดึงดาวสูงสุด (Best Stars)
+    const [history] = await db.query(`
+        SELECT levelId, MAX(stars) as bestStars 
+        FROM user_hunter_history 
+        WHERE lineUserId = ? 
+        GROUP BY levelId
+    `, [lineUserId]);
+    
+    const historyMap = {};
+    history.forEach(h => { historyMap[h.levelId] = h.bestStars; });
+
+    // ⭐ ดึงจำนวนครั้งที่เล่น (Attempts)
+    const [attempts] = await db.query(`
+        SELECT levelId, attempt_count 
+        FROM hunter_attempts 
+        WHERE lineUserId = ?
+    `, [lineUserId]);
+
+    const attemptsMap = {};
+    attempts.forEach(a => { attemptsMap[a.levelId] = a.attempt_count; });
 
     const result = levels.map(l => ({
         ...l,
-        isCleared: clearedSet.has(l.levelId)
+        isCleared: historyMap.hasOwnProperty(l.levelId),
+        bestStars: historyMap[l.levelId] || 0,
+        // เพิ่มฟิลด์นี้ส่งกลับไป
+        playedCount: attemptsMap[l.levelId] || 0,
+        maxPlays: 3 // กำหนดค่า Max ไว้ตรงนี้เลย
     }));
 
     res.json({ status: "success", data: result });
@@ -2041,30 +2064,36 @@ app.post('/api/game/hunter/check', async (req, res) => {
     }
 });
 
-// 4. USER: จบเกม (รับรางวัล)
+// 4. USER: จบเกม (รับรางวัล + บันทึกดาว)
 app.post('/api/game/hunter/complete', async (req, res) => {
-    const { lineUserId, levelId } = req.body;
+    const { lineUserId, levelId, stars } = req.body; // ⭐ รับ stars เพิ่ม
     const REWARD = 150; 
     const conn = await db.getClient();
 
     try {
         await conn.beginTransaction();
 
+        // เช็คว่าเคยผ่านด่านนี้หรือยัง (เพื่อแจกเหรียญแค่ครั้งแรก)
         const [hist] = await conn.query("SELECT * FROM user_hunter_history WHERE lineUserId = ? AND levelId = ?", [lineUserId, levelId]);
         
         let earnedCoins = 0;
-        
         if (hist.length === 0) {
             earnedCoins = REWARD;
-            
-            await conn.query("INSERT INTO user_hunter_history (lineUserId, levelId) VALUES (?, ?)", [lineUserId, levelId]);
             await conn.query("UPDATE users SET coinBalance = coinBalance + ? WHERE lineUserId = ?", [earnedCoins, lineUserId]);
             
+            // แจ้งเตือนเหรียญ (เฉพาะครั้งแรก)
             await conn.query(
                 "INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt) VALUES (?, ?, ?, ?, ?, ?, NOW())",
                 ["NOTIF" + uuidv4(), lineUserId, `สุดยอด! คุณค้นหาจุดเสี่ยงครบ รับ ${earnedCoins} เหรียญ`, 'game_hunter', levelId, lineUserId]
             );
         }
+
+        // ⭐ บันทึกประวัติการเล่นรอบนี้ (พร้อมดาว) ลง DB เสมอ (ไม่ว่าจะเล่นซ้ำหรือไม่)
+        // เพื่อให้ user สามารถกลับมาแก้ตัวทำ 3 ดาวได้
+        await conn.query(
+            "INSERT INTO user_hunter_history (lineUserId, levelId, stars) VALUES (?, ?, ?)", 
+            [lineUserId, levelId, stars || 1]
+        );
 
         const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
         await conn.commit();
@@ -2074,6 +2103,55 @@ app.post('/api/game/hunter/complete', async (req, res) => {
     } catch (e) {
         await conn.rollback();
         res.status(500).json({ message: e.message });
+    } finally {
+        conn.release();
+    }
+});
+
+// --- API: เริ่มเล่นด่าน (นับจำนวนครั้ง) ---
+app.post('/api/game/hunter/start-level', async (req, res) => {
+    const { lineUserId, levelId } = req.body;
+    const MAX_PLAYS = 3;
+
+    const conn = await db.getClient();
+    try {
+        await conn.beginTransaction();
+
+        // 1. เช็คจำนวนครั้งปัจจุบัน
+        const [rows] = await conn.query(
+            "SELECT attempt_count FROM hunter_attempts WHERE lineUserId = ? AND levelId = ?",
+            [lineUserId, levelId]
+        );
+
+        let current = 0;
+        if (rows.length > 0) {
+            current = rows[0].attempt_count;
+        }
+
+        // 2. ถ้าครบ 3 ครั้งแล้ว -> ห้ามเล่น
+        if (current >= MAX_PLAYS) {
+            throw new Error(`คุณใช้สิทธิ์เล่นด่านนี้ครบ ${MAX_PLAYS} ครั้งแล้ว`);
+        }
+
+        // 3. บวกเพิ่ม 1 ครั้ง
+        if (rows.length === 0) {
+            await conn.query(
+                "INSERT INTO hunter_attempts (lineUserId, levelId, attempt_count) VALUES (?, ?, 1)",
+                [lineUserId, levelId]
+            );
+        } else {
+            await conn.query(
+                "UPDATE hunter_attempts SET attempt_count = attempt_count + 1 WHERE lineUserId = ? AND levelId = ?",
+                [lineUserId, levelId]
+            );
+        }
+
+        await conn.commit();
+        res.json({ status: "success", data: { canPlay: true, played: current + 1 } });
+
+    } catch (e) {
+        await conn.rollback();
+        res.status(400).json({ status: "error", message: e.message });
     } finally {
         conn.release();
     }
