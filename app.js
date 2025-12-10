@@ -2294,7 +2294,7 @@ function startDailyQuiz() {
     loadGamePage(); 
 }
 
-// 3. ฟังก์ชันหมุนกาชา (Ultra Premium: Card Reveal Style + Shake & Glow)
+// 3. ฟังก์ชันหมุนกาชา (Ultra Premium: Card Reveal Style)
 async function pullGacha() {
     const currentCoins = parseInt($('#coin-display').text()) || 0;
     if (currentCoins < 100) {
@@ -2302,37 +2302,35 @@ async function pullGacha() {
         return Swal.fire({
             icon: 'warning',
             title: 'เหรียญไม่พอ',
-            text: 'ต้องการอย่างน้อย 100 เหรียญในการสุ่ม',
+            text: 'ต้องการ 100 เหรียญ',
             confirmButtonText: 'โอเค'
         });
     }
 
-    // แตะปุ่มแล้วสั่นเบา ๆ
     triggerHaptic('medium');
 
-    // 1) สร้าง Overlay (Popup เต็มจอ)
+    // 1. สร้าง Overlay มารอไว้ก่อน (ยังไม่ใส่ข้อมูล)
     const overlayId = 'gacha-' + Date.now();
     const overlayHtml = `
         <div id="${overlayId}" class="gacha-overlay animate__animated animate__fadeIn">
             <div class="gacha-burst"></div>
-            <div class="gacha-sparkles"></div>
 
             <h2 class="text-white fw-bold mb-4 animate__animated animate__pulse animate__infinite">
-                กำลังสุ่ม…
+                กำลังสุ่ม...
             </h2>
 
             <div class="gacha-card-container">
-                <div class="gacha-card card-enter" id="card-${overlayId}">
-                    <div class="gacha-face gacha-back">
-                        <i class="fas fa-helmet-safety text-warning" style="font-size: 4rem;"></i>
-                    </div>
+                <div class="gacha-card" id="card-${overlayId}">
+                    <!-- ตอนนี้ใช้เฉพาะด้านหน้าเท่านั้น -->
                     <div class="gacha-face gacha-front">
                         <img id="img-${overlayId}" src="" class="img-fluid mb-2" style="max-height: 150px;">
                         <div class="badge bg-warning text-dark mb-1" id="rarity-${overlayId}">.</div>
-                        <h5 class="fw-bold text-dark text-center" id="name-${overlayId}">.</h5>
+                        <h5 class="fw-bold text-dark text-center mb-0" id="name-${overlayId}">.</h5>
                     </div>
                 </div>
             </div>
+
+            <div class="gacha-sparkles"></div>
 
             <button class="btn-claim" id="btn-${overlayId}">เก็บใส่สมุด</button>
         </div>
@@ -2340,58 +2338,66 @@ async function pullGacha() {
     $('body').append(overlayHtml);
 
     try {
-        // 2) ยิง API ขอข้อมูลการ์ดที่สุ่มได้
-        const res = await callApi('/api/game/gacha-pull', {
-            lineUserId: AppState.lineProfile.userId
-        }, 'POST');
+        // 2. ยิง API ขอข้อมูล
+        const res = await callApi('/api/game/gacha-pull', { lineUserId: AppState.lineProfile.userId }, 'POST');
 
-        // อัปเดตเหรียญบน HUD
+        // อัปเดตเหรียญ
         $('#coin-display').text(res.remainingCoins);
-        if (AppState.currentUser) {
-            AppState.currentUser.coinBalance = res.remainingCoins;
-        }
+        if (AppState.currentUser) AppState.currentUser.coinBalance = res.remainingCoins;
 
-        // 3) ใส่ข้อมูลลงหน้าการ์ด (ยังไม่พลิก)
+        // 3. ใส่ข้อมูลลงในการ์ด (แต่ยังไม่เปิด)
         $(`#img-${overlayId}`).attr('src', getFullImageUrl(res.badge.imageUrl));
         $(`#name-${overlayId}`).text(res.badge.badgeName);
         $(`#rarity-${overlayId}`).text(res.badge.rarity || 'Common');
 
-        // เปลี่ยนหัวข้อเป็น "แตะเพื่อเปิด!"
-        const $title = $(`#${overlayId} h2`);
-        $title
-            .text('แตะเพื่อเปิด!')
-            .removeClass('animate__infinite');
+        // เปลี่ยนข้อความเป็น "แตะเพื่อเปิด!"
+        $(`#${overlayId} h2`).text("แตะเพื่อเปิด!");
 
-        // 4) รอให้ผู้ใช้แตะที่หน้าจอเพื่อ "เปิดการ์ด"
+        // 4. รอให้ user แตะการ์ดเพื่อเปิด
         $(`#${overlayId}`).one('click', function () {
-            const $overlay = $(`#${overlayId}`);
-            const $card = $(`#card-${overlayId}`);
-
-            // สั่นจอแรง ๆ ตอนเปิดการ์ด
             triggerHaptic('heavy');
-            $overlay.addClass('shake-screen');
-            setTimeout(() => $overlay.removeClass('shake-screen'), 450);
 
-            // พลิกการ์ด + เปิดการเรืองแสง
-            $card.addClass('flipped glow');
+            // เอฟเฟกต์การ์ดเด้ง + glow
+            $(`#card-${overlayId}`).addClass('flipped'); // ตอนนี้ใช้เป็น state "เปิดการ์ด"
 
-            // เปลี่ยนหัวข้อ + โชว์ปุ่มรับการ์ด
-            $title.text('ยินดีด้วย!').addClass('text-warning');
+            // เอฟเฟกต์สั่นหน้าจอเล็กน้อย
+            document.body.classList.add('shake-screen');
+            setTimeout(() => {
+                document.body.classList.remove('shake-screen');
+            }, 400);
+
+            // เปิดประกายไฟรอบการ์ด
+            $(`#${overlayId} .gacha-sparkles`).addClass('active');
+
+            // เปลี่ยนหัวข้อ
+            $(`#${overlayId} h2`).text("ยินดีด้วย!").addClass('text-warning');
+
+            // โชว์ปุ่มเก็บใส่สมุด
             $(`#btn-${overlayId}`).addClass('show');
+
+            // เอฟเฟกต์พลุ (confetti เบาๆ)
+            Swal.fire({
+                title: '',
+                width: 0,
+                padding: 0,
+                background: 'transparent',
+                backdrop: `rgba(0,0,0,0) url("https://assets2.lottiefiles.com/packages/lf20_u4yrau.json") center center no-repeat`,
+                timer: 2000,
+                showConfirmButton: false
+            });
         });
 
-        // 5) ปุ่ม "เก็บใส่สมุด" — ปิด popup แล้วโหลด Dashboard ใหม่
+        // 5. ปุ่มปิด / เก็บใส่สมุด
         $(`#btn-${overlayId}`).on('click', function (e) {
-            e.stopPropagation(); // กันไม่ให้ไปทับ event click overlay
-            const $overlay = $(`#${overlayId}`);
-            $overlay.removeClass('animate__fadeIn').addClass('animate__fadeOut');
-            setTimeout(() => $overlay.remove(), 500);
+            e.stopPropagation(); // กันกระทบ overlay-click
+            $(`#${overlayId}`).removeClass('animate__fadeIn').addClass('animate__fadeOut');
+            setTimeout(() => $(`#${overlayId}`).remove(), 500);
             loadGameDashboard();
         });
 
     } catch (e) {
         $(`#${overlayId}`).remove();
-        Swal.fire('เกิดข้อผิดพลาด', e.message || 'ไม่สามารถสุ่มการ์ดได้', 'error');
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
     }
 }
 
