@@ -492,91 +492,274 @@ body {
 .btn-claim.show { opacity: 1; pointer-events: all; }
 
 /* =========================================
-   BENTO GRID UI (New & Balanced)
+   GAME CENTER (Modern Tech Style)
    ========================================= */
 
 #game-page {
-    background-color: #f0f2f5; /* พื้นหลังสีเทาอ่อน สบายตา */
+    background: radial-gradient(circle at top, #ffffff 0%, #f0f2f5 45%, #e5e7eb 100%);
     min-height: 100vh;
     padding-bottom: 100px;
     color: #333;
 }
 
-/* 1. Header HUD แบบเรียบหรู */
-.bento-header {
-    background: #ffffff;
-    padding: 20px 25px;
-    border-radius: 0 0 30px 30px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-    margin-bottom: 25px;
+/* ---------- TOP HUD ---------- */
+
+.bento-header.game-hud {
+    background: rgba(255, 255, 255, 0.9);
+    padding: 20px 22px;
+    border-radius: 24px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+    margin-bottom: 18px;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(148, 163, 184, 0.25);
 }
 
-/* 2. Grid System (หัวใจหลักของ Bento) */
+.game-hud-left {
+    max-width: 60%;
+}
+
+.game-hud-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-medium-gray);
+    font-weight: 700;
+}
+
+.game-hud-value {
+    font-family: 'Kanit', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 2.3rem;
+    font-weight: 800;
+    color: #111827;
+    line-height: 1;
+}
+
+.game-hud-icon {
+    font-size: 1.4rem;
+    color: #fbbf24;
+    text-shadow: 0 4px 10px rgba(251, 191, 36, 0.6);
+}
+
+.game-hud-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-medium-gray);
+    margin-top: 4px;
+}
+
+.game-hud-right {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* HUD Stat Chips (Streak / Info) */
+.hud-stat-chip {
+    border-radius: 999px;
+    padding: 6px 12px;
+    background: rgba(248, 250, 252, 0.95);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 140px;
+}
+
+.hud-stat-chip-secondary {
+    background: rgba(15, 118, 110, 0.06);
+    border-color: rgba(45, 212, 191, 0.6);
+}
+
+.hud-stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.hud-stat-value {
+    font-size: 0.85rem;
+    color: #111827;
+    font-weight: 700;
+}
+
+/* ---------- COMMON SECTIONS ---------- */
+
+.game-section {
+    padding: 0 4px;
+}
+
+/* ---------- MINI COLLECTION ---------- */
+
+.mini-collection-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 10px 12px;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    overflow-x: auto;
+    scrollbar-width: none; /* Firefox */
+}
+
+.mini-collection-card::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
+.mini-collection-list {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 50px;
+}
+
+/* ---------- BENTO GRID (GAME MODES) ---------- */
+
 .bento-container {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* แบ่ง 2 คอลัมน์เท่ากัน */
-    grid-auto-rows: minmax(100px, auto); /* ความสูงแถว */
-    gap: 15px; /* ช่องว่างระหว่างกล่อง */
-    padding: 0 20px;
+    grid-template-columns: 1fr 1fr; /* 2 คอลัมน์เท่า ๆ กัน */
+    grid-auto-rows: minmax(110px, auto);
+    gap: 14px;
+    padding: 0 4px;
+    margin-top: 4px;
 }
 
-/* 3. การ์ดพื้นฐาน */
 .bento-card {
     background: #ffffff;
-    border-radius: 24px;
-    padding: 15px;
+    border-radius: 22px;
+    padding: 14px;
     position: relative;
     overflow: hidden;
-    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.04);
-    border: 1px solid rgba(255,255,255,0.5);
+    transition: transform 0.18s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                box-shadow 0.18s ease, 
+                border-color 0.18s ease, 
+                background 0.18s ease;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+    border: 1px solid rgba(226, 232, 240, 0.9);
     display: flex;
     flex-direction: column;
     justify-content: center;
     cursor: pointer;
 }
 
-.bento-card:active { transform: scale(0.96); }
+.bento-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
+}
+
+.bento-card:active {
+    transform: scale(0.97);
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
+}
 
 /* ขนาดพิเศษ */
-.span-2 { grid-column: span 2; } /* กว้างเต็มจอ (2 คอลัมน์) */
-.span-row-2 { grid-row: span 2; } /* สูง 2 เท่า */
+.span-2 { grid-column: span 2; }
+.span-row-2 { grid-row: span 2; }
 
-/* ธีมสี (ใช้ Gradient อ่อนๆ ดูแพง) */
-.theme-gacha { background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%); border-color: #ffcccc; }
-.theme-quiz { background: linear-gradient(135deg, #e3ffe7 0%, #d1f7d6 100%); border-color: #c3e6cb; }
-.theme-gold { background: linear-gradient(135deg, #fffcf0 0%, #fff4d9 100%); border-color: #ffeeba; }
-.theme-blue { background: linear-gradient(135deg, #f0f7ff 0%, #dceeff 100%); border-color: #cce5ff; }
-.theme-dark { background: linear-gradient(135deg, #343a40 0%, #212529 100%); color: white !important; }
+/* ---------- COLOR THEMES ---------- */
 
-/* องค์ประกอบภายใน */
+.theme-gacha {
+    background: radial-gradient(circle at 0% 0%, #fee2e2 0%, #fff5f5 45%, #ffffff 100%);
+    border-color: rgba(248, 113, 113, 0.5);
+}
+
+.theme-quiz {
+    background: radial-gradient(circle at 0% 0%, #dcfce7 0%, #f0fdf4 45%, #ffffff 100%);
+    border-color: rgba(34, 197, 94, 0.45);
+}
+
+.theme-gold {
+    background: radial-gradient(circle at 0% 0%, #fef3c7 0%, #fffbeb 45%, #ffffff 100%);
+    border-color: rgba(245, 158, 11, 0.45);
+}
+
+.theme-blue {
+    background: radial-gradient(circle at 0% 0%, #dbeafe 0%, #eff6ff 45%, #ffffff 100%);
+    border-color: rgba(59, 130, 246, 0.45);
+}
+
+.theme-dark {
+    background: radial-gradient(circle at 0% 0%, #111827 0%, #020617 100%);
+    color: #f9fafb;
+    border-color: rgba(15, 23, 42, 0.9);
+}
+
+/* ---------- CARD CONTENT TYPOGRAPHY ---------- */
+
 .bento-title {
-    font-weight: 800; font-size: 1rem; margin-bottom: 2px;
-    color: #2c3e50; line-height: 1.2;
+    font-weight: 800;
+    font-size: 0.98rem;
+    margin-bottom: 2px;
+    color: #111827;
+    line-height: 1.2;
 }
-.bento-sub {
-    font-size: 0.7rem; opacity: 0.7; font-weight: 500;
-}
-.theme-dark .bento-title, 
-.theme-dark .bento-sub,
-.theme-dark i { color: white !important; }
 
-/* ปุ่มกลมเล็กๆ (Go Button) */
+.bento-sub {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    font-weight: 500;
+    color: #4b5563;
+}
+
+.theme-dark .bento-title,
+.theme-dark .bento-sub,
+.theme-dark i {
+    color: #f9fafb !important;
+}
+
+/* ---------- LITTLE ROUND GO BUTTON ---------- */
+
 .btn-circle-go {
-    width: 35px; height: 35px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: #ffffff;
-    color: #333;
-    display: flex; align-items: center; justify-content: center;
+    color: #111827;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     position: absolute;
-    bottom: 12px; right: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    bottom: 12px;
+    right: 12px;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.25);
+    font-size: 0.85rem;
 }
 
-/* ไอคอนตกแต่ง */
+/* ---------- ICONS ---------- */
+
 .bento-icon-img {
-    width: 60px; height: 60px;
+    width: 60px;
+    height: 60px;
     object-fit: contain;
-    margin-bottom: 10px;
-    filter: drop-shadow(0 4px 4px rgba(0,0,0,0.1));
+    margin-bottom: 4px;
+    filter: drop-shadow(0 4px 8px rgba(15, 23, 42, 0.2));
+}
+
+/* ---------- RESPONSIVE ---------- */
+
+@media (max-width: 576px) {
+    .bento-header.game-hud {
+        padding: 16px 16px;
+        border-radius: 18px;
+    }
+
+    .game-hud-left {
+        max-width: 100%;
+    }
+
+    .game-hud-value {
+        font-size: 2rem;
+    }
+
+    .hud-stat-chip {
+        min-width: auto;
+    }
+
+    .bento-container {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .span-row-2 {
+        grid-row: span 2;
+    }
 }
