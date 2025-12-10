@@ -2947,7 +2947,8 @@ $('#q-image-input').on('change', function() {
 
 let hunterLevelData = null;
 let hunterFound = new Set();
-let editorHazards = []; 
+let editorHazards = [];
+let hunterLives = 3; // ⭐ 1. ตัวแปรเก็บจำนวนหัวใจ
 
 // 1. เปิดเมนูเลือกด่าน
 async function openHunterMenu() {
@@ -3004,14 +3005,17 @@ async function openHunterMenu() {
     }
 }
 
-// 2. เริ่มเล่นเกม (User)
+// ⭐ 2. แก้ไขฟังก์ชันเริ่มเกม (Reset หัวใจ)
 function startHunterGame(id, imgUrl, total) {
     hunterLevelData = { id, total };
     hunterFound.clear();
+    hunterLives = 3; // รีเซ็ตหัวใจเต็ม 3 ดวง
     
     $('#hunter-target-img').attr('src', getFullImageUrl(imgUrl));
     $('#hunter-progress').text(`0 / ${total}`);
-    $('.hunter-marker').remove(); // ล้างจุดเก่า
+    updateHunterLivesUI(); // อัปเดตการแสดงผลหัวใจ
+    
+    $('.hunter-marker').remove(); 
     
     $('#hunter-menu-modal').modal('hide');
     if (!AppState.allModals['hunter-game']) {
@@ -3020,15 +3024,27 @@ function startHunterGame(id, imgUrl, total) {
     AppState.allModals['hunter-game'].show();
 }
 
-// 3. User เล่น: จิ้มหาจุด (แก้ Logic พิกัดให้แม่นยำขึ้น)
-// เปลี่ยน Selector จาก #hunter-game-area เป็น #hunter-target-img โดยตรง
-$(document).on('click', '#hunter-target-img', async function(e) {
-    if (hunterFound.size >= hunterLevelData.total) return;
+// ⭐ 3. ฟังก์ชันอัปเดต UI หัวใจ (สร้างใหม่)
+function updateHunterLivesUI() {
+    let heartsHtml = '';
+    // วนลูปสร้างหัวใจ 3 ดวง
+    for(let i=0; i<3; i++) {
+        if (i < hunterLives) {
+            heartsHtml += '❤️'; // ยังมีชีวิต
+        } else {
+            heartsHtml += '🖤'; // ตายแล้ว (หัวใจดำ)
+        }
+    }
+    $('#hunter-lives').html(heartsHtml);
+}
 
-    const img = $(this); // ตัวรูปภาพ
+// ⭐ 4. แก้ไข Logic การคลิก (ตัดหัวใจเมื่อพลาด)
+$(document).on('click', '#hunter-target-img', async function(e) {
+    // ถ้าตายแล้ว หรือ หาครบแล้ว ห้ามคลิกต่อ
+    if (hunterLives <= 0 || hunterFound.size >= hunterLevelData.total) return;
+
+    const img = $(this);
     const offset = img.offset(); 
-    
-    // คำนวณพิกัด % จากรูปภาพโดยตรง (แก้ปัญหาขอบดำ)
     const x = ((e.pageX - offset.left) / img.width()) * 100;
     const y = ((e.pageY - offset.top) / img.height()) * 100;
 
@@ -3038,12 +3054,12 @@ $(document).on('click', '#hunter-target-img', async function(e) {
         }, 'POST');
 
         if (res.isHit) {
+            // --- กรณีเจอจุดเสี่ยง (เหมือนเดิม) ---
             const h = res.hazard;
             if (!hunterFound.has(h.hazardId)) {
                 hunterFound.add(h.hazardId);
                 triggerHaptic('medium');
 
-                // แสดงวงกลมเขียวตรงตำแหน่งที่ถูกต้อง (ใช้ h.x, h.y จาก DB เพื่อความแม่นยำ)
                 const marker = $('<div class="hunter-marker"></div>').css({
                     position: 'absolute', left: h.x + '%', top: h.y + '%',
                     width: '40px', height: '40px', borderRadius: '50%',
@@ -3064,45 +3080,35 @@ $(document).on('click', '#hunter-target-img', async function(e) {
                 }
             }
         } else {
-            triggerHaptic('light');
-            // กากบาทแดงตรงจุดที่คลิก (x, y ที่คำนวณได้)
+            // --- ⭐ กรณีจิ้มผิด (MISS) ⭐ ---
+            hunterLives--; // ลดหัวใจ
+            updateHunterLivesUI(); // อัปเดตหน้าจอ
+            triggerHaptic('heavy'); // สั่นเตือน
+
+            // กากบาทแดง
             const miss = $('<div class="fas fa-times text-danger fs-1"></div>').css({
                 position: 'absolute', left: x + '%', top: y + '%',
                 transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 10
             }).fadeOut(1000, function() { $(this).remove(); });
             $('#hunter-game-area').append(miss);
+
+            // เช็คว่า Game Over หรือยัง?
+            if (hunterLives <= 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Game Over!',
+                    text: 'คุณจิ้มผิดเกิน 3 ครั้ง 😭',
+                    confirmButtonText: 'เริ่มใหม่',
+                    confirmButtonColor: '#d33',
+                    allowOutsideClick: false
+                }).then(() => {
+                    // รีเซ็ตเกมด่านเดิมใหม่ทันที
+                    startHunterGame(hunterLevelData.id, $('#hunter-target-img').attr('src'), hunterLevelData.total);
+                });
+            }
         }
     } catch (e) { console.error(e); }
 });
-
-// 4. จบเกม
-async function finishHunterGame() {
-    triggerHaptic('heavy');
-    Swal.fire({
-        title: 'ภารกิจสำเร็จ!',
-        text: 'คุณค้นหาจุดเสี่ยงครบทั้งหมดแล้ว',
-        icon: 'success',
-        confirmButtonText: 'รับรางวัล',
-        confirmButtonColor: '#06C755'
-    }).then(async () => {
-        try {
-            const res = await callApi('/api/game/hunter/complete', {
-                lineUserId: AppState.lineProfile.userId,
-                levelId: hunterLevelData.id
-            }, 'POST');
-
-            if (res.earnedCoins > 0) {
-                Swal.fire('ยินดีด้วย!', `ได้รับ ${res.earnedCoins} เหรียญ`, 'success');
-                $('#coin-display').text(res.newCoinBalance);
-                if(AppState.currentUser) AppState.currentUser.coinBalance = res.newCoinBalance;
-            } else {
-                Swal.fire('เก่งมาก!', 'คุณผ่านด่านนี้ไปแล้ว', 'info');
-            }
-            AppState.allModals['hunter-game'].hide();
-            openHunterMenu();
-        } catch (e) { Swal.fire('Error', e.message, 'error'); }
-    });
-}
 
 // 5. Admin: เปิดหน้าสร้างด่าน (แก้ ID ให้ตรงกับ HTML)
 function openHunterEditor() {
