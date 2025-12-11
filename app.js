@@ -3452,6 +3452,8 @@ $(document).on('click', '#editor-preview-img', function(e) {
     // ⭐ ใช้ HTML Form ใน SweetAlert เพื่อรับ 2 ค่า (ชื่อ + ความรู้)
     Swal.fire({
         title: 'เพิ่มจุดเสี่ยง',
+        // ⭐ เพิ่มบรรทัดนี้: สั่งให้ Swal ไปเกิดใน Modal แทนที่จะไปเกิดที่ Body
+        target: document.getElementById('hunter-editor-modal'),       
         html: `
             <input id="swal-input1" class="swal2-input" placeholder="ชื่อจุดเสี่ยง (เช่น สายไฟชำรุด)">
             <textarea id="swal-input2" class="swal2-textarea" placeholder="ความรู้/วิธีแก้ไข (เช่น แจ้งช่างซ่อมทันที)"></textarea>
