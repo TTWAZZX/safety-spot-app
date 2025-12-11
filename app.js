@@ -3038,7 +3038,7 @@ async function openHunterMenu() {
 
         // 4. วนลูปสร้างการ์ดด่าน
         levels.forEach(l => {
-            // --- 4.1 Badge ดาว ---
+            // ... (โค้ดส่วน Badge ดาว และ Badge โควตา เหมือนเดิม) ...
             let badge = '<span class="badge bg-warning text-dark">ใหม่</span>';
             if (l.isCleared) {
                 let starsHtml = '';
@@ -3048,7 +3048,6 @@ async function openHunterMenu() {
                 badge = `<span class="badge bg-light border text-dark">${starsHtml}</span>`;
             }
             
-            // --- 4.2 Badge โควตา ---
             let quotaBadgeClass = 'bg-info text-dark';
             if(l.playedCount >= l.maxPlays) quotaBadgeClass = 'bg-secondary';
             const quotaBadge = `<span class="badge ${quotaBadgeClass} ms-1"><i class="fas fa-history"></i> ${l.playedCount}/${l.maxPlays}</span>`;
@@ -3057,7 +3056,7 @@ async function openHunterMenu() {
             const isLocked = l.playedCount >= l.maxPlays;
             const cardOpacity = isLocked ? 'opacity: 0.7; filter: grayscale(80%);' : '';
             
-            // --- 4.4 สร้าง HTML ---
+            // ⭐⭐⭐ แก้ตรงนี้: ลบ onclick ออก แล้วใส่ class 'btn-hunter-level' กับ data-attributes แทน ⭐⭐⭐
             list.append(`
                 <div class="col-12 col-md-6">
                     <div class="card shadow-sm h-100 border-0 overflow-hidden btn-hunter-level" 
@@ -3075,7 +3074,6 @@ async function openHunterMenu() {
                         <div class="card-body pb-2">
                             <h6 class="fw-bold mb-1">${safeTitle}</h6>
                             <small class="text-muted"><i class="fas fa-bomb me-1"></i> ${l.totalHazards} จุดเสี่ยง</small>
-                            
                         </div>
                     </div>
                 </div>
@@ -3426,6 +3424,7 @@ function openHunterEditor() {
     // เช็คว่ามี instance เดิมค้างอยู่ไหม ถ้ามีให้ทำลายทิ้งก่อน
     if (AppState.allModals['hunter-editor']) {
         AppState.allModals['hunter-editor'].dispose();
+        delete AppState.allModals['hunter-editor']; // ลบออกจาก AppState ด้วย
     } else {
         // กันเหนียว: เช็คจาก DOM โดยตรงเผื่อ AppState ไม่ตรง
         const existingInstance = bootstrap.Modal.getInstance(modalEl);
@@ -3660,3 +3659,27 @@ async function editHunterLevel(levelId) {
         Swal.fire('Error', e.message, 'error');
     }
 }
+
+// ⭐ ตัวดักจับการคลิกการ์ดด่าน Hunter (ปลอดภัยกว่า onclick)
+$(document).on('click', '.btn-hunter-level', function() {
+    // 1. ดึงข้อมูลจาก data-attribute
+    const levelId = $(this).data('level-id');
+    const imageUrl = $(this).data('image-url');
+    const hazards = $(this).data('hazards');
+    const isLocked = $(this).data('locked');
+
+    // 2. ถ้าล็อคอยู่ ให้แจ้งเตือนและไม่ให้เข้า
+    if (isLocked === true || isLocked === "true") {
+        triggerHaptic('light');
+        Swal.fire({
+            icon: 'info',
+            title: 'สิทธิ์เต็มแล้ว',
+            text: 'คุณใช้โควตาสำหรับด่านนี้ครบแล้วครับ',
+            confirmButtonText: 'ตกลง'
+        });
+        return;
+    }
+
+    // 3. เรียกฟังก์ชันเช็คสิทธิ์และเริ่มเกม
+    checkQuotaAndStart(levelId, imageUrl, hazards);
+});
