@@ -3141,15 +3141,19 @@ function updateHunterLivesUI() {
 function endGameByTimeOut() {
     clearInterval(hunterTimerInterval);
     triggerHaptic('heavy');
+    
+    // ⭐ แก้ไขส่วนนี้ครับ
     Swal.fire({
         icon: 'error',
         title: 'หมดเวลา!',
         text: 'เสียดายจัง เวลาหมดซะก่อน',
-        confirmButtonText: 'เริ่มใหม่',
-        confirmButtonColor: '#d33',
+        confirmButtonText: 'กลับสู่เมนู', // เปลี่ยนข้อความปุ่ม
+        confirmButtonColor: '#6c757d',
         allowOutsideClick: false
     }).then(() => {
-        startHunterGame(hunterLevelData.id, $('#hunter-target-img').attr('src'), hunterLevelData.total);
+        // เด้งออกไปหน้าเมนู เพื่อให้ต้องกดเริ่มใหม่ (และถูกตัดโควตา)
+        AppState.allModals['hunter-game'].hide();
+        openHunterMenu();
     });
 }
 
@@ -3227,15 +3231,19 @@ $(document).on('click', '#hunter-target-img', async function(e) {
 
             if (hunterLives <= 0) {
                 clearInterval(hunterTimerInterval); // หยุดเวลา
+                
+                // ⭐ แก้ไขส่วนนี้ครับ
                 Swal.fire({
                     icon: 'error',
                     title: 'Game Over!',
-                    text: 'คุณจิ้มผิดเกิน 3 ครั้ง',
-                    confirmButtonText: 'เริ่มใหม่',
-                    confirmButtonColor: '#d33',
+                    text: 'คุณจิ้มผิดเกิน 3 ครั้ง ภารกิจล้มเหลว',
+                    confirmButtonText: 'กลับสู่เมนู',  // เปลี่ยนข้อความปุ่ม
+                    confirmButtonColor: '#6c757d',   // เปลี่ยนเป็นสีเทาให้ดูเหมือนปุ่มออก
                     allowOutsideClick: false
                 }).then(() => {
-                    startHunterGame(hunterLevelData.id, $('#hunter-target-img').attr('src'), hunterLevelData.total);
+                    // แทนที่จะเริ่มเกมใหม่ ให้ปิดเกมและโหลดเมนูแทน
+                    AppState.allModals['hunter-game'].hide();
+                    openHunterMenu(); 
                 });
             }
         }
