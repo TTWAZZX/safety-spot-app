@@ -221,7 +221,7 @@
 
             </div>
 
-            <div class="modal fade" id="quiz-modal" tabindex="-1">
+            <div class="modal fade" id="quiz-modal">
                 <div class="modal-dialog modal-dialog-centered modal-lg">
                     <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
                         
@@ -418,7 +418,7 @@
         </nav>
     </div>
     
-    <div class="modal fade" id="submission-modal" tabindex="-1">
+    <div class="modal fade" id="submission-modal">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -450,7 +450,7 @@
     </div>
 </div>
     
-    <div class="modal fade" id="admin-reports-modal" tabindex="-1">
+    <div class="modal fade" id="admin-reports-modal">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content">
                 <div class="modal-header">
@@ -466,8 +466,8 @@
         </div>
     </div>
 
-    <div class="modal fade" id="admin-activities-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><button id="create-activity-btn" class="btn btn-success mb-3"><i class="fas fa-plus"></i> สร้างกิจกรรมใหม่</button><div id="activities-list-admin"></div></div></div></div></div>
-    <div class="modal fade" id="activity-form-modal" tabindex="-1">
+    <div class="modal fade" id="admin-activities-modal"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">จัดการกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><button id="create-activity-btn" class="btn btn-success mb-3"><i class="fas fa-plus"></i> สร้างกิจกรรมใหม่</button><div id="activities-list-admin"></div></div></div></div></div>
+    <div class="modal fade" id="activity-form-modal">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -504,10 +504,10 @@
         </div>
     </div>
 </div>
-    <div class="modal fade" id="activity-detail-modal" tabindex="-1"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-detail-title">...</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body bg-light"><div id="submissions-container" class="container-fluid"></div><div id="submissions-loading" class="text-center my-5"><div class="spinner-border" style="color: var(--line-green);"></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">ปิด</button></div></div></div></div>
-    <div class="modal fade" id="imageViewerModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="imageViewerModalLabel">รูปภาพกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body text-center p-0"><img id="imageViewerContent" src="" class="img-fluid" alt="Activity Image" style="max-height: 80vh; width: auto;"></div><div class="modal-footer justify-content-center"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button><a id="downloadImageBtn" class="btn btn-primary" download><i class="fas fa-download me-2"></i> บันทึกรูปภาพ</a></div></div></div></div>
-    <div class="modal fade" id="admin-stats-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">ข้อมูลสรุป Dashboard</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3"><div class="col-12"><canvas id="reportsChart"></canvas></div></div><div id="stats-container" class="row g-3 mt-3"></div><div id="stats-loading" class="text-center my-4"><div class="spinner-border"></div></div></div></div></div></div>
-    <div class="modal fade" id="admin-manage-badges-modal" tabindex="-1">
+    <div class="modal fade" id="activity-detail-modal"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-detail-title">...</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body bg-light"><div id="submissions-container" class="container-fluid"></div><div id="submissions-loading" class="text-center my-5"><div class="spinner-border" style="color: var(--line-green);"></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">ปิด</button></div></div></div></div>
+    <div class="modal fade" id="imageViewerModal"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="imageViewerModalLabel">รูปภาพกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body text-center p-0"><img id="imageViewerContent" src="" class="img-fluid" alt="Activity Image" style="max-height: 80vh; width: auto;"></div><div class="modal-footer justify-content-center"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button><a id="downloadImageBtn" class="btn btn-primary" download><i class="fas fa-download me-2"></i> บันทึกรูปภาพ</a></div></div></div></div>
+    <div class="modal fade" id="admin-stats-modal"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">ข้อมูลสรุป Dashboard</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3"><div class="col-12"><canvas id="reportsChart"></canvas></div></div><div id="stats-container" class="row g-3 mt-3"></div><div id="stats-loading" class="text-center my-4"><div class="spinner-border"></div></div></div></div></div></div>
+    <div class="modal fade" id="admin-manage-badges-modal">
     <div class="modal-dialog modal-fullscreen">
         <div class="modal-content">
             <div class="modal-header">
@@ -552,9 +552,9 @@
         </div>
     </div>
 </div>
-    <div class="modal fade" id="badge-form-modal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="badge-form-title">เพิ่มป้ายรางวัลใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="badge-form"><input type="hidden" id="badge-id-input"><div class="mb-3"><label class="form-label">ชื่อป้ายรางวัล</label><input type="text" class="form-control" id="badge-name-input" required></div><div class="mb-3"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="badge-desc-input" rows="3" required></textarea></div><div class="mb-3"><label class="form-label">รูปภาพป้ายรางวัล</label><input type="file" class="form-control" id="badge-image-input" accept="image/*" required><div class="image-preview-container mt-2"><img id="badge-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview"></div><input type="hidden" id="badge-image-url-input"></div><button type="submit" class="btn btn-primary w-100">บันทึก</button></form></div></div></div></div>
+    <div class="modal fade" id="badge-form-modal"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="badge-form-title">เพิ่มป้ายรางวัลใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="badge-form"><input type="hidden" id="badge-id-input"><div class="mb-3"><label class="form-label">ชื่อป้ายรางวัล</label><input type="text" class="form-control" id="badge-name-input" required></div><div class="mb-3"><label class="form-label">คำอธิบาย</label><textarea class="form-control" id="badge-desc-input" rows="3" required></textarea></div><div class="mb-3"><label class="form-label">รูปภาพป้ายรางวัล</label><input type="file" class="form-control" id="badge-image-input" accept="image/*" required><div class="image-preview-container mt-2"><img id="badge-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview"></div><input type="hidden" id="badge-image-url-input"></div><button type="submit" class="btn btn-primary w-100">บันทึก</button></form></div></div></div></div>
 
-    <div class="modal fade" id="user-details-modal" tabindex="-1">
+    <div class="modal fade" id="user-details-modal">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content p-3">
                 <div class="text-center mb-3">
@@ -595,7 +595,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="notification-modal" tabindex="-1">
+    <div class="modal fade" id="notification-modal">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content">
                 <div class="modal-header"><h5 class="modal-title">การแจ้งเตือน</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -606,7 +606,7 @@
         </div>
     </div>
     
-    <div class="modal fade" id="gacha-modal" tabindex="-1">
+    <div class="modal fade" id="gacha-modal">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content text-center" style="background: transparent; border: none;">
                 <div class="modal-body">
@@ -621,7 +621,7 @@
             </div>
         </div>
     </div>
-    <div class="modal fade" id="admin-questions-modal" tabindex="-1">
+    <div class="modal fade" id="admin-questions-modal">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content">
                 <div class="modal-header">
@@ -638,7 +638,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="question-form-modal" tabindex="-1">
+    <div class="modal fade" id="question-form-modal">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
@@ -726,7 +726,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="card-album-modal" tabindex="-1">
+    <div class="modal fade" id="card-album-modal">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content">
                 <div class="modal-header border-0 bg-white shadow-sm">
@@ -755,7 +755,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="admin-cards-modal" tabindex="-1">
+    <div class="modal fade" id="admin-cards-modal">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content">
                 <div class="modal-header">
@@ -772,7 +772,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="card-form-modal" tabindex="-1">
+    <div class="modal fade" id="card-form-modal">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
@@ -838,7 +838,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="recycle-modal" tabindex="-1">
+    <div class="modal fade" id="recycle-modal">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header border-0 bg-dark text-white">
@@ -866,7 +866,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="hunter-menu-modal" tabindex="-1">
+    <div class="modal fade" id="hunter-menu-modal">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content bg-light">
                 <div class="modal-header border-0 bg-white shadow-sm">
@@ -885,7 +885,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="hunter-game-modal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal fade" id="hunter-game-modal" data-bs-backdrop="static">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content bg-dark">
                 <div class="d-flex justify-content-between align-items-center p-3 text-white fixed-top" style="background: rgba(0,0,0,0.8); z-index: 1050;">
