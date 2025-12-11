@@ -2097,10 +2097,14 @@ app.post('/api/game/hunter/complete', async (req, res) => {
             );
         }
 
-        // ⭐ บันทึกประวัติการเล่นรอบนี้ (พร้อมดาว) ลง DB เสมอ (ไม่ว่าจะเล่นซ้ำหรือไม่)
-        // เพื่อให้ user สามารถกลับมาแก้ตัวทำ 3 ดาวได้
+        // ⭐ แก้ไข: ใช้ ON DUPLICATE KEY UPDATE รองรับการเล่นซ้ำ
+        // (ถ้ามีข้อมูลแล้ว จะอัปเดตดาวให้เฉพาะเมื่อได้ดาวมากกว่าเดิม)
         await conn.query(
-            "INSERT INTO user_hunter_history (lineUserId, levelId, stars) VALUES (?, ?, ?)", 
+            `INSERT INTO user_hunter_history (lineUserId, levelId, stars, clearedAt) 
+             VALUES (?, ?, ?, NOW())
+             ON DUPLICATE KEY UPDATE 
+             stars = GREATEST(stars, VALUES(stars)), 
+             clearedAt = NOW()`, 
             [lineUserId, levelId, stars || 1]
         );
 
