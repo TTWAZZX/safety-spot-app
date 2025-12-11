@@ -3139,26 +3139,57 @@ function updateHunterLivesUI() {
 
 // หมดเวลา!
 function endGameByTimeOut() {
-    clearInterval(hunterTimerInterval);
-    triggerHaptic('heavy');
-    
-    // ⭐ แก้ไขส่วนนี้ครับ
-    Swal.fire({
-        icon: 'error',
-        title: 'หมดเวลา!',
-        text: 'เสียดายจัง เวลาหมดซะก่อน',
-        confirmButtonText: 'กลับสู่เมนู', // เปลี่ยนข้อความปุ่ม
-        confirmButtonColor: '#6c757d',
-        allowOutsideClick: false
-    }).then(() => {
-        // เด้งออกไปหน้าเมนู เพื่อให้ต้องกดเริ่มใหม่ (และถูกตัดโควตา)
-        AppState.allModals['hunter-game'].hide();
-        openHunterMenu();
-    });
+    // เรียกใช้ฟังก์ชันกลาง ส่งหัวข้อและข้อความไป
+    handleHunterFail('หมดเวลา!', 'เสียดายจัง เวลาหมดซะก่อน');
 }
 
-// ⭐ User คลิกหารูป
+// ⭐ ฟังก์ชันใหม่: จัดการเมื่อเล่นแพ้ (หยุดเวลา + รับรางวัลปลอบใจ + เด้งออก)
+async function handleHunterFail(title, text) {
+    clearInterval(hunterTimerInterval); // หยุดเวลา
+    triggerHaptic('heavy'); // สั่นยาวๆ
+
+    try {
+        // 1. เรียก API รับรางวัลปลอบใจ
+        const res = await callApi('/api/game/hunter/fail', {
+            lineUserId: AppState.lineProfile.userId,
+            levelId: hunterLevelData.id
+        }, 'POST');
+
+        // 2. อัปเดตเหรียญบนหน้าจอทันที
+        $('#coin-display').text(res.newCoinBalance);
+        if(AppState.currentUser) AppState.currentUser.coinBalance = res.newCoinBalance;
+
+        // 3. แสดง Popup แจ้งเตือน + รางวัลปลอบใจ
+        Swal.fire({
+            icon: 'error',
+            title: title,
+            html: `
+                <p>${text}</p>
+                <div class="mt-3 p-2 bg-light rounded border">
+                    <small class="text-muted">รางวัลความพยายาม</small><br>
+                    <span class="text-warning fw-bold fs-4">+${res.earnedCoins} เหรียญ 💰</span>
+                </div>
+            `,
+            confirmButtonText: 'กลับสู่เมนู',
+            confirmButtonColor: '#6c757d',
+            allowOutsideClick: false
+        }).then(() => {
+            // 4. ปิดเกม กลับเมนู
+            AppState.allModals['hunter-game'].hide();
+            openHunterMenu();
+        });
+
+    } catch (e) {
+        console.error("Fail reward error:", e);
+        // กรณี Error (เน็ตหลุด) ก็ให้เด้งออกปกติ
+        AppState.allModals['hunter-game'].hide();
+        openHunterMenu();
+    }
+}
+
+// ⭐ User คลิกหารูป (Logic ที่ถูกต้อง: ลบโค้ดซ้ำซ้อนออกแล้ว)
 $(document).on('click', '#hunter-target-img', async function(e) {
+    // เช็คสถานะก่อน ถ้าจบเกมแล้วห้ามคลิกต่อ
     if (hunterLives <= 0 || hunterFound.size >= hunterLevelData.total || hunterTimeLeft <= 0) return;
 
     const img = $(this);
@@ -3172,6 +3203,7 @@ $(document).on('click', '#hunter-target-img', async function(e) {
         }, 'POST');
 
         if (res.isHit) {
+            // --- กรณีเจอจุดเสี่ยง ---
             const h = res.hazard;
             if (!hunterFound.has(h.hazardId)) {
                 // หยุดเวลาชั่วคราวขณะอ่านความรู้
@@ -3189,7 +3221,7 @@ $(document).on('click', '#hunter-target-img', async function(e) {
                 $('#hunter-game-area').append(marker);
                 $('#hunter-progress').text(`${hunterFound.size} / ${hunterLevelData.total}`);
 
-                // ⭐ Education Popup (แสดงความรู้)
+                // แสดง Popup ความรู้
                 await Swal.fire({
                     icon: 'success',
                     title: 'เจอจุดเสี่ยง!',
@@ -3205,7 +3237,7 @@ $(document).on('click', '#hunter-target-img', async function(e) {
                     allowOutsideClick: false
                 });
 
-                // เล่นต่อได้ไหม?
+                // เล่นต่อหรือจบเกม?
                 if (hunterFound.size === hunterLevelData.total) {
                     finishHunterGame();
                 } else {
@@ -3218,33 +3250,22 @@ $(document).on('click', '#hunter-target-img', async function(e) {
                 }
             }
         } else {
-            // ผิด
+            // --- กรณีผิด (Miss) ---
             hunterLives--;
             updateHunterLivesUI();
             triggerHaptic('heavy');
 
+            // แสดงกากบาทแดง
             const miss = $('<div class="fas fa-times text-danger fs-1"></div>').css({
                 position: 'absolute', left: x + '%', top: y + '%',
                 transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 10
             }).fadeOut(1000, function() { $(this).remove(); });
             $('#hunter-game-area').append(miss);
 
+            // เช็คว่าตายหรือยัง
             if (hunterLives <= 0) {
-                clearInterval(hunterTimerInterval); // หยุดเวลา
-                
-                // ⭐ แก้ไขส่วนนี้ครับ
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Game Over!',
-                    text: 'คุณจิ้มผิดเกิน 3 ครั้ง ภารกิจล้มเหลว',
-                    confirmButtonText: 'กลับสู่เมนู',  // เปลี่ยนข้อความปุ่ม
-                    confirmButtonColor: '#6c757d',   // เปลี่ยนเป็นสีเทาให้ดูเหมือนปุ่มออก
-                    allowOutsideClick: false
-                }).then(() => {
-                    // แทนที่จะเริ่มเกมใหม่ ให้ปิดเกมและโหลดเมนูแทน
-                    AppState.allModals['hunter-game'].hide();
-                    openHunterMenu(); 
-                });
+                // ⭐ เรียกฟังก์ชันจบเกมแบบแพ้ (รับรางวัลปลอบใจ + เด้งออก)
+                handleHunterFail('Game Over!', 'คุณจิ้มผิดเกิน 3 ครั้ง ภารกิจล้มเหลว');
             }
         }
     } catch (e) { console.error(e); }
@@ -3296,6 +3317,50 @@ async function finishHunterGame() {
             openHunterMenu(); // รีโหลดเมนูเพื่อโชว์ดาวใหม่
         } catch (e) { Swal.fire('Error', e.message, 'error'); }
     });
+}
+
+// ⭐ ฟังก์ชันจัดการเมื่อเล่นแพ้ (หัวใจหมด หรือ เวลาหมด)
+async function handleHunterFail(title, text) {
+    clearInterval(hunterTimerInterval); // หยุดเวลา
+    triggerHaptic('heavy'); // สั่นยาวๆ
+
+    try {
+        // เรียก API รับรางวัลปลอบใจ
+        const res = await callApi('/api/game/hunter/fail', {
+            lineUserId: AppState.lineProfile.userId,
+            levelId: hunterLevelData.id
+        }, 'POST');
+
+        // อัปเดตเหรียญบนหน้าจอทันที
+        $('#coin-display').text(res.newCoinBalance);
+        if(AppState.currentUser) AppState.currentUser.coinBalance = res.newCoinBalance;
+
+        // แสดง Popup แจ้งเตือน + รางวัลปลอบใจ
+        Swal.fire({
+            icon: 'error', // ใช้ icon error เพื่อบอกว่าภารกิจล้มเหลว
+            title: title,
+            html: `
+                <p>${text}</p>
+                <div class="mt-3 p-2 bg-light rounded border">
+                    <small class="text-muted">รางวัลความพยายาม</small><br>
+                    <span class="text-warning fw-bold fs-4">+${res.earnedCoins} เหรียญ 💰</span>
+                </div>
+            `,
+            confirmButtonText: 'กลับสู่เมนู',
+            confirmButtonColor: '#6c757d',
+            allowOutsideClick: false
+        }).then(() => {
+            // ปิดเกม กลับเมนู (เพื่อนับ Quota ใหม่ถ้าจะเล่นอีก)
+            AppState.allModals['hunter-game'].hide();
+            openHunterMenu();
+        });
+
+    } catch (e) {
+        console.error("Fail reward error:", e);
+        // กรณี Error (เน็ตหลุด) ก็ให้เด้งออกปกติ
+        AppState.allModals['hunter-game'].hide();
+        openHunterMenu();
+    }
 }
 
 // ----------------------------------------------------

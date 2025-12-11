@@ -2234,6 +2234,48 @@ app.delete('/api/admin/hunter/level/:id', isAdmin, async (req, res) => {
     }
 });
 
+// --- API: จบเกมแบบไม่ผ่าน (รับรางวัลปลอบใจ) ---
+app.post('/api/game/hunter/fail', async (req, res) => {
+    const { lineUserId, levelId } = req.body;
+    const CONSOLATION_PRIZE = 10; // ⭐ กำหนดจำนวนเหรียญปลอบใจตรงนี้
+
+    const conn = await db.getClient();
+    try {
+        await conn.beginTransaction();
+
+        // 1. เพิ่มเหรียญให้ User
+        await conn.query(
+            "UPDATE users SET coinBalance = coinBalance + ? WHERE lineUserId = ?",
+            [CONSOLATION_PRIZE, lineUserId]
+        );
+
+        // 2. บันทึกแจ้งเตือน (Optional)
+        await conn.query(
+            "INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt) VALUES (?, ?, ?, ?, ?, ?, NOW())",
+            [
+                "NOTIF" + uuidv4(), 
+                lineUserId, 
+                `พยายามได้ดี! รับรางวัลปลอบใจ ${CONSOLATION_PRIZE} เหรียญ จากภารกิจล่าจุดเสี่ยง`, 
+                'game_hunter_fail', 
+                levelId, 
+                lineUserId
+            ]
+        );
+
+        // 3. ดึงยอดล่าสุดส่งกลับ
+        const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
+
+        await conn.commit();
+        res.json({ status: "success", data: { earnedCoins: CONSOLATION_PRIZE, newCoinBalance: user.coinBalance } });
+
+    } catch (e) {
+        await conn.rollback();
+        res.status(500).json({ message: e.message });
+    } finally {
+        conn.release();
+    }
+});
+
 // ======================================================
 // SERVER START
 // ======================================================
