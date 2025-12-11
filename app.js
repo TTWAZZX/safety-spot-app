@@ -3416,13 +3416,26 @@ function openHunterEditor() {
     renderEditorHazards();
     $('#hunter-editor-modal .modal-title').text('สร้างด่านใหม่');
     
-    // ⭐ ปิด Modal ก่อนหน้า (ไม่ว่าจะมาจาก Menu หรือ Admin Manage)
+    // ปิด Modal อื่นๆ ก่อนหน้า
     if(AppState.allModals['hunter-menu']) AppState.allModals['hunter-menu'].hide();
     if(AppState.allModals['admin-hunter-manage']) AppState.allModals['admin-hunter-manage'].hide();
     
-    if (!AppState.allModals['hunter-editor']) {
-        AppState.allModals['hunter-editor'] = new bootstrap.Modal(document.getElementById('hunter-editor-modal'), {focus: false});
+    // ⭐⭐⭐ แก้ไขตรงนี้: ลบอันเก่าทิ้ง (ถ้ามี) แล้วสร้างใหม่เสมอ เพื่อให้แน่ใจว่าได้ focus: false ชัวร์ๆ ⭐⭐⭐
+    const modalEl = document.getElementById('hunter-editor-modal');
+    
+    // เช็คว่ามี instance เดิมค้างอยู่ไหม ถ้ามีให้ทำลายทิ้งก่อน
+    if (AppState.allModals['hunter-editor']) {
+        AppState.allModals['hunter-editor'].dispose();
+    } else {
+        // กันเหนียว: เช็คจาก DOM โดยตรงเผื่อ AppState ไม่ตรง
+        const existingInstance = bootstrap.Modal.getInstance(modalEl);
+        if (existingInstance) existingInstance.dispose();
     }
+
+    // สร้างใหม่ด้วย option { focus: false } (หัวใจสำคัญที่ทำให้พิมพ์ได้)
+    AppState.allModals['hunter-editor'] = new bootstrap.Modal(modalEl, { focus: false });
+    
+    // แสดงผล
     AppState.allModals['hunter-editor'].show();
 }
 
