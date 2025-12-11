@@ -3610,12 +3610,13 @@ async function deleteHunterLevel(levelId) {
 // --- ADMIN: เตรียมแก้ไขด่าน ---
 let editingLevelId = null; // ตัวแปรเก็บ ID ด่านที่กำลังแก้
 
+// --- ADMIN: เตรียมแก้ไขด่าน (ฉบับแก้บั๊กพิมพ์ไม่ได้ 100%) ---
 async function editHunterLevel(levelId) {
     Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading() });
     
     try {
         const res = await callApi(`/api/admin/hunter/level/${levelId}`);
-        const data = res; // { levelId, title, imageUrl, hazards: [] }
+        const data = res; 
 
         // 1. ตั้งค่าตัวแปร
         editingLevelId = levelId;
@@ -3625,18 +3626,16 @@ async function editHunterLevel(levelId) {
             knowledge: h.knowledge
         }));
 
-        // 2. เปิดหน้า Editor
+        // 2. ใส่ข้อมูลลงฟอร์ม
         $('#editor-title').val(data.title);
-        $('#editor-file').val(''); // เคลียร์ input file เพราะเราใช้รูปเดิม
+        $('#editor-file').val(''); 
         $('#editor-preview-img').attr('src', getFullImageUrl(data.imageUrl)).parent().show();
         $('#editor-placeholder').hide();
-        
-        // 3. เปลี่ยนปุ่ม Save ให้รู้ว่ากำลัง Edit
         $('#hunter-editor-modal .modal-title').text('แก้ไขด่าน');
         
-        // 4. เรนเดอร์จุดเดิมที่มีอยู่
+        // 3. เรนเดอร์จุดเดิมบนภาพ
         renderEditorHazards();
-        $('.editor-marker').remove(); // ล้างจุดเก่าหน้าจอ
+        $('.editor-marker').remove(); 
         editorHazards.forEach(h => {
              const marker = $('<div class="editor-marker">!</div>').css({
                 position: 'absolute', left: h.x + '%', top: h.y + '%',
@@ -3647,12 +3646,24 @@ async function editHunterLevel(levelId) {
             $('#editor-area').append(marker);
         });
 
-        // ซ่อนเมนู เปิด Editor
-        $('#hunter-menu-modal').modal('hide');
+        // ⭐⭐⭐ จุดที่แก้ไข: ปิด Modal ก่อนหน้าให้หมด ⭐⭐⭐
+        if(AppState.allModals['hunter-menu']) AppState.allModals['hunter-menu'].hide();
+        if(AppState.allModals['admin-hunter-manage']) AppState.allModals['admin-hunter-manage'].hide();
         Swal.close();
-        if (!AppState.allModals['hunter-editor']) {
-            AppState.allModals['hunter-editor'] = new bootstrap.Modal(document.getElementById('hunter-editor-modal'), {focus:false});
+
+        // ⭐⭐⭐ จุดที่แก้ไข: บังคับสร้าง Modal ใหม่ด้วย { focus: false } ⭐⭐⭐
+        const modalEl = document.getElementById('hunter-editor-modal');
+        
+        // ล้าง instance เก่าทิ้ง (ถ้ามี)
+        if (AppState.allModals['hunter-editor']) {
+            AppState.allModals['hunter-editor'].dispose();
+        } else {
+            const existing = bootstrap.Modal.getInstance(modalEl);
+            if(existing) existing.dispose();
         }
+
+        // สร้างใหม่ เพื่อให้พิมพ์ได้แน่นอน
+        AppState.allModals['hunter-editor'] = new bootstrap.Modal(modalEl, { focus: false });
         AppState.allModals['hunter-editor'].show();
 
     } catch (e) {
