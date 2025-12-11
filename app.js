@@ -3036,44 +3036,58 @@ async function openHunterMenu() {
             return;
         }
 
-        // 4. วนลูปสร้างการ์ดด่าน
+        // 4. วนลูปสร้างการ์ดด่าน (ดีไซน์ใหม่)
         levels.forEach(l => {
-            // ... (โค้ดส่วน Badge ดาว และ Badge โควตา เหมือนเดิม) ...
-            let badge = '<span class="badge bg-warning text-dark">ใหม่</span>';
+            // Logic สถานะ (เหมือนเดิม)
+            let statusBadge = '<span class="badge bg-warning text-dark shadow-sm">🚀 ภารกิจใหม่</span>';
             if (l.isCleared) {
                 let starsHtml = '';
                 for(let i=1; i<=3; i++) {
-                    starsHtml += i <= l.bestStars ? '<i class="fas fa-star text-warning"></i>' : '<i class="far fa-star text-muted"></i>';
+                    starsHtml += i <= l.bestStars ? '<i class="fas fa-star text-warning"></i>' : '<i class="far fa-star text-secondary"></i>';
                 }
-                badge = `<span class="badge bg-light border text-dark">${starsHtml}</span>`;
+                statusBadge = `<span class="badge bg-white text-dark shadow-sm border">${starsHtml}</span>`;
             }
             
-            let quotaBadgeClass = 'bg-info text-dark';
-            if(l.playedCount >= l.maxPlays) quotaBadgeClass = 'bg-secondary';
-            const quotaBadge = `<span class="badge ${quotaBadgeClass} ms-1"><i class="fas fa-history"></i> ${l.playedCount}/${l.maxPlays}</span>`;
-
+            // Logic Quota (เหมือนเดิม)
+            let quotaClass = 'text-white'; 
+            let iconColor = 'text-success';
+            if(l.playedCount >= l.maxPlays) { 
+                quotaClass = 'text-danger'; 
+                iconColor = 'text-danger';
+            }
+            
             const safeTitle = sanitizeHTML(l.title);
             const isLocked = l.playedCount >= l.maxPlays;
-            const cardOpacity = isLocked ? 'opacity: 0.7; filter: grayscale(80%);' : '';
+            const lockedClass = isLocked ? 'locked' : '';
             
-            // ⭐⭐⭐ แก้ตรงนี้: ลบ onclick ออก แล้วใส่ class 'btn-hunter-level' กับ data-attributes แทน ⭐⭐⭐
+            // HTML ใหม่: ใช้ Class mission-card
             list.append(`
                 <div class="col-12 col-md-6">
-                    <div class="card shadow-sm h-100 border-0 overflow-hidden btn-hunter-level" 
+                    <div class="mission-card ${lockedClass} btn-hunter-level" 
                         data-level-id="${l.levelId}"
                         data-image-url="${l.imageUrl}"
                         data-hazards="${l.totalHazards}"
-                        data-locked="${isLocked}"
-                        style="cursor: pointer; ${cardOpacity}">
+                        data-locked="${isLocked}">
                         
-                        <div class="position-relative">
-                            <img src="${getFullImageUrl(l.imageUrl)}" class="card-img-top" style="height: 180px; object-fit: cover;">
-                            <div class="position-absolute top-0 end-0 m-2">${badge}</div>
-                            <div class="position-absolute bottom-0 start-0 m-2">${quotaBadge}</div>
+                        <div class="mission-img-wrapper">
+                            <img src="${getFullImageUrl(l.imageUrl)}" class="mission-img">
+                            <div class="mission-status-badge">${statusBadge}</div>
+                            <div class="mission-quota-badge ${quotaClass}">
+                                <i class="fas fa-ticket-alt ${iconColor} me-1"></i> ${l.playedCount}/${l.maxPlays}
+                            </div>
+                            <div class="mission-overlay">
+                                <h6 class="fw-bold mb-0 text-white text-shadow">${safeTitle}</h6>
+                            </div>
                         </div>
-                        <div class="card-body pb-2">
-                            <h6 class="fw-bold mb-1">${safeTitle}</h6>
-                            <small class="text-muted"><i class="fas fa-bomb me-1"></i> ${l.totalHazards} จุดเสี่ยง</small>
+                        
+                        <div class="p-3 d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="fas fa-crosshairs text-danger me-1"></i> 
+                                เป้าหมาย: <b>${l.totalHazards} จุด</b>
+                            </small>
+                            <button class="btn btn-sm btn-light rounded-circle shadow-sm">
+                                <i class="fas fa-play text-primary"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -3249,11 +3263,10 @@ $(document).on('click', '#hunter-target-img', async function(e) {
                 hunterFound.add(h.hazardId);
                 triggerHaptic('medium');
 
+                // สร้าง Marker (ใช้ Class จาก CSS แล้ว)
                 const marker = $('<div class="hunter-marker"></div>').css({
-                    position: 'absolute', left: h.x + '%', top: h.y + '%',
-                    width: '40px', height: '40px', borderRadius: '50%',
-                    border: '3px solid #00ff00', boxShadow: '0 0 10px #00ff00',
-                    transform: 'translate(-50%, -50%)', zIndex: 10, pointerEvents: 'none'
+                    left: h.x + '%', 
+                    top: h.y + '%'
                 });
                 $('#hunter-game-area').append(marker);
                 $('#hunter-progress').text(`${hunterFound.size} / ${hunterLevelData.total}`);

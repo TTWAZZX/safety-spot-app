@@ -908,25 +908,37 @@
 
     <div class="modal fade" id="hunter-game-modal" data-bs-backdrop="static">
         <div class="modal-dialog modal-fullscreen">
-            <div class="modal-content bg-dark">
-                <div class="d-flex justify-content-between align-items-center p-3 text-white fixed-top" style="background: rgba(0,0,0,0.8); z-index: 1050;">
-                    <div>
-                        <span class="badge bg-danger rounded-pill fs-6">หาจุดเสี่ยง</span>
-                        <span id="hunter-progress" class="ms-2 fw-bold fs-5">0 / 0</span>
-                        <span id="hunter-lives" class="ms-3 fs-4" style="vertical-align: middle;">❤️❤️❤️</span>
-                        
-                        <span id="hunter-timer" class="ms-3 badge bg-warning text-dark fs-6" style="vertical-align: middle; min-width: 60px;">00:00</span>
-                        
+            <div class="modal-content bg-dark position-relative">
+                
+                <div class="hunter-hud-container">
+                    <div class="hunter-capsule">
+                        <i class="fas fa-crosshairs text-danger"></i>
+                        <span id="hunter-progress" class="fw-bold">0 / 0</span>
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-light rounded-circle" data-bs-dismiss="modal"><i class="fas fa-times"></i></button>
+
+                    <div class="hunter-capsule timer" id="hunter-timer-capsule">
+                        <i class="fas fa-stopwatch"></i>
+                        <span id="hunter-timer">00:00</span>
+                    </div>
+
+                    <button type="button" class="btn btn-light rounded-circle shadow" data-bs-dismiss="modal" style="width: 40px; height: 40px; pointer-events: auto;">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
-                <div class="modal-body p-0 d-flex align-items-center justify-content-center" style="overflow: auto;">
-                    <div id="hunter-game-area" style="position: relative; max-width: 100%;">
-                        <img id="hunter-target-img" src="" style="width: 100%; display: block; min-width: 350px;">
+
+                <div style="position: absolute; top: 75px; left: 20px; z-index: 1050; pointer-events: none;">
+                    <span id="hunter-lives" class="fs-4 drop-shadow">❤️❤️❤️</span>
+                </div>
+
+                <div class="modal-body p-0 d-flex align-items-center justify-content-center bg-black" style="overflow: hidden;">
+                    <div id="hunter-game-area" style="position: relative; width: 100%; max-width: 800px;">
+                        <img id="hunter-target-img" src="" style="width: 100%; display: block;">
                     </div>
                 </div>
-                <div class="fixed-bottom p-3 text-center text-white small" style="background: linear-gradient(transparent, rgba(0,0,0,0.9)); pointer-events: none;">
-                    แตะที่ภาพเพื่อระบุจุดอันตราย
+
+                <div class="position-absolute bottom-0 w-100 p-3 text-center pointer-events-none" 
+                    style="background: linear-gradient(transparent, rgba(0,0,0,0.8)); pointer-events: none;">
+                    <small class="text-white opacity-75"><i class="fas fa-hand-pointer me-1 animate__animated animate__pulse animate__infinite"></i> แตะที่ภาพเพื่อระบุจุดเสี่ยง</small>
                 </div>
             </div>
         </div>
