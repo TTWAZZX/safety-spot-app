@@ -3560,30 +3560,6 @@ async function saveHunterLevel() {
     } catch (e) { Swal.fire('Error', e.message, 'error'); }
 }
 
-// ⭐ ตัวดักจับการคลิกการ์ดด่าน Hunter (ปลอดภัยกว่า onclick)
-$(document).on('click', '.btn-hunter-level', function() {
-    // 1. ดึงข้อมูลจาก data-attribute
-    const levelId = $(this).data('level-id');
-    const imageUrl = $(this).data('image-url');
-    const hazards = $(this).data('hazards');
-    const isLocked = $(this).data('locked');
-
-    // 2. ถ้าล็อคอยู่ (เล่นครบ 3 ครั้งแล้ว) ให้แจ้งเตือนและไม่ให้เข้า
-    if (isLocked === true || isLocked === "true") {
-        triggerHaptic('light');
-        Swal.fire({
-            icon: 'info',
-            title: 'สิทธิ์เต็มแล้ว',
-            text: 'คุณใช้โควตาสำหรับด่านนี้ครบแล้วครับ',
-            confirmButtonText: 'ตกลง'
-        });
-        return;
-    }
-
-    // 3. เรียกฟังก์ชันเช็คสิทธิ์และเริ่มเกม
-    checkQuotaAndStart(levelId, imageUrl, hazards);
-});
-
 // --- ADMIN: ลบด่าน ---
 async function deleteHunterLevel(levelId) {
     const result = await Swal.fire({
