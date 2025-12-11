@@ -722,6 +722,9 @@ function bindAdminEventListeners() {
     $('#q-image-input').on('change', function() { handleImagePreview(this, '#q-image-preview'); $('#q-image-preview').show(); });
     // Event Listener สำหรับจัดการการ์ด
     $('#manage-cards-btn').on('click', handleManageCards);
+    // ⭐ เพิ่ม 2 บรรทัดนี้
+    $('#manage-hunter-btn').on('click', handleManageHunterLevels);
+    $('#btn-create-hunter-level').on('click', openHunterEditor); // ใช้ฟังก์ชันเดิมได้เลย    
     $('#add-card-btn').on('click', handleAddCard);
     $('#card-form').on('submit', handleSaveCard);
     $('#card-image-input').on('change', function() { handleImagePreview(this, '#card-image-preview'); $('#card-image-preview').show(); });
@@ -806,6 +809,59 @@ function bindAdminTabEventListeners() {
         const currentQuery = $('#user-search-input').val();
         fetchAdminUsers(1, currentQuery, false);
     });
+}
+
+// --- ADMIN: โหลดหน้ารายการด่าน ---
+async function handleManageHunterLevels() {
+    const list = $('#admin-hunter-list');
+    list.html('<div class="col-12 text-center my-5"><div class="spinner-border text-success"></div></div>');
+    
+    // เปิด Modal ใหม่
+    const modal = new bootstrap.Modal(document.getElementById('admin-hunter-manage-modal'));
+    AppState.allModals['admin-hunter-manage'] = modal;
+    modal.show();
+
+    try {
+        // ดึงข้อมูลด่าน (ใช้ API ตัวเดิมได้เลย)
+        const levels = await callApi('/api/game/hunter/levels', { lineUserId: AppState.lineProfile.userId });
+        list.empty();
+
+        if (levels.length === 0) {
+            list.html('<div class="col-12 text-center text-muted mt-5">ยังไม่มีด่านในระบบ</div>');
+            return;
+        }
+
+        levels.forEach(l => {
+            const safeTitle = sanitizeHTML(l.title);
+            
+            // สร้าง Card สำหรับ Admin (เน้นปุ่มจัดการ)
+            list.append(`
+                <div class="col-12 col-md-6 col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="d-flex">
+                            <img src="${getFullImageUrl(l.imageUrl)}" class="rounded-start" style="width: 120px; height: 120px; object-fit: cover;">
+                            <div class="card-body p-2 d-flex flex-column justify-content-center">
+                                <h6 class="fw-bold mb-1 text-truncate">${safeTitle}</h6>
+                                <small class="text-muted mb-2"><i class="fas fa-bomb text-danger"></i> ${l.totalHazards} จุดเสี่ยง</small>
+                                
+                                <div class="d-flex gap-2 mt-auto">
+                                    <button class="btn btn-sm btn-outline-primary flex-grow-1" onclick="editHunterLevel('${l.levelId}')">
+                                        <i class="fas fa-edit"></i> แก้ไข
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger flex-grow-1" onclick="deleteHunterLevel('${l.levelId}')">
+                                        <i class="fas fa-trash"></i> ลบ
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `);
+        });
+
+    } catch (e) {
+        list.html(`<div class="text-center text-danger">Error: ${e.message}</div>`);
+    }
 }
 
 // แสดงรายชื่อผู้ใช้สำหรับมอบป้ายรางวัล
@@ -2997,22 +3053,6 @@ async function openHunterMenu() {
             if(l.playedCount >= l.maxPlays) quotaBadgeClass = 'bg-secondary';
             const quotaBadge = `<span class="badge ${quotaBadgeClass} ms-1"><i class="fas fa-history"></i> ${l.playedCount}/${l.maxPlays}</span>`;
 
-            // --- 4.3 ส่วน Admin Controls (เพิ่มใหม่) ---
-            let adminControls = '';
-            if (AppState.currentUser && AppState.currentUser.isAdmin) {
-                // event.stopPropagation() สำคัญมาก! กันไม่ให้กดปุ่มแล้วเด้งเข้าเกม
-                adminControls = `
-                    <div class="mt-2 border-top pt-2 d-flex gap-2" style="position: relative; z-index: 10;">
-                        <button class="btn btn-sm btn-outline-primary w-100" onclick="event.stopPropagation(); editHunterLevel('${l.levelId}')">
-                            <i class="fas fa-edit"></i> แก้ไข
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger w-100" onclick="event.stopPropagation(); deleteHunterLevel('${l.levelId}')">
-                            <i class="fas fa-trash"></i> ลบ
-                        </button>
-                    </div>
-                `;
-            }
-
             const safeTitle = sanitizeHTML(l.title);
             const isLocked = l.playedCount >= l.maxPlays;
             const cardOpacity = isLocked ? 'opacity: 0.7; filter: grayscale(80%);' : '';
@@ -3036,7 +3076,6 @@ async function openHunterMenu() {
                             <h6 class="fw-bold mb-1">${safeTitle}</h6>
                             <small class="text-muted"><i class="fas fa-bomb me-1"></i> ${l.totalHazards} จุดเสี่ยง</small>
                             
-                            ${adminControls}
                         </div>
                     </div>
                 </div>
@@ -3369,13 +3408,18 @@ async function handleHunterFail(title, text) {
 
 function openHunterEditor() {
     editorHazards = [];
+    editingLevelId = null; // เคลียร์ ID เพื่อบอกว่าสร้างใหม่
     $('#editor-title').val('');
     $('#editor-file').val(''); 
     $('#editor-preview-img').attr('src', '').parent().hide();
     $('#editor-placeholder').show();
     renderEditorHazards();
+    $('#hunter-editor-modal .modal-title').text('สร้างด่านใหม่');
     
-    $('#hunter-menu-modal').modal('hide');
+    // ⭐ ปิด Modal ก่อนหน้า (ไม่ว่าจะมาจาก Menu หรือ Admin Manage)
+    if(AppState.allModals['hunter-menu']) AppState.allModals['hunter-menu'].hide();
+    if(AppState.allModals['admin-hunter-manage']) AppState.allModals['admin-hunter-manage'].hide();
+    
     if (!AppState.allModals['hunter-editor']) {
         AppState.allModals['hunter-editor'] = new bootstrap.Modal(document.getElementById('hunter-editor-modal'), {focus: false});
     }
@@ -3496,7 +3540,8 @@ async function saveHunterLevel() {
         editingLevelId = null;
         $('#hunter-editor-modal .modal-title').text('สร้างด่านใหม่'); // คืนค่า title
         
-        openHunterMenu();
+        // ⭐ เปลี่ยนจาก openHunterMenu() เป็น:
+        handleManageHunterLevels();
 
     } catch (e) { Swal.fire('Error', e.message, 'error'); }
 }
@@ -3540,7 +3585,8 @@ async function deleteHunterLevel(levelId) {
         try {
             await callApi(`/api/admin/hunter/level/${levelId}`, {}, 'DELETE');
             Swal.fire('เรียบร้อย', 'ลบด่านแล้ว', 'success');
-            openHunterMenu(); // รีโหลดหน้าเมนู
+            // ⭐ เปลี่ยนจาก openHunterMenu() เป็น:
+            handleManageHunterLevels();
         } catch (e) {
             Swal.fire('Error', e.message, 'error');
         }
