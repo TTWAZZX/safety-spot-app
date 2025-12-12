@@ -3629,40 +3629,45 @@ async function deleteHunterLevel(levelId) {
 // --- ADMIN: เตรียมแก้ไขด่าน ---
 let editingLevelId = null; // ตัวแปรเก็บ ID ด่านที่กำลังแก้
 
-// --- ADMIN: เตรียมแก้ไขด่าน (ฉบับสมบูรณ์: รองรับ URL + แก้จุดแดงหาย + แก้พิมพ์ไม่ได้) ---
+// --- ADMIN: เตรียมแก้ไขด่าน (ฉบับ Final: แก้ Console Warning) ---
 async function editHunterLevel(levelId) {
+    // ⭐ 1. แก้บั๊ก Console Warning (สั่งปลด Focus ออกจากปุ่มเดิมทันที)
+    if (document.activeElement) {
+        document.activeElement.blur();
+    }
+
     Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading() });
     
     try {
         const res = await callApi(`/api/admin/hunter/level/${levelId}`);
         const data = res; 
 
-        // 1. ตั้งค่าตัวแปร
+        // 2. ตั้งค่าตัวแปร
         editingLevelId = levelId;
         editorHazards = data.hazards.map(h => ({
             x: h.x, y: h.y, description: h.description, knowledge: h.knowledge
         }));
 
-        // 2. ใส่ข้อมูลลงฟอร์ม
+        // 3. ใส่ข้อมูลลงฟอร์ม
         $('#editor-title').val(data.title);
         
-        // --- ส่วนจัดการรูปภาพ (URL support) ---
+        // จัดการรูปภาพ (รองรับทั้ง Upload และ URL)
         const imgUrl = getFullImageUrl(data.imageUrl);
         $('#editor-preview-img').attr('src', imgUrl).parent().show();
         $('#editor-placeholder').hide();
         
-        $('#editor-file').val(''); // เคลียร์ file input
-        $('#editor-url-text').val(data.imageUrl); // ใส่ URL เดิมในช่อง text เผื่อแก้
-        $('#editor-image-original').val(data.imageUrl); // เก็บค่าเดิมไว้เช็ค
+        $('#editor-file').val(''); 
+        $('#editor-url-text').val(data.imageUrl); 
+        $('#editor-image-original').val(data.imageUrl); 
         
-        // รีเซ็ต Radio กลับไปที่ Upload (หรือจะเปลี่ยน default ตามใจชอบได้)
+        // รีเซ็ต Radio
         $('#hunter-sourceUpload').prop('checked', true).trigger('change');
 
         $('#hunter-editor-modal .modal-title').text('แก้ไขด่าน');
         
-        // ⭐⭐⭐ 3. (จุดสำคัญ) วาดจุดแดงเดิมกลับมาบนรูป (ใส่ Style บังคับให้ขึ้นชัวร์ๆ) ⭐⭐⭐
+        // 4. วาดจุดแดงเดิม
         renderEditorHazards(); 
-        $('.editor-marker').remove(); // ล้างจุดเก่า
+        $('.editor-marker').remove(); 
         
         editorHazards.forEach(h => {
              const marker = $('<div class="editor-marker">!</div>').css({
@@ -3681,14 +3686,14 @@ async function editHunterLevel(levelId) {
             $('#editor-area').append(marker);
         });
 
-        // 4. จัดการ Modal (แก้เรื่องพิมพ์ไม่ได้)
+        // 5. ปิด Modal เก่า
         if(AppState.allModals['hunter-menu']) AppState.allModals['hunter-menu'].hide();
         if(AppState.allModals['admin-hunter-manage']) AppState.allModals['admin-hunter-manage'].hide();
         
         Swal.close();
 
+        // 6. สร้าง Modal ใหม่ (Force Re-create เพื่อแก้ Focus Issue)
         const modalEl = document.getElementById('hunter-editor-modal');
-        // ล้าง Instance เก่าทิ้งเพื่อแก้บั๊ก Focus
         if (AppState.allModals['hunter-editor']) {
             AppState.allModals['hunter-editor'].dispose();
         } else {
@@ -3696,7 +3701,6 @@ async function editHunterLevel(levelId) {
             if(existing) existing.dispose();
         }
 
-        // สร้างใหม่ด้วย focus: false
         AppState.allModals['hunter-editor'] = new bootstrap.Modal(modalEl, { focus: false });
         AppState.allModals['hunter-editor'].show();
 
