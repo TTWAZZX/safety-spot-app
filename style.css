@@ -1736,3 +1736,84 @@ body {
         box-shadow: 0 0 0 0 rgba(0, 255, 0, 0);
     }
 }
+
+/* =========================================
+   🔥 STREAK BADGE ANIMATION (ETERNAL FLAME)
+   ========================================= */
+
+/* กล่องป้ายไฟ */
+.streak-badge-container {
+    background: linear-gradient(135deg, #2c0b0b 0%, #000000 100%);
+    border: 1px solid #ff4500;
+    border-radius: 30px;
+    padding: 5px 12px 5px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 0 15px rgba(255, 69, 0, 0.4);
+    position: relative;
+    overflow: hidden;
+    min-width: 90px;
+    justify-content: center;
+}
+
+/* เอฟเฟกต์แสงวิ่งผ่านป้าย (Shine Effect) */
+.streak-badge-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transform: skewX(-20deg);
+    animation: streak-shine 3s infinite;
+}
+
+/* ไอคอนไฟ (พระเอกของงาน) */
+.streak-fire-icon {
+    font-size: 1.2rem;
+    background: linear-gradient(to top, #ff9000, #ff0000);
+    -webkit-background-clip: text;
+    background-clip: text; /* เพิ่ม standard property */
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 5px rgba(255, 69, 0, 0.8));
+    animation: flame-flicker 1.5s infinite alternate;
+    display: flex;
+    align-items: center;
+}
+
+/* ตัวหนังสือ */
+.streak-text {
+    font-weight: 800;
+    color: #fff;
+    font-family: 'Kanit', sans-serif;
+    text-shadow: 0 0 5px rgba(255, 140, 0, 0.5);
+    font-size: 0.9rem;
+    z-index: 1;
+}
+
+/* --- Keyframes Animations --- */
+
+/* 1. ไฟลุกโชน */
+@keyframes flame-flicker {
+    0% {
+        transform: scale(1) rotate(-5deg);
+        filter: drop-shadow(0 0 2px rgba(255, 69, 0, 0.5));
+    }
+    50% {
+        transform: scale(1.15) rotate(0deg);
+        filter: drop-shadow(0 0 10px rgba(255, 140, 0, 0.9));
+    }
+    100% {
+        transform: scale(1.05) rotate(5deg);
+        filter: drop-shadow(0 0 4px rgba(255, 0, 0, 0.6));
+    }
+}
+
+/* 2. แสงวิ่งวิบวับ */
+@keyframes streak-shine {
+    0% { left: -100%; }
+    20% { left: 200%; }
+    100% { left: 200%; }
+}
