@@ -3629,6 +3629,7 @@ async function deleteHunterLevel(levelId) {
 // --- ADMIN: เตรียมแก้ไขด่าน ---
 let editingLevelId = null; // ตัวแปรเก็บ ID ด่านที่กำลังแก้
 
+// --- ADMIN: เตรียมแก้ไขด่าน (ฉบับสมบูรณ์: รองรับ URL + แก้จุดแดงหาย + แก้พิมพ์ไม่ได้) ---
 async function editHunterLevel(levelId) {
     Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading() });
     
@@ -3636,14 +3637,16 @@ async function editHunterLevel(levelId) {
         const res = await callApi(`/api/admin/hunter/level/${levelId}`);
         const data = res; 
 
+        // 1. ตั้งค่าตัวแปร
         editingLevelId = levelId;
         editorHazards = data.hazards.map(h => ({
             x: h.x, y: h.y, description: h.description, knowledge: h.knowledge
         }));
 
+        // 2. ใส่ข้อมูลลงฟอร์ม
         $('#editor-title').val(data.title);
         
-        // ⭐ จัดการรูปภาพ
+        // --- ส่วนจัดการรูปภาพ (URL support) ---
         const imgUrl = getFullImageUrl(data.imageUrl);
         $('#editor-preview-img').attr('src', imgUrl).parent().show();
         $('#editor-placeholder').hide();
@@ -3652,27 +3655,48 @@ async function editHunterLevel(levelId) {
         $('#editor-url-text').val(data.imageUrl); // ใส่ URL เดิมในช่อง text เผื่อแก้
         $('#editor-image-original').val(data.imageUrl); // เก็บค่าเดิมไว้เช็ค
         
-        // ⭐ รีเซ็ต Radio กลับไปที่ Upload (หรือจะให้เป็น URL ก็ได้ถ้าชอบ)
+        // รีเซ็ต Radio กลับไปที่ Upload (หรือจะเปลี่ยน default ตามใจชอบได้)
         $('#hunter-sourceUpload').prop('checked', true).trigger('change');
 
         $('#hunter-editor-modal .modal-title').text('แก้ไขด่าน');
         
-        renderEditorHazards();
-        $('.editor-marker').remove(); 
+        // ⭐⭐⭐ 3. (จุดสำคัญ) วาดจุดแดงเดิมกลับมาบนรูป (ใส่ Style บังคับให้ขึ้นชัวร์ๆ) ⭐⭐⭐
+        renderEditorHazards(); 
+        $('.editor-marker').remove(); // ล้างจุดเก่า
+        
         editorHazards.forEach(h => {
              const marker = $('<div class="editor-marker">!</div>').css({
-                left: h.x + '%', top: h.y + '%'
+                position: 'absolute', 
+                left: h.x + '%', 
+                top: h.y + '%',
+                width: '30px', height: '30px', 
+                background: 'red', color: 'white', borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                fontWeight: 'bold',
+                transform: 'translate(-50%, -50%)', 
+                pointerEvents: 'none', 
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                zIndex: 10
             });
             $('#editor-area').append(marker);
         });
 
-        // ... (ส่วนปิด/เปิด Modal เหมือนเดิม) ...
+        // 4. จัดการ Modal (แก้เรื่องพิมพ์ไม่ได้)
         if(AppState.allModals['hunter-menu']) AppState.allModals['hunter-menu'].hide();
         if(AppState.allModals['admin-hunter-manage']) AppState.allModals['admin-hunter-manage'].hide();
+        
         Swal.close();
+
         const modalEl = document.getElementById('hunter-editor-modal');
-        if (AppState.allModals['hunter-editor']) AppState.allModals['hunter-editor'].dispose();
-        else { const ex = bootstrap.Modal.getInstance(modalEl); if(ex) ex.dispose(); }
+        // ล้าง Instance เก่าทิ้งเพื่อแก้บั๊ก Focus
+        if (AppState.allModals['hunter-editor']) {
+            AppState.allModals['hunter-editor'].dispose();
+        } else {
+            const existing = bootstrap.Modal.getInstance(modalEl);
+            if(existing) existing.dispose();
+        }
+
+        // สร้างใหม่ด้วย focus: false
         AppState.allModals['hunter-editor'] = new bootstrap.Modal(modalEl, { focus: false });
         AppState.allModals['hunter-editor'].show();
 
