@@ -751,8 +751,6 @@ function bindAdminEventListeners() {
     $(document).on('click', '.user-card', function() { handleViewUserDetails($(this).data('userid')); });
     $(document).on('click', '.badge-toggle-btn', handleToggleBadge);
     // ===== END: Event Listeners for Idea 3 =====
-    
-    // ⭐⭐⭐ วางโค้ดใหม่ตรงนี้ (ต่อท้ายรายการเดิม) ⭐⭐⭐
 
     // --- HUNTER ADMIN: สลับโหมด Upload / URL ---
     $(document).on('change', 'input[name="hunter-img-source"]', function() {
@@ -3441,43 +3439,40 @@ async function handleHunterFail(title, text) {
 // ----------------------------------------------------
 
 function openHunterEditor() {
+    // ⭐ 1. แก้บั๊ก Focus ค้าง (สำคัญมาก)
+    if (document.activeElement) {
+        document.activeElement.blur(); 
+    }
+
     editorHazards = [];
-    editingLevelId = null; // เคลียร์ ID เพื่อบอกว่าสร้างใหม่
+    editingLevelId = null;
+    
+    // รีเซ็ตค่าฟอร์ม
     $('#editor-title').val('');
     $('#editor-file').val(''); 
-    $('#editor-url-text').val(''); // ⭐ รีเซ็ตช่อง URL
-    $('#editor-image-original').val(''); // ⭐ รีเซ็ตค่าเดิม
+    $('#editor-url-text').val(''); // ล้างช่อง URL
+    $('#editor-image-original').val('');
+    $('#hunter-sourceUpload').prop('checked', true).trigger('change'); // กลับไปโหมด Upload
 
     $('#editor-preview-img').attr('src', '').parent().hide();
     $('#editor-placeholder').show();
-    
-    // ⭐ รีเซ็ต Radio กลับไปที่ Upload
-    $('#hunter-sourceUpload').prop('checked', true).trigger('change');
-
     renderEditorHazards();
     $('#hunter-editor-modal .modal-title').text('สร้างด่านใหม่');
     
-    // ปิด Modal อื่นๆ ก่อนหน้า
+    // ปิด Modal อื่นๆ
     if(AppState.allModals['hunter-menu']) AppState.allModals['hunter-menu'].hide();
     if(AppState.allModals['admin-hunter-manage']) AppState.allModals['admin-hunter-manage'].hide();
     
-    // ⭐⭐⭐ แก้ไขตรงนี้: ลบอันเก่าทิ้ง (ถ้ามี) แล้วสร้างใหม่เสมอ เพื่อให้แน่ใจว่าได้ focus: false ชัวร์ๆ ⭐⭐⭐
+    // สร้าง Modal ใหม่แบบไม่เอา Focus (แก้ปัญหาพิมพ์ไม่ได้)
     const modalEl = document.getElementById('hunter-editor-modal');
-    
-    // เช็คว่ามี instance เดิมค้างอยู่ไหม ถ้ามีให้ทำลายทิ้งก่อน
     if (AppState.allModals['hunter-editor']) {
         AppState.allModals['hunter-editor'].dispose();
-        delete AppState.allModals['hunter-editor']; // ลบออกจาก AppState ด้วย
     } else {
-        // กันเหนียว: เช็คจาก DOM โดยตรงเผื่อ AppState ไม่ตรง
         const existingInstance = bootstrap.Modal.getInstance(modalEl);
         if (existingInstance) existingInstance.dispose();
     }
 
-    // สร้างใหม่ด้วย option { focus: false } (หัวใจสำคัญที่ทำให้พิมพ์ได้)
     AppState.allModals['hunter-editor'] = new bootstrap.Modal(modalEl, { focus: false });
-    
-    // แสดงผล
     AppState.allModals['hunter-editor'].show();
 }
 
@@ -3559,29 +3554,20 @@ async function saveHunterLevel() {
     const title = $('#editor-title').val();
     const isEditMode = !!editingLevelId;
     
-    // ⭐ Logic การเลือกรูป
+    // ⭐ ตรวจสอบว่าจะเอารูปจากไหน
     const mode = $('input[name="hunter-img-source"]:checked').val();
     const file = $('#editor-file')[0].files[0];
     const urlText = $('#editor-url-text').val().trim();
     const originalUrl = $('#editor-image-original').val();
 
-    let finalImageUrl = originalUrl; // ค่าตั้งต้น (ใช้รูปเดิม)
+    let finalImageUrl = originalUrl;
 
     if (mode === 'upload') {
-        // ถ้าเลือกโหมดอัปโหลด และมีไฟล์ใหม่
-        if (file) {
-            // (ต้องรออัปโหลดใน try block)
-        } else if (!isEditMode) {
-            // สร้างใหม่แต่ไม่อัปรูป
-            return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาอัปโหลดรูปภาพ', 'warning');
-        }
+        if (!file && !isEditMode) return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาอัปโหลดรูปภาพ', 'warning');
     } else {
         // โหมด URL
-        if (urlText) {
-            finalImageUrl = urlText;
-        } else if (!isEditMode) {
-            return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาใส่ลิงก์รูปภาพ', 'warning');
-        }
+        if (urlText) finalImageUrl = urlText;
+        else if (!isEditMode) return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาใส่ลิงก์รูปภาพ', 'warning');
     }
 
     if (!title || editorHazards.length === 0) {
@@ -3591,7 +3577,7 @@ async function saveHunterLevel() {
     Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading() });
 
     try {
-        // อัปโหลดไฟล์ถ้าจำเป็น
+        // อัปโหลดไฟล์ถ้าเลือกโหมด Upload และมีไฟล์
         if (mode === 'upload' && file) {
             finalImageUrl = await uploadImage(file);
         }
@@ -3611,7 +3597,6 @@ async function saveHunterLevel() {
         
         Swal.fire('สำเร็จ', 'บันทึกข้อมูลเรียบร้อย', 'success');
         AppState.allModals['hunter-editor'].hide();
-        
         editingLevelId = null;
         handleManageHunterLevels();
 
