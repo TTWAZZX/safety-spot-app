@@ -965,7 +965,26 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">รูปภาพ</label>
-                                <input type="file" id="editor-file" class="form-control" accept="image/*">
+                                
+                                <div class="btn-group w-100 mb-2" role="group">
+                                    <input type="radio" class="btn-check" name="hunter-img-source" id="hunter-sourceUpload" value="upload" checked>
+                                    <label class="btn btn-outline-success" for="hunter-sourceUpload"><i class="fas fa-upload me-1"></i> อัปโหลดไฟล์</label>
+
+                                    <input type="radio" class="btn-check" name="hunter-img-source" id="hunter-sourceUrl" value="url">
+                                    <label class="btn btn-outline-primary" for="hunter-sourceUrl"><i class="fas fa-link me-1"></i> ใส่ลิงก์รูป</label>
+                                </div>
+
+                                <div id="hunter-input-group-upload">
+                                    <input type="file" id="editor-file" class="form-control" accept="image/*">
+                                    <div class="form-text small">รองรับไฟล์ .png, .jpg</div>
+                                </div>
+
+                                <div id="hunter-input-group-url" style="display:none;">
+                                    <input type="text" class="form-control" id="editor-url-text" placeholder="https://example.com/image.jpg">
+                                    <div class="form-text small">วางลิงก์รูปภาพโดยตรงจากเว็บอื่น</div>
+                                </div>
+                                
+                                <input type="hidden" id="editor-image-original">
                             </div>
                             <hr>
                             <h6 class="fw-bold">จุดเสี่ยง (<span id="editor-count">0</span>)</h6>

@@ -751,6 +751,29 @@ function bindAdminEventListeners() {
     $(document).on('click', '.user-card', function() { handleViewUserDetails($(this).data('userid')); });
     $(document).on('click', '.badge-toggle-btn', handleToggleBadge);
     // ===== END: Event Listeners for Idea 3 =====
+    
+    // ⭐⭐⭐ วางโค้ดใหม่ตรงนี้ (ต่อท้ายรายการเดิม) ⭐⭐⭐
+
+    // --- HUNTER ADMIN: สลับโหมด Upload / URL ---
+    $(document).on('change', 'input[name="hunter-img-source"]', function() {
+        const mode = $(this).val();
+        if(mode === 'upload') {
+            $('#hunter-input-group-upload').show();
+            $('#hunter-input-group-url').hide();
+        } else {
+            $('#hunter-input-group-upload').hide();
+            $('#hunter-input-group-url').show();
+        }
+    });
+
+    // --- HUNTER ADMIN: พิมพ์ URL แล้วโชว์รูป Preview ทันที ---
+    $(document).on('input', '#editor-url-text', function() {
+        const url = $(this).val().trim();
+        if(url) {
+            $('#editor-preview-img').attr('src', url).parent().show();
+            $('#editor-placeholder').hide();
+        }
+    });
 }
 
 function bindAdminTabEventListeners() {
@@ -3422,8 +3445,15 @@ function openHunterEditor() {
     editingLevelId = null; // เคลียร์ ID เพื่อบอกว่าสร้างใหม่
     $('#editor-title').val('');
     $('#editor-file').val(''); 
+    $('#editor-url-text').val(''); // ⭐ รีเซ็ตช่อง URL
+    $('#editor-image-original').val(''); // ⭐ รีเซ็ตค่าเดิม
+
     $('#editor-preview-img').attr('src', '').parent().hide();
     $('#editor-placeholder').show();
+    
+    // ⭐ รีเซ็ต Radio กลับไปที่ Upload
+    $('#hunter-sourceUpload').prop('checked', true).trigger('change');
+
     renderEditorHazards();
     $('#hunter-editor-modal .modal-title').text('สร้างด่านใหม่');
     
@@ -3525,49 +3555,64 @@ function renderEditorHazards() {
     `));
 }
 
-// แต่เพื่อความชัวร์ แปะทับไปเลยก็ได้ครับ
 async function saveHunterLevel() {
     const title = $('#editor-title').val();
-    
-    // ถ้าแก้ไข รูปภาพไม่จำเป็นต้องใส่ (ใช้รูปเดิม)
-    // แต่ถ้าสร้างใหม่ ต้องมีรูป
-    const file = $('#editor-file')[0].files[0];
     const isEditMode = !!editingLevelId;
+    
+    // ⭐ Logic การเลือกรูป
+    const mode = $('input[name="hunter-img-source"]:checked').val();
+    const file = $('#editor-file')[0].files[0];
+    const urlText = $('#editor-url-text').val().trim();
+    const originalUrl = $('#editor-image-original').val();
+
+    let finalImageUrl = originalUrl; // ค่าตั้งต้น (ใช้รูปเดิม)
+
+    if (mode === 'upload') {
+        // ถ้าเลือกโหมดอัปโหลด และมีไฟล์ใหม่
+        if (file) {
+            // (ต้องรออัปโหลดใน try block)
+        } else if (!isEditMode) {
+            // สร้างใหม่แต่ไม่อัปรูป
+            return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาอัปโหลดรูปภาพ', 'warning');
+        }
+    } else {
+        // โหมด URL
+        if (urlText) {
+            finalImageUrl = urlText;
+        } else if (!isEditMode) {
+            return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาใส่ลิงก์รูปภาพ', 'warning');
+        }
+    }
 
     if (!title || editorHazards.length === 0) {
         return Swal.fire('ข้อมูลไม่ครบ', 'ต้องมีชื่อด่าน และจุดเสี่ยงอย่างน้อย 1 จุด', 'warning');
-    }
-    
-    if (!isEditMode && !file) {
-        return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาอัปโหลดรูปภาพ', 'warning');
     }
 
     Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading() });
 
     try {
-        // ถ้าเป็น Edit Mode ให้เรียก API อัปเดต
+        // อัปโหลดไฟล์ถ้าจำเป็น
+        if (mode === 'upload' && file) {
+            finalImageUrl = await uploadImage(file);
+        }
+
+        const payload = { 
+            title, 
+            imageUrl: finalImageUrl, 
+            hazards: editorHazards 
+        };
+
         if (isEditMode) {
-            await callApi('/api/admin/hunter/level/update', { 
-                levelId: editingLevelId,
-                title, 
-                hazards: editorHazards 
-                // ไม่ส่ง imageUrl ไป เพราะใช้รูปเดิม
-            }, 'POST');
-            
+            payload.levelId = editingLevelId;
+            await callApi('/api/admin/hunter/level/update', payload, 'POST');
         } else {
-            // สร้างใหม่ (Create)
-            const imageUrl = await uploadImage(file);
-            await callApi('/api/admin/hunter/level', { title, imageUrl, hazards: editorHazards }, 'POST');
+            await callApi('/api/admin/hunter/level', payload, 'POST');
         }
         
         Swal.fire('สำเร็จ', 'บันทึกข้อมูลเรียบร้อย', 'success');
         AppState.allModals['hunter-editor'].hide();
         
-        // รีเซ็ตค่า
         editingLevelId = null;
-        $('#hunter-editor-modal .modal-title').text('สร้างด่านใหม่'); // คืนค่า title
-        
-        // ⭐ เปลี่ยนจาก openHunterMenu() เป็น:
         handleManageHunterLevels();
 
     } catch (e) { Swal.fire('Error', e.message, 'error'); }
@@ -3599,7 +3644,6 @@ async function deleteHunterLevel(levelId) {
 // --- ADMIN: เตรียมแก้ไขด่าน ---
 let editingLevelId = null; // ตัวแปรเก็บ ID ด่านที่กำลังแก้
 
-// --- ADMIN: เตรียมแก้ไขด่าน (ฉบับแก้บั๊กพิมพ์ไม่ได้ 100%) ---
 async function editHunterLevel(levelId) {
     Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading() });
     
@@ -3607,51 +3651,43 @@ async function editHunterLevel(levelId) {
         const res = await callApi(`/api/admin/hunter/level/${levelId}`);
         const data = res; 
 
-        // 1. ตั้งค่าตัวแปร
         editingLevelId = levelId;
         editorHazards = data.hazards.map(h => ({
-            x: h.x, y: h.y,
-            description: h.description,
-            knowledge: h.knowledge
+            x: h.x, y: h.y, description: h.description, knowledge: h.knowledge
         }));
 
-        // 2. ใส่ข้อมูลลงฟอร์ม
         $('#editor-title').val(data.title);
-        $('#editor-file').val(''); 
-        $('#editor-preview-img').attr('src', getFullImageUrl(data.imageUrl)).parent().show();
+        
+        // ⭐ จัดการรูปภาพ
+        const imgUrl = getFullImageUrl(data.imageUrl);
+        $('#editor-preview-img').attr('src', imgUrl).parent().show();
         $('#editor-placeholder').hide();
+        
+        $('#editor-file').val(''); // เคลียร์ file input
+        $('#editor-url-text').val(data.imageUrl); // ใส่ URL เดิมในช่อง text เผื่อแก้
+        $('#editor-image-original').val(data.imageUrl); // เก็บค่าเดิมไว้เช็ค
+        
+        // ⭐ รีเซ็ต Radio กลับไปที่ Upload (หรือจะให้เป็น URL ก็ได้ถ้าชอบ)
+        $('#hunter-sourceUpload').prop('checked', true).trigger('change');
+
         $('#hunter-editor-modal .modal-title').text('แก้ไขด่าน');
         
-        // 3. เรนเดอร์จุดเดิมบนภาพ
         renderEditorHazards();
         $('.editor-marker').remove(); 
         editorHazards.forEach(h => {
              const marker = $('<div class="editor-marker">!</div>').css({
-                position: 'absolute', left: h.x + '%', top: h.y + '%',
-                width: '30px', height: '30px', background: 'red', color: 'white', borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold',
-                transform: 'translate(-50%, -50%)', pointerEvents: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                left: h.x + '%', top: h.y + '%'
             });
             $('#editor-area').append(marker);
         });
 
-        // ⭐⭐⭐ จุดที่แก้ไข: ปิด Modal ก่อนหน้าให้หมด ⭐⭐⭐
+        // ... (ส่วนปิด/เปิด Modal เหมือนเดิม) ...
         if(AppState.allModals['hunter-menu']) AppState.allModals['hunter-menu'].hide();
         if(AppState.allModals['admin-hunter-manage']) AppState.allModals['admin-hunter-manage'].hide();
         Swal.close();
-
-        // ⭐⭐⭐ จุดที่แก้ไข: บังคับสร้าง Modal ใหม่ด้วย { focus: false } ⭐⭐⭐
         const modalEl = document.getElementById('hunter-editor-modal');
-        
-        // ล้าง instance เก่าทิ้ง (ถ้ามี)
-        if (AppState.allModals['hunter-editor']) {
-            AppState.allModals['hunter-editor'].dispose();
-        } else {
-            const existing = bootstrap.Modal.getInstance(modalEl);
-            if(existing) existing.dispose();
-        }
-
-        // สร้างใหม่ เพื่อให้พิมพ์ได้แน่นอน
+        if (AppState.allModals['hunter-editor']) AppState.allModals['hunter-editor'].dispose();
+        else { const ex = bootstrap.Modal.getInstance(modalEl); if(ex) ex.dispose(); }
         AppState.allModals['hunter-editor'] = new bootstrap.Modal(modalEl, { focus: false });
         AppState.allModals['hunter-editor'].show();
 
