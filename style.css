@@ -1738,82 +1738,96 @@ body {
 }
 
 /* =========================================
-   🔥 STREAK BADGE ANIMATION (ETERNAL FLAME)
+   🔥 TIKTOK STYLE STREAK (JUICY & BOUNCY)
    ========================================= */
 
-/* กล่องป้ายไฟ */
-.streak-badge-container {
-    background: linear-gradient(135deg, #2c0b0b 0%, #000000 100%);
-    border: 1px solid #ff4500;
-    border-radius: 30px;
-    padding: 5px 12px 5px 10px;
+/* กล่องหลัก */
+.tiktok-streak-badge {
+    background: linear-gradient(135deg, #FF512F 0%, #F09819 100%); /* สีส้ม-เหลือง สไตล์ TikTok/Instagram */
+    border-radius: 50px;
+    padding: 6px 16px 6px 12px;
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    box-shadow: 0 0 15px rgba(255, 69, 0, 0.4);
+    box-shadow: 
+        0 4px 15px rgba(240, 152, 25, 0.4), /* เงาสีส้มฟุ้งๆ */
+        inset 0 2px 5px rgba(255, 255, 255, 0.3); /* แสงเงาด้านในให้ดูนูน */
     position: relative;
-    overflow: hidden;
-    min-width: 90px;
-    justify-content: center;
+    border: 2px solid #ffffff; /* ขอบขาวตัดให้เด่น */
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* เอฟเฟกต์แสงวิ่งผ่านป้าย (Shine Effect) */
-.streak-badge-container::after {
+/* เอฟเฟกต์กดแล้วยุบ */
+.tiktok-streak-badge:active {
+    transform: scale(0.95);
+}
+
+/* ไอคอนไฟ (วงกลมพื้นขาว ไฟสีส้ม) */
+.tiktok-fire {
+    width: 32px;
+    height: 32px;
+    background: #ffffff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: #FF512F; /* สีไฟ */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    animation: tiktok-pop 2s infinite ease-in-out; /* ไฟเต้นตุบๆ */
+}
+
+/* ตัวเลขและหน่วย */
+.tiktok-count {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1;
+}
+
+.tiktok-count span {
+    font-size: 1.2rem;
+    font-weight: 900;
+    font-family: 'Kanit', sans-serif;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    font-style: italic; /* ตัวเอียงเพิ่มความซิ่ง */
+}
+
+.tiktok-count small {
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: 0.05em;
+}
+
+/* --- Animations --- */
+
+/* ไฟเต้นตุบๆ และหมุนนิดๆ */
+@keyframes tiktok-pop {
+    0% { transform: scale(1) rotate(0deg); }
+    15% { transform: scale(1.2) rotate(-10deg); } /* ขยาย + เอียงซ้าย */
+    30% { transform: scale(1.2) rotate(10deg); }  /* ขยาย + เอียงขวา */
+    45% { transform: scale(1.2) rotate(-5deg); }
+    60% { transform: scale(1) rotate(0deg); }     /* กลับที่เดิม */
+    100% { transform: scale(1) rotate(0deg); }    /* พัก */
+}
+
+/* (Optional) เพิ่มแสงวิบวับพาดผ่าน */
+.tiktok-streak-badge::after {
     content: '';
     position: absolute;
     top: 0;
     left: -150%;
     width: 50%;
     height: 100%;
-    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.6), transparent);
     transform: skewX(-20deg);
-    animation: streak-shine 3s infinite;
+    animation: tiktok-shine 4s infinite;
 }
 
-/* ไอคอนไฟ (พระเอกของงาน) */
-.streak-fire-icon {
-    font-size: 1.2rem;
-    background: linear-gradient(to top, #ff9000, #ff0000);
-    -webkit-background-clip: text;
-    background-clip: text; /* เพิ่ม standard property */
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 0 5px rgba(255, 69, 0, 0.8));
-    animation: flame-flicker 1.5s infinite alternate;
-    display: flex;
-    align-items: center;
-}
-
-/* ตัวหนังสือ */
-.streak-text {
-    font-weight: 800;
-    color: #fff;
-    font-family: 'Kanit', sans-serif;
-    text-shadow: 0 0 5px rgba(255, 140, 0, 0.5);
-    font-size: 0.9rem;
-    z-index: 1;
-}
-
-/* --- Keyframes Animations --- */
-
-/* 1. ไฟลุกโชน */
-@keyframes flame-flicker {
-    0% {
-        transform: scale(1) rotate(-5deg);
-        filter: drop-shadow(0 0 2px rgba(255, 69, 0, 0.5));
-    }
-    50% {
-        transform: scale(1.15) rotate(0deg);
-        filter: drop-shadow(0 0 10px rgba(255, 140, 0, 0.9));
-    }
-    100% {
-        transform: scale(1.05) rotate(5deg);
-        filter: drop-shadow(0 0 4px rgba(255, 0, 0, 0.6));
-    }
-}
-
-/* 2. แสงวิ่งวิบวับ */
-@keyframes streak-shine {
-    0% { left: -100%; }
-    20% { left: 200%; }
-    100% { left: 200%; }
+@keyframes tiktok-shine {
+    0% { left: -150%; }
+    10% { left: 150%; } /* วิ่งผ่านเร็วมาก */
+    100% { left: 150%; }
 }
