@@ -2541,7 +2541,7 @@ function startDailyQuiz() {
 
 // 3. ฟังก์ชันหมุนกาชา (Ultra Premium: Card Reveal Style)
 async function pullGacha() {
-    const currentCoins = parseInt($('#coin-display').text()) || 0;
+    const currentCoins = parseInt($('#coin-display').text().replace(/,/g, '')) || 0;
     if (currentCoins < 100) {
         triggerHaptic('heavy');
         return Swal.fire({
@@ -2953,7 +2953,8 @@ async function handleDeleteCard() {
 
 async function exchangeCoinsToScore() {
     // 1. ดึงค่าเหรียญปัจจุบันจากหน้าจอมาเช็คเบื้องต้น
-    const currentCoins = parseInt($('#coin-display').text()) || 0;
+    // ⭐ แก้ตรงนี้: สั่งลบลูกน้ำ (,) ออกก่อนแปลงเป็นตัวเลข
+    const currentCoins = parseInt($('#coin-display').text().replace(/,/g, '')) || 0;
     
     if (currentCoins < 10) {
         return Swal.fire({
