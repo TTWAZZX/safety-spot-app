@@ -2473,32 +2473,33 @@ async function handleToggleQuestion() {
 
 // ===============================================================
 //  UPDATED: loadGameDashboard
-//  (รองรับ Coin Animation + Collection Progress Bar)
+//  (แก้ไข: เพิ่มการคำนวณ Progress Bar ให้หลอดขยับ)
 // ===============================================================
 async function loadGameDashboard() {
     console.log("Loading Game Dashboard...");
     
     const user = AppState.currentUser;
     
-    // 1. ใช้ Animation ตัวเลขวิ่ง แทนการ setText ธรรมดา
-    // (เดิม: $('#coin-display').text(...))
+    // 1. ใช้ Animation ตัวเลขวิ่ง
     animateCoinChange(user.coinBalance || 0);
     
     $('#streak-display').text((user.currentStreak || 0) + " วัน");
 
-    // 2. ดึงข้อมูลการ์ดเพื่อแสดง Mini Collection + Progress Bar
+    // 2. ดึงข้อมูลการ์ด
     try {
         const cards = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
         
-        // --- ส่วนที่เพิ่ม: คำนวณหลอดความคืบหน้า ---
+        // ⭐⭐⭐ ส่วนที่เพิ่ม: คำนวณหลอดความคืบหน้า ⭐⭐⭐
         const totalCards = cards.length; 
         const ownedCount = cards.filter(c => c.isOwned).length;
         
-        // เรียกฟังก์ชันอัปเดตหลอด (ที่อยู่ท้ายไฟล์ app.js)
-        updateCollectionProgressBar(ownedCount, totalCards);
-        // ----------------------------------------
+        // เรียกฟังก์ชันอัปเดตหลอด (ต้องมีฟังก์ชันนี้อยู่ท้ายไฟล์ app.js แล้วนะ)
+        if (typeof updateCollectionProgressBar === 'function') {
+            updateCollectionProgressBar(ownedCount, totalCards);
+        }
+        // ⭐⭐⭐ จบส่วนที่เพิ่ม ⭐⭐⭐
 
-        // แสดงการ์ด 5 ใบแรกที่สะสมได้
+        // แสดงการ์ด 5 ใบแรกที่สะสมได้ (Mini Collection)
         const recentCards = cards.filter(c => c.isOwned).slice(0, 5);
         
         const list = $('#mini-collection-list');
@@ -2509,7 +2510,7 @@ async function loadGameDashboard() {
         } else {
             recentCards.forEach(c => {
                 let borderColor = '#dee2e6';
-                if (c.rarity === 'UR') borderColor = '#ffc107'; // ขอบทองสำหรับ UR
+                if (c.rarity === 'UR') borderColor = '#ffc107'; // ขอบทอง
                 
                 list.append(`
                     <img src="${getFullImageUrl(c.imageUrl)}" class="rounded border bg-white" 
@@ -3956,12 +3957,12 @@ function animateCoinChange(newBalance) {
     window.requestAnimationFrame(step);
 }
 
-// 2. ฟังก์ชันอัปเดตหลอดความคืบหน้า (Progress Bar)
-// (ต้องเรียกใช้ฟังก์ชันนี้ตอนโหลดข้อมูล User เสร็จ)
+// ฟังก์ชันอัปเดตหลอด (ต้องมีตัวนี้วางไว้ท้ายไฟล์ app.js)
 function updateCollectionProgressBar(ownedCount, totalCount) {
     if (totalCount === 0) return;
     const percentage = Math.round((ownedCount / totalCount) * 100);
     
+    // อัปเดตข้อความและหลอด
     $('#collection-progress-text').text(`${ownedCount} / ${totalCount} ใบ (${percentage}%)`);
     $('#collection-progress-bar').css('width', `${percentage}%`);
 }
