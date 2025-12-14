@@ -16,6 +16,7 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const cron = require('node-cron'); // เพิ่มบรรทัดนี้ต่อจาก require อื่นๆ
 
 // -----------------------------
 //   CORS
@@ -1649,12 +1650,19 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
     } finally { conn.release(); }
 });
 
-// --- API: หมุนกาชา (ใช้ Coin แลกของ) ---
-// --- API: หมุนกาชา (ฉบับอัปเดต: ใช้ safety_cards) ---
+// --- API: หมุนกาชา (ฉบับอัปเดต: มี Bonus Coin Cashback) ---
 app.post('/api/game/gacha-pull', async (req, res) => {
     const { lineUserId } = req.body;
     const GACHA_COST = 100; // ค่าหมุน 100 เหรียญ
     const conn = await db.getClient();
+
+    // ⭐ กำหนดเรทเงินคืนตามระดับ (Cashback)
+    const BONUS_RATES = {
+        'C': 5,    // ปลอบใจ
+        'R': 10,   // คืนทุน 10%
+        'SR': 50,  // คืนทุน 50%
+        'UR': 200  // กำไร! (ได้การ์ดแถมได้เงินเพิ่ม)
+    };
 
     try {
         await conn.beginTransaction();
@@ -1663,57 +1671,53 @@ app.post('/api/game/gacha-pull', async (req, res) => {
         const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
         if (user.coinBalance < GACHA_COST) throw new Error("เหรียญไม่พอครับ (ต้องการ 100 เหรียญ)");
 
-        // 2. หักเงิน
-        await conn.query("UPDATE users SET coinBalance = coinBalance - ? WHERE lineUserId = ?", [GACHA_COST, lineUserId]);
-
-        // 3. สุ่มการ์ด (แยกตาม Rarity)
+        // 2. สุ่มการ์ด (แยกตาม Rarity)
         const rand = Math.random() * 100;
-        let rarityPool = ['C']; // Default
-        if (rand < 5) rarityPool = ['UR'];        // 5% (0-4)
-        else if (rand < 20) rarityPool = ['SR'];  // 15% (5-19)
-        else if (rand < 50) rarityPool = ['R'];   // 30% (20-49)
-        else rarityPool = ['C'];                  // 50% (50-99)
+        let rarityPool = ['C']; 
+        if (rand < 5) rarityPool = ['UR'];        // 5%
+        else if (rand < 20) rarityPool = ['SR'];  // 15%
+        else if (rand < 50) rarityPool = ['R'];   // 30%
+        else rarityPool = ['C'];                  // 50%
 
-        // ดึงการ์ดสุ่มจาก Rarity ที่ได้ จากตาราง safety_cards
         const [cards] = await conn.query("SELECT * FROM safety_cards WHERE rarity IN (?) ORDER BY RAND() LIMIT 1", [rarityPool]);
         
         let card;
         if (cards.length > 0) {
             card = cards[0];
         } else {
-            // กันเหนียว: ถ้าไม่มีการ์ดใน Rarity นั้น ให้สุ่มมั่วๆ มาใบหนึ่งจากทั้งหมด
             const [backup] = await conn.query("SELECT * FROM safety_cards ORDER BY RAND() LIMIT 1");
             if (backup.length === 0) throw new Error("ระบบยังไม่มีข้อมูลการ์ด");
             card = backup[0];
         }
 
-        // 4. บันทึกว่าได้การ์ด (Insert ลง user_cards แทน user_badges)
+        // ⭐ 3. คำนวณเงินสุทธิ (ลบค่าสุ่ม + บวกโบนัสที่ซ่อนในการ์ด)
+        const bonusCoins = BONUS_RATES[card.rarity] || 5;
+        const netChange = -GACHA_COST + bonusCoins;
+
+        // อัปเดตเงิน
+        await conn.query("UPDATE users SET coinBalance = coinBalance + ? WHERE lineUserId = ?", [netChange, lineUserId]);
+
+        // 4. บันทึกการได้การ์ด
         await conn.query("INSERT INTO user_cards (lineUserId, cardId) VALUES (?, ?)", [lineUserId, card.cardId]);
 
-        // ==========================================
-        // ✨ เพิ่มแจ้งเตือน: ได้การ์ดใหม่ ✨
-        // ==========================================
+        // 5. แจ้งเตือน
         await conn.query(
-            `INSERT INTO notifications 
-            (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
-             VALUES (?, ?, ?, 'game_gacha', ?, ?, NOW())`,
-            [
-                "NOTIF" + uuidv4(),
-                lineUserId,
-                `คุณได้รับ Safety Card ระดับ ${card.rarity || 'ทั่วไป'}: "${card.cardName}" จากตู้กาชา`,
-                card.cardId, // relatedItemId (เก็บ ID การ์ดที่ได้)
-                lineUserId
-            ]
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt) VALUES (?, ?, ?, 'game_gacha', ?, ?, NOW())`,
+            ["NOTIF" + uuidv4(), lineUserId, `ได้รับการ์ด ${card.rarity}: "${card.cardName}" พร้อมเหรียญโบนัส ${bonusCoins} เหรียญ!`, card.cardId, lineUserId]
         );
+
+        // ดึงยอดเงินล่าสุด
+        const [[updatedUser]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
 
         await conn.commit();
         
-        // ส่งข้อมูลกลับ (Mapping ชื่อให้ Frontend เข้าใจง่าย โดยส่ง badgeName ไปด้วยเผื่อ Frontend เดิมใช้ชื่อนี้)
+        // ส่งข้อมูลกลับ (เพิ่ม bonusCoins ไปบอกหน้าบ้าน)
         res.json({ 
             status: "success", 
             data: { 
                 badge: { ...card, badgeName: card.cardName }, 
-                remainingCoins: user.coinBalance - GACHA_COST 
+                remainingCoins: updatedUser.coinBalance,
+                bonusCoins: bonusCoins // ส่งค่านี้ไปโชว์
             } 
         });
 
@@ -2278,6 +2282,160 @@ app.post('/api/game/hunter/fail', async (req, res) => {
     } finally {
         conn.release();
     }
+});
+
+const axios = require('axios'); // ต้องมีบรรทัดนี้ด้านบนสุด ถ้าไม่มีให้ npm install axios
+
+// --- API: Admin กดปุ่มแจ้งเตือนเอง (Manual) ---
+app.post('/api/admin/remind-streaks', isAdmin, async (req, res) => {
+    // เรียกใช้ฟังก์ชันเดียวกับ Auto เลย
+    const result = await broadcastStreakReminders();
+
+    if (result.success) {
+        res.json({ status: "success", message: result.message });
+    } else {
+        res.status(500).json({ status: "error", message: result.message });
+    }
+});
+
+// ==========================================
+// 🕹️ GAME MONITOR API (สำหรับ Admin)
+// ==========================================
+
+// 1. ดึงคนเล่น KYT วันนี้
+app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT u.fullName, u.employeeId, u.pictureUrl, h.isCorrect, h.earnedPoints
+            FROM user_game_history h
+            JOIN users u ON h.lineUserId = u.lineUserId
+            WHERE h.playedAt = CURDATE()
+            ORDER BY h.id DESC
+        `); // สมมติว่ามี id เป็น auto_increment ถ้าไม่มีอาจจะเรียงตามลำดับไม่ได้เป๊ะ
+        res.json({ status: "success", data: rows });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// 2. ดึงประวัติการผ่านด่าน Hunter ล่าสุด
+app.get('/api/admin/monitor/hunter', isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT u.fullName, u.pictureUrl, l.title, h.stars, h.clearedAt
+            FROM user_hunter_history h
+            JOIN users u ON h.lineUserId = u.lineUserId
+            JOIN hunter_levels l ON h.levelId = l.levelId
+            ORDER BY h.clearedAt DESC
+            LIMIT 50
+        `);
+        res.json({ status: "success", data: rows });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// 3. ดูอันดับ Streak (ไฟต่อเนื่อง)
+app.get('/api/admin/monitor/streaks', isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT u.fullName, u.pictureUrl, u.employeeId, s.currentStreak, s.lastPlayedDate
+            FROM user_streaks s
+            JOIN users u ON s.lineUserId = u.lineUserId
+            ORDER BY s.currentStreak DESC
+            LIMIT 100
+        `);
+        res.json({ status: "success", data: rows });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// --- ฟังก์ชันกลาง: ส่งแจ้งเตือน Streak (ใช้ร่วมกันทั้ง Auto และ Manual) ---
+async function broadcastStreakReminders() {
+    const conn = await db.getClient();
+    console.log(`[${new Date().toLocaleString()}] เริ่มต้นกระบวนการแจ้งเตือน Streak...`);
+
+    try {
+        // 1. หาคนที่เคยมี Streak แต่ยังไม่เล่นวันนี้
+        const [users] = await conn.query(`
+            SELECT lineUserId, currentStreak 
+            FROM user_streaks 
+            WHERE currentStreak > 0 
+              AND lastPlayedDate < CURDATE()
+        `);
+
+        if (users.length === 0) {
+            console.log("ไม่มีผู้ใช้ที่ต้องแจ้งเตือน");
+            return { success: true, count: 0, message: "ทุกคนเล่นครบแล้ว" };
+        }
+
+        const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+        if (!token) throw new Error("ไม่พบ LINE Channel Access Token");
+
+        let sentCount = 0;
+        // 2. วนลูปส่ง
+        for (const u of users) {
+            try {
+                const message = {
+                    to: u.lineUserId,
+                    messages: [{
+                        type: "flex",
+                        altText: "🔥 ระวังไฟดับ! เข้ามาเติมด่วน",
+                        contents: {
+                            type: "bubble",
+                            body: {
+                                type: "box",
+                                layout: "vertical",
+                                contents: [
+                                    { type: "text", text: "🔥 ระวังไฟดับ!", weight: "bold", size: "xl", color: "#ff5500" },
+                                    { type: "text", text: `คุณรักษาสถิติมา ${u.currentStreak} วันแล้ว`, size: "md", color: "#555555", margin: "md" },
+                                    { type: "text", text: "รีบเล่น Daily Quiz ก่อนเที่ยงคืนเพื่อรักษาสถิติ!", size: "sm", color: "#aaaaaa", wrap: true, margin: "sm" }
+                                ]
+                            },
+                            footer: {
+                                type: "box",
+                                layout: "vertical",
+                                contents: [
+                                    {
+                                        type: "button",
+                                        action: { type: "uri", label: "เข้าเกมทันที 🎮", uri: "https://liff.line.me/2007053300-9xLKdwZp" },
+                                        style: "primary",
+                                        color: "#06C755"
+                                    }
+                                ]
+                            }
+                        }
+                    }]
+                };
+
+                await axios.post('https://api.line.me/v2/bot/message/push', message, {
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+                });
+                sentCount++;
+            } catch (err) {
+                console.error(`ส่งหา ${u.lineUserId} ไม่สำเร็จ:`, err.message);
+            }
+        }
+
+        console.log(`ส่งแจ้งเตือนสำเร็จ ${sentCount} คน`);
+        return { success: true, count: sentCount, message: `ส่งสำเร็จ ${sentCount} คน` };
+
+    } catch (e) {
+        console.error("Broadcast Error:", e);
+        return { success: false, message: e.message };
+    } finally {
+        conn.release();
+    }
+}
+
+// --- ตั้งเวลา Auto (Cron Job) ---
+// รูปแบบเวลา: 'นาที ชั่วโมง * * *'
+// '0 12,15 * * *' แปลว่า: นาทีที่ 0 ของชั่วโมงที่ 12 และ 15 (เที่ยงตรง และ บ่ายสามโมงตรง)
+cron.schedule('0 12,15 * * *', async () => {
+    console.log(`[${new Date().toLocaleString()}] ⏰ ถึงเวลาแจ้งเตือนอัตโนมัติ (รอบ 12:00 / 15:00)...`);
+    
+    // เรียกฟังก์ชันแจ้งเตือน
+    const result = await broadcastStreakReminders();
+    console.log(`ผลการทำงาน: ${result.message}`);
+    
+}, {
+    scheduled: true,
+    timezone: "Asia/Bangkok" // สำคัญมาก! ต้องระบุเพื่อให้ตรงกับเวลาไทย
 });
 
 // ======================================================
