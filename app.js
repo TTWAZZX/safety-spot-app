@@ -749,6 +749,16 @@ function bindAdminEventListeners() {
             }
         }
     });
+    // --- ปุ่มทดสอบแจ้งเตือน (ส่งหาตัวเอง) ---
+    $('#btn-test-remind').on('click', async function() {
+        Swal.fire({ title: 'กำลังทดสอบ...', didOpen: () => Swal.showLoading() });
+        try {
+            const res = await callApi('/api/admin/test-remind-self', {}, 'POST');
+            Swal.fire('สำเร็จ', res.message, 'success');
+        } catch (e) {
+            Swal.fire('Error', e.message, 'error');
+        }
+    });
 
     // Event Listener (วางไว้ใน bindAdminEventListeners หรือ document.ready)
     $(document).on('click', '.btn-edit-question', handleEditQuestion);

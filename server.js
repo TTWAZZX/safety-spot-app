@@ -2302,6 +2302,60 @@ app.post('/api/admin/remind-streaks', isAdmin, async (req, res) => {
     }
 });
 
+// --- API: ทดสอบส่งแจ้งเตือนหาตัวเอง (Admin Only) ---
+app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
+    const { requesterId } = req.body; // ไอดีของแอดมินที่กดปุ่ม
+    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+
+    try {
+        if (!token) throw new Error("ไม่พบ LINE Channel Access Token");
+
+        // สร้างข้อความ (Mock Data: สมมติว่ามี Streak 5 วัน เพื่อดูตัวอย่าง)
+        const message = {
+            to: requesterId,
+            messages: [{
+                type: "flex",
+                altText: "[TEST] 🔥 ระวังไฟดับ! เข้ามาเติมด่วน",
+                contents: {
+                    type: "bubble",
+                    body: {
+                        type: "box",
+                        layout: "vertical",
+                        contents: [
+                            { type: "text", text: "🔥 [TEST] ระวังไฟดับ!", weight: "bold", size: "xl", color: "#ff5500" },
+                            { type: "text", text: `คุณรักษาสถิติมา 5 วันแล้ว (ตัวอย่าง)`, size: "md", color: "#555555", margin: "md" },
+                            { type: "text", text: "รีบเล่น Daily Quiz ก่อนเที่ยงคืนเพื่อรักษาสถิติ!", size: "sm", color: "#aaaaaa", wrap: true, margin: "sm" }
+                        ]
+                    },
+                    footer: {
+                        type: "box",
+                        layout: "vertical",
+                        contents: [
+                            {
+                                type: "button",
+                                action: { type: "uri", label: "เข้าเกมทันที 🎮", uri: "https://liff.line.me/2007053300-9xLKdwZp" },
+                                style: "primary",
+                                color: "#06C755"
+                            }
+                        ]
+                    }
+                }
+            }]
+        };
+
+        // ยิงเข้าไลน์แอดมินคนเดียว
+        await axios.post('https://api.line.me/v2/bot/message/push', message, {
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+        });
+
+        res.json({ status: "success", data: { message: "ส่งข้อความทดสอบสำเร็จ! เช็คไลน์ของคุณได้เลย" } });
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
 // ==========================================
 // 🕹️ GAME MONITOR API (Fixed & Updated)
 // ==========================================
