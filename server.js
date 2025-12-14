@@ -1658,10 +1658,10 @@ app.post('/api/game/gacha-pull', async (req, res) => {
 
     // ⭐ กำหนดเรทเงินคืนตามระดับ (Cashback)
     const BONUS_RATES = {
-        'C': 5,    // ปลอบใจ
-        'R': 10,   // คืนทุน 10%
-        'SR': 50,  // คืนทุน 50%
-        'UR': 200  // กำไร! (ได้การ์ดแถมได้เงินเพิ่ม)
+        'C': 20,    // ปลอบใจ
+        'R': 40,   // คืนทุน 10%
+        'SR': 80,  // คืนทุน 50%
+        'UR': 100  // กำไร! (ได้การ์ดแถมได้เงินเพิ่ม)
     };
 
     try {
@@ -2290,9 +2290,13 @@ const axios = require('axios'); // ต้องมีบรรทัดนี้
 app.post('/api/admin/remind-streaks', isAdmin, async (req, res) => {
     // เรียกใช้ฟังก์ชันเดียวกับ Auto เลย
     const result = await broadcastStreakReminders();
-
+    
     if (result.success) {
-        res.json({ status: "success", message: result.message });
+        // ⭐⭐⭐ แก้ตรงนี้: ต้องห่อ message ไว้ใน data เพื่อให้ callApi รับค่าได้ถูกต้อง ⭐⭐⭐
+        res.json({ 
+            status: "success", 
+            data: { message: result.message } 
+        });
     } else {
         res.status(500).json({ status: "error", message: result.message });
     }
