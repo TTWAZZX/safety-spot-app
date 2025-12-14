@@ -2471,43 +2471,58 @@ async function handleToggleQuestion() {
 //  GAME DASHBOARD & GACHA LOGIC (NEW V.2)
 // ===============================================================
 
-// 1. โหลดข้อมูล Dashboard หน้าเกม (Coin & Streak)
+// ===============================================================
+//  UPDATED: loadGameDashboard
+//  (รองรับ Coin Animation + Collection Progress Bar)
+// ===============================================================
 async function loadGameDashboard() {
     console.log("Loading Game Dashboard...");
     
-    // โหลดจำนวนเหรียญ (ถ้าใน User Profile ยังไม่มี field coin ให้ใช้คะแนนแทนไปก่อน หรือแก้ Backend)
-    // สมมติว่า Backend ส่ง coinBalance มากับ profile แล้ว
-    const user = AppState.currentUser; 
+    const user = AppState.currentUser;
     
-    // *หมายเหตุ: ถ้า Backend ยังไม่แก้ ให้ใช้ Dummy data ไปก่อนเพื่อดูผลลัพธ์ UI
-    const coins = user.coinBalance !== undefined ? user.coinBalance : 0; 
-    const streak = user.currentStreak !== undefined ? user.currentStreak : 0;
+    // 1. ใช้ Animation ตัวเลขวิ่ง แทนการ setText ธรรมดา
+    // (เดิม: $('#coin-display').text(...))
+    animateCoinChange(user.coinBalance || 0);
+    
+    $('#streak-display').text((user.currentStreak || 0) + " วัน");
 
-    $('#coin-display').text(coins);
-    $('#streak-display').text(streak + " วัน");
-
-    // โหลด Mini Collection (การ์ด 5 ใบล่าสุด)
+    // 2. ดึงข้อมูลการ์ดเพื่อแสดง Mini Collection + Progress Bar
     try {
-        const badges = await callApi('/api/user/badges', { lineUserId: AppState.lineProfile.userId });
-        const recentBadges = badges.filter(b => b.isEarned).slice(0, 5); // เอา 5 ใบแรกที่ได้
+        const cards = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
+        
+        // --- ส่วนที่เพิ่ม: คำนวณหลอดความคืบหน้า ---
+        const totalCards = cards.length; 
+        const ownedCount = cards.filter(c => c.isOwned).length;
+        
+        // เรียกฟังก์ชันอัปเดตหลอด (ที่อยู่ท้ายไฟล์ app.js)
+        updateCollectionProgressBar(ownedCount, totalCards);
+        // ----------------------------------------
+
+        // แสดงการ์ด 5 ใบแรกที่สะสมได้
+        const recentCards = cards.filter(c => c.isOwned).slice(0, 5);
         
         const list = $('#mini-collection-list');
         list.empty();
         
-        if(recentBadges.length === 0) {
+        if(recentCards.length === 0) {
             list.html('<div class="text-muted small p-2">ยังไม่มีการ์ด</div>');
         } else {
-            recentBadges.forEach(b => {
+            recentCards.forEach(c => {
+                let borderColor = '#dee2e6';
+                if (c.rarity === 'UR') borderColor = '#ffc107'; // ขอบทองสำหรับ UR
+                
                 list.append(`
-                    <img src="${getFullImageUrl(b.img)}" class="rounded border bg-white" 
-                         style="width: 50px; height: 50px; object-fit: cover;" 
-                         data-bs-toggle="tooltip" title="${b.name}">
+                    <img src="${getFullImageUrl(c.imageUrl)}" class="rounded border bg-white" 
+                         style="width: 50px; height: 50px; object-fit: cover; border-color: ${borderColor} !important;" 
+                         data-bs-toggle="tooltip" title="${c.cardName}">
                 `);
             });
+            
+            // Activate Tooltip
+            const tooltips = list.find('[data-bs-toggle="tooltip"]');
+            [...tooltips].map(el => new bootstrap.Tooltip(el));
         }
-    } catch (e) {
-        console.error("Load mini collection error:", e);
-    }
+    } catch (e) { console.error(e); }
 }
 
 // 2. ฟังก์ชันเริ่ม Quiz (ผูกกับปุ่ม "เริ่มเล่นเลย")
@@ -3907,3 +3922,46 @@ $(document).on('click', '.btn-hunter-level', function() {
     // 3. เรียกฟังก์ชันเช็คสิทธิ์และเริ่มเกม
     checkQuotaAndStart(levelId, imageUrl, hazards);
 });
+
+// =========================================
+// ✨ UI/UX HELPER FUNCTIONS
+// =========================================
+
+// 1. ฟังก์ชันทำตัวเลขวิ่ง (Coin Counter Animation)
+function animateCoinChange(newBalance) {
+    const coinElement = $('#coin-display');
+    // ดึงค่าเก่ามา (ถ้าไม่มีให้เป็น 0)
+    const startValue = parseInt(coinElement.text().replace(/,/g, '')) || 0;
+    const endValue = newBalance;
+    const duration = 1500; // ระยะเวลาวิ่ง (ms)
+    
+    if (startValue === endValue) return;
+
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        // คำนวณค่าปัจจุบัน based on progress
+        const currentValue = Math.floor(progress * (endValue - startValue) + startValue);
+        // อัปเดตหน้าจอ พร้อมใส่ลูกน้ำ
+        coinElement.text(currentValue.toLocaleString());
+        
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        } else {
+            // จบการทำงาน: เซ็ตค่าสุดท้ายให้เป๊ะ
+             coinElement.text(endValue.toLocaleString());
+        }
+    };
+    window.requestAnimationFrame(step);
+}
+
+// 2. ฟังก์ชันอัปเดตหลอดความคืบหน้า (Progress Bar)
+// (ต้องเรียกใช้ฟังก์ชันนี้ตอนโหลดข้อมูล User เสร็จ)
+function updateCollectionProgressBar(ownedCount, totalCount) {
+    if (totalCount === 0) return;
+    const percentage = Math.round((ownedCount / totalCount) * 100);
+    
+    $('#collection-progress-text').text(`${ownedCount} / ${totalCount} ใบ (${percentage}%)`);
+    $('#collection-progress-bar').css('width', `${percentage}%`);
+}

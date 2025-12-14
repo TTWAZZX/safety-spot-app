@@ -67,6 +67,11 @@
             </div>
 
             <div id="game-page" class="page">
+                <div class="living-bg">
+                    <div class="floating-shape shape-1"></div>
+                    <div class="floating-shape shape-2"></div>
+                    <div class="floating-shape shape-3"></div>
+                </div>
 
                 <!-- HERO LOBBY (DARK GLOW) -->
                 <section class="game-hero-dark">
@@ -137,15 +142,31 @@
 
                 <!-- MINI COLLECTION -->
                 <section class="game-section mt-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2 px-1">
-                        <small class="text-muted fw-bold text-uppercase">Collection</small>
-                        <a href="#" class="text-decoration-none small fw-bold" onclick="openCardAlbum()">ดูทั้งหมด</a>
+                    
+                    <div class="d-flex justify-content-between align-items-end mb-1 px-1">
+                        <div class="d-flex align-items-center">
+                            <small class="text-muted fw-bold text-uppercase" style="letter-spacing: 1px;">Collection</small>
+                            <a href="#" class="ms-2 text-decoration-none small text-muted" style="font-size: 0.7em;" onclick="openCardAlbum()">
+                                ดูทั้งหมด <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </div>
+                        <small id="collection-progress-text" class="text-primary fw-bold" style="font-size: 0.75rem;">
+                            กำลังโหลด...
+                        </small>
                     </div>
+
+                    <div class="progress bg-white shadow-sm" style="height: 6px; margin-bottom: 12px; border-radius: 10px;">
+                        <div id="collection-progress-bar" class="progress-bar" role="progressbar" 
+                             style="background-color: #06C755; width: 0%; border-radius: 10px; transition: width 0.6s ease;">
+                        </div>
+                    </div>
+
                     <div class="mini-collection-card">
                         <div class="mini-collection-list" id="mini-collection-list">
                             <div class="text-center w-100 text-muted small py-2">Loading...</div>
                         </div>
                     </div>
+
                 </section>
 
                 <!-- GAME MODES -->
