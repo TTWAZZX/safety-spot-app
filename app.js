@@ -794,137 +794,95 @@ function bindAdminEventListeners() {
         }
     });
 
-    // --- GAME MONITOR LOGIC ---
+    // --- GAME MONITOR LOGIC (Complete Fixed Version) ---
 
-    // 1. ผูกปุ่มเปิด Modal
+    // ผูกปุ่มและแท็บ
     $(document).on('click', '#btn-game-monitor', function() {
         const modal = new bootstrap.Modal(document.getElementById('admin-monitor-modal'));
         modal.show();
-        loadKytMonitor(); // โหลดหน้าแรกก่อน
+        loadKytMonitor();
     });
 
-    // 2. ผูก Tab ให้โหลดข้อมูลเมื่อกด
     $('button[data-bs-target="#tab-kyt"]').on('shown.bs.tab', loadKytMonitor);
     $('button[data-bs-target="#tab-hunter"]').on('shown.bs.tab', loadHunterMonitor);
     $('button[data-bs-target="#tab-streak"]').on('shown.bs.tab', loadStreakMonitor);
-    $('button[data-bs-target="#tab-coins"]').on('shown.bs.tab', loadCoinMonitor);
+    $('button[data-bs-target="#tab-coins"]').on('shown.bs.tab', loadCoinMonitor); // ⭐ เพิ่มแท็บเหรียญ
 
-    // --- Functions โหลดข้อมูลแต่ละ Tab ---
-
+    // Function 1: KYT
     async function loadKytMonitor() {
         const list = $('#monitor-kyt-list');
         list.html('<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>');
-        
         try {
             const data = await callApi('/api/admin/monitor/kyt');
             list.empty();
-            
-            if (data.length === 0) {
-                list.html('<div class="text-center text-muted mt-4">วันนี้ยังไม่มีใครเล่น KYT</div>');
-                return;
-            }
+            if (data.length === 0) { list.html('<div class="text-center text-muted mt-4">วันนี้ยังไม่มีใครเล่น KYT</div>'); return; }
 
-            // Header สรุป
-            list.append(`<div class="list-group-item bg-success text-white fw-bold">
-                <i class="fas fa-users me-2"></i> เล่นแล้ววันนี้: ${data.length} คน
-            </div>`);
+            list.append(`<div class="list-group-item bg-success text-white fw-bold"><i class="fas fa-users me-2"></i> เล่นแล้ววันนี้: ${data.length} คน</div>`);
 
             data.forEach(u => {
-                const status = u.isCorrect 
-                    ? '<span class="badge bg-success">ถูกต้อง</span>' 
-                    : '<span class="badge bg-danger">ผิด</span>';
-                
+                const status = u.isCorrect ? '<span class="badge bg-success">ถูกต้อง</span>' : '<span class="badge bg-danger">ผิด</span>';
                 list.append(`
                     <div class="list-group-item d-flex align-items-center">
-                        <img src="${u.pictureUrl || 'https://placehold.co/40'}" class="rounded-circle me-3" width="40" height="40">
-                        <div class="flex-grow-1">
-                            <div class="fw-bold">${u.fullName}</div>
-                            <small class="text-muted">รหัส: ${u.employeeId}</small>
-                        </div>
-                        <div class="text-end">
-                            ${status}<br>
-                            <small class="text-muted">+${u.earnedPoints} คะแนน</small>
-                        </div>
+                        <img src="${u.pictureUrl || ''}" onerror="this.src='https://placehold.co/40?text=User'" class="rounded-circle me-3" width="40" height="40">
+                        <div class="flex-grow-1"><div class="fw-bold">${u.fullName}</div><small class="text-muted">รหัส: ${u.employeeId}</small></div>
+                        <div class="text-end">${status}<br><small class="text-muted">+${u.earnedPoints} คะแนน</small></div>
                     </div>
                 `);
             });
         } catch (e) { list.html(`<div class="text-danger p-3">${e.message}</div>`); }
     }
 
+    // Function 2: Hunter
     async function loadHunterMonitor() {
         const list = $('#monitor-hunter-list');
         list.html('<div class="text-center py-4"><div class="spinner-border text-danger"></div></div>');
-        
         try {
             const data = await callApi('/api/admin/monitor/hunter');
             list.empty();
-            
-            if (data.length === 0) {
-                list.html('<div class="text-center text-muted mt-4">ยังไม่มีข้อมูลการเล่น Hunter</div>');
-                return;
-            }
+            if (data.length === 0) { list.html('<div class="text-center text-muted mt-4">ยังไม่มีข้อมูล</div>'); return; }
 
             data.forEach(h => {
-                // แปลงเวลา
                 const time = new Date(h.clearedAt).toLocaleString('th-TH', { hour:'2-digit', minute:'2-digit', day:'numeric', month:'short' });
-                
-                // ดาว
-                let stars = '';
-                for(let i=1; i<=3; i++) stars += i <= h.stars ? '⭐' : '⚫';
-
+                let stars = ''; for(let i=1; i<=3; i++) stars += i <= h.stars ? '⭐' : '⚫';
                 list.append(`
                     <div class="list-group-item d-flex align-items-center">
-                        <img src="${h.pictureUrl || 'https://placehold.co/40'}" class="rounded-circle me-3" width="40" height="40">
-                        <div class="flex-grow-1">
-                            <div class="fw-bold">${h.fullName}</div>
-                            <small class="text-primary"><i class="fas fa-map-marker-alt me-1"></i>${h.title}</small>
-                        </div>
-                        <div class="text-end">
-                            <div class="text-warning small" style="letter-spacing: -2px;">${stars}</div>
-                            <small class="text-muted" style="font-size: 0.75rem;">${time}</small>
-                        </div>
+                        <img src="${h.pictureUrl || ''}" onerror="this.src='https://placehold.co/40?text=User'" class="rounded-circle me-3" width="40" height="40">
+                        <div class="flex-grow-1"><div class="fw-bold">${h.fullName}</div><small class="text-primary"><i class="fas fa-map-marker-alt me-1"></i>${h.title}</small></div>
+                        <div class="text-end"><div class="text-warning small" style="letter-spacing: -2px;">${stars}</div><small class="text-muted" style="font-size:0.75rem;">${time}</small></div>
                     </div>
                 `);
             });
         } catch (e) { list.html(`<div class="text-danger p-3">${e.message}</div>`); }
     }
 
+    // Function 3: Streak
     async function loadStreakMonitor() {
         const list = $('#monitor-streak-list');
         list.html('<div class="text-center py-4"><div class="spinner-border text-warning"></div></div>');
-        
         try {
             const data = await callApi('/api/admin/monitor/streaks');
             list.empty();
-            
-            if (data.length === 0) {
-                list.html('<div class="text-center text-muted mt-4">ยังไม่มีใครสะสม Streak</div>');
-                return;
-            }
+            if (data.length === 0) { list.html('<div class="text-center text-muted mt-4">ยังไม่มีข้อมูล</div>'); return; }
 
             data.forEach((u, index) => {
                 const rank = index + 1;
                 let rankBadge = `<span class="badge bg-secondary rounded-pill me-2">${rank}</span>`;
                 if (rank === 1) rankBadge = `<span class="badge bg-warning text-dark rounded-pill me-2">🥇 1</span>`;
-                if (rank === 2) rankBadge = `<span class="badge bg-secondary bg-opacity-75 rounded-pill me-2">🥈 2</span>`;
-                if (rank === 3) rankBadge = `<span class="badge bg-secondary bg-opacity-50 rounded-pill me-2">🥉 3</span>`;
-
-                // เช็คว่าเล่นวันนี้หรือยัง
+                
+                // เช็คว่าเล่นวันนี้หรือยัง (เทียบกับเวลาไทย)
                 const lastPlayed = new Date(u.lastPlayedDate).setHours(0,0,0,0);
-                const today = new Date().setHours(0,0,0,0);
+                const now = new Date();
+                const thaiNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"})); // แปลงเป็นเวลาไทย
+                const today = thaiNow.setHours(0,0,0,0);
+                
                 const isPlayedToday = lastPlayed === today;
-                const statusDot = isPlayedToday 
-                    ? '<i class="fas fa-circle text-success small" title="เล่นแล้ววันนี้"></i>' 
-                    : '<i class="fas fa-circle text-danger small" title="ยังไม่เล่นวันนี้"></i>';
+                const statusDot = isPlayedToday ? '<i class="fas fa-circle text-success small"></i>' : '<i class="fas fa-circle text-danger small"></i>';
 
                 list.append(`
                     <div class="list-group-item d-flex align-items-center">
                         <div style="width: 40px; text-align: center;">${rankBadge}</div>
-                        <img src="${u.pictureUrl || 'https://placehold.co/40'}" class="rounded-circle me-3" width="40" height="40">
-                        <div class="flex-grow-1">
-                            <div class="fw-bold">${u.fullName}</div>
-                            <small class="text-muted">Streak: <b class="text-danger">${u.currentStreak} วัน</b></small>
-                        </div>
+                        <img src="${u.pictureUrl || ''}" onerror="this.src='https://placehold.co/40?text=User'" class="rounded-circle me-3" width="40" height="40">
+                        <div class="flex-grow-1"><div class="fw-bold">${u.fullName}</div><small class="text-muted">Streak: <b class="text-danger">${u.currentStreak} วัน</b></small></div>
                         <div>${statusDot}</div>
                     </div>
                 `);
@@ -932,46 +890,35 @@ function bindAdminEventListeners() {
         } catch (e) { list.html(`<div class="text-danger p-3">${e.message}</div>`); }
     }
 
+    // ⭐ Function 4: Coins (ใหม่)
     async function loadCoinMonitor() {
         const list = $('#monitor-coin-list');
         list.html('<div class="text-center py-4"><div class="spinner-border text-warning"></div></div>');
-        
         try {
             const data = await callApi('/api/admin/monitor/coins');
             list.empty();
-            
-            if (data.length === 0) {
-                list.html('<div class="text-center text-muted mt-4">ไม่มีข้อมูลผู้ใช้</div>');
-                return;
-            }
+            if (data.length === 0) { list.html('<div class="text-center text-muted mt-4">ไม่มีข้อมูล</div>'); return; }
 
             data.forEach((u, index) => {
                 const rank = index + 1;
                 let rankBadge = `<span class="badge bg-light text-dark border me-2">#${rank}</span>`;
                 if (rank === 1) rankBadge = `<span class="badge bg-warning text-dark me-2">👑 1</span>`;
                 
-                // Format ตัวเลขเหรียญให้มีลูกน้ำ (เช่น 1,000)
-                const formattedCoins = u.coinBalance.toLocaleString();
+                const coins = u.coinBalance ? u.coinBalance.toLocaleString() : "0";
 
                 list.append(`
                     <div class="list-group-item d-flex align-items-center">
                         <div style="width: 40px; text-align: center;">${rankBadge}</div>
-                        <img src="${u.pictureUrl || 'https://placehold.co/40'}" class="rounded-circle me-3" width="40" height="40">
-                        <div class="flex-grow-1">
-                            <div class="fw-bold">${u.fullName}</div>
-                            <small class="text-muted">รหัส: ${u.employeeId}</small>
-                        </div>
-                        <div class="text-end">
-                            <span class="badge bg-warning text-dark fs-6">
-                                <i class="fas fa-coins me-1"></i> ${formattedCoins}
-                            </span>
-                        </div>
+                        <img src="${u.pictureUrl || ''}" onerror="this.src='https://placehold.co/40?text=User'" class="rounded-circle me-3" width="40" height="40">
+                        <div class="flex-grow-1"><div class="fw-bold">${u.fullName}</div><small class="text-muted">รหัส: ${u.employeeId}</small></div>
+                        <div class="text-end"><span class="badge bg-warning text-dark fs-6"><i class="fas fa-coins me-1"></i> ${coins}</span></div>
                     </div>
                 `);
             });
         } catch (e) { list.html(`<div class="text-danger p-3">${e.message}</div>`); }
     }
 }
+
 
 function bindAdminTabEventListeners() {
     $('.admin-tab-btn').on('click', function(e) {

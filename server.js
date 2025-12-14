@@ -2299,24 +2299,29 @@ app.post('/api/admin/remind-streaks', isAdmin, async (req, res) => {
 });
 
 // ==========================================
-// 🕹️ GAME MONITOR API (สำหรับ Admin)
+// 🕹️ GAME MONITOR API (Fixed & Updated)
 // ==========================================
 
-// 1. ดึงคนเล่น KYT วันนี้ (แก้ไข: ลบ ORDER BY h.id ที่ทำให้ error ออก)
+// 1. ดึงคนเล่น KYT วันนี้ (แก้: ลบ h.id ออก + ใช้เวลาไทย)
 app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
     try {
+        // หาวันที่ไทย
+        const now = new Date();
+        const thaiDate = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
+        const todayStr = thaiDate.toISOString().split('T')[0];
+
         const [rows] = await db.query(`
-            SELECT u.fullName, u.employeeId, u.pictureUrl, h.isCorrect, h.earnedPoints
+            SELECT u.fullName, u.employeeId, u.pictureUrl, h.isCorrect, h.earnedPoints, h.playedAt
             FROM user_game_history h
             JOIN users u ON h.lineUserId = u.lineUserId
-            WHERE h.playedAt = CURDATE()
-            -- ไม่ต้อง Order by ID เพราะไม่มีคอลัมน์นี้
-        `); 
+            WHERE DATE(h.playedAt) = ? 
+            ORDER BY h.playedAt DESC
+        `, [todayStr]); 
         res.json({ status: "success", data: rows });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// 2. ดึงประวัติการผ่านด่าน Hunter ล่าสุด
+// 2. ดึงประวัติ Hunter (เหมือนเดิม)
 app.get('/api/admin/monitor/hunter', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -2324,35 +2329,32 @@ app.get('/api/admin/monitor/hunter', isAdmin, async (req, res) => {
             FROM user_hunter_history h
             JOIN users u ON h.lineUserId = u.lineUserId
             JOIN hunter_levels l ON h.levelId = l.levelId
-            ORDER BY h.clearedAt DESC
-            LIMIT 50
+            ORDER BY h.clearedAt DESC LIMIT 50
         `);
         res.json({ status: "success", data: rows });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// 3. ดูอันดับ Streak (ไฟต่อเนื่อง)
+// 3. ดู Streak (เหมือนเดิม)
 app.get('/api/admin/monitor/streaks', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT u.fullName, u.pictureUrl, u.employeeId, s.currentStreak, s.lastPlayedDate
             FROM user_streaks s
             JOIN users u ON s.lineUserId = u.lineUserId
-            ORDER BY s.currentStreak DESC
-            LIMIT 100
+            ORDER BY s.currentStreak DESC LIMIT 100
         `);
         res.json({ status: "success", data: rows });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// 4. ดูยอดเหรียญสะสม (Coin Rich List)
+// ⭐ 4. (ใหม่) กระเป๋าเหรียญ (Coin Wallet)
 app.get('/api/admin/monitor/coins', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT fullName, pictureUrl, employeeId, coinBalance 
             FROM users 
-            ORDER BY coinBalance DESC 
-            LIMIT 100
+            ORDER BY coinBalance DESC LIMIT 100
         `);
         res.json({ status: "success", data: rows });
     } catch (e) { res.status(500).json({ message: e.message }); }
