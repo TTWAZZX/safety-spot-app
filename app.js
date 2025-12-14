@@ -2471,17 +2471,18 @@ async function handleToggleQuestion() {
 //  GAME DASHBOARD & GACHA LOGIC (NEW V.2)
 // ===============================================================
 
-// ===============================================================
-//  UPDATED: loadGameDashboard
-//  (แก้ไข: เพิ่มการคำนวณ Progress Bar ให้หลอดขยับ)
-// ===============================================================
+// เก็บอันนี้ไว้ (อันเดียวพอ)
 async function loadGameDashboard() {
     console.log("Loading Game Dashboard...");
     
     const user = AppState.currentUser;
     
-    // 1. ใช้ Animation ตัวเลขวิ่ง
-    animateCoinChange(user.coinBalance || 0);
+    // 1. ตัวเลขวิ่ง
+    if (typeof animateCoinChange === 'function') {
+        animateCoinChange(user.coinBalance || 0);
+    } else {
+        $('#coin-display').text(user.coinBalance || 0);
+    }
     
     $('#streak-display').text((user.currentStreak || 0) + " วัน");
 
@@ -2489,19 +2490,16 @@ async function loadGameDashboard() {
     try {
         const cards = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
         
-        // ⭐⭐⭐ ส่วนที่เพิ่ม: คำนวณหลอดความคืบหน้า ⭐⭐⭐
+        // ⭐ ต้องมีท่อนคำนวณหลอดตรงนี้ ⭐
         const totalCards = cards.length; 
         const ownedCount = cards.filter(c => c.isOwned).length;
         
-        // เรียกฟังก์ชันอัปเดตหลอด (ต้องมีฟังก์ชันนี้อยู่ท้ายไฟล์ app.js แล้วนะ)
         if (typeof updateCollectionProgressBar === 'function') {
             updateCollectionProgressBar(ownedCount, totalCards);
         }
-        // ⭐⭐⭐ จบส่วนที่เพิ่ม ⭐⭐⭐
+        // --------------------------------
 
-        // แสดงการ์ด 5 ใบแรกที่สะสมได้ (Mini Collection)
         const recentCards = cards.filter(c => c.isOwned).slice(0, 5);
-        
         const list = $('#mini-collection-list');
         list.empty();
         
@@ -2510,7 +2508,7 @@ async function loadGameDashboard() {
         } else {
             recentCards.forEach(c => {
                 let borderColor = '#dee2e6';
-                if (c.rarity === 'UR') borderColor = '#ffc107'; // ขอบทอง
+                if (c.rarity === 'UR') borderColor = '#ffc107';
                 
                 list.append(`
                     <img src="${getFullImageUrl(c.imageUrl)}" class="rounded border bg-white" 
@@ -2518,8 +2516,6 @@ async function loadGameDashboard() {
                          data-bs-toggle="tooltip" title="${c.cardName}">
                 `);
             });
-            
-            // Activate Tooltip
             const tooltips = list.find('[data-bs-toggle="tooltip"]');
             [...tooltips].map(el => new bootstrap.Tooltip(el));
         }
@@ -2672,6 +2668,10 @@ async function pullGacha() {
 // --- CARD ALBUM LOGIC ---
 
 async function openCardAlbum() {
+    // ⭐ แก้ Console Error: สั่งปลด Focus ออกจากปุ่มกดก่อนเปิด Modal
+    if (document.activeElement) {
+        document.activeElement.blur();
+    }
     const modal = new bootstrap.Modal(document.getElementById('card-album-modal'));
     modal.show();
     
@@ -2726,39 +2726,6 @@ async function openCardAlbum() {
         console.error(e);
         container.html('<p class="text-danger text-center">โหลดข้อมูลไม่สำเร็จ</p>');
     }
-}
-
-// อัปเดตฟังก์ชัน loadGameDashboard ให้ดึง Card แทน Badge
-async function loadGameDashboard() {
-    // ... (โค้ดเดิมส่วน Coin/Streak) ...
-    const user = AppState.currentUser;
-    $('#coin-display').text(user.coinBalance || 0);
-    $('#streak-display').text((user.currentStreak || 0) + " วัน");
-
-    // --- ส่วนที่แก้: ดึง Safety Cards แทน Badges ---
-    try {
-        // ใช้ API ใหม่ที่เราเพิ่งสร้าง
-        const cards = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
-        const recentCards = cards.filter(c => c.isOwned).slice(0, 5); // เอา 5 ใบแรก (หรือจะ sort by obtainedAt ถ้าทำได้)
-        
-        const list = $('#mini-collection-list');
-        list.empty();
-        
-        if(recentCards.length === 0) {
-            list.html('<div class="text-muted small p-2">ยังไม่มีการ์ด</div>');
-        } else {
-            recentCards.forEach(c => {
-                let borderColor = '#dee2e6';
-                if (c.rarity === 'UR') borderColor = '#ffc107';
-                
-                list.append(`
-                    <img src="${getFullImageUrl(c.imageUrl)}" class="rounded border bg-white" 
-                         style="width: 50px; height: 50px; object-fit: cover; border-color: ${borderColor} !important;" 
-                         data-bs-toggle="tooltip" title="${c.cardName}">
-                `);
-            });
-        }
-    } catch (e) { console.error(e); }
 }
 
 // --- ADMIN: CARD MANAGEMENT ---
@@ -3957,12 +3924,11 @@ function animateCoinChange(newBalance) {
     window.requestAnimationFrame(step);
 }
 
-// ฟังก์ชันอัปเดตหลอด (ต้องมีตัวนี้วางไว้ท้ายไฟล์ app.js)
+// ต้องมีตัวนี้อยู่ที่ท้ายไฟล์ app.js
 function updateCollectionProgressBar(ownedCount, totalCount) {
     if (totalCount === 0) return;
     const percentage = Math.round((ownedCount / totalCount) * 100);
     
-    // อัปเดตข้อความและหลอด
     $('#collection-progress-text').text(`${ownedCount} / ${totalCount} ใบ (${percentage}%)`);
     $('#collection-progress-bar').css('width', `${percentage}%`);
 }
