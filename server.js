@@ -2302,7 +2302,7 @@ app.post('/api/admin/remind-streaks', isAdmin, async (req, res) => {
 // 🕹️ GAME MONITOR API (สำหรับ Admin)
 // ==========================================
 
-// 1. ดึงคนเล่น KYT วันนี้
+// 1. ดึงคนเล่น KYT วันนี้ (แก้ไข: ลบ ORDER BY h.id ที่ทำให้ error ออก)
 app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -2310,8 +2310,8 @@ app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
             FROM user_game_history h
             JOIN users u ON h.lineUserId = u.lineUserId
             WHERE h.playedAt = CURDATE()
-            ORDER BY h.id DESC
-        `); // สมมติว่ามี id เป็น auto_increment ถ้าไม่มีอาจจะเรียงตามลำดับไม่ได้เป๊ะ
+            -- ไม่ต้อง Order by ID เพราะไม่มีคอลัมน์นี้
+        `); 
         res.json({ status: "success", data: rows });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -2339,6 +2339,19 @@ app.get('/api/admin/monitor/streaks', isAdmin, async (req, res) => {
             FROM user_streaks s
             JOIN users u ON s.lineUserId = u.lineUserId
             ORDER BY s.currentStreak DESC
+            LIMIT 100
+        `);
+        res.json({ status: "success", data: rows });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// 4. ดูยอดเหรียญสะสม (Coin Rich List)
+app.get('/api/admin/monitor/coins', isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT fullName, pictureUrl, employeeId, coinBalance 
+            FROM users 
+            ORDER BY coinBalance DESC 
             LIMIT 100
         `);
         res.json({ status: "success", data: rows });

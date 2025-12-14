@@ -807,6 +807,7 @@ function bindAdminEventListeners() {
     $('button[data-bs-target="#tab-kyt"]').on('shown.bs.tab', loadKytMonitor);
     $('button[data-bs-target="#tab-hunter"]').on('shown.bs.tab', loadHunterMonitor);
     $('button[data-bs-target="#tab-streak"]').on('shown.bs.tab', loadStreakMonitor);
+    $('button[data-bs-target="#tab-coins"]').on('shown.bs.tab', loadCoinMonitor);
 
     // --- Functions โหลดข้อมูลแต่ละ Tab ---
 
@@ -925,6 +926,46 @@ function bindAdminEventListeners() {
                             <small class="text-muted">Streak: <b class="text-danger">${u.currentStreak} วัน</b></small>
                         </div>
                         <div>${statusDot}</div>
+                    </div>
+                `);
+            });
+        } catch (e) { list.html(`<div class="text-danger p-3">${e.message}</div>`); }
+    }
+
+    async function loadCoinMonitor() {
+        const list = $('#monitor-coin-list');
+        list.html('<div class="text-center py-4"><div class="spinner-border text-warning"></div></div>');
+        
+        try {
+            const data = await callApi('/api/admin/monitor/coins');
+            list.empty();
+            
+            if (data.length === 0) {
+                list.html('<div class="text-center text-muted mt-4">ไม่มีข้อมูลผู้ใช้</div>');
+                return;
+            }
+
+            data.forEach((u, index) => {
+                const rank = index + 1;
+                let rankBadge = `<span class="badge bg-light text-dark border me-2">#${rank}</span>`;
+                if (rank === 1) rankBadge = `<span class="badge bg-warning text-dark me-2">👑 1</span>`;
+                
+                // Format ตัวเลขเหรียญให้มีลูกน้ำ (เช่น 1,000)
+                const formattedCoins = u.coinBalance.toLocaleString();
+
+                list.append(`
+                    <div class="list-group-item d-flex align-items-center">
+                        <div style="width: 40px; text-align: center;">${rankBadge}</div>
+                        <img src="${u.pictureUrl || 'https://placehold.co/40'}" class="rounded-circle me-3" width="40" height="40">
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">${u.fullName}</div>
+                            <small class="text-muted">รหัส: ${u.employeeId}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-warning text-dark fs-6">
+                                <i class="fas fa-coins me-1"></i> ${formattedCoins}
+                            </span>
+                        </div>
                     </div>
                 `);
             });
