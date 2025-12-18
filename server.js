@@ -1887,7 +1887,7 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: แก้ไขประวัติ KYT (ฉบับแก้ Error db.getConnection) ---
+// --- API: แก้ไขประวัติ KYT (ฉบับแก้ชื่อคอลัมน์แจ้งเตือนเป็น lineUserId) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
     console.log("🚀 Admin Update KYT Start:", req.body);
 
@@ -1899,15 +1899,15 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
     }
 
     try {
-        // 1. ดึงข้อมูลเก่า (ใช้ db.query ตรงๆ ไม่ต้อง getConnection)
+        // 1. ดึงข้อมูลเก่า
         const [oldData] = await db.query('SELECT earnedPoints FROM user_game_history WHERE historyId = ?', [historyId]);
-        if (oldData.length === 0) throw new Error("ไม่พบประวัติการเล่น (History ID ไม่ถูกต้อง)");
+        if (oldData.length === 0) throw new Error("ไม่พบประวัติการเล่น");
         
         const oldScore = oldData[0].earnedPoints || 0;
         const diff = parseInt(newScore) - oldScore; 
         console.log(`📊 Score Diff: ${diff} (Old: ${oldScore}, New: ${newScore})`);
 
-        // 2. อัปเดตประวัติ (ใช้ db.query)
+        // 2. อัปเดตประวัติ
         await db.query(`
             UPDATE user_game_history 
             SET isCorrect = ?, earnedPoints = ? 
@@ -1923,27 +1923,27 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             `, [diff, diff, lineUserId]);
         }
 
-        // 4. สร้างการแจ้งเตือน (Safe Mode)
+        // 4. สร้างการแจ้งเตือน
         try {
             const msg = `แอดมินแก้ไขผล KYT: ${isCorrect ? 'ถูกต้อง✅' : 'ผิด❌'} (${diff >= 0 ? '+' : ''}${diff} คะแนน)`;
             const notifId = 'NOTIF-' + Date.now();
 
+            // ⭐ แก้ตรงนี้: เปลี่ยน userId -> lineUserId
             await db.query(`
-                INSERT INTO notifications (notificationId, userId, message, type, isRead, createdAt)
+                INSERT INTO notifications (notificationId, lineUserId, message, type, isRead, createdAt)
                 VALUES (?, ?, ?, 'admin_fix', 0, NOW())
             `, [notifId, lineUserId, msg]);
             
             console.log("✅ Notification Created:", notifId);
         } catch (notifyError) {
+            // ถ้าแจ้งเตือนพังอีก ให้ข้ามไปเลย ไม่ต้อง Error ทั้งระบบ
             console.warn("⚠️ แจ้งเตือนล้มเหลว (ข้ามไป):", notifyError.message);
         }
 
-        // ไม่ต้อง commit เพราะ db.query ทำงานทันที
         console.log("✅ Update Successfully");
         res.json({ status: "success", message: "แก้ไขเรียบร้อย" });
 
     } catch (e) {
-        // ไม่ต้อง rollback เพราะไม่ได้เปิด transaction
         console.error("❌ Critical Error Update KYT:", e);
         res.status(500).json({ message: "Update Failed: " + e.message });
     }
