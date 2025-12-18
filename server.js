@@ -1887,7 +1887,7 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: แก้ไขประวัติ KYT (แก้คำเป็น "เหรียญ" + แจ้งเตือนในแอพ) ---
+// --- API: แก้ไขประวัติ KYT (ฉบับแก้ไข: ใช้ชื่อคอลัมน์ userId ให้ตรงกับ DB) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
     console.log("🚀 Admin Update KYT Start:", req.body);
 
@@ -1901,7 +1901,7 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
     try {
         // 1. ดึงข้อมูลเก่า
         const [oldData] = await db.query('SELECT earnedPoints FROM user_game_history WHERE historyId = ?', [historyId]);
-        if (oldData.length === 0) throw new Error("ไม่พบประวัติการเล่น (History ID ไม่ถูกต้อง)");
+        if (oldData.length === 0) throw new Error("ไม่พบประวัติการเล่น");
         
         const oldScore = oldData[0].earnedPoints || 0;
         const diff = parseInt(newScore) - oldScore; 
@@ -1914,7 +1914,7 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             WHERE historyId = ?
         `, [isCorrect, newScore, historyId]);
 
-        // 3. อัปเดตคะแนนรวม และ เหรียญ ของผู้ใช้
+        // 3. อัปเดตคะแนนรวม
         if (diff !== 0) {
             await db.query(`
                 UPDATE users 
@@ -1923,16 +1923,14 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             `, [diff, diff, lineUserId]);
         }
 
-        // 4. สร้างการแจ้งเตือน (เปลี่ยนคำเป็น "เหรียญ")
+        // 4. สร้างการแจ้งเตือน (⭐ แก้ไขจุดสำคัญตรงนี้ ⭐)
         try {
-            // ⭐ แก้ไขข้อความตรงนี้ครับ
             const msg = `แอดมินแก้ไขผล KYT: ${isCorrect ? 'ถูกต้อง✅' : 'ผิด❌'} (${diff >= 0 ? '+' : ''}${diff} เหรียญ)`;
             const notifId = 'NOTIF-' + Date.now();
 
-            // หมายเหตุ: ตรวจสอบชื่อคอลัมน์ใน DB ของคุณอีกครั้งว่าใช้ 'lineUserId' หรือ 'userId'
-            // (ในโค้ดนี้ผมใช้ lineUserId เพราะเป็นค่ามาตรฐานที่ใช้ในตาราง Users ครับ)
+            // เปลี่ยนจาก lineUserId -> userId (ตามรูป image_b298c9.jpg)
             await db.query(`
-                INSERT INTO notifications (notificationId, lineUserId, message, type, isRead, createdAt)
+                INSERT INTO notifications (notificationId, userId, message, type, isRead, createdAt)
                 VALUES (?, ?, ?, 'admin_fix', 0, NOW())
             `, [notifId, lineUserId, msg]);
             
@@ -1942,7 +1940,7 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             console.error("❌ แจ้งเตือนลง DB ล้มเหลว:", notifyError.message);
         }
 
-        console.log("✅ Update Process Completed");
+        console.log("✅ Update Successfully");
         res.json({ status: "success", message: "แก้ไขและคืนเหรียญเรียบร้อย" });
 
     } catch (e) {
