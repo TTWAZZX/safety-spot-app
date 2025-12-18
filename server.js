@@ -1887,11 +1887,10 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: แก้ไขประวัติ KYT (ฉบับสมบูรณ์: แก้ type + เพิ่ม triggeringUserId) ---
+// --- API: แก้ไขประวัติ KYT (ฉบับ Final: อัดข้อมูลลงทุกช่องกันเหนียว) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
     console.log("🚀 Admin Update KYT Start:", req.body);
 
-    // รับ requesterId (ID แอดมิน) มาด้วยเพื่อใส่ใน triggeringUserId
     const { historyId, lineUserId, isCorrect, newScore, requesterId } = req.body;
     
     // Validate
@@ -1906,8 +1905,7 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
         
         const oldScore = oldData[0].earnedPoints || 0;
         const diff = parseInt(newScore) - oldScore; 
-        console.log(`📊 Score Diff: ${diff} (Old: ${oldScore}, New: ${newScore})`);
-
+        
         // 2. อัปเดตประวัติ
         await db.query(`
             UPDATE user_game_history 
@@ -1924,26 +1922,27 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             `, [diff, diff, lineUserId]);
         }
 
-        // 4. สร้างการแจ้งเตือน (⭐⭐ แก้ไขจุดสำคัญ ⭐⭐)
+        // 4. สร้างการแจ้งเตือน (⭐⭐ จุดแก้บั๊ก ⭐⭐)
         try {
             const msg = `แอดมินแก้ไขผล KYT: ${isCorrect ? 'ถูกต้อง✅' : 'ผิด❌'} (${diff >= 0 ? '+' : ''}${diff} เหรียญ)`;
             const notifId = 'NOTIF-' + Date.now();
             
-            // ใช้ ID แอดมิน หรือถ้าไม่มีให้ใช้ ID ของ User เองไปก่อน (เพื่อกัน Error)
+            // หา ID ผู้กระทำ (ถ้าไม่มี requesterId ให้ใช้ lineUserId แทนกัน error)
             const triggerUser = requesterId || lineUserId; 
 
-            // Insert ให้ครบทุกคอลัมน์ที่จำเป็น (userId, type, triggeringUserId)
+            // 🔥 ใส่ทั้ง triggeringUserId และ triggeringLineUserId 
+            // รวมถึงใส่ userId (ผู้รับ) ด้วย
             await db.query(`
                 INSERT INTO notifications 
-                (notificationId, userId, message, type, isRead, createdAt, triggeringUserId)
-                VALUES (?, ?, ?, 'game_quiz', 0, NOW(), ?)
-            `, [notifId, lineUserId, msg, triggerUser]);
+                (notificationId, userId, message, type, isRead, createdAt, triggeringUserId, triggeringLineUserId)
+                VALUES (?, ?, ?, 'game_quiz', 0, NOW(), ?, ?)
+            `, [notifId, lineUserId, msg, triggerUser, triggerUser]);
             
             console.log("✅ Notification Saved to DB:", notifId);
             
         } catch (notifyError) {
-            // ปริ้น Error ออกมาดูชัดๆ ถ้ายังไม่ได้อีก
-            console.error("❌ แจ้งเตือนลง DB ล้มเหลว:", notifyError);
+            // ปริ้น Error ออกมาดูชัดๆ
+            console.error("❌ แจ้งเตือนลง DB ล้มเหลว:", notifyError.sqlMessage || notifyError);
         }
 
         console.log("✅ Update Successfully");
