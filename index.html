@@ -1139,8 +1139,15 @@
                         <input type="hidden" id="edit-kyt-history-id">
                         <input type="hidden" id="edit-kyt-userid">
                         
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">คำถามที่ตอบ:</label>
+                            <div class="p-3 bg-light border rounded text-dark" id="edit-kyt-question-display" style="font-size: 0.95rem; font-weight: 500;">
+                                กำลังโหลด...
+                            </div>
+                        </div>
+
                         <div class="mb-3 text-center">
-                            <h6 id="edit-kyt-user-name" class="fw-bold">ชื่อผู้ใช้</h6>
+                            <h6 id="edit-kyt-user-name" class="fw-bold text-primary">ชื่อผู้ใช้</h6>
                         </div>
 
                         <div class="mb-3">
@@ -1150,11 +1157,9 @@
                                 <option value="0">❌ ผิด (Incorrect)</option>
                             </select>
                         </div>
-
                         <div class="mb-3">
-                            <label class="form-label">คะแนนที่ได้รับ (Coins)</label>
+                            <label class="form-label">คะแนนที่ได้รับ</label>
                             <input type="number" class="form-control" id="edit-kyt-score" min="0">
-                            <small class="text-muted">*ระบบจะคำนวณและคืน/หักเหรียญผู้ใช้ให้อัตโนมัติ</small>
                         </div>
 
                         <button type="submit" class="btn btn-primary w-100">บันทึกและส่งแจ้งเตือน</button>

@@ -2507,18 +2507,28 @@ app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
 // ==========================================
 
 // 1. ดึงคนเล่น KYT วันนี้ (แก้: ลบ h.id ออก + ใช้เวลาไทย)
-// --- API: ดึงข้อมูล Monitor KYT (ใช้ historyId) ---
+// --- API: ดึงข้อมูล Monitor KYT (ฉบับแก้ไข: ตรงกับตาราง kyt_questions ของคุณ) ---
 app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
     try {
         const now = new Date();
         const thaiDate = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
         const todayStr = thaiDate.toISOString().split('T')[0];
 
-        // ⭐ แก้ตรงนี้: เปลี่ยน h.id -> h.historyId
+        // ⭐ แก้ไข SQL: Join ด้วย questionId และดึง questionText
         const [rows] = await db.query(`
-            SELECT h.historyId AS id, u.lineUserId, u.fullName, u.employeeId, u.pictureUrl, h.isCorrect, h.earnedPoints, h.playedAt
+            SELECT 
+                h.historyId AS id, 
+                u.lineUserId, 
+                u.fullName, 
+                u.employeeId, 
+                u.pictureUrl, 
+                h.isCorrect, 
+                h.earnedPoints, 
+                h.playedAt,
+                COALESCE(q.questionText, 'คำถามถูกลบไปแล้ว') AS questionText
             FROM user_game_history h
             JOIN users u ON h.lineUserId = u.lineUserId
+            LEFT JOIN kyt_questions q ON h.questionId = q.questionId
             WHERE DATE(h.playedAt) = ? 
             ORDER BY h.playedAt DESC
         `, [todayStr]); 

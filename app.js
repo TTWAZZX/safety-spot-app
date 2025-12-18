@@ -833,13 +833,14 @@ function bindAdminEventListeners() {
                 const status = u.isCorrect ? '<span class="badge bg-success">ถูกต้อง</span>' : '<span class="badge bg-danger">ผิด</span>';
                 
                 // ⭐ เข้ารหัสข้อมูลเพื่อใส่ในปุ่ม
-                const kytData = encodeURIComponent(JSON.stringify({
-                    id: u.id, // ต้องมั่นใจว่า API /api/admin/monitor/kyt ส่ง id (historyId) มาด้วยนะครับ
-                    userId: u.lineUserId,
-                    name: u.fullName,
-                    isCorrect: u.isCorrect,
-                    score: u.earnedPoints
-                }));
+            const kytData = encodeURIComponent(JSON.stringify({
+                id: u.id,
+                userId: u.lineUserId,
+                name: u.fullName,
+                isCorrect: u.isCorrect,
+                score: u.earnedPoints,
+                question: u.questionText // ⭐ เพิ่มบรรทัดนี้
+            }));
 
                 list.append(`
                     <div class="list-group-item d-flex align-items-center justify-content-between">
@@ -4016,7 +4017,9 @@ $(document).on('click', '.btn-edit-kyt', function() {
     $('#edit-kyt-userid').val(data.userId);
     $('#edit-kyt-user-name').text(data.name);
     
-    // ตั้งค่า Select และ Input ตามค่าเดิม
+    // ⭐ เอาคำถามมาแปะ (ถ้าไม่มีให้ขึ้นว่าไม่พบ)
+    $('#edit-kyt-question-display').text(data.question || "(ไม่พบข้อมูลคำถาม)");
+    
     $('#edit-kyt-status').val(data.isCorrect ? "1" : "0");
     $('#edit-kyt-score').val(data.score);
 
