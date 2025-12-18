@@ -1887,31 +1887,28 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: แก้ไขประวัติ KYT (Safe Mode: ตัด relatedItemId ออกกัน Error) ---
+// --- API: แก้ไขประวัติ KYT (ฉบับแก้ Error db.getConnection) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
-    console.log("🚀 Admin Update KYT Start:", req.body); // Log เริ่มต้น
+    console.log("🚀 Admin Update KYT Start:", req.body);
 
     const { historyId, lineUserId, isCorrect, newScore } = req.body;
     
-    // Validate ข้อมูลเบื้องต้น
+    // Validate
     if (!historyId || !lineUserId) {
         return res.status(400).json({ message: "ข้อมูลไม่ครบ (Missing historyId or lineUserId)" });
     }
 
-    const conn = await db.getConnection();
     try {
-        await conn.beginTransaction();
-
-        // 1. ดึงข้อมูลเก่า
-        const [oldData] = await conn.query('SELECT earnedPoints FROM user_game_history WHERE historyId = ?', [historyId]);
+        // 1. ดึงข้อมูลเก่า (ใช้ db.query ตรงๆ ไม่ต้อง getConnection)
+        const [oldData] = await db.query('SELECT earnedPoints FROM user_game_history WHERE historyId = ?', [historyId]);
         if (oldData.length === 0) throw new Error("ไม่พบประวัติการเล่น (History ID ไม่ถูกต้อง)");
         
         const oldScore = oldData[0].earnedPoints || 0;
         const diff = parseInt(newScore) - oldScore; 
         console.log(`📊 Score Diff: ${diff} (Old: ${oldScore}, New: ${newScore})`);
 
-        // 2. อัปเดตประวัติ
-        await conn.query(`
+        // 2. อัปเดตประวัติ (ใช้ db.query)
+        await db.query(`
             UPDATE user_game_history 
             SET isCorrect = ?, earnedPoints = ? 
             WHERE historyId = ?
@@ -1919,20 +1916,19 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
 
         // 3. อัปเดตคะแนนรวมของผู้ใช้
         if (diff !== 0) {
-            await conn.query(`
+            await db.query(`
                 UPDATE users 
                 SET coinBalance = coinBalance + ?, totalScore = totalScore + ?
                 WHERE lineUserId = ?
             `, [diff, diff, lineUserId]);
         }
 
-        // 4. สร้างการแจ้งเตือน (Safe Mode: ไม่ใส่ relatedItemId)
+        // 4. สร้างการแจ้งเตือน (Safe Mode)
         try {
             const msg = `แอดมินแก้ไขผล KYT: ${isCorrect ? 'ถูกต้อง✅' : 'ผิด❌'} (${diff >= 0 ? '+' : ''}${diff} คะแนน)`;
-            const notifId = 'NOTIF-' + Date.now(); // สร้าง ID สั้นๆ
+            const notifId = 'NOTIF-' + Date.now();
 
-            // ⭐ ตัด relatedItemId ออก เพื่อป้องกัน Error Foreign Key ⭐
-            await conn.query(`
+            await db.query(`
                 INSERT INTO notifications (notificationId, userId, message, type, isRead, createdAt)
                 VALUES (?, ?, ?, 'admin_fix', 0, NOW())
             `, [notifId, lineUserId, msg]);
@@ -1940,19 +1936,16 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             console.log("✅ Notification Created:", notifId);
         } catch (notifyError) {
             console.warn("⚠️ แจ้งเตือนล้มเหลว (ข้ามไป):", notifyError.message);
-            // ไม่ Throw Error เพื่อให้การบันทึกคะแนนยังทำงานต่อได้
         }
 
-        await conn.commit();
-        console.log("✅ Transaction Committed Successfully");
+        // ไม่ต้อง commit เพราะ db.query ทำงานทันที
+        console.log("✅ Update Successfully");
         res.json({ status: "success", message: "แก้ไขเรียบร้อย" });
 
     } catch (e) {
-        await conn.rollback();
+        // ไม่ต้อง rollback เพราะไม่ได้เปิด transaction
         console.error("❌ Critical Error Update KYT:", e);
         res.status(500).json({ message: "Update Failed: " + e.message });
-    } finally {
-        conn.release();
     }
 });
 
