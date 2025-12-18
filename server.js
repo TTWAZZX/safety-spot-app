@@ -1753,11 +1753,13 @@ app.get('/api/user/cards', async (req, res) => {
 // ======================================================
 // ADMIN: Users list for admin panel
 // ======================================================
+// --- API: ดึงรายชื่อผู้ใช้ (Admin) - รองรับ Search & Sort ---
 app.get('/api/admin/users', isAdmin, async (req, res) => {
     const { search, sortBy } = req.query;
 
+    // ⭐ เพิ่ม coinBalance เข้าไปตรงนี้ครับ
     let sql = `
-        SELECT lineUserId, fullName, pictureUrl, employeeId, totalScore
+        SELECT lineUserId, fullName, pictureUrl, employeeId, totalScore, coinBalance
         FROM users
         WHERE 1=1
     `;
@@ -1775,9 +1777,13 @@ app.get('/api/admin/users', isAdmin, async (req, res) => {
         sql += ` ORDER BY totalScore DESC`;
     }
 
-    const [rows] = await db.query(sql, params);
-
-    res.json({ status: "success", data: rows });
+    try {
+        const [rows] = await db.query(sql, params);
+        res.json({ status: "success", data: rows });
+    } catch (e) {
+        console.error("Get Users Error:", e);
+        res.status(500).json({ message: e.message });
+    }
 });
 
 app.get('/api/admin/user-details', isAdmin, async (req, res) => {
