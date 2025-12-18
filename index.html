@@ -1127,6 +1127,43 @@
         </div>
     </div>
 
+    <div class="modal fade" id="admin-edit-kyt-modal">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title text-dark"><i class="fas fa-gavel"></i> แก้ไขผลการตอบ KYT</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="admin-edit-kyt-form">
+                        <input type="hidden" id="edit-kyt-history-id">
+                        <input type="hidden" id="edit-kyt-userid">
+                        
+                        <div class="mb-3 text-center">
+                            <h6 id="edit-kyt-user-name" class="fw-bold">ชื่อผู้ใช้</h6>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">สถานะคำตอบ</label>
+                            <select class="form-select" id="edit-kyt-status">
+                                <option value="1">✅ ถูกต้อง (Correct)</option>
+                                <option value="0">❌ ผิด (Incorrect)</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">คะแนนที่ได้รับ (Coins)</label>
+                            <input type="number" class="form-control" id="edit-kyt-score" min="0">
+                            <small class="text-muted">*ระบบจะคำนวณและคืน/หักเหรียญผู้ใช้ให้อัตโนมัติ</small>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">บันทึกและส่งแจ้งเตือน</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>

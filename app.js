@@ -831,11 +831,32 @@ function bindAdminEventListeners() {
 
             data.forEach(u => {
                 const status = u.isCorrect ? '<span class="badge bg-success">ถูกต้อง</span>' : '<span class="badge bg-danger">ผิด</span>';
+                
+                // ⭐ เข้ารหัสข้อมูลเพื่อใส่ในปุ่ม
+                const kytData = encodeURIComponent(JSON.stringify({
+                    id: u.id, // ต้องมั่นใจว่า API /api/admin/monitor/kyt ส่ง id (historyId) มาด้วยนะครับ
+                    userId: u.lineUserId,
+                    name: u.fullName,
+                    isCorrect: u.isCorrect,
+                    score: u.earnedPoints
+                }));
+
                 list.append(`
-                    <div class="list-group-item d-flex align-items-center">
-                        <img src="${u.pictureUrl || ''}" onerror="this.src='https://placehold.co/40?text=User'" class="rounded-circle me-3" width="40" height="40">
-                        <div class="flex-grow-1"><div class="fw-bold">${u.fullName}</div><small class="text-muted">รหัส: ${u.employeeId}</small></div>
-                        <div class="text-end">${status}<br><small class="text-muted">+${u.earnedPoints} คะแนน</small></div>
+                    <div class="list-group-item d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <img src="${u.pictureUrl || ''}" onerror="this.src='https://placehold.co/40?text=User'" class="rounded-circle me-3" width="40" height="40">
+                            <div>
+                                <div class="fw-bold">${u.fullName}</div>
+                                <small class="text-muted">รหัส: ${u.employeeId}</small>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            ${status}<br>
+                            <small class="text-muted">+${u.earnedPoints}</small>
+                            <button class="btn btn-sm btn-outline-warning ms-2 btn-edit-kyt" data-kyt="${kytData}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
                     </div>
                 `);
             });
@@ -3929,17 +3950,23 @@ function animateCoinChange(newBalance) {
 // --- LOGIC: แก้ไขผู้ใช้แบบ Real-time ---
 
 // 1. กดปุ่มแก้ไข -> เปิด Modal พร้อมดึงข้อมูลเก่ามาโชว์
+// แก้ไข: โค้ดส่วนกดปุ่มดินสอ (วางทับของเดิมท้ายไฟล์ app.js)
 $(document).on('click', '.btn-edit-user-full', function(e) {
-    e.stopPropagation(); // กันไม่ให้ไปกดโดนการ์ดแม่ (สำคัญ!)
+    e.stopPropagation(); 
     
-    // ⭐ ต้อง decode ก่อน parse
-    const user = JSON.parse(decodeURIComponent($(this).attr('data-user'))); 
+    // decode ข้อมูล
+    const user = JSON.parse(decodeURIComponent($(this).attr('data-user')));
+
+    // Debug ดูค่าใน Console (กด F12 ดูได้ว่า coinBalance มาไหม)
+    console.log("Editing User Data:", user);
 
     $('#edit-user-id').val(user.lineUserId);
     $('#edit-user-name').val(user.fullName);
     $('#edit-user-empid').val(user.employeeId);
-    $('#edit-user-coins').val(user.coinBalance);
-    $('#edit-user-score').val(user.totalScore);
+    
+    // ⭐ แก้จุดนี้: เช็คให้ชัวร์ว่าถ้าไม่มีค่า ให้ใส่ 0
+    $('#edit-user-coins').val((user.coinBalance !== undefined && user.coinBalance !== null) ? user.coinBalance : 0);
+    $('#edit-user-score').val((user.totalScore !== undefined && user.totalScore !== null) ? user.totalScore : 0);
 
     new bootstrap.Modal(document.getElementById('admin-edit-user-modal')).show();
 });
@@ -3978,3 +4005,47 @@ function updateCollectionProgressBar(ownedCount, totalCount) {
     $('#collection-progress-text').text(`${ownedCount} / ${totalCount} ใบ (${percentage}%)`);
     $('#collection-progress-bar').css('width', `${percentage}%`);
 }
+
+// --- LOGIC: แก้ไข KYT ---
+
+// 1. กดปุ่มแก้ไขในหน้า Monitor -> เปิด Modal
+$(document).on('click', '.btn-edit-kyt', function() {
+    const data = JSON.parse(decodeURIComponent($(this).attr('data-kyt')));
+    
+    $('#edit-kyt-history-id').val(data.id);
+    $('#edit-kyt-userid').val(data.userId);
+    $('#edit-kyt-user-name').text(data.name);
+    
+    // ตั้งค่า Select และ Input ตามค่าเดิม
+    $('#edit-kyt-status').val(data.isCorrect ? "1" : "0");
+    $('#edit-kyt-score').val(data.score);
+
+    new bootstrap.Modal(document.getElementById('admin-edit-kyt-modal')).show();
+});
+
+// 2. กดบันทึก -> ยิง API
+$('#admin-edit-kyt-form').on('submit', async function(e) {
+    e.preventDefault();
+    
+    const payload = {
+        historyId: $('#edit-kyt-history-id').val(),
+        lineUserId: $('#edit-kyt-userid').val(),
+        isCorrect: $('#edit-kyt-status').val() === "1",
+        newScore: parseInt($('#edit-kyt-score').val()) || 0
+    };
+
+    try {
+        await callApi('/api/admin/kyt/update-answer', payload, 'POST');
+        
+        Swal.fire('สำเร็จ', 'แก้ไขและแจ้งเตือนผู้ใช้แล้ว', 'success');
+        $('#admin-edit-kyt-modal').modal('hide');
+        
+        // รีโหลดหน้า Monitor ทันที
+        // (ต้องมั่นใจว่าฟังก์ชัน loadKytMonitor เข้าถึงได้ หรือกด tab ใหม่)
+        const btn = $('button[data-bs-target="#tab-kyt"]');
+        if(btn.length) btn.trigger('click'); 
+
+    } catch (err) {
+        Swal.fire('Error', err.message, 'error');
+    }
+});

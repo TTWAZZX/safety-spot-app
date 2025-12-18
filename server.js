@@ -1887,6 +1887,55 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
+// --- API: แก้ไขประวัติ KYT ของผู้ใช้ + แจ้งเตือน (ใช้ตาราง user_game_history) ---
+app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
+    const { historyId, lineUserId, isCorrect, newScore, adminName } = req.body;
+    
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        // 1. ดึงข้อมูลเก่า (แก้ชื่อตารางเป็น user_game_history)
+        const [oldData] = await conn.query('SELECT earnedCoins FROM user_game_history WHERE id = ?', [historyId]);
+        if (oldData.length === 0) throw new Error("ไม่พบข้อมูลประวัติ");
+        
+        const oldScore = oldData[0].earnedCoins || 0;
+        const diff = parseInt(newScore) - oldScore; 
+
+        // 2. อัปเดตประวัติ (แก้ชื่อตารางเป็น user_game_history)
+        await conn.query(`
+            UPDATE user_game_history 
+            SET isCorrect = ?, earnedCoins = ? 
+            WHERE id = ?
+        `, [isCorrect, newScore, historyId]);
+
+        // 3. อัปเดตคะแนนรวมของผู้ใช้
+        if (diff !== 0) {
+            await conn.query(`
+                UPDATE users 
+                SET coinBalance = coinBalance + ?, totalScore = totalScore + ?
+                WHERE lineUserId = ?
+            `, [diff, diff, lineUserId]);
+        }
+
+        // 4. สร้างการแจ้งเตือน
+        const msg = `แอดมินได้แก้ไขผลการตอบ KYT ของคุณ: สถานะ ${isCorrect ? 'ถูกต้อง✅' : 'ไม่ถูกต้อง❌'} (คะแนนปรับปรุง ${diff >= 0 ? '+' : ''}${diff})`;
+        await conn.query(`
+            INSERT INTO notifications (lineUserId, message, type, relatedItemId)
+            VALUES (?, ?, 'admin_fix', ?)
+        `, [lineUserId, msg, historyId]);
+
+        await conn.commit();
+        res.json({ status: "success", message: "แก้ไขและแจ้งเตือนเรียบร้อย" });
+
+    } catch (e) {
+        await conn.rollback();
+        res.status(500).json({ message: e.message });
+    } finally {
+        conn.release();
+    }
+});
+
 // ======================================================
 // NOTIFICATIONS
 // ======================================================
@@ -2445,6 +2494,7 @@ app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
 // ==========================================
 
 // 1. ดึงคนเล่น KYT วันนี้ (แก้: ลบ h.id ออก + ใช้เวลาไทย)
+// --- API: ดึงข้อมูล Monitor KYT (ใช้ตาราง user_game_history) ---
 app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
     try {
         // หาวันที่ไทย
@@ -2452,13 +2502,15 @@ app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
         const thaiDate = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
         const todayStr = thaiDate.toISOString().split('T')[0];
 
+        // ⭐ เพิ่ม h.id และ u.lineUserId เข้าไปใน SELECT
         const [rows] = await db.query(`
-            SELECT u.fullName, u.employeeId, u.pictureUrl, h.isCorrect, h.earnedPoints, h.playedAt
+            SELECT h.id, u.lineUserId, u.fullName, u.employeeId, u.pictureUrl, h.isCorrect, h.earnedPoints, h.playedAt
             FROM user_game_history h
             JOIN users u ON h.lineUserId = u.lineUserId
             WHERE DATE(h.playedAt) = ? 
             ORDER BY h.playedAt DESC
         `, [todayStr]); 
+        
         res.json({ status: "success", data: rows });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
