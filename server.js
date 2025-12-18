@@ -1887,7 +1887,7 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: แก้ไขประวัติ KYT ของผู้ใช้ + แจ้งเตือน (ใช้ตาราง user_game_history) ---
+// --- API: แก้ไขประวัติ KYT (ใช้ historyId) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
     const { historyId, lineUserId, isCorrect, newScore, adminName } = req.body;
     
@@ -1895,18 +1895,18 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // 1. ดึงข้อมูลเก่า (แก้ชื่อตารางเป็น user_game_history)
-        const [oldData] = await conn.query('SELECT earnedCoins FROM user_game_history WHERE id = ?', [historyId]);
+        // 1. ดึงข้อมูลเก่า (แก้ id -> historyId)
+        const [oldData] = await conn.query('SELECT earnedPoints FROM user_game_history WHERE historyId = ?', [historyId]);
         if (oldData.length === 0) throw new Error("ไม่พบข้อมูลประวัติ");
         
-        const oldScore = oldData[0].earnedCoins || 0;
+        const oldScore = oldData[0].earnedPoints || 0; // แก้ earnedCoins -> earnedPoints (ตามชื่อใน DB)
         const diff = parseInt(newScore) - oldScore; 
 
-        // 2. อัปเดตประวัติ (แก้ชื่อตารางเป็น user_game_history)
+        // 2. อัปเดตประวัติ (แก้ id -> historyId และ earnedCoins -> earnedPoints)
         await conn.query(`
             UPDATE user_game_history 
-            SET isCorrect = ?, earnedCoins = ? 
-            WHERE id = ?
+            SET isCorrect = ?, earnedPoints = ? 
+            WHERE historyId = ?
         `, [isCorrect, newScore, historyId]);
 
         // 3. อัปเดตคะแนนรวมของผู้ใช้
@@ -2494,17 +2494,16 @@ app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
 // ==========================================
 
 // 1. ดึงคนเล่น KYT วันนี้ (แก้: ลบ h.id ออก + ใช้เวลาไทย)
-// --- API: ดึงข้อมูล Monitor KYT (ใช้ตาราง user_game_history) ---
+// --- API: ดึงข้อมูล Monitor KYT (ใช้ historyId) ---
 app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
     try {
-        // หาวันที่ไทย
         const now = new Date();
         const thaiDate = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
         const todayStr = thaiDate.toISOString().split('T')[0];
 
-        // ⭐ เพิ่ม h.id และ u.lineUserId เข้าไปใน SELECT
+        // ⭐ แก้ตรงนี้: เปลี่ยน h.id -> h.historyId
         const [rows] = await db.query(`
-            SELECT h.id, u.lineUserId, u.fullName, u.employeeId, u.pictureUrl, h.isCorrect, h.earnedPoints, h.playedAt
+            SELECT h.historyId AS id, u.lineUserId, u.fullName, u.employeeId, u.pictureUrl, h.isCorrect, h.earnedPoints, h.playedAt
             FROM user_game_history h
             JOIN users u ON h.lineUserId = u.lineUserId
             WHERE DATE(h.playedAt) = ? 
