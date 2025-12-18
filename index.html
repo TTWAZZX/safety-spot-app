@@ -1091,6 +1091,42 @@
         </div>
     </div>
 
+    <div class="modal fade" id="admin-edit-user-modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-user-edit"></i> แก้ไขข้อมูลผู้ใช้</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="admin-edit-user-form">
+                        <input type="hidden" id="edit-user-id">
+                        
+                        <div class="mb-3">
+                            <label>ชื่อ-นามสกุล</label>
+                            <input type="text" class="form-control" id="edit-user-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>รหัสพนักงาน</label>
+                            <input type="text" class="form-control" id="edit-user-empid">
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label>เหรียญ (Coins)</label>
+                                <input type="number" class="form-control" id="edit-user-coins">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label>คะแนนรวม (Score)</label>
+                                <input type="number" class="form-control" id="edit-user-score">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">บันทึกการเปลี่ยนแปลง</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>

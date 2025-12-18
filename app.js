@@ -1900,14 +1900,17 @@ async function fetchAdminUsers(page, query, isLoadMore = false) {
 }
 // ===== END: แทนที่ฟังก์ชัน fetchAdminUsers เดิมด้วยอันนี้ =====
 
-
+// ฟังก์ชัน renderUserListForAdmin (ฉบับอัปเดต: เพิ่มปุ่มแก้ไข)
 function renderUserListForAdmin(users, container) {
     users.forEach(user => {
-        // พยายามดึงจำนวนป้ายจากหลาย ๆ ฟิลด์ เผื่อ backend ใช้ชื่อไม่ตรงกัน
+        // พยายามดึงจำนวนป้ายจากหลาย ๆ ฟิลด์
         const badgeCount =
             typeof user.badgeCount === 'number' ? user.badgeCount :
             typeof user.badgesCount === 'number' ? user.badgesCount :
             Array.isArray(user.badges) ? user.badges.length : 0;
+
+        // ⭐ เข้ารหัสข้อมูล User เพื่อฝังในปุ่ม (ป้องกัน Error เครื่องหมายคำพูดตีกัน)
+        const userDataSafe = encodeURIComponent(JSON.stringify(user));
 
         const html = `
             <div class="card shadow-sm mb-2 user-card" style="cursor: pointer;" data-userid="${user.lineUserId}">
@@ -1915,6 +1918,7 @@ function renderUserListForAdmin(users, container) {
                     <div class="d-flex align-items-center">
                         <img src="${getFullImageUrl(user.pictureUrl) || 'https://placehold.co/45x45'}"
                              class="rounded-circle me-3" width="45" height="45" alt="Profile">
+                        
                         <div class="flex-grow-1">
                             <h6 class="fw-bold mb-0">${sanitizeHTML(user.fullName)}</h6>
                             <small class="text-muted">
@@ -1923,7 +1927,14 @@ function renderUserListForAdmin(users, container) {
                                 | <i class="fas fa-certificate text-warning"></i> ${badgeCount} ป้าย
                             </small>
                         </div>
-                        <i class="fas fa-chevron-right ms-auto text-muted"></i>
+
+                        <button class="btn btn-sm btn-outline-warning btn-edit-user-full me-3" 
+                                data-user="${userDataSafe}"
+                                title="แก้ไขข้อมูล">
+                            <i class="fas fa-edit"></i>
+                        </button>
+
+                        <i class="fas fa-chevron-right text-muted"></i>
                     </div>
                 </div>
             </div>`;
@@ -2384,27 +2395,23 @@ async function handleSaveQuestion(e) {
     btn.prop('disabled', true).text('กำลังบันทึก...');
 
     try {
-        // --- จัดการรูปภาพ (Logic ใหม่) ---
+        // ... (ส่วนจัดการรูปภาพเหมือนเดิม) ...
         const mode = $('input[name="q-imgSource"]:checked').val();
-        let finalImageUrl = $('#q-image-final-url').val(); // ค่าเดิม
+        let finalImageUrl = $('#q-image-final-url').val(); 
 
         if (mode === 'upload') {
-            // โหมดอัปโหลด: ถ้ามีไฟล์ใหม่ให้อัปโหลด
             const fileInput = $('#q-image-input')[0];
             if (fileInput.files.length > 0) {
                 finalImageUrl = await uploadImage(fileInput.files[0]);
             }
         } else {
-            // โหมดลิงก์: ใช้ค่าจากช่อง Text
             const urlInput = $('#q-image-url-text').val().trim();
-            if (urlInput) {
-                finalImageUrl = urlInput;
-            }
+            if (urlInput) finalImageUrl = urlInput;
         }
-        // ----------------------------------
+        // ...
 
         const payload = {
-            questionId: $('#q-id').val(),
+            questionId: $('#q-id').val(), // ⭐ เช็คตรงนี้
             questionText: $('#q-text').val(),
             optionA: $('#q-opt-a').val(), optionB: $('#q-opt-b').val(),
             optionC: $('#q-opt-c').val(), optionD: $('#q-opt-d').val(),
@@ -2412,17 +2419,16 @@ async function handleSaveQuestion(e) {
             optionG: $('#q-opt-g').val(), optionH: $('#q-opt-h').val(),
             correctOption: $('input[name="correctOption"]:checked').val(),
             scoreReward: $('#q-score').val(),
-            imageUrl: finalImageUrl // ส่ง URL รูปที่ได้
+            imageUrl: finalImageUrl
         };
 
-        await callApi('/api/admin/questions', payload, 'POST');
+        // ⭐ ถ้ามี ID ให้ใช้ PUT (แก้ไข) ถ้าไม่มีใช้ POST (เพิ่มใหม่)
+        const method = payload.questionId ? 'PUT' : 'POST';
+        await callApi('/api/admin/questions', payload, method);
         
-        // ปิด Modal
         AppState.allModals['question-form'].hide();
         showSuccess('บันทึกข้อมูลเรียบร้อย');
-        
-        // Refresh List (เรียกฟังก์ชันที่เราสร้างใหม่)
-        loadAdminQuestions(); 
+        loadAdminQuestions(); // รีเฟรชตารางทันที
 
     } catch (e) {
         showError(e.message);
@@ -2873,45 +2879,40 @@ async function handleSaveCard(e) {
     btn.prop('disabled', true).text('กำลังบันทึก...');
 
     try {
+        // ... (ส่วนจัดการรูปภาพเหมือนเดิม) ...
         const mode = $('input[name="imgSource"]:checked').val();
-        let finalImageUrl = $('#card-image-final-url').val(); // ค่าตั้งต้น = รูปเดิม
+        let finalImageUrl = $('#card-image-final-url').val();
 
         if (mode === 'upload') {
-            // โหมดอัปโหลด: ถ้ามีการเลือกไฟล์ใหม่ ให้อัปโหลด
             const fileInput = $('#card-image-input')[0];
             if (fileInput.files.length > 0) {
                 finalImageUrl = await uploadImage(fileInput.files[0]);
             }
         } else {
-            // โหมดลิงก์: ใช้ค่าจากช่อง Text
             const urlInput = $('#card-image-url-text').val().trim();
-            if (urlInput) {
-                finalImageUrl = urlInput;
-            }
+            if (urlInput) finalImageUrl = urlInput;
         }
+        // ...
 
         const payload = {
-            cardId: $('#card-id').val(),
+            cardId: $('#card-id').val(), // ⭐ เช็คตรงนี้
             cardName: $('#card-name').val(),
             description: $('#card-desc').val(),
             rarity: $('#card-rarity').val(),
             imageUrl: finalImageUrl
         };
 
-        await callApi('/api/admin/cards', payload, 'POST');
+        // ⭐ ถ้ามี ID ให้ใช้ PUT (แก้ไข)
+        const method = payload.cardId ? 'PUT' : 'POST';
+        await callApi('/api/admin/cards', payload, method);
         
-        // ปิด Modal และ Refresh
-        const modalEl = document.getElementById('card-form-modal');
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        modal.hide();
-
+        // ปิด Modal และรีเฟรชลิสต์
+        bootstrap.Modal.getInstance(document.getElementById('card-form-modal')).hide();
         showSuccess('บันทึกข้อมูลเรียบร้อย');
         
-        // ปิด Modal List ตัวเก่าก่อน แล้วค่อยเปิดใหม่เพื่อรีเฟรช (ป้องกัน Backdrop ค้าง)
-        const listModalEl = document.getElementById('admin-cards-modal');
-        const listModal = bootstrap.Modal.getInstance(listModalEl);
+        // รีเฟรชหน้า Card List
+        const listModal = bootstrap.Modal.getInstance(document.getElementById('admin-cards-modal'));
         listModal.hide();
-        
         setTimeout(() => handleManageCards(), 500);
 
     } catch (e) {
@@ -3924,6 +3925,50 @@ function animateCoinChange(newBalance) {
     };
     window.requestAnimationFrame(step);
 }
+
+// --- LOGIC: แก้ไขผู้ใช้แบบ Real-time ---
+
+// 1. กดปุ่มแก้ไข -> เปิด Modal พร้อมดึงข้อมูลเก่ามาโชว์
+$(document).on('click', '.btn-edit-user-full', function(e) {
+    e.stopPropagation(); // กันไม่ให้ไปกดโดนการ์ดแม่ (สำคัญ!)
+    
+    // ⭐ ต้อง decode ก่อน parse
+    const user = JSON.parse(decodeURIComponent($(this).attr('data-user'))); 
+
+    $('#edit-user-id').val(user.lineUserId);
+    $('#edit-user-name').val(user.fullName);
+    $('#edit-user-empid').val(user.employeeId);
+    $('#edit-user-coins').val(user.coinBalance);
+    $('#edit-user-score').val(user.totalScore);
+
+    new bootstrap.Modal(document.getElementById('admin-edit-user-modal')).show();
+});
+
+// 2. กดบันทึก -> ยิง API -> รีเฟรชตาราง
+$('#admin-edit-user-form').on('submit', async function(e) {
+    e.preventDefault();
+    
+    const payload = {
+        lineUserId: $('#edit-user-id').val(),
+        fullName: $('#edit-user-name').val(),
+        employeeId: $('#edit-user-empid').val(),
+        coinBalance: parseInt($('#edit-user-coins').val()) || 0,
+        totalScore: parseInt($('#edit-user-score').val()) || 0
+    };
+
+    try {
+        await callApi('/api/admin/user/update-full', payload, 'POST');
+        
+        Swal.fire('สำเร็จ', 'อัปเดตข้อมูลเรียบร้อย', 'success');
+        $('#admin-edit-user-modal').modal('hide');
+
+        // ⭐ หัวใจสำคัญ: สั่งโหลดข้อมูลใหม่ทันที เพื่อให้ตารางอัปเดต
+        loadUsersForAdmin(); 
+
+    } catch (err) {
+        Swal.fire('Error', err.message, 'error');
+    }
+});
 
 // ต้องมีตัวนี้อยู่ที่ท้ายไฟล์ app.js
 function updateCollectionProgressBar(ownedCount, totalCount) {

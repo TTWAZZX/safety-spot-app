@@ -1803,6 +1803,90 @@ app.get('/api/admin/user-details', isAdmin, async (req, res) => {
     res.json({ status: "success", data: { user, badges } });
 });
 
+// ==========================================
+// 🛠️ ADMIN EDIT APIs (แก้ได้ทุกตาราง)
+// ==========================================
+
+// 1. แก้ไขคำถาม (Quiz)
+app.put('/api/admin/questions', isAdmin, async (req, res) => {
+    const { questionId, questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, scoreReward, imageUrl } = req.body;
+    try {
+        await db.query(`
+            UPDATE daily_questions 
+            SET questionText=?, optionA=?, optionB=?, optionC=?, optionD=?, optionE=?, optionF=?, optionG=?, optionH=?, correctOption=?, scoreReward=?, imageUrl=?
+            WHERE questionId=?
+        `, [questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, scoreReward, imageUrl, questionId]);
+        res.json({ status: "success", message: "แก้ไขคำถามเรียบร้อย" });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// 2. แก้ไขการ์ด (Cards)
+app.put('/api/admin/cards', isAdmin, async (req, res) => {
+    const { cardId, cardName, description, rarity, imageUrl } = req.body;
+    try {
+        await db.query(`
+            UPDATE cards 
+            SET cardName=?, description=?, rarity=?, imageUrl=?
+            WHERE cardId=?
+        `, [cardName, description, rarity, imageUrl, cardId]);
+        res.json({ status: "success", message: "แก้ไขการ์ดเรียบร้อย" });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// 3. แก้ไขกิจกรรม (Activities)
+app.put('/api/admin/activities', isAdmin, async (req, res) => {
+    const { activityId, title, description, imageUrl } = req.body;
+    try {
+        await db.query(`
+            UPDATE activities 
+            SET title=?, description=?, imageUrl=?
+            WHERE activityId=?
+        `, [title, description, imageUrl, activityId]);
+        res.json({ status: "success", message: "แก้ไขกิจกรรมเรียบร้อย" });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// 4. แก้ไขป้ายรางวัล (Badges)
+app.put('/api/admin/badges/:id', isAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { badgeName, description, imageUrl } = req.body;
+    try {
+        await db.query(`
+            UPDATE badges 
+            SET badgeName=?, description=?, imageUrl=?
+            WHERE badgeId=?
+        `, [badgeName, description, imageUrl, id]);
+        res.json({ status: "success", message: "แก้ไขป้ายรางวัลเรียบร้อย" });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// 5. แก้ไขด่าน Hunter (อันนี้เดิมใช้ POST path update อยู่แล้ว แต่ใส่เผื่อไว้)
+app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
+    const { levelId, title, imageUrl, hazards } = req.body;
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+        // อัปเดตข้อมูลด่าน
+        await conn.query('UPDATE hunter_levels SET title=?, imageUrl=? WHERE levelId=?', [title, imageUrl, levelId]);
+        
+        // ลบจุดเดิมทิ้ง แล้วลงใหม่ (ง่ายกว่าไล่เช็คทีละจุด)
+        await conn.query('DELETE FROM hunter_hazards WHERE levelId=?', [levelId]);
+        
+        // ลงจุดใหม่
+        for (const h of hazards) {
+            await conn.query('INSERT INTO hunter_hazards (levelId, x, y, description, knowledge) VALUES (?, ?, ?, ?, ?)', 
+                [levelId, h.x, h.y, h.description, h.knowledge]);
+        }
+        await conn.commit();
+        res.json({ status: "success", message: "แก้ไขด่านเรียบร้อย" });
+    } catch (e) {
+        await conn.rollback();
+        res.status(500).json({ message: e.message });
+    } finally {
+        conn.release();
+    }
+});
+
 // ======================================================
 // NOTIFICATIONS
 // ======================================================
