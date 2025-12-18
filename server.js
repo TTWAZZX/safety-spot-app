@@ -1888,6 +1888,7 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
 });
 
 // --- API: แก้ไขประวัติ KYT (ฉบับ Final: อัดข้อมูลลงทุกช่องกันเหนียว) ---
+// --- API: แก้ไขประวัติ KYT (Final Fix: เพิ่ม relatedItemId และใส่ ID ให้ครบทุกช่อง) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
     console.log("🚀 Admin Update KYT Start:", req.body);
 
@@ -1922,26 +1923,31 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             `, [diff, diff, lineUserId]);
         }
 
-        // 4. สร้างการแจ้งเตือน (⭐⭐ จุดแก้บั๊ก ⭐⭐)
+        // 4. สร้างการแจ้งเตือน (⭐⭐ แก้ไขให้ครบทุกคอลัมน์ตามภาพ DB ⭐⭐)
         try {
             const msg = `แอดมินแก้ไขผล KYT: ${isCorrect ? 'ถูกต้อง✅' : 'ผิด❌'} (${diff >= 0 ? '+' : ''}${diff} เหรียญ)`;
             const notifId = 'NOTIF-' + Date.now();
             
-            // หา ID ผู้กระทำ (ถ้าไม่มี requesterId ให้ใช้ lineUserId แทนกัน error)
+            // หา ID ผู้กระทำ (ใช้ LINE ID ของแอดมิน หรือ User)
             const triggerUser = requesterId || lineUserId; 
 
-            // 🔥 ใส่ทั้ง triggeringUserId และ triggeringLineUserId 
-            // รวมถึงใส่ userId (ผู้รับ) ด้วย
+            // ใส่ข้อมูลให้ครบทุกช่องที่จำเป็นในตาราง notifications
             await db.query(`
                 INSERT INTO notifications 
-                (notificationId, userId, message, type, isRead, createdAt, triggeringUserId, triggeringLineUserId)
-                VALUES (?, ?, ?, 'game_quiz', 0, NOW(), ?, ?)
-            `, [notifId, lineUserId, msg, triggerUser, triggerUser]);
+                (notificationId, userId, message, type, isRead, createdAt, triggeringUserId, triggeringLineUserId, relatedItemId)
+                VALUES (?, ?, ?, 'game_quiz', 0, NOW(), ?, ?, ?)
+            `, [
+                notifId,           // notificationId
+                lineUserId,        // userId (ผู้รับ)
+                msg,               // message
+                triggerUser,       // triggeringUserId (ใส่ LINE ID ได้เลยดูจากภาพ DB)
+                triggerUser,       // triggeringLineUserId
+                historyId.toString() // relatedItemId (ใส่ historyId กลับเข้าไป เพื่อให้ไม่ว่าง)
+            ]);
             
             console.log("✅ Notification Saved to DB:", notifId);
             
         } catch (notifyError) {
-            // ปริ้น Error ออกมาดูชัดๆ
             console.error("❌ แจ้งเตือนลง DB ล้มเหลว:", notifyError.sqlMessage || notifyError);
         }
 
