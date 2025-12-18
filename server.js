@@ -1887,14 +1887,12 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: แก้ไขประวัติ KYT (ฉบับ Final: อัดข้อมูลลงทุกช่องกันเหนียว) ---
-// --- API: แก้ไขประวัติ KYT (Final Fix: เพิ่ม relatedItemId และใส่ ID ให้ครบทุกช่อง) ---
+// --- API: แก้ไขประวัติ KYT (ฉบับแก้ 502: ตัดคอลัมน์ที่มีปัญหาออก) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
     console.log("🚀 Admin Update KYT Start:", req.body);
 
     const { historyId, lineUserId, isCorrect, newScore, requesterId } = req.body;
     
-    // Validate
     if (!historyId || !lineUserId) {
         return res.status(400).json({ message: "ข้อมูลไม่ครบ (Missing historyId or lineUserId)" });
     }
@@ -1923,32 +1921,32 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             `, [diff, diff, lineUserId]);
         }
 
-        // 4. สร้างการแจ้งเตือน (⭐⭐ แก้ไขให้ครบทุกคอลัมน์ตามภาพ DB ⭐⭐)
+        // 4. สร้างการแจ้งเตือน (⭐⭐ แก้ไขให้เหมือนแถว 10864 ที่ทำงานได้ ⭐⭐)
         try {
             const msg = `แอดมินแก้ไขผล KYT: ${isCorrect ? 'ถูกต้อง✅' : 'ผิด❌'} (${diff >= 0 ? '+' : ''}${diff} เหรียญ)`;
             const notifId = 'NOTIF-' + Date.now();
             
-            // หา ID ผู้กระทำ (ใช้ LINE ID ของแอดมิน หรือ User)
+            // หา ID ผู้กระทำ (ใช้ ID แอดมิน หรือถ้าไม่มีก็ใช้ของ User เอง)
             const triggerUser = requesterId || lineUserId; 
 
-            // ใส่ข้อมูลให้ครบทุกช่องที่จำเป็นในตาราง notifications
+            // ตัด triggeringLineUserId ออก! ใส่แค่ triggeringUserId และ relatedItemId
             await db.query(`
                 INSERT INTO notifications 
-                (notificationId, userId, message, type, isRead, createdAt, triggeringUserId, triggeringLineUserId, relatedItemId)
-                VALUES (?, ?, ?, 'game_quiz', 0, NOW(), ?, ?, ?)
+                (notificationId, userId, message, type, isRead, createdAt, triggeringUserId, relatedItemId)
+                VALUES (?, ?, ?, 'game_quiz', 0, NOW(), ?, ?)
             `, [
-                notifId,           // notificationId
-                lineUserId,        // userId (ผู้รับ)
-                msg,               // message
-                triggerUser,       // triggeringUserId (ใส่ LINE ID ได้เลยดูจากภาพ DB)
-                triggerUser,       // triggeringLineUserId
-                historyId.toString() // relatedItemId (ใส่ historyId กลับเข้าไป เพื่อให้ไม่ว่าง)
+                notifId,
+                lineUserId,
+                msg,
+                triggerUser,          // triggeringUserId (ช่องขวาสุด)
+                historyId.toString()  // relatedItemId (แปลงเป็น string กันเหนียว)
             ]);
             
             console.log("✅ Notification Saved to DB:", notifId);
             
         } catch (notifyError) {
-            console.error("❌ แจ้งเตือนลง DB ล้มเหลว:", notifyError.sqlMessage || notifyError);
+            console.error("❌ แจ้งเตือนลง DB ล้มเหลว:", notifyError.message);
+            // ไม่ throw error เพื่อให้ระบบแจ้งว่า update สำเร็จ แม้แจ้งเตือนจะพลาด
         }
 
         console.log("✅ Update Successfully");
