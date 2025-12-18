@@ -1887,22 +1887,24 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: แก้ไขประวัติ KYT (ใช้ historyId) ---
+// --- API: แก้ไขประวัติ KYT (ฉบับแก้ไข: ตรงกับตาราง notifications ของคุณ) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
-    const { historyId, lineUserId, isCorrect, newScore, adminName } = req.body;
+    const { historyId, lineUserId, isCorrect, newScore } = req.body;
     
+    console.log("Admin editing KYT:", req.body);
+
     const conn = await db.getConnection();
     try {
         await conn.beginTransaction();
 
-        // 1. ดึงข้อมูลเก่า (แก้ id -> historyId)
+        // 1. ดึงข้อมูลเก่า (ใช้ historyId และ earnedPoints ตาม DB คุณ)
         const [oldData] = await conn.query('SELECT earnedPoints FROM user_game_history WHERE historyId = ?', [historyId]);
-        if (oldData.length === 0) throw new Error("ไม่พบข้อมูลประวัติ");
+        if (oldData.length === 0) throw new Error("ไม่พบข้อมูลประวัติ (History ID ไม่ถูกต้อง)");
         
-        const oldScore = oldData[0].earnedPoints || 0; // แก้ earnedCoins -> earnedPoints (ตามชื่อใน DB)
+        const oldScore = oldData[0].earnedPoints || 0;
         const diff = parseInt(newScore) - oldScore; 
 
-        // 2. อัปเดตประวัติ (แก้ id -> historyId และ earnedCoins -> earnedPoints)
+        // 2. อัปเดตประวัติ
         await conn.query(`
             UPDATE user_game_history 
             SET isCorrect = ?, earnedPoints = ? 
@@ -1918,19 +1920,30 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             `, [diff, diff, lineUserId]);
         }
 
-        // 4. สร้างการแจ้งเตือน
-        const msg = `แอดมินได้แก้ไขผลการตอบ KYT ของคุณ: สถานะ ${isCorrect ? 'ถูกต้อง✅' : 'ไม่ถูกต้อง❌'} (คะแนนปรับปรุง ${diff >= 0 ? '+' : ''}${diff})`;
-        await conn.query(`
-            INSERT INTO notifications (lineUserId, message, type, relatedItemId)
-            VALUES (?, ?, 'admin_fix', ?)
-        `, [lineUserId, msg, historyId]);
+        // 4. สร้างการแจ้งเตือน (⭐⭐ แก้ไขให้ตรงกับตาราง notifications ของคุณ ⭐⭐)
+        try {
+            const msg = `แอดมินแก้ไขผล KYT: ${isCorrect ? 'ถูกต้อง✅' : 'ผิด❌'} (${diff >= 0 ? '+' : ''}${diff} คะแนน)`;
+            
+            // สร้าง ID สำหรับแจ้งเตือน (เช่น NOTIF-1734508...)
+            const notifId = 'NOTIF-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+
+            // ใช้ชื่อคอลัมน์ userId แทน lineUserId และเพิ่ม notificationId
+            await conn.query(`
+                INSERT INTO notifications (notificationId, userId, message, type, relatedItemId, isRead, createdAt)
+                VALUES (?, ?, ?, 'admin_fix', ?, 0, NOW())
+            `, [notifId, lineUserId, msg, historyId]);
+            
+        } catch (notifyError) {
+            console.warn("แจ้งเตือนล้มเหลว (แต่บันทึกคะแนนสำเร็จ):", notifyError.message);
+        }
 
         await conn.commit();
-        res.json({ status: "success", message: "แก้ไขและแจ้งเตือนเรียบร้อย" });
+        res.json({ status: "success", message: "แก้ไขเรียบร้อย" });
 
     } catch (e) {
         await conn.rollback();
-        res.status(500).json({ message: e.message });
+        console.error("Critical Error Update KYT:", e);
+        res.status(500).json({ message: "Update Failed: " + e.message });
     } finally {
         conn.release();
     }
