@@ -1887,7 +1887,7 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: แก้ไขประวัติ KYT (ฉบับแก้ 502: ตัดคอลัมน์ที่มีปัญหาออก) ---
+// --- API: แก้ไขประวัติ KYT (Final Fix: ใช้ชื่อคอลัมน์ recipientUserId ตามภาพ) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
     console.log("🚀 Admin Update KYT Start:", req.body);
 
@@ -1921,32 +1921,31 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             `, [diff, diff, lineUserId]);
         }
 
-        // 4. สร้างการแจ้งเตือน (⭐⭐ แก้ไขให้เหมือนแถว 10864 ที่ทำงานได้ ⭐⭐)
+        // 4. สร้างการแจ้งเตือน (⭐⭐ แก้ชื่อคอลัมน์ตามภาพ image_bd7dee.png ⭐⭐)
         try {
             const msg = `แอดมินแก้ไขผล KYT: ${isCorrect ? 'ถูกต้อง✅' : 'ผิด❌'} (${diff >= 0 ? '+' : ''}${diff} เหรียญ)`;
             const notifId = 'NOTIF-' + Date.now();
             
-            // หา ID ผู้กระทำ (ใช้ ID แอดมิน หรือถ้าไม่มีก็ใช้ของ User เอง)
+            // ID ผู้ทำรายการ (Admin)
             const triggerUser = requesterId || lineUserId; 
 
-            // ตัด triggeringLineUserId ออก! ใส่แค่ triggeringUserId และ relatedItemId
+            // ใช้ recipientUserId (ผู้รับ) และ triggeringUserId (ผู้ทำ)
             await db.query(`
                 INSERT INTO notifications 
-                (notificationId, userId, message, type, isRead, createdAt, triggeringUserId, relatedItemId)
+                (notificationId, recipientUserId, message, type, isRead, createdAt, triggeringUserId, relatedItemId)
                 VALUES (?, ?, ?, 'game_quiz', 0, NOW(), ?, ?)
             `, [
                 notifId,
-                lineUserId,
+                lineUserId,           // recipientUserId
                 msg,
-                triggerUser,          // triggeringUserId (ช่องขวาสุด)
-                historyId.toString()  // relatedItemId (แปลงเป็น string กันเหนียว)
+                triggerUser,          // triggeringUserId
+                historyId.toString()  // relatedItemId
             ]);
             
             console.log("✅ Notification Saved to DB:", notifId);
             
         } catch (notifyError) {
             console.error("❌ แจ้งเตือนลง DB ล้มเหลว:", notifyError.message);
-            // ไม่ throw error เพื่อให้ระบบแจ้งว่า update สำเร็จ แม้แจ้งเตือนจะพลาด
         }
 
         console.log("✅ Update Successfully");
