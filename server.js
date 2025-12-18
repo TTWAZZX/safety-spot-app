@@ -1887,11 +1887,12 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: แก้ไขประวัติ KYT (ฉบับแก้ไข: ใช้ชื่อคอลัมน์ userId ให้ตรงกับ DB) ---
+// --- API: แก้ไขประวัติ KYT (ฉบับสมบูรณ์: แก้ type + เพิ่ม triggeringUserId) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
     console.log("🚀 Admin Update KYT Start:", req.body);
 
-    const { historyId, lineUserId, isCorrect, newScore } = req.body;
+    // รับ requesterId (ID แอดมิน) มาด้วยเพื่อใส่ใน triggeringUserId
+    const { historyId, lineUserId, isCorrect, newScore, requesterId } = req.body;
     
     // Validate
     if (!historyId || !lineUserId) {
@@ -1923,21 +1924,26 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             `, [diff, diff, lineUserId]);
         }
 
-        // 4. สร้างการแจ้งเตือน (⭐ แก้ไขจุดสำคัญตรงนี้ ⭐)
+        // 4. สร้างการแจ้งเตือน (⭐⭐ แก้ไขจุดสำคัญ ⭐⭐)
         try {
             const msg = `แอดมินแก้ไขผล KYT: ${isCorrect ? 'ถูกต้อง✅' : 'ผิด❌'} (${diff >= 0 ? '+' : ''}${diff} เหรียญ)`;
             const notifId = 'NOTIF-' + Date.now();
+            
+            // ใช้ ID แอดมิน หรือถ้าไม่มีให้ใช้ ID ของ User เองไปก่อน (เพื่อกัน Error)
+            const triggerUser = requesterId || lineUserId; 
 
-            // เปลี่ยนจาก lineUserId -> userId (ตามรูป image_b298c9.jpg)
+            // Insert ให้ครบทุกคอลัมน์ที่จำเป็น (userId, type, triggeringUserId)
             await db.query(`
-                INSERT INTO notifications (notificationId, userId, message, type, isRead, createdAt)
-                VALUES (?, ?, ?, 'admin_fix', 0, NOW())
-            `, [notifId, lineUserId, msg]);
+                INSERT INTO notifications 
+                (notificationId, userId, message, type, isRead, createdAt, triggeringUserId)
+                VALUES (?, ?, ?, 'game_quiz', 0, NOW(), ?)
+            `, [notifId, lineUserId, msg, triggerUser]);
             
             console.log("✅ Notification Saved to DB:", notifId);
             
         } catch (notifyError) {
-            console.error("❌ แจ้งเตือนลง DB ล้มเหลว:", notifyError.message);
+            // ปริ้น Error ออกมาดูชัดๆ ถ้ายังไม่ได้อีก
+            console.error("❌ แจ้งเตือนลง DB ล้มเหลว:", notifyError);
         }
 
         console.log("✅ Update Successfully");
