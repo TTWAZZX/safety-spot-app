@@ -1887,22 +1887,28 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: แก้ไขประวัติ KYT (ฉบับแก้ไข: ตรงกับตาราง notifications ของคุณ) ---
+// --- API: แก้ไขประวัติ KYT (Safe Mode: ตัด relatedItemId ออกกัน Error) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
+    console.log("🚀 Admin Update KYT Start:", req.body); // Log เริ่มต้น
+
     const { historyId, lineUserId, isCorrect, newScore } = req.body;
     
-    console.log("Admin editing KYT:", req.body);
+    // Validate ข้อมูลเบื้องต้น
+    if (!historyId || !lineUserId) {
+        return res.status(400).json({ message: "ข้อมูลไม่ครบ (Missing historyId or lineUserId)" });
+    }
 
     const conn = await db.getConnection();
     try {
         await conn.beginTransaction();
 
-        // 1. ดึงข้อมูลเก่า (ใช้ historyId และ earnedPoints ตาม DB คุณ)
+        // 1. ดึงข้อมูลเก่า
         const [oldData] = await conn.query('SELECT earnedPoints FROM user_game_history WHERE historyId = ?', [historyId]);
-        if (oldData.length === 0) throw new Error("ไม่พบข้อมูลประวัติ (History ID ไม่ถูกต้อง)");
+        if (oldData.length === 0) throw new Error("ไม่พบประวัติการเล่น (History ID ไม่ถูกต้อง)");
         
         const oldScore = oldData[0].earnedPoints || 0;
         const diff = parseInt(newScore) - oldScore; 
+        console.log(`📊 Score Diff: ${diff} (Old: ${oldScore}, New: ${newScore})`);
 
         // 2. อัปเดตประวัติ
         await conn.query(`
@@ -1920,29 +1926,30 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             `, [diff, diff, lineUserId]);
         }
 
-        // 4. สร้างการแจ้งเตือน (⭐⭐ แก้ไขให้ตรงกับตาราง notifications ของคุณ ⭐⭐)
+        // 4. สร้างการแจ้งเตือน (Safe Mode: ไม่ใส่ relatedItemId)
         try {
             const msg = `แอดมินแก้ไขผล KYT: ${isCorrect ? 'ถูกต้อง✅' : 'ผิด❌'} (${diff >= 0 ? '+' : ''}${diff} คะแนน)`;
-            
-            // สร้าง ID สำหรับแจ้งเตือน (เช่น NOTIF-1734508...)
-            const notifId = 'NOTIF-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+            const notifId = 'NOTIF-' + Date.now(); // สร้าง ID สั้นๆ
 
-            // ใช้ชื่อคอลัมน์ userId แทน lineUserId และเพิ่ม notificationId
+            // ⭐ ตัด relatedItemId ออก เพื่อป้องกัน Error Foreign Key ⭐
             await conn.query(`
-                INSERT INTO notifications (notificationId, userId, message, type, relatedItemId, isRead, createdAt)
-                VALUES (?, ?, ?, 'admin_fix', ?, 0, NOW())
-            `, [notifId, lineUserId, msg, historyId]);
+                INSERT INTO notifications (notificationId, userId, message, type, isRead, createdAt)
+                VALUES (?, ?, ?, 'admin_fix', 0, NOW())
+            `, [notifId, lineUserId, msg]);
             
+            console.log("✅ Notification Created:", notifId);
         } catch (notifyError) {
-            console.warn("แจ้งเตือนล้มเหลว (แต่บันทึกคะแนนสำเร็จ):", notifyError.message);
+            console.warn("⚠️ แจ้งเตือนล้มเหลว (ข้ามไป):", notifyError.message);
+            // ไม่ Throw Error เพื่อให้การบันทึกคะแนนยังทำงานต่อได้
         }
 
         await conn.commit();
+        console.log("✅ Transaction Committed Successfully");
         res.json({ status: "success", message: "แก้ไขเรียบร้อย" });
 
     } catch (e) {
         await conn.rollback();
-        console.error("Critical Error Update KYT:", e);
+        console.error("❌ Critical Error Update KYT:", e);
         res.status(500).json({ message: "Update Failed: " + e.message });
     } finally {
         conn.release();
