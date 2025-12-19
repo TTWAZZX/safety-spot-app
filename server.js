@@ -1581,7 +1581,7 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: จบเกม (เวอร์ชันอัปเกรด: เก็บสถิติที่หายไป + แจกเหรียญ) ---
+// --- API: จบเกม V2 (กู้ชีพ Streak + เก็บช้อยส์ + แจ้งเตือน) ---
 app.post('/api/game/submit-answer-v2', async (req, res) => {
     const { lineUserId, questionId, selectedOption } = req.body;
     const today = new Date().toISOString().split('T')[0];
@@ -1600,7 +1600,7 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
         let earnedCoins = isCorrect ? 50 : 10;
         let earnedScore = isCorrect ? question.scoreReward : 2; 
 
-        // 2. ระบบ Streak (Logic ใหม่: เก็บ Streak เก่าไว้ให้กู้คืน)
+        // 2. ระบบ Streak (Logic ใหม่: เก็บสถิติเก่าไว้กู้คืน)
         const [streakRow] = await conn.query("SELECT * FROM user_streaks WHERE lineUserId = ?", [lineUserId]);
         let currentStreak = 1;
         let recoverableStreak = 0;
@@ -1612,21 +1612,20 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             if (diffDays === 1) { 
-                // ต่อเนื่อง: บวกเพิ่ม
+                // ต่อเนื่อง
                 currentStreak = streakRow[0].currentStreak + 1;
-                recoverableStreak = 0; // เคลียร์ค่ากู้คืน (เพราะเล่นต่อเนื่องแล้ว)
+                recoverableStreak = 0; 
             } else if (diffDays === 0) {
-                // ซ้ำวันเดิม: เท่าเดิม
+                // ซ้ำวันเดิม
                 currentStreak = streakRow[0].currentStreak;
                 recoverableStreak = streakRow[0].recoverableStreak; 
             } else {
                 // ❄️ ขาดช่วง (ไฟดับ!): เก็บของเก่าไว้กู้คืน
                 isStreakBroken = true;
-                // ต้องมีขั้นต่ำ 3 วันถึงจะคุ้มให้กู้คืน (แก้เลขตรงนี้ได้)
                 if (streakRow[0].currentStreak >= 3) { 
                     recoverableStreak = streakRow[0].currentStreak;
                 }
-                currentStreak = 1; // รีเซ็ตเป็น 1
+                currentStreak = 1;
             }
             
             await conn.query(
@@ -1635,7 +1634,10 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
             );
         } else {
             // เล่นครั้งแรก
-            await conn.query("INSERT INTO user_streaks (lineUserId, currentStreak, lastPlayedDate, recoverableStreak) VALUES (?, 1, ?, 0)", [lineUserId, today]);
+            await conn.query(
+                "INSERT INTO user_streaks (lineUserId, currentStreak, lastPlayedDate, recoverableStreak) VALUES (?, 1, ?, 0)", 
+                [lineUserId, today]
+            );
         }
 
         // Streak Bonus (ทุก 7 วัน)
@@ -1646,10 +1648,22 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
         // 3. อัปเดต User
         await conn.query("UPDATE users SET totalScore = totalScore + ?, coinBalance = coinBalance + ? WHERE lineUserId = ?", [earnedScore, earnedCoins, lineUserId]);
 
-        // 4. บันทึกประวัติ
+        // ⭐ 4. บันทึกประวัติ (เพิ่ม selectedAnswer เพื่อเก็บ A-H)
         await conn.query(
-            "INSERT INTO user_game_history (lineUserId, questionId, isCorrect, earnedPoints, playedAt) VALUES (?, ?, ?, ?, ?)",
-            [lineUserId, questionId, isCorrect, earnedCoins, today]
+            "INSERT INTO user_game_history (lineUserId, questionId, isCorrect, earnedPoints, playedAt, selectedAnswer) VALUES (?, ?, ?, ?, ?, ?)",
+            [lineUserId, questionId, isCorrect, earnedCoins, today, selectedOption]
+        );
+
+        // ⭐ 5. แจ้งเตือนลง App
+        const notifMsg = isCorrect 
+            ? `ภารกิจสำเร็จ! คุณได้รับ ${earnedCoins} เหรียญจากการตอบคำถามประจำวัน`
+            : `ตอบผิดรับรางวัลปลอบใจ ${earnedCoins} เหรียญ`;
+
+        await conn.query(
+            `INSERT INTO notifications 
+            (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'game_quiz', ?, ?, NOW())`,
+            ["NOTIF" + Date.now(), lineUserId, notifMsg, questionId, lineUserId]
         );
 
         const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
@@ -1661,7 +1675,7 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
                 isCorrect, 
                 earnedCoins, 
                 currentStreak,
-                recoverableStreak, // ส่งไปบอกหน้าบ้านให้โชว์ปุ่ม
+                recoverableStreak,
                 newCoinBalance: updatedUser.coinBalance,
                 isStreakBroken 
             } 
