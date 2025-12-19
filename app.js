@@ -2165,89 +2165,120 @@ async function loadGamePage() {
     }
 }
 
-// --- แก้ไข Event Listener ตอบคำถามใน app.js ---
+// --- แก้ไข Event Listener ตอบคำถาม (รองรับระบบกู้คืน Streak) ---
 $(document).on('click', '.answer-btn', async function() {
 
-    // ✨ จุดที่ 1: ใส่ตรงนี้ (สั่นเบาๆ เมื่อนิ้วแตะปุ่ม)
+    // 1. สั่นเบาๆ เมื่อนิ้วแตะปุ่ม
     triggerHaptic('light');
 
     const btn = $(this);
     const choice = btn.data('choice');
     const qid = $('#game-content').data('qid');
 
-    $('.answer-btn').prop('disabled', true); // ล็อกปุ่ม
+    $('.answer-btn').prop('disabled', true); // ล็อกปุ่มกันกดซ้ำ
 
     try {
-        const res = await callApi('/api/game/submit-answer', {
+        // ⭐ เปลี่ยน Endpoint เป็น v2 เพื่อรับค่า recoverableStreak
+        const res = await callApi('/api/game/submit-answer-v2', {
             lineUserId: AppState.lineProfile.userId,
             questionId: qid,
             selectedOption: choice
         }, 'POST');
 
-        // ==========================================
-        // 1. อัปเดตเหรียญที่หน้าจอทันที (สำคัญ!)
-        // ==========================================
+        // 2. อัปเดตเหรียญทันที
         $('#coin-display').text(res.newCoinBalance);
-        
-        // อัปเดตในตัวแปร Global ด้วย เผื่อไปหน้าอื่น
         if(AppState.currentUser) {
             AppState.currentUser.coinBalance = res.newCoinBalance;
-            AppState.currentUser.totalScore = res.newTotalScore;
+            // อัปเดตคะแนนรวมด้วย (เผื่อมี)
+            if(res.newTotalScore) AppState.currentUser.totalScore = res.newTotalScore;
         }
-        // ==========================================
 
+        // 3. แสดงผล ถูก/ผิด
         if (res.isCorrect) {
-            // ✨ จุดที่ 2: ใส่ในเงื่อนไขตอบถูก (สั่นกลางๆ ยินดีด้วย)
             triggerHaptic('medium');
-            // --- กรณีตอบถูก ---
             btn.addClass('correct');
             Swal.fire({
                 icon: 'success',
                 title: 'ถูกต้อง! เก่งมาก',
                 html: `คุณได้รับ <b class="text-warning">${res.earnedCoins} เหรียญ</b> 💰`,
                 confirmButtonText: 'เยี่ยมเลย',
-                confirmButtonColor: '#06C755'
+                confirmButtonColor: '#06C755',
+                timer: 2000
             });
         } else {
-            // ✨ จุดที่ 3: สั่นแรง เตือนว่าผิด
             triggerHaptic('heavy');
-            
-            // --- กรณีตอบผิด ---
             btn.addClass('wrong');
-            
-            // ❌ ลบบรรทัดเฉลยปุ่มเขียวออก เพราะเราไม่รู้ข้อถูกแล้ว
-            // $(`.answer-btn[data-choice="${res.correctOption}"]`).addClass('correct'); 
-            
             Swal.fire({
                 icon: 'error',
                 title: 'ยังไม่ถูกนะ...',
-                // ✅ แก้ข้อความ ไม่ต้องบอกข้อถูก
                 html: `คำตอบยังไม่ถูกต้อง<br>รับรางวัลปลอบใจไป <b class="text-warning">${res.earnedCoins} เหรียญ</b> 💰`,
                 confirmButtonText: 'ไปต่อ',
-                confirmButtonColor: '#6c757d'
+                confirmButtonColor: '#6c757d',
+                timer: 2000
             });
         }
 
-        // ในไฟล์ app.js ส่วน event click ของ .answer-btn ท่อนล่างสุด
+        // ⭐ 4. Logic ใหม่: ตรวจสอบการกู้คืน Streak
+        // รอ 2.2 วินาที (ให้คนดูผลตอบถูกผิดก่อน) แล้วค่อยเช็ค
         setTimeout(() => {
-            // แก้จาก $('#quiz-modal').modal('hide'); เป็น:
-            if (AppState.allModals['quiz']) {
-                AppState.allModals['quiz'].hide();
+            if (res.recoverableStreak > 0) {
+                // 🔥 พบสถิติที่กู้คืนได้! แสดง Popup ชวนกู้คืน
+                Swal.fire({
+                    title: '🔥 ไฟดับไปแล้ว!',
+                    html: `คุณพลาดการเล่นทำให้สถิติ <b>${res.recoverableStreak} วัน</b> หายไป<br>ต้องการใช้ <b>200 เหรียญ</b> เพื่อกู้คืนไหม?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33', // สีแดง
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'กู้คืนเดี๋ยวนี้! (200💰)',
+                    cancelButtonText: 'ไม่เป็นไร เริ่มใหม่'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        // เรียก API กู้คืน
+                        try {
+                            const restoreRes = await callApi('/api/game/restore-streak', { lineUserId: AppState.lineProfile.userId }, 'POST');
+                            
+                            // อัปเดตเหรียญหลังจ่ายค่ากู้คืน
+                            $('#coin-display').text(restoreRes.newCoinBalance);
+                            if(AppState.currentUser) AppState.currentUser.coinBalance = restoreRes.newCoinBalance;
+
+                            Swal.fire('สำเร็จ!', restoreRes.message, 'success').then(() => {
+                                closeQuizAndReload();
+                            });
+                        } catch (err) {
+                            Swal.fire('เสียใจด้วย', err.message, 'error').then(() => {
+                                closeQuizAndReload();
+                            });
+                        }
+                    } else {
+                        // ถ้าไม่กู้คืน ก็ปิดเกมปกติ
+                        closeQuizAndReload();
+                    }
+                });
             } else {
-                // Fallback
-                const modalEl = document.getElementById('quiz-modal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if(modal) modal.hide();
+                // ถ้าไม่มีอะไรให้กู้คืน ก็ปิดเกมปกติ
+                closeQuizAndReload();
             }
-            
-            loadGameDashboard(); 
-        }, 2500);
+        }, 2200);
 
     } catch (e) {
         Swal.fire('แจ้งเตือน', e.message, 'warning');
         $('.answer-btn').prop('disabled', false); // ปลดล็อกปุ่มถ้า Error
     }
 });
+
+// ⭐ เพิ่มฟังก์ชันนี้ต่อท้ายลงไปด้วยนะครับ (ถ้ายังไม่มี)
+// ฟังก์ชันช่วยปิด Modal และโหลดข้อมูลใหม่
+function closeQuizAndReload() {
+    if (AppState.allModals['quiz']) {
+        AppState.allModals['quiz'].hide();
+    } else {
+        const modalEl = document.getElementById('quiz-modal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if(modal) modal.hide();
+    }
+    loadGameDashboard(); 
+}
 
 // ==========================================
 // --- ADMIN: QUESTION MANAGEMENT (FIXED V.2) ---

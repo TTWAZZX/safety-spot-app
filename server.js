@@ -187,46 +187,43 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 // PART 2 — USER / ACTIVITIES / LEADERBOARD
 // ======================================================
 
-// -----------------------------
-//   USER PROFILE
-// -----------------------------
-// -----------------------------
-//   USER PROFILE (FIXED STREAK)
-// -----------------------------
+// --- API: USER PROFILE (ฉบับแก้: โชว์ Streak 0 ถ้าขาดช่วง) ---
 app.get('/api/user/profile', async (req, res) => {
     try {
         const { lineUserId } = req.query;
-        if (!lineUserId) {
-            return res.json({
-                status: "success",
-                data: { registered: false, user: null }
-            });
-        }
+        if (!lineUserId) return res.json({ status: "success", data: { registered: false, user: null } });
 
-        // ⭐ แก้ตรงนี้: ใช้ LEFT JOIN เพื่อดึง currentStreak จากตาราง user_streaks
-        // ใช้ COALESCE เพื่อแปลงค่า NULL (ถ้ายังไม่เคยเล่น) ให้เป็น 0
         const [rows] = await db.query(`
             SELECT u.*, 
-                   COALESCE(us.currentStreak, 0) AS currentStreak
+                   us.currentStreak,
+                   us.lastPlayedDate,
+                   us.recoverableStreak
             FROM users u
             LEFT JOIN user_streaks us ON u.lineUserId = us.lineUserId
             WHERE u.lineUserId = ?
         `, [lineUserId]);
 
-        if (rows.length === 0) {
-            return res.json({
-                status: "success",
-                data: { registered: false, user: null }
-            });
-        }
+        if (rows.length === 0) return res.json({ status: "success", data: { registered: false, user: null } });
 
         const user = rows[0];
+        
+        // ⭐ LOGIC: ถ้าไม่ได้เล่นมาเกิน 1 วัน ให้แสดงเป็น 0 (Visual Reset)
+        let displayStreak = 0;
+        if (user.currentStreak && user.lastPlayedDate) {
+            const now = new Date();
+            const last = new Date(user.lastPlayedDate);
+            const diffTime = Math.abs(now - last);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+            
+            // ถ้าเล่นวันนี้ (0) หรือเมื่อวาน (1) -> โชว์เลขเดิม
+            if (diffDays <= 1) {
+                displayStreak = user.currentStreak;
+            }
+        }
+        user.currentStreak = displayStreak;
 
-        const [adminRows] = await db.query(
-            "SELECT * FROM admins WHERE lineUserId = ?",
-            [lineUserId]
-        );
-
+        // เช็ค Admin
+        const [adminRows] = await db.query("SELECT * FROM admins WHERE lineUserId = ?", [lineUserId]);
         user.isAdmin = adminRows.length > 0;
 
         res.json({ status: "success", data: { registered: true, user } });
@@ -1584,7 +1581,7 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: จบเกม (คำนวณ Streak + แจก Coin) ---
+// --- API: จบเกม (เวอร์ชันอัปเกรด: เก็บสถิติที่หายไป + แจกเหรียญ) ---
 app.post('/api/game/submit-answer-v2', async (req, res) => {
     const { lineUserId, questionId, selectedOption } = req.body;
     const today = new Date().toISOString().split('T')[0];
@@ -1593,18 +1590,21 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
     try {
         await conn.beginTransaction();
         
-        // 1. ตรวจคำตอบ ... (เหมือนเดิม) ...
+        // 1. ตรวจคำตอบ
         const [qs] = await conn.query("SELECT * FROM kyt_questions WHERE questionId = ?", [questionId]);
+        if (qs.length === 0) throw new Error("ไม่พบคำถาม");
+        
         const question = qs[0];
         const isCorrect = (selectedOption === question.correctOption);
         
-        // 2. คำนวณรางวัล (ให้ Coin แทน)
-        let earnedCoins = isCorrect ? 50 : 10; // ถูกได้ 50, ผิดได้ 10
+        let earnedCoins = isCorrect ? 50 : 10;
         let earnedScore = isCorrect ? question.scoreReward : 2; 
 
-        // 3. ระบบ Streak (โบนัสความต่อเนื่อง)
+        // 2. ระบบ Streak (Logic ใหม่: เก็บ Streak เก่าไว้ให้กู้คืน)
         const [streakRow] = await conn.query("SELECT * FROM user_streaks WHERE lineUserId = ?", [lineUserId]);
         let currentStreak = 1;
+        let recoverableStreak = 0;
+        let isStreakBroken = false;
         
         if (streakRow.length > 0) {
             const lastDate = new Date(streakRow[0].lastPlayedDate);
@@ -1612,41 +1612,122 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             if (diffDays === 1) { 
-                // มาเล่นต่อจากเมื่อวาน -> Streak ขึ้น
+                // ต่อเนื่อง: บวกเพิ่ม
                 currentStreak = streakRow[0].currentStreak + 1;
+                recoverableStreak = 0; // เคลียร์ค่ากู้คืน (เพราะเล่นต่อเนื่องแล้ว)
             } else if (diffDays === 0) {
-                // เล่นซ้ำวันเดิม -> Streak เท่าเดิม
+                // ซ้ำวันเดิม: เท่าเดิม
                 currentStreak = streakRow[0].currentStreak;
+                recoverableStreak = streakRow[0].recoverableStreak; 
             } else {
-                // ขาดช่วง -> รีเซ็ตเหลือ 1
-                currentStreak = 1;
+                // ❄️ ขาดช่วง (ไฟดับ!): เก็บของเก่าไว้กู้คืน
+                isStreakBroken = true;
+                // ต้องมีขั้นต่ำ 3 วันถึงจะคุ้มให้กู้คืน (แก้เลขตรงนี้ได้)
+                if (streakRow[0].currentStreak >= 3) { 
+                    recoverableStreak = streakRow[0].currentStreak;
+                }
+                currentStreak = 1; // รีเซ็ตเป็น 1
             }
             
-            // อัปเดต Streak
             await conn.query(
-                "UPDATE user_streaks SET currentStreak = ?, lastPlayedDate = ? WHERE lineUserId = ?",
-                [currentStreak, today, lineUserId]
+                "UPDATE user_streaks SET currentStreak = ?, lastPlayedDate = ?, recoverableStreak = ? WHERE lineUserId = ?",
+                [currentStreak, today, recoverableStreak, lineUserId]
             );
         } else {
-            // เพิ่งเคยเล่นครั้งแรก
-            await conn.query("INSERT INTO user_streaks VALUES (?, 1, ?, 1)", [lineUserId, today]);
+            // เล่นครั้งแรก
+            await conn.query("INSERT INTO user_streaks (lineUserId, currentStreak, lastPlayedDate, recoverableStreak) VALUES (?, 1, ?, 0)", [lineUserId, today]);
         }
 
-        // Streak Bonus: ทุกๆ 7 วัน ได้เหรียญเพิ่ม 100
-        if (currentStreak > 0 && currentStreak % 7 === 0) {
+        // Streak Bonus (ทุก 7 วัน)
+        if (!isStreakBroken && currentStreak > 0 && currentStreak % 7 === 0) {
             earnedCoins += 100; 
         }
 
-        // 4. บันทึกผลและอัปเดต User
-        // ... (บันทึก history เหมือนเดิม) ...
+        // 3. อัปเดต User
         await conn.query("UPDATE users SET totalScore = totalScore + ?, coinBalance = coinBalance + ? WHERE lineUserId = ?", [earnedScore, earnedCoins, lineUserId]);
 
+        // 4. บันทึกประวัติ
+        await conn.query(
+            "INSERT INTO user_game_history (lineUserId, questionId, isCorrect, earnedPoints, playedAt) VALUES (?, ?, ?, ?, ?)",
+            [lineUserId, questionId, isCorrect, earnedCoins, today]
+        );
+
+        const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
         await conn.commit();
-        res.json({ status: "success", data: { isCorrect, earnedCoins, currentStreak } });
+        
+        res.json({ 
+            status: "success", 
+            data: { 
+                isCorrect, 
+                earnedCoins, 
+                currentStreak,
+                recoverableStreak, // ส่งไปบอกหน้าบ้านให้โชว์ปุ่ม
+                newCoinBalance: updatedUser.coinBalance,
+                isStreakBroken 
+            } 
+        });
 
     } catch (e) {
         await conn.rollback();
         res.status(500).json({message: e.message});
+    } finally { conn.release(); }
+});
+
+// --- API: ใช้ไอเทมกู้คืน Streak (Restore) ---
+app.post('/api/game/restore-streak', async (req, res) => {
+    const { lineUserId } = req.body;
+    const RESTORE_COST = 200; // ราคาค่ากู้คืน
+    const conn = await db.getClient();
+
+    try {
+        await conn.beginTransaction();
+
+        // 1. เช็คว่ามีอะไรให้กู้ไหม
+        const [streakRow] = await conn.query("SELECT * FROM user_streaks WHERE lineUserId = ?", [lineUserId]);
+        if (streakRow.length === 0 || streakRow[0].recoverableStreak <= 0) {
+            throw new Error("ไม่มีสถิติให้กู้คืนครับ");
+        }
+        const lostStreak = streakRow[0].recoverableStreak;
+
+        // 2. เช็คเงิน
+        const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
+        if (user.coinBalance < RESTORE_COST) {
+            throw new Error(`เหรียญไม่พอครับ (ต้องการ ${RESTORE_COST} เหรียญ)`);
+        }
+
+        // 3. หักเงิน + กู้คืน
+        // สูตร: เอาของเก่า (lost) + ของปัจจุบัน (current) รวมกัน
+        const restoredStreak = lostStreak + streakRow[0].currentStreak;
+
+        await conn.query("UPDATE users SET coinBalance = coinBalance - ? WHERE lineUserId = ?", [RESTORE_COST, lineUserId]);
+        
+        await conn.query(
+            "UPDATE user_streaks SET currentStreak = ?, recoverableStreak = 0 WHERE lineUserId = ?",
+            [restoredStreak, lineUserId]
+        );
+
+        // 4. แจ้งเตือน
+        await conn.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt) VALUES (?, ?, ?, 'system_alert', 'restore', ?, NOW())`,
+            ["NOTIF" + Date.now(), lineUserId, `กู้ชีพสำเร็จ! 🔥 ไฟกลับมาเป็น ${restoredStreak} วันแล้ว`, lineUserId]
+        );
+
+        const [[updatedUser]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
+        await conn.commit();
+
+        res.json({ 
+            status: "success", 
+            data: { 
+                success: true, 
+                newStreak: restoredStreak,
+                newCoinBalance: updatedUser.coinBalance,
+                message: `กู้คืนสำเร็จ! ไฟกลับมาลุกโชน ${restoredStreak} วัน 🔥`
+            } 
+        });
+
+    } catch (e) {
+        await conn.rollback();
+        res.status(400).json({ status: "error", message: e.message });
     } finally { conn.release(); }
 });
 
@@ -2590,82 +2671,70 @@ app.get('/api/admin/monitor/coins', isAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// --- ฟังก์ชันกลาง: ส่งแจ้งเตือน Streak (ใช้ร่วมกันทั้ง Auto และ Manual) ---
+// --- ฟังก์ชันกลาง: ส่งแจ้งเตือน Streak (แยก 2 กลุ่ม: เตือน / ดับ) ---
 async function broadcastStreakReminders() {
     const conn = await db.getClient();
-    console.log(`[${new Date().toLocaleString()}] เริ่มต้นกระบวนการแจ้งเตือน Streak...`);
+    console.log(`[${new Date().toLocaleString()}] เริ่มกระบวนการแจ้งเตือน Streak แบบแยกกลุ่ม...`);
+
+    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!token) return { success: false, message: "No Token" };
 
     try {
-        // 1. หาคนที่เคยมี Streak แต่ยังไม่เล่นวันนี้
-        const [users] = await conn.query(`
-            SELECT lineUserId, currentStreak 
-            FROM user_streaks 
-            WHERE currentStreak > 0 
-              AND lastPlayedDate < CURDATE()
+        // กลุ่ม 1: Warning (หายไป 1 วัน)
+        const [warningUsers] = await conn.query(`
+            SELECT lineUserId, currentStreak FROM user_streaks 
+            WHERE currentStreak > 0 AND DATEDIFF(CURDATE(), lastPlayedDate) = 1
         `);
 
-        if (users.length === 0) {
-            console.log("ไม่มีผู้ใช้ที่ต้องแจ้งเตือน");
-            return { success: true, count: 0, message: "ทุกคนเล่นครบแล้ว" };
-        }
+        // กลุ่ม 2: Lost (หายไป 2 วัน - แจ้งแค่ครั้งเดียว)
+        const [lostUsers] = await conn.query(`
+            SELECT lineUserId, currentStreak FROM user_streaks 
+            WHERE currentStreak > 0 AND DATEDIFF(CURDATE(), lastPlayedDate) = 2
+        `);
 
-        const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-        if (!token) throw new Error("ไม่พบ LINE Channel Access Token");
-
-        let sentCount = 0;
-        // 2. วนลูปส่ง
-        for (const u of users) {
-            try {
-                const message = {
-                    to: u.lineUserId,
-                    messages: [{
-                        type: "flex",
-                        altText: "🔥 ระวังไฟดับ! เข้ามาเติมด่วน",
-                        contents: {
-                            type: "bubble",
-                            body: {
-                                type: "box",
-                                layout: "vertical",
-                                contents: [
-                                    { type: "text", text: "🔥 ระวังไฟดับ!", weight: "bold", size: "xl", color: "#ff5500" },
-                                    { type: "text", text: `คุณรักษาสถิติมา ${u.currentStreak} วันแล้ว`, size: "md", color: "#555555", margin: "md" },
-                                    { type: "text", text: "รีบเล่น Daily Quiz ก่อนเที่ยงคืนเพื่อรักษาสถิติ!", size: "sm", color: "#aaaaaa", wrap: true, margin: "sm" }
-                                ]
-                            },
-                            footer: {
-                                type: "box",
-                                layout: "vertical",
-                                contents: [
-                                    {
-                                        type: "button",
-                                        action: { type: "uri", label: "เข้าเกมทันที 🎮", uri: "https://liff.line.me/2007053300-9xLKdwZp" },
-                                        style: "primary",
-                                        color: "#06C755"
-                                    }
-                                ]
+        // Helper function ยิงไลน์
+        const sendPush = async (users, title, text, color, btnText) => {
+            let count = 0;
+            for (const u of users) {
+                try {
+                    await axios.post('https://api.line.me/v2/bot/message/push', {
+                        to: u.lineUserId,
+                        messages: [{
+                            type: "flex", altText: title,
+                            contents: {
+                                type: "bubble",
+                                body: {
+                                    type: "box", layout: "vertical",
+                                    contents: [
+                                        { type: "text", text: title, weight: "bold", size: "xl", color: color },
+                                        { type: "text", text: text.replace('{streak}', u.currentStreak), size: "md", color: "#555555", margin: "md", wrap: true },
+                                    ]
+                                },
+                                footer: {
+                                    type: "box", layout: "vertical",
+                                    contents: [{
+                                        type: "button", style: "primary", color: color,
+                                        action: { type: "uri", label: btnText, uri: "https://liff.line.me/" + process.env.LIFF_ID }
+                                    }]
+                                }
                             }
-                        }
-                    }]
-                };
-
-                await axios.post('https://api.line.me/v2/bot/message/push', message, {
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
-                });
-                sentCount++;
-            } catch (err) {
-                console.error(`ส่งหา ${u.lineUserId} ไม่สำเร็จ:`, err.message);
+                        }]
+                    }, { headers: { 'Authorization': `Bearer ${token}` } });
+                    count++;
+                } catch (e) { console.error(`Failed to send to ${u.lineUserId}`); }
             }
-        }
+            return count;
+        };
 
-        console.log(`ส่งแจ้งเตือนสำเร็จ ${sentCount} คน`);
-        return { success: true, count: sentCount, message: `ส่งสำเร็จ ${sentCount} คน` };
+        const sentWarning = await sendPush(warningUsers, "⚠️ เตือนภัย! ไฟจะดับ", "คุณรักษาสถิติมา {streak} วันแล้ว รีบเข้ามาเล่นก่อนเที่ยงคืน!", "#ffaa00", "เข้าเติมไฟ 🔥");
+        
+        const sentLost = await sendPush(lostUsers, "😭 ไฟดับแล้วเหลือ 0...", "เสียดายจัง! สถิติ {streak} วันสิ้นสุดลงแล้ว แต่เริ่มใหม่ได้เสมอนะ!", "#ff0000", "เริ่มจุดไฟใหม่ 🕯️");
+
+        return { success: true, message: `Warning: ${sentWarning}, Lost: ${sentLost}` };
 
     } catch (e) {
-        console.error("Broadcast Error:", e);
         return { success: false, message: e.message };
-    } finally {
-        conn.release();
-    }
+    } finally { conn.release(); }
 }
 
 // --- ตั้งเวลา Auto (Cron Job) ---
