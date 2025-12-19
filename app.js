@@ -583,6 +583,7 @@ async function loadLeaderboard(isLoadMore = false) {
 
 async function refreshHomePageData() {
     try {
+        // 1. โหลดข้อมูล Profile และ กิจกรรม (ของเดิม)
         const [userDataResponse, activities] = await Promise.all([
             callApi('/api/user/profile', { lineUserId: AppState.lineProfile.userId }),
             callApi('/api/activities', { lineUserId: AppState.lineProfile.userId })
@@ -595,9 +596,17 @@ async function refreshHomePageData() {
 
         displayActivitiesUI(activities, 'latest-activities-list');
 
+        // ⭐ 2. เพิ่มบรรทัดนี้: สั่งให้โหลดข้อมูลหน้าเกมใหม่ด้วย
+        await loadGameDashboard(); 
+        
+        // (แถม) ถ้าอยู่ในหน้า Leaderboard ก็ให้โหลดใหม่ด้วย
+        if ($('#leaderboard-page').hasClass('active')) {
+            loadLeaderboard(false);
+        }
+
     } catch (error) {
         console.error("Failed to refresh home page data:", error);
-        showError("ไม่สามารถรีเฟรชข้อมูลได้");
+        // ไม่ต้อง show error ให้ user เห็นตอน pull refresh มันจะรำคาญ แค่ log ไว้พอ
     }
 }
 
@@ -2267,9 +2276,9 @@ $(document).on('click', '.answer-btn', async function() {
     }
 });
 
-// ⭐ เพิ่มฟังก์ชันนี้ต่อท้ายลงไปด้วยนะครับ (ถ้ายังไม่มี)
 // ฟังก์ชันช่วยปิด Modal และโหลดข้อมูลใหม่
 function closeQuizAndReload() {
+    // ปิด Modal Quiz
     if (AppState.allModals['quiz']) {
         AppState.allModals['quiz'].hide();
     } else {
@@ -2277,6 +2286,8 @@ function closeQuizAndReload() {
         const modal = bootstrap.Modal.getInstance(modalEl);
         if(modal) modal.hide();
     }
+
+    // ⭐ สั่งโหลดข้อมูลหน้าเกมใหม่ทันที
     loadGameDashboard(); 
 }
 
@@ -4083,3 +4094,33 @@ $('#admin-edit-kyt-form').on('submit', async function(e) {
         Swal.fire('Error', err.message, 'error');
     }
 });
+
+// ===============================================================
+//  AUTO REFRESH SYSTEM (Real-time Polling)
+// ===============================================================
+setInterval(() => {
+    // ทำงานเฉพาะเมื่อ User อยู่หน้า Game Page และไม่ได้เปิด Modal ค้างไว้
+    if ($('#game-page').hasClass('active') && !$('.modal.show').length) {
+        
+        // เรียก API แบบเงียบๆ (ไม่ต้องโชว์ Loading spinner)
+        callApi('/api/user/profile', { lineUserId: AppState.lineProfile.userId })
+            .then(res => {
+                if (res.registered) {
+                    const user = res.user;
+                    const oldCoins = AppState.currentUser ? AppState.currentUser.coinBalance : 0;
+                    
+                    // อัปเดตข้อมูลใน AppState
+                    AppState.currentUser = user;
+
+                    // ถ้าเหรียญเปลี่ยน ให้ทำตัวเลขวิ่ง
+                    if (user.coinBalance !== oldCoins) {
+                        animateCoinChange(user.coinBalance);
+                    }
+                    
+                    // อัปเดต Streak (เผื่อข้ามวันแล้วไฟดับ)
+                    $('#streak-display').text((user.currentStreak || 0) + " วัน");
+                }
+            })
+            .catch(e => console.error("Auto-refresh failed", e));
+    }
+}, 5000); // ทำงานทุก 5 วินาที
