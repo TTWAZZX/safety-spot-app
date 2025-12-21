@@ -2559,13 +2559,12 @@ app.post('/api/admin/remind-streaks', isAdmin, async (req, res) => {
 
 // --- API: ทดสอบส่งแจ้งเตือนหาตัวเอง (Admin Only) ---
 app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
-    const { requesterId } = req.body; // ไอดีของแอดมินที่กดปุ่ม
+    const { requesterId } = req.body; 
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
     try {
         if (!token) throw new Error("ไม่พบ LINE Channel Access Token");
 
-        // สร้างข้อความ (Mock Data: สมมติว่ามี Streak 5 วัน เพื่อดูตัวอย่าง)
         const message = {
             to: requesterId,
             messages: [{
@@ -2588,7 +2587,8 @@ app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
                         contents: [
                             {
                                 type: "button",
-                                action: { type: "uri", label: "เข้าเกมทันที 🎮", uri: "https://liff.line.me/2007053300-9xLKdwZp" },
+                                // ⭐ แก้ตรงนี้: ใช้ process.env.LIFF_ID
+                                action: { type: "uri", label: "เข้าเกมทันที 🎮", uri: "https://liff.line.me/" + process.env.LIFF_ID },
                                 style: "primary",
                                 color: "#06C755"
                             }
@@ -2598,7 +2598,6 @@ app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
             }]
         };
 
-        // ยิงเข้าไลน์แอดมินคนเดียว
         await axios.post('https://api.line.me/v2/bot/message/push', message, {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
         });
@@ -2728,6 +2727,7 @@ async function broadcastStreakReminders() {
                                     type: "box", layout: "vertical",
                                     contents: [{
                                         type: "button", style: "primary", color: color,
+                                        // ⭐ แก้ตรงนี้: ใช้ process.env.LIFF_ID
                                         action: { type: "uri", label: btnText, uri: "https://liff.line.me/" + process.env.LIFF_ID }
                                     }]
                                 }
