@@ -1905,12 +1905,24 @@ body {
 }
 
 .now-playing-avatar {
-    width: 48px;
-    height: 48px;
+    width: 64px;
+    height: 64px;
     object-fit: cover;
-    border: 2px solid rgba(255,255,255,0.7);
-    box-shadow: 0 0 0 3px rgba(6,199,85,0.45);
+    border: 3px solid rgba(255,255,255,0.8);
+    box-shadow: 0 0 0 3px rgba(6,199,85,0.5), 0 4px 12px rgba(0,0,0,0.25);
     flex-shrink: 0;
+}
+
+.now-playing-name-text {
+    font-size: 1rem;
+    line-height: 1.2;
+    letter-spacing: 0.1px;
+}
+
+.now-playing-subtitle {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.6);
+    margin-top: 1px;
 }
 
 .now-playing-badge {
@@ -1985,8 +1997,8 @@ body {
         gap: 10px;
     }
     .now-playing-avatar {
-        width: 36px;
-        height: 36px;
+        width: 48px;
+        height: 48px;
     }
     #now-playing-name {
         font-size: 0.82rem;

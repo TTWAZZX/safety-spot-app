@@ -1930,7 +1930,7 @@ app.get('/api/admin/user-details', isAdmin, async (req, res) => {
     const { lineUserId } = req.query;
 
     const [[user]] = await db.query(
-        `SELECT lineUserId, fullName, employeeId, pictureUrl, totalScore
+        `SELECT lineUserId, fullName, employeeId, pictureUrl, totalScore, coinBalance
          FROM users
          WHERE lineUserId = ?`,
         [lineUserId]

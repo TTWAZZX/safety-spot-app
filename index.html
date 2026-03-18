@@ -101,15 +101,19 @@
                     </div>
 
                     <!-- NOW PLAYING INDICATOR -->
-                    <div id="now-playing-bar" class="now-playing-bar d-flex align-items-center gap-3 mt-3 d-none">
-                        <img id="now-playing-pic" src="https://placehold.co/48x48" class="rounded-circle now-playing-avatar" width="48" height="48">
-                        <div class="flex-grow-1 lh-sm overflow-hidden">
-                            <div class="text-white fw-bold text-truncate" id="now-playing-name" style="font-size:0.95rem;">...</div>
-                            <div style="font-size:0.72rem;color:rgba(255,255,255,0.65);">กำลังเล่น Safety Spot Arcade</div>
+                    <div id="now-playing-bar" class="now-playing-bar d-none">
+                        <div class="d-flex align-items-center gap-3">
+                            <img id="now-playing-pic" src="https://placehold.co/64x64" class="rounded-circle now-playing-avatar" width="64" height="64" alt="">
+                            <div class="flex-grow-1 overflow-hidden">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="now-playing-badge flex-shrink-0">
+                                        <span class="now-playing-dot"></span>ONLINE
+                                    </span>
+                                </div>
+                                <div class="text-white fw-bold text-truncate now-playing-name-text" id="now-playing-name">...</div>
+                                <div class="now-playing-subtitle">กำลังเล่น Safety Spot Arcade</div>
+                            </div>
                         </div>
-                        <span class="now-playing-badge flex-shrink-0">
-                            <span class="now-playing-dot"></span>ONLINE
-                        </span>
                     </div>
 
                     <!-- เนื้อหา Hero -->
