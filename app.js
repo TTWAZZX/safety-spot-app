@@ -220,13 +220,14 @@ async function showMainApp(userData) {
             $('#admin-nav-item').hide();
         }
 
-        // โหลดกิจกรรม
+        // โหลดกิจกรรม (สำหรับหน้าภารกิจเท่านั้น)
         const activities = await callApi('/api/activities', {
             lineUserId: AppState.lineProfile.userId
         });
-
-        displayActivitiesUI(activities, 'latest-activities-list');
         displayActivitiesUI(activities, 'all-activities-list');
+
+        // โหลด Home Dashboard (profile card + stats + dept leaderboard)
+        loadHomeDashboard();
 
         // ปิด loading overlay ก่อน แล้วค่อยแสดง app
         $('#loading-overlay').addClass('d-none');
@@ -377,8 +378,6 @@ function syncCoins(amount) {
 }
 
 function updateUserInfoUI(user) {
-    $('#user-header').addClass('user-header-card');
-
     $('#user-profile-pic, #profile-page-pic').attr('src', user.pictureUrl || 'https://placehold.co/80x80');
     $('#user-display-name, #profile-page-name').text(user.fullName);
     $('#user-employee-id').text(`รหัส: ${user.employeeId}`);
@@ -386,7 +385,49 @@ function updateUserInfoUI(user) {
     $('#user-score, #profile-page-score').text(user.totalScore);
     $('#profile-page-coins').text(user.coinBalance || 0);
     $('#profile-page-streak').text((user.currentStreak || 0) + ' วัน');
+    // Home dashboard stats
+    $('#home-coins-display').text((user.coinBalance || 0).toLocaleString());
+    $('#home-streak-display').text(user.currentStreak || 0);
+    $('#home-dept-name').text(user.department || 'ยังไม่ระบุแผนก');
     // completion % จะถูกอัปเดตใน loadGameDashboard() หลังโหลดการ์ด
+}
+
+async function loadHomeDashboard() {
+    // อัปเดต profile fields จาก AppState ที่มีอยู่แล้ว
+    if (AppState.currentUser) {
+        updateUserInfoUI(AppState.currentUser);
+    }
+
+    // โหลด Department Leaderboard
+    const container = $('#home-dept-leaderboard');
+    try {
+        const rows = await callApi('/api/department-leaderboard');
+        if (!rows || !rows.length) {
+            container.html('<p class="text-muted text-center small py-2">ยังไม่มีข้อมูลแผนก</p>');
+            return;
+        }
+
+        const myDept = AppState.currentUser ? AppState.currentUser.department : '';
+        const myRank = rows.findIndex(r => r.department === myDept);
+
+        if (myRank >= 0) {
+            $('#home-dept-rank-label').text(`แผนกคุณ: อันดับ ${myRank + 1} / ${rows.length}`);
+        }
+
+        const medals = ['🥇', '🥈', '🥉'];
+        const html = rows.map((r, i) => {
+            const isMe = r.department === myDept;
+            return `<div class="home-dept-row ${isMe ? 'home-dept-row-mine' : ''}">
+                <span class="home-dept-rank">${medals[i] || (i + 1)}</span>
+                <span class="home-dept-name-text flex-grow-1 text-truncate">${sanitizeHTML(r.department)}</span>
+                <span class="home-dept-score">${r.avgScore} <small class="text-muted">เฉลี่ย</small></span>
+            </div>`;
+        }).join('');
+
+        container.html(html);
+    } catch (e) {
+        container.html('<p class="text-muted text-center small py-2">โหลดไม่ได้</p>');
+    }
 }
 
 // ในไฟล์ app.js
@@ -719,10 +760,11 @@ async function refreshHomePageData() {
             updateUserInfoUI(AppState.currentUser);
         }
 
-        displayActivitiesUI(activities, 'latest-activities-list');
+        displayActivitiesUI(activities, 'all-activities-list');
+        loadHomeDashboard();
 
         // ⭐ 2. เพิ่มบรรทัดนี้: สั่งให้โหลดข้อมูลหน้าเกมใหม่ด้วย
-        await loadGameDashboard(); 
+        await loadGameDashboard();
         
         // (แถม) ถ้าอยู่ในหน้า Leaderboard ก็ให้โหลดใหม่ด้วย
         if ($('#leaderboard-page').hasClass('active')) {
@@ -808,8 +850,11 @@ function bindStaticEventListeners() {
             $('.page').removeClass('active');
             $('#' + pageId).addClass('active');
 
+            if (pageId === 'home-page') {
+                loadHomeDashboard();
+            }
             if (pageId === 'leaderboard-page') {
-                loadLeaderboard(false); 
+                loadLeaderboard(false);
             }
             if (pageId === 'profile-page') {
                 loadUserBadges();

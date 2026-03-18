@@ -53,23 +53,68 @@
     <div id="main-app" style="display: none;">
         <main class="container py-3 pb-5 mb-5">
             <div id="home-page" class="page active">
-                 <div id="user-header" class="d-flex align-items-center p-3 mb-4">
-                    <img id="user-profile-pic" src="https://placehold.co/60x60" class="rounded-circle me-3" width="60" height="60" alt="Profile Picture">
-                    <div>
-                        <p class="mb-0 text-muted small" id="user-employee-id">รหัส: ...</p>
-                        <h5 class="mb-0 fw-bold" id="user-display-name">...</h5>
-                    </div>
-                    <div class="ms-auto text-end">
-                        <div class="fw-bold text-primary">
-                            <h4 class="mb-0" id="user-score">0</h4>
-                            <small>คะแนน</small>
+
+                <!-- Profile Hero Card -->
+                <div class="home-profile-card mb-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <img id="user-profile-pic" src="https://placehold.co/64x64" class="home-profile-avatar" width="64" height="64" alt="">
+                        <div class="flex-grow-1 overflow-hidden">
+                            <div class="fw-bold text-truncate" id="user-display-name" style="font-size:1.05rem;">...</div>
+                            <div class="text-muted small" id="user-employee-id">รหัส: ...</div>
+                            <span class="home-dept-badge mt-1 d-inline-block">
+                                <i class="fas fa-building me-1"></i><span id="home-dept-name">-</span>
+                            </span>
+                        </div>
+                        <div class="text-end flex-shrink-0">
+                            <div class="home-score-value" id="user-score">0</div>
+                            <small class="text-muted" style="font-size:0.68rem;">คะแนนสะสม</small>
                         </div>
                     </div>
                 </div>
-                <h5 class="mb-3 fw-bold">กิจกรรมล่าสุด</h5>
-                <div id="latest-activities-list">
-                    <p class="text-center text-muted">กำลังโหลดกิจกรรม...</p>
+
+                <!-- Stats Row -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="home-stat-card">
+                            <i class="fas fa-coins home-stat-icon" style="color:#f59e0b;"></i>
+                            <div class="home-stat-value" id="home-coins-display">0</div>
+                            <div class="home-stat-label">เหรียญ</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="home-stat-card">
+                            <i class="fas fa-fire home-stat-icon" style="color:#ef4444;"></i>
+                            <div class="home-stat-value" id="home-streak-display">0</div>
+                            <div class="home-stat-label">วันติดต่อ</div>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Quick Actions -->
+                <div class="d-flex gap-2 mb-4">
+                    <button class="btn btn-success fw-semibold flex-grow-1 home-action-btn"
+                            onclick="$('[data-page=game-page]').trigger('click')">
+                        <i class="fas fa-gamepad me-2"></i>เล่นเกม
+                    </button>
+                    <button class="btn btn-outline-success fw-semibold flex-grow-1 home-action-btn"
+                            onclick="$('[data-page=activities-page]').trigger('click')">
+                        <i class="fas fa-paper-plane me-2"></i>ส่งรายงาน
+                    </button>
+                </div>
+
+                <!-- Department Leaderboard -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between pb-1">
+                        <span class="fw-bold" style="font-size:0.9rem;">
+                            <i class="fas fa-building me-2 text-primary"></i>อันดับคะแนนแผนก
+                        </span>
+                        <small class="text-muted" id="home-dept-rank-label"></small>
+                    </div>
+                    <div class="card-body pt-1 pb-2" id="home-dept-leaderboard">
+                        <div class="text-center py-3"><div class="spinner-border spinner-border-sm text-secondary"></div></div>
+                    </div>
+                </div>
+
             </div>
 
             <div id="game-page" class="page">
@@ -338,7 +383,10 @@
             </div>
 
             <div id="activities-page" class="page">
-                <h4 class="mb-3 fw-bold">กิจกรรมทั้งหมด</h4>
+                <div class="mb-3">
+                    <h4 class="fw-bold mb-0">ภารกิจความปลอดภัย</h4>
+                    <small class="text-muted">เลือกกิจกรรมที่ต้องการเข้าร่วมและส่งรายงาน</small>
+                </div>
                 <div id="all-activities-list"></div>
             </div>
 

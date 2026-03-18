@@ -402,6 +402,26 @@ app.post('/api/user/update-department', async (req, res) => {
 // -----------------------------
 //   ACTIVITIES LIST
 // -----------------------------
+// Public: Department Leaderboard (top 10 by avg score)
+app.get('/api/department-leaderboard', async (_req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT department,
+                   COUNT(*) AS memberCount,
+                   ROUND(AVG(totalScore), 1) AS avgScore,
+                   SUM(totalScore) AS totalScore
+            FROM users
+            WHERE department != ''
+            GROUP BY department
+            ORDER BY avgScore DESC
+            LIMIT 10
+        `);
+        res.json({ status: "success", data: rows });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
 app.get('/api/activities', async (req, res) => {
     try {
         const { lineUserId } = req.query;
