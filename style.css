@@ -2350,19 +2350,25 @@ body {
 
 /* ===== STICKY MY RANK BAR ===== */
 .my-rank-bar {
-    position: sticky;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
+    position: fixed;
+    bottom: 66px; /* above bottom nav */
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 448px;
+    z-index: 200;
     background: linear-gradient(135deg, #06C755 0%, #04a844 100%);
     color: #fff;
     display: flex;
     align-items: center;
     padding: 10px 16px;
-    border-radius: 14px 14px 0 0;
-    box-shadow: 0 -4px 16px rgba(6,199,85,0.25);
-    margin: 0 -18px;
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(6,199,85,0.4);
+    animation: slideUpBar 0.35s ease;
+}
+@keyframes slideUpBar {
+    from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+    to   { transform: translateX(-50%) translateY(0);   opacity: 1; }
 }
 .my-rank-bar img {
     width: 32px;

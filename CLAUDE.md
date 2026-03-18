@@ -6,7 +6,7 @@ LINE LIFF web application สำหรับระบบรายงานคว
 - Database: MySQL (Aiven Cloud) ผ่าน `db.js`
 - Frontend: jQuery + Bootstrap 5 (`app.js`, `index.html`)
 - Storage: Cloudflare R2 (S3-compatible)
-- Deploy: Render.com (backend), GitHub Pages หรือ static hosting (frontend)
+- Deploy: Render.com (backend), GitHub Pages (frontend)
 
 ## Architecture
 ```
@@ -18,19 +18,19 @@ LINE LIFF (frontend) → callApi() → Express REST API → MySQL (Aiven)
 ## Key Files
 | File | หน้าที่ |
 |------|---------|
-| `server.js` | Express backend ~3250 บรรทัด — API ทั้งหมด |
+| `server.js` | Express backend ~3400 บรรทัด — API ทั้งหมด |
 | `db.js` | MySQL connection pool — export `query()` และ `getClient()` |
 | `schema.sql` | Full schema สำหรับ fresh install (DROP + CREATE) |
 | `migration.sql` | ALTER statements สำหรับ patch production ที่มีข้อมูลแล้ว |
-| `app.js` | Frontend SPA logic ~3300 บรรทัด |
-| `index.html` | HTML template ~81KB |
-| `style.css` | Custom styles (Bootstrap 5 overrides, LINE green theme) |
+| `app.js` | Frontend SPA logic ~5100 บรรทัด |
+| `index.html` | HTML template |
+| `style.css` | Custom styles (Bootstrap 5 overrides, LINE green theme) ~2460 บรรทัด |
 
 ## Database
 - **Host:** Aiven Cloud MySQL 8.0
 - **Connection:** ผ่าน `DATABASE_URL` env variable
 - **Pool:** `db.getClient()` สำหรับ transaction, `db.query()` สำหรับ query ธรรมดา
-- **Tables:** 19 ตาราง (ดู `schema.sql` สำหรับ full schema) — รวม `audit_logs` ที่สร้างอัตโนมัติตอน server start
+- **Tables:** 19 ตาราง + `audit_logs` (สร้างอัตโนมัติตอน server start)
 
 ## Environment Variables (.env)
 ```
@@ -108,6 +108,13 @@ formData.append('image', file);
 formData.append('lineUserId', AppState.lineProfile.userId);
 ```
 
+### callApi Helper
+```javascript
+// callApi อัตโนมัติ inject requesterId จาก AppState.lineProfile.userId ทุก request
+await callApi('/api/endpoint', { param: value }, 'POST');
+// GET requests → query string, POST requests → JSON body
+```
+
 ## Game Tables
 | Table | หน้าที่ |
 |-------|---------|
@@ -121,12 +128,13 @@ formData.append('lineUserId', AppState.lineProfile.userId);
 | `hunter_attempts` | จำนวนครั้งที่เล่นแต่ละด่าน (max 3) |
 | `user_hunter_history` | ผลดาวและ UNIQUE per (lineUserId, levelId) |
 
-## Features Added
+## Features Implemented
 
 ### Rate Limiting (`express-rate-limit`)
 - `generalLimiter`: 100 req/min — ครอบ `/api/`
-- `authLimiter`: 10 req/5min — `/api/user/register`, `/api/user/profile`
+- `authLimiter`: 10 req/5min — `/api/user/register` เท่านั้น
 - `uploadLimiter`: 20 req/5min — `/api/submissions`, `/api/upload`
+- ⚠️ `/api/user/profile` **ต้องไม่อยู่ใน authLimiter** — auto-refresh ทุก 5 วินาทีจะ 429
 
 ### Department System
 - 34 แผนกคงที่ใน `DEPARTMENTS` constant (app.js)
@@ -140,11 +148,83 @@ formData.append('lineUserId', AppState.lineProfile.userId);
 - `GET /api/admin/export/submissions/print` — HTML page สำหรับ print PDF
 
 ### Admin Audit Log
-- ตาราง `audit_logs` — สร้างอัตโนมัติด้วย `CREATE TABLE IF NOT EXISTS`
-- `logAdminAction(adminId, action, targetType, targetId, targetName, detail)` — helper fire-and-forget ไม่บล็อก response
-- บันทึกทุก action สำคัญ: APPROVE/REJECT/DELETE_SUBMISSION, ADD/DEDUCT_SCORE, ADD/DEDUCT_COINS, UPDATE_STREAK, AWARD/REVOKE_BADGE, AWARD_CARD, UPDATE_PROFILE
-- `GET /api/admin/audit-logs` — paginated 50/page, filter ตาม action/dateFrom/dateTo
-- UI: modal fullscreen พร้อม filter bar + pagination ในหน้า Admin
+- ตาราง `audit_logs` — สร้างอัตโนมัติด้วย `CREATE TABLE IF NOT EXISTS` ตอน server start
+- `logAdminAction(adminId, action, targetType, targetId, targetName, detail)` — fire-and-forget ไม่บล็อก response
+- บันทึกทุก action: APPROVE/REJECT/DELETE_SUBMISSION, ADD/DEDUCT_SCORE, ADD/DEDUCT_COINS, UPDATE_STREAK, AWARD/REVOKE_BADGE, AWARD_CARD, UPDATE_PROFILE
+- `GET /api/admin/audit-logs` — paginated 50/page, filter ตาม action/adminId/dateFrom/dateTo
+- UI: `#admin-audit-modal` fullscreen พร้อม filter bar + pagination
+
+### Home Dashboard (Personal Dashboard)
+หน้าหลักเป็น Personal Dashboard แยกออกจากหน้ากิจกรรม:
+- **Profile card**: avatar, ชื่อ, รหัสพนักงาน, แผนก, คะแนน, percentile chip
+- **Stats row**: เหรียญ, streak ต่อเนื่อง
+- **Quick actions**: เล่นเกม / ส่งรายงาน
+- **Department Leaderboard**: top 10 avg score, highlight แผนกตัวเอง, rank label
+- **Recent activities**: compact card 3 อันดับแรก, กดเปิด submission modal ได้
+- **Social Feed**: ความเคลื่อนไหวล่าสุด (10 รายการ approved)
+
+### Activities Page (ภารกิจความปลอดภัย)
+- **Filter tabs**: ทั้งหมด / ยังไม่ได้ร่วม / ร่วมแล้ว ✓
+- **Done badges**: `activity-done-badge` (✅ overlay บนรูป), `activity-count-badge` (👥 overlay), green border
+- `AppState._lastActivities` cache ไว้ filter tabs ใช้
+- Filter reset เป็น "all" อัตโนมัติเมื่อโหลดกิจกรรมใหม่
+
+### Leaderboard Page
+- **Sticky "My Rank" bar**: `position: fixed; bottom: 66px` (เหนือ bottom nav)
+- แสดงอัตโนมัติหลัง `loadLeaderboard` โหลดเสร็จ
+- ซ่อนเมื่อออกจากหน้า leaderboard (nav click handler)
+- Fallback: ถ้า user ไม่อยู่ใน page 1 ใช้ `AppState.currentUser.userRank` จาก profile
+
+### Percentile System
+- `/api/user/profile` คำนวณ `userRank`, `totalUsers`, `percentile`
+- `updateUserInfoUI` populate `#home-percentile-label` พร้อม CSS class tier:
+  - `.pct-top` (gold) — Top ≤10%
+  - `.pct-mid` (green) — Top ≤50%
+  - `.pct-low` (grey) — Top >50%
+
+### Confetti Celebrations (`canvas-confetti`)
+CDN: `https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js`
+```javascript
+fireConfetti('default')  // ส่งรายงาน, admin อนุมัติ
+fireConfetti('streak')   // streak milestone (ยิงสองข้าง)
+fireConfetti('big')      // 3 bursts
+```
+
+### Streak Milestone Celebration
+- `checkStreakMilestone(streak)` เรียกใน `showMainApp` ทุก login
+- Milestone: 7, 30, 60, 100 วัน
+- Dedup ด้วย `localStorage.getItem('streak_milestone_N_shown')`
+- แสดง Swal popup + confetti streak
+
+### Social Feed
+- `GET /api/social-feed` (public) — 10 approved submissions ล่าสุด พร้อม user + activity info
+- `loadSocialFeed()` — render ใน `#home-social-feed` เรียกจาก `loadHomeDashboard`
+- `formatTimeAgo(dateStr)` — Thai time labels (เมื่อกี้ / X นาที / X ชั่วโมง / X วัน)
+
+### Department Leaderboard (Public)
+- `GET /api/department-leaderboard` (public) — top 10 แผนก by avgScore
+- ไม่ต้อง auth, เรียกได้เลย
+
+### Submission Count per Activity
+- `/api/activities` คืน `submissionCount` ต่อ activity
+- คำนวณจาก GROUP BY ใน query แยก + map เป็น object
+
+### Empty States
+- `.empty-state` — icon + heading + text (ใช้ใน activities list)
+- `.empty-state-small` — compact version (ใช้ใน social feed, home cards)
+- Filter-aware: ข้อความต่างกันสำหรับ done/pending filter ที่ว่าง
+
+## Public API Endpoints (ไม่ต้องการ auth)
+| Endpoint | Returns |
+|----------|---------|
+| `GET /api/social-feed` | 10 approved submissions ล่าสุด |
+| `GET /api/department-leaderboard` | Top 10 แผนก by avgScore |
+| `GET /api/activities?lineUserId=` | กิจกรรม + userHasSubmitted + submissionCount |
+| `GET /api/leaderboard?page=` | ผู้ใช้ ranked by totalScore |
+
+## KYT Monitor
+- ⚠️ Column จริงคือ `h.selectedAnswer` — ต้อง `h.selectedAnswer AS selectedOption`
+- อย่าใช้ `h.selectedOption` — ไม่มีคอลัมน์นี้ใน `user_game_history`
 
 ## Fixed Bugs Log
 
@@ -168,10 +248,9 @@ formData.append('lineUserId', AppState.lineProfile.userId);
 ### รอบที่ 2 — Security & Race Condition
 | ID | ปัญหา | วิธีแก้ |
 |----|-------|---------|
-| S-1 | Quiz submit v1/v2: SELECT→INSERT race condition → เล่นซ้ำวันเดิมได้ | ลบ SELECT check, จับ ER_DUP_ENTRY บน INSERT แทน |
+| S-1 | Quiz submit v1/v2: SELECT→INSERT race condition | ลบ SELECT check, จับ ER_DUP_ENTRY บน INSERT แทน |
 | S-2 | Upload ไม่จำกัดขนาด/ไม่เช็ค MIME | เพิ่ม 10MB limit + `mimetype.startsWith('image/')` + require lineUserId |
 | DB-1 | UNIQUE constraint ขาดหาย | เพิ่มใน migration.sql และ schema.sql |
-| DB-2 | `uq_game_history_daily` สร้างใน DBeaver โดยตรง | บันทึกใน migration.sql (comment) |
 
 ### รอบที่ 3 — UX/UI Fixes (app.js)
 | ID | ปัญหา | วิธีแก้ |
@@ -181,15 +260,42 @@ formData.append('lineUserId', AppState.lineProfile.userId);
 | U-3 | coin/score ไม่อัปเดตหลัง exchange | เพิ่ม UI update หลัง callApi สำเร็จ |
 | U-4 | Quiz options ว่างยังแสดง (กดพลาดได้) | loop show/hide `.col-6` ตาม option ที่มีค่า |
 | U-5 | Streak recovery ปุ่มสีแดง = confusing | เปลี่ยนเป็น confirm=เขียว, cancel=เทา |
-| U-6 | Admin user list: N+1 API calls (31 requests) | LEFT JOIN badge COUNT ใน SQL เดียว |
+| U-6 | Admin user list: N+1 API calls | LEFT JOIN badge COUNT ใน SQL เดียว |
 | U-7 | Submit form ไม่ disable button ระหว่าง upload | disable/enable ใน try/finally |
-| U-8 | loadPendingSubmissions ไม่มี catch → container ว่าง | เพิ่ม catch + error message |
-| U-X | hunter/edit-user/edit-kyt modals ใช้ jQuery syntax ผิด | แก้เป็น `bootstrap.Modal.getInstance(...)?.hide()` |
+| U-8 | loadPendingSubmissions ไม่มี catch | เพิ่ม catch + error message |
+| U-9 | KYT monitor 500: `h.selectedOption` ไม่มีคอลัมน์นี้ | แก้เป็น `h.selectedAnswer AS selectedOption` |
+| U-10 | 429 Too Many Requests บน `/api/user/profile` | ลบออกจาก `authLimiter` |
+| U-11 | Profile avatar ไม่ชิดขอบ (now-playing-bar) | Full-bleed: `margin: 0 -18px; border-radius: 0` |
+
+## AppState (Global State)
+```javascript
+AppState = {
+    lineProfile,       // LINE profile object
+    currentUser,       // DB user object (includes userRank, percentile)
+    allModals,         // Bootstrap modal instances
+    reportsChart,      // Chart.js instance
+    leaderboard,       // { currentPage, hasMore }
+    adminUsers,        // { currentPage, hasMore, currentSearch, currentSort }
+    _cachedQuestions,  // cached quiz questions
+    _cachedCards,      // cached safety cards
+    _cachedBadges,     // cached badges
+    _cachedAdminUsers, // cached admin user list
+    _lastCards,        // last loaded user cards
+    _lastActivities,   // last loaded activities (used by filter tabs & home dashboard)
+    _streakWarningShown,
+    _filterActive,     // flag: filter tab is active (prevent cache overwrite)
+}
+```
+
+## CSS Architecture
+- `style.css` — เรียงตามลำดับ: Variables → Reset → Layout → Components → Pages → Responsive
+- ใช้ `var(--line-green)` (#06C755) เป็น primary color
+- Bootstrap 5 เป็น base — override เฉพาะที่จำเป็น
+- ไม่มี dark mode
 
 ## Database Migration
 - **Fresh install:** รัน `schema.sql`
 - **Production patch:** รัน `migration.sql` (safe, ไม่ลบข้อมูล)
-- Schema จริงใน production อาจต่างจาก `schema.sql` ให้ใช้ `DESCRIBE <table>` ตรวจสอบก่อนแก้
 - **สำคัญ:** Aiven MySQL บังคับ Primary Key ทุกตาราง (`sql_require_primary_key`)
 - **UNIQUE Index ที่สร้างแล้วใน DB:** `uq_game_history_daily` บน `user_game_history(lineUserId, playedAt)`
 
@@ -205,9 +311,10 @@ npm run dev   # nodemon
 npm start     # production
 ```
 
-## Known Limitations (ไม่ใช่ bug แต่ควรรู้)
+## Known Limitations
 - Auth ฝั่ง server ไม่มี token verification — trust lineUserId จาก client (LINE LIFF handles auth)
-- Render.com free tier อาจ spin down → cold start ~30 วินาที (UptimeRobot ping ทุก 5 นาทีเพื่อ keep alive)
-- Notification ไม่มี pagination (ถ้ามีมากจะ render ทีเดียว)
-- Admin user list ไม่มี server-side pagination (คืนทุก row, sort/filter ใน SQL)
-- `audit_logs.detail` เก็บเป็น JSON string — ถ้า MySQL ไม่รองรับ JSON type จะ fallback เป็น TEXT
+- Render.com free tier อาจ spin down → cold start ~30 วินาที (UptimeRobot ping ทุก 5 นาที keep alive)
+- Notification ไม่มี pagination
+- Admin user list ไม่มี server-side pagination
+- `audit_logs.detail` เก็บเป็น JSON string
+- Department Trend (↑↓ รายสัปดาห์) ยังไม่ implement — ต้องมี snapshot table ก่อน

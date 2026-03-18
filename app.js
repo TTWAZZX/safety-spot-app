@@ -571,6 +571,9 @@ function displayActivitiesUI(activities, listId) {
     // Cache full list for filter tabs (only from the full activities page, not filtered subsets)
     if (listId === 'all-activities-list' && !AppState._filterActive) {
         AppState._lastActivities = activities;
+        // Reset filter tab to "all" on full reload
+        $('.act-filter-btn').removeClass('active');
+        $('.act-filter-btn[data-filter="all"]').addClass('active');
     }
     activities.forEach(act => {
         // --- ส่วนที่เพิ่มเข้ามา ---
@@ -1012,6 +1015,10 @@ function bindStaticEventListeners() {
             $('.page').removeClass('active');
             $('#' + pageId).addClass('active');
 
+            // Hide rank bar when leaving leaderboard
+            if (pageId !== 'leaderboard-page') {
+                $('#my-rank-bar').addClass('d-none');
+            }
             if (pageId === 'home-page') {
                 loadHomeDashboard();
             }
@@ -1072,7 +1079,16 @@ function bindStaticEventListeners() {
         else if (filter === 'pending') filtered = all.filter(a => !a.userHasSubmitted);
         else filtered = all;
         AppState._filterActive = (filter !== 'all');
-        displayActivitiesUI(filtered, 'all-activities-list');
+        if (filtered.length === 0) {
+            const msg = filter === 'done'
+                ? '<div class="empty-state"><i class="fas fa-check-double"></i><h6>ยังไม่ได้ร่วมกิจกรรมไหนเลย</h6><p>ลองเข้าร่วมกิจกรรมดูนะ!</p></div>'
+                : filter === 'pending'
+                    ? '<div class="empty-state"><i class="fas fa-trophy"></i><h6>ร่วมกิจกรรมครบทุกอย่างแล้ว!</h6><p>เยี่ยมมาก ติดตามกิจกรรมใหม่เร็วๆนี้</p></div>'
+                    : '<div class="empty-state"><i class="fas fa-clipboard-list"></i><h6>ยังไม่มีกิจกรรม</h6><p>ติดตามกิจกรรมความปลอดภัยได้ที่นี่</p></div>';
+            $('#all-activities-list').html(msg);
+        } else {
+            displayActivitiesUI(filtered, 'all-activities-list');
+        }
         AppState._filterActive = false;
     });
 
