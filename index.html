@@ -373,7 +373,7 @@
                             <div class="col-4">
                                 <div class="rounded-3 p-3 text-center" style="background:#fff1f2;">
                                     <div class="fs-5 fw-bold text-danger" id="profile-page-streak">0</div>
-                                    <small class="text-muted fw-semibold" style="font-size:0.7rem;"><i class="fas fa-fire me-1"></i>วันติดต่อกัน</small>
+                                    <small class="text-muted fw-semibold" style="font-size:0.7rem;"><i class="fas fa-fire me-1"></i>ติดต่อ</small>
                                 </div>
                             </div>
                             <div class="col-4">
@@ -473,6 +473,9 @@
                     </a>
                     <a href="#" id="btn-export-reports" class="list-group-item list-group-item-action">
                         <i class="fas fa-file-excel me-2 text-success"></i> Export รายงาน (Excel / PDF)
+                    </a>
+                    <a href="#" id="btn-audit-log" class="list-group-item list-group-item-action">
+                        <i class="fas fa-history me-2 text-warning"></i> ประวัติการดำเนินการ Admin
                     </a>
                 </div>
             </div>
@@ -699,6 +702,78 @@
                     <button class="btn btn-danger flex-grow-1" id="btn-export-pdf">
                         <i class="fas fa-file-pdf me-2"></i>Export PDF
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Audit Log Modal -->
+    <div class="modal fade" id="admin-audit-modal">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-history me-2 text-warning"></i>ประวัติการดำเนินการ Admin</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-2">
+                    <!-- Filters -->
+                    <div class="d-flex flex-wrap gap-2 mb-3 align-items-end">
+                        <div>
+                            <label class="form-label small mb-1">ประเภท</label>
+                            <select class="form-select form-select-sm" id="audit-filter-action" style="min-width:160px;">
+                                <option value="">ทั้งหมด</option>
+                                <option value="APPROVE_SUBMISSION">Approve รายงาน</option>
+                                <option value="REJECT_SUBMISSION">Reject รายงาน</option>
+                                <option value="DELETE_SUBMISSION">ลบรายงาน</option>
+                                <option value="ADD_SCORE">เพิ่มคะแนน</option>
+                                <option value="DEDUCT_SCORE">หักคะแนน</option>
+                                <option value="ADD_COINS">เพิ่มเหรียญ</option>
+                                <option value="DEDUCT_COINS">หักเหรียญ</option>
+                                <option value="UPDATE_STREAK">แก้ Streak</option>
+                                <option value="AWARD_BADGE">มอบป้าย</option>
+                                <option value="REVOKE_BADGE">เพิกถอนป้าย</option>
+                                <option value="AWARD_CARD">มอบการ์ด</option>
+                                <option value="UPDATE_PROFILE">แก้ Profile</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label small mb-1">วันที่เริ่ม</label>
+                            <input type="date" class="form-control form-control-sm" id="audit-filter-from">
+                        </div>
+                        <div>
+                            <label class="form-label small mb-1">ถึงวันที่</label>
+                            <input type="date" class="form-control form-control-sm" id="audit-filter-to">
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="btn-audit-search" style="height:32px;">
+                            <i class="fas fa-search"></i> ค้นหา
+                        </button>
+                    </div>
+                    <!-- Table -->
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle" style="font-size:0.82rem;">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>#</th>
+                                    <th>เวลา</th>
+                                    <th>Admin</th>
+                                    <th>การดำเนินการ</th>
+                                    <th>เป้าหมาย</th>
+                                    <th>รายละเอียด</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-log-tbody">
+                                <tr><td colspan="6" class="text-center text-muted">กำลังโหลด...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Pagination -->
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <span class="text-muted small" id="audit-total-label"></span>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-outline-secondary btn-sm" id="btn-audit-prev">&#8592; ก่อนหน้า</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="btn-audit-next">ถัดไป &#8594;</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

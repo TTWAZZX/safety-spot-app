@@ -149,7 +149,7 @@ $(document).ready(function() {
 // ในไฟล์ app.js ค้นหา function initializeAllModals()
 function initializeAllModals() {
     // เพิ่ม 'quiz' เข้าไปใน array นี้ครับ
-    const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form', 'user-details', 'notification', 'quiz', 'admin-analytics', 'admin-dept', 'admin-export'];
+    const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form', 'user-details', 'notification', 'quiz', 'admin-analytics', 'admin-dept', 'admin-export', 'admin-audit'];
     
     modalIds.forEach(id => {
         const modalElement = document.getElementById(`${id}-modal`);
@@ -949,6 +949,22 @@ function bindAdminEventListeners() {
     });
     $('#btn-export-csv').on('click', handleExportCSV);
     $('#btn-export-pdf').on('click', handleExportPDF);
+    $('#btn-audit-log').on('click', function(e) {
+        e.preventDefault();
+        AppState.allModals['admin-audit'].show();
+        loadAdminAuditLogs(1);
+    });
+    $('#btn-audit-search').on('click', function() { loadAdminAuditLogs(1); });
+    $('#btn-audit-prev').on('click', function() {
+        const cur = Number($('#btn-audit-prev').data('page') || 1);
+        if (cur > 1) loadAdminAuditLogs(cur - 1);
+    });
+    $('#btn-audit-next').on('click', function() {
+        const cur = Number($('#btn-audit-prev').data('page') || 1);
+        const total = Number($('#btn-audit-prev').data('total') || 0);
+        const limit = 50;
+        if (cur * limit < total) loadAdminAuditLogs(cur + 1);
+    });
 
     // ผูกปุ่มและแท็บ
     $(document).on('click', '#btn-game-monitor', function() {
@@ -2165,6 +2181,73 @@ function handleExportPDF() {
         const params = new URLSearchParams({ status, from, to, format: 'print' });
         window.open(`/api/admin/export/submissions/print?${params.toString()}`, '_blank');
     });
+}
+
+// ===== ADMIN AUDIT LOG =====
+const AUDIT_ACTION_LABELS = {
+    APPROVE_SUBMISSION: { label: 'Approve รายงาน',  cls: 'success' },
+    REJECT_SUBMISSION:  { label: 'Reject รายงาน',   cls: 'danger'  },
+    DELETE_SUBMISSION:  { label: 'ลบรายงาน',         cls: 'dark'    },
+    ADD_SCORE:          { label: 'เพิ่มคะแนน',       cls: 'primary' },
+    DEDUCT_SCORE:       { label: 'หักคะแนน',          cls: 'warning' },
+    ADD_COINS:          { label: 'เพิ่มเหรียญ',       cls: 'info'    },
+    DEDUCT_COINS:       { label: 'หักเหรียญ',          cls: 'warning' },
+    UPDATE_STREAK:      { label: 'แก้ Streak',        cls: 'secondary'},
+    AWARD_BADGE:        { label: 'มอบป้าย',           cls: 'success' },
+    REVOKE_BADGE:       { label: 'เพิกถอนป้าย',       cls: 'danger'  },
+    AWARD_CARD:         { label: 'มอบการ์ด',          cls: 'primary' },
+    UPDATE_PROFILE:     { label: 'แก้ Profile',       cls: 'secondary'},
+};
+
+async function loadAdminAuditLogs(page = 1) {
+    const action   = $('#audit-filter-action').val();
+    const dateFrom = $('#audit-filter-from').val();
+    const dateTo   = $('#audit-filter-to').val();
+
+    const payload = { page, limit: 50 };
+    if (action)   payload.action   = action;
+    if (dateFrom) payload.dateFrom = dateFrom;
+    if (dateTo)   payload.dateTo   = dateTo;
+
+    $('#audit-log-tbody').html('<tr><td colspan="6" class="text-center"><span class="spinner-border spinner-border-sm"></span> กำลังโหลด...</td></tr>');
+
+    try {
+        const json = await callApi('/api/admin/audit-logs', payload);
+        const { rows, total, limit } = json;
+        const totalPages = Math.ceil(total / limit);
+
+        $('#audit-total-label').text(`แสดง ${rows.length} จาก ${total} รายการ | หน้า ${page}/${totalPages || 1}`);
+        $('#btn-audit-prev').data('page', page).data('total', total).prop('disabled', page <= 1);
+        $('#btn-audit-next').data('page', page).data('total', total).prop('disabled', page >= totalPages);
+
+        if (!rows.length) {
+            $('#audit-log-tbody').html('<tr><td colspan="6" class="text-center text-muted">ไม่พบข้อมูล</td></tr>');
+            return;
+        }
+
+        const offset = (page - 1) * limit;
+        const html = rows.map((r, i) => {
+            const meta = AUDIT_ACTION_LABELS[r.action] || { label: r.action, cls: 'secondary' };
+            const ts = new Date(r.createdAt).toLocaleString('th-TH');
+            let detail = '';
+            try {
+                const d = typeof r.detail === 'string' ? JSON.parse(r.detail) : (r.detail || {});
+                detail = Object.entries(d).map(([k, v]) => `<span class="text-muted">${k}:</span> <b>${sanitizeHTML(String(v))}</b>`).join(' · ');
+            } catch(_) {}
+            return `<tr>
+                <td class="text-muted">${offset + i + 1}</td>
+                <td style="white-space:nowrap;">${ts}</td>
+                <td><small>${sanitizeHTML(r.adminName || r.adminId)}</small></td>
+                <td><span class="badge bg-${meta.cls}">${meta.label}</span></td>
+                <td><small class="text-muted">${sanitizeHTML(r.targetName || r.targetId || '')}</small></td>
+                <td><small>${detail}</small></td>
+            </tr>`;
+        }).join('');
+
+        $('#audit-log-tbody').html(html);
+    } catch(e) {
+        $('#audit-log-tbody').html(`<tr><td colspan="6" class="text-danger text-center">${e.message}</td></tr>`);
+    }
 }
 
 // แก้ไขฟังก์ชันนี้ทั้งฟังก์ชัน

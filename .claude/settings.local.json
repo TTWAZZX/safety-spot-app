@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find /c/safety-spot-app -maxdepth 2 -type f \\\\\\(-name *.css -o -name .env* -o -name *.md \\\\\\) ! -path */node_modules/* ! -path */.git/*)"
+      "Bash(find /c/safety-spot-app -maxdepth 2 -type f \\\\\\(-name *.css -o -name .env* -o -name *.md \\\\\\) ! -path */node_modules/* ! -path */.git/*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(grep \"\\\\\")"
     ]
   }
 }

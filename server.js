@@ -96,6 +96,34 @@ db.query("ALTER TABLE users ADD COLUMN department VARCHAR(100) NOT NULL DEFAULT 
   .catch(() => {}); // ignore if column already exists
 db.query("ALTER TABLE submissions ADD COLUMN reviewedAt DATETIME DEFAULT NULL")
   .catch(() => {});
+db.query(`
+  CREATE TABLE IF NOT EXISTS audit_logs (
+    logId       INT AUTO_INCREMENT PRIMARY KEY,
+    adminId     VARCHAR(100) NOT NULL,
+    adminName   VARCHAR(200) DEFAULT '',
+    action      VARCHAR(100) NOT NULL,
+    targetType  VARCHAR(50)  DEFAULT '',
+    targetId    VARCHAR(100) DEFAULT '',
+    targetName  VARCHAR(200) DEFAULT '',
+    detail      JSON,
+    createdAt   DATETIME DEFAULT NOW()
+  )
+`).catch(() => {});
+
+// -------------------------
+//   Admin Audit Log Helper
+// -------------------------
+async function logAdminAction(adminId, action, targetType, targetId, targetName, detail) {
+    try {
+        const [[admin]] = await db.query("SELECT fullName FROM users WHERE lineUserId = ?", [adminId]);
+        const adminName = admin ? admin.fullName : adminId;
+        await db.query(
+            `INSERT INTO audit_logs (adminId, adminName, action, targetType, targetId, targetName, detail, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+            [adminId, adminName, action, targetType || '', targetId || '', targetName || '', JSON.stringify(detail || {})]
+        );
+    } catch (_) { /* never block main flow */ }
+}
 
 // -----------------------------
 //   Auto award badges by score (ADD + REMOVE)
@@ -1231,6 +1259,7 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
         await autoAwardBadgesForUser(ownerId, conn);
 
         await conn.commit();
+        logAdminAction(requesterId, 'APPROVE_SUBMISSION', 'submission', String(submissionId), `Submission #${submissionId}`, { score, ownerId });
         res.json({ status: "success", data: { message: "Approved." } });
     } catch (err) {
         await conn.rollback();
@@ -1278,6 +1307,7 @@ app.post('/api/admin/submissions/reject', isAdmin, async (req, res) => {
         ]);
 
         await conn.commit();
+        logAdminAction(requesterId, 'REJECT_SUBMISSION', 'submission', String(submissionId), `Submission #${submissionId}`, { ownerId });
         res.json({ status: "success", data: { message: "Rejected." } });
     } catch (err) {
         await conn.rollback();
@@ -1291,10 +1321,12 @@ app.post('/api/admin/submissions/reject', isAdmin, async (req, res) => {
 // ADMIN: Delete Submission
 // ======================================================
 app.delete('/api/admin/submissions/:submissionId', isAdmin, async (req, res) => {
+    const requesterId = req.query.requesterId;
     try {
         await db.query("DELETE FROM likes WHERE submissionId = ?", [req.params.submissionId]);
         await db.query("DELETE FROM comments WHERE submissionId = ?", [req.params.submissionId]);
         await db.query("DELETE FROM submissions WHERE submissionId = ?", [req.params.submissionId]);
+        logAdminAction(requesterId, 'DELETE_SUBMISSION', 'submission', req.params.submissionId, `Submission #${req.params.submissionId}`, {});
         res.json({ status: "success", data: { removed: true } });
     } catch (err) {
         res.status(500).json({ status: "error", message: err.message });
@@ -1493,6 +1525,7 @@ app.post('/api/admin/award-badge', isAdmin, async (req, res) => {
         ]
     );
 
+    logAdminAction(requesterId, 'AWARD_BADGE', 'user', lineUserId, lineUserId, { badgeId, badgeName: badge ? badge.badgeName : '' });
     res.json({ status: "success", data: { awarded: true } });
 });
 
@@ -1529,6 +1562,7 @@ app.post('/api/admin/revoke-badge', isAdmin, async (req, res) => {
         ]
     );
 
+    logAdminAction(requesterId, 'REVOKE_BADGE', 'user', lineUserId, lineUserId, { badgeId, badgeName: badge ? badge.badgeName : '' });
     res.json({ status: "success", data: { revoked: true } });
 });
 
@@ -1662,6 +1696,7 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
             ]
         );
 
+        logAdminAction(requesterId, deltaScore >= 0 ? 'ADD_SCORE' : 'DEDUCT_SCORE', 'user', lineUserId, lineUserId, { deltaScore, newTotalScore });
         res.json({
             status: "success",
             data: {
@@ -2030,7 +2065,7 @@ app.get('/api/admin/user-details', isAdmin, async (req, res) => {
 
 // B-1: ปรับ Coins โดยตรง
 app.post('/api/admin/user/update-coins', isAdmin, async (req, res) => {
-    const { lineUserId, deltaCoins } = req.body;
+    const { lineUserId, deltaCoins, requesterId } = req.body;
     if (!lineUserId || deltaCoins === undefined) {
         return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
     }
@@ -2039,6 +2074,7 @@ app.post('/api/admin/user/update-coins', isAdmin, async (req, res) => {
         if (!user) return res.status(404).json({ status: "error", message: "ไม่พบผู้ใช้" });
         const newBalance = Math.max(0, user.coinBalance + Number(deltaCoins));
         await db.query("UPDATE users SET coinBalance = ? WHERE lineUserId = ?", [newBalance, lineUserId]);
+        logAdminAction(requesterId, Number(deltaCoins) >= 0 ? 'ADD_COINS' : 'DEDUCT_COINS', 'user', lineUserId, lineUserId, { deltaCoins, newBalance });
         res.json({ status: "success", data: { newBalance } });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
@@ -2106,7 +2142,7 @@ app.get('/api/admin/user/submissions', isAdmin, async (req, res) => {
 
 // B-7: Reset / แก้ไข Streak
 app.post('/api/admin/user/update-streak', isAdmin, async (req, res) => {
-    const { lineUserId, newStreak } = req.body;
+    const { lineUserId, newStreak, requesterId } = req.body;
     if (!lineUserId || newStreak === undefined) {
         return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
     }
@@ -2124,6 +2160,7 @@ app.post('/api/admin/user/update-streak', isAdmin, async (req, res) => {
                 [lineUserId, streak]
             );
         }
+        logAdminAction(requesterId, 'UPDATE_STREAK', 'user', lineUserId, lineUserId, { newStreak: streak });
         res.json({ status: "success", data: { newStreak: streak } });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
@@ -2132,12 +2169,13 @@ app.post('/api/admin/user/update-streak', isAdmin, async (req, res) => {
 
 // B-8: มอบการ์ดให้ user โดยตรง
 app.post('/api/admin/award-card', isAdmin, async (req, res) => {
-    const { lineUserId, cardId } = req.body;
+    const { lineUserId, cardId, requesterId } = req.body;
     if (!lineUserId || !cardId) {
         return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
     }
     try {
         await db.query("INSERT INTO user_cards (lineUserId, cardId) VALUES (?, ?)", [lineUserId, cardId]);
+        logAdminAction(requesterId, 'AWARD_CARD', 'user', lineUserId, lineUserId, { cardId });
         res.json({ status: "success", data: { message: "มอบการ์ดสำเร็จ" } });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
@@ -2146,7 +2184,7 @@ app.post('/api/admin/award-card', isAdmin, async (req, res) => {
 
 // B-9: แก้ไข Profile user (ชื่อ, รหัสพนักงาน)
 app.post('/api/admin/user/update-profile', isAdmin, async (req, res) => {
-    const { lineUserId, fullName, employeeId, department } = req.body;
+    const { lineUserId, fullName, employeeId, department, requesterId } = req.body;
     if (!lineUserId || !fullName) {
         return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
     }
@@ -2155,6 +2193,7 @@ app.post('/api/admin/user/update-profile', isAdmin, async (req, res) => {
             "UPDATE users SET fullName = ?, employeeId = ?, department = ? WHERE lineUserId = ?",
             [fullName, employeeId || '', department || '', lineUserId]
         );
+        logAdminAction(requesterId, 'UPDATE_PROFILE', 'user', lineUserId, fullName, { fullName, employeeId, department });
         res.json({ status: "success", message: "แก้ไขข้อมูลเรียบร้อย" });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
@@ -3187,6 +3226,36 @@ app.get('/api/admin/export/submissions/print', isAdmin, async (req, res) => {
             </table>
         </body></html>`);
     } catch(e) { res.status(500).send('Error: ' + e.message); }
+});
+
+// ======================================================
+// ADMIN: Audit Logs
+// ======================================================
+app.get('/api/admin/audit-logs', isAdmin, async (req, res) => {
+    const { page = 1, limit = 50, action, adminId, dateFrom, dateTo } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+    const conditions = [];
+    const params = [];
+
+    if (action)   { conditions.push("action = ?");            params.push(action); }
+    if (adminId)  { conditions.push("adminId = ?");           params.push(adminId); }
+    if (dateFrom) { conditions.push("createdAt >= ?");        params.push(dateFrom); }
+    if (dateTo)   { conditions.push("createdAt <= ?");        params.push(dateTo + ' 23:59:59'); }
+
+    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+    try {
+        const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM audit_logs ${where}`, params);
+        const [rows] = await db.query(
+            `SELECT logId, adminId, adminName, action, targetType, targetId, targetName, detail, createdAt
+             FROM audit_logs ${where}
+             ORDER BY createdAt DESC
+             LIMIT ? OFFSET ?`,
+            [...params, Number(limit), offset]
+        );
+        res.json({ status: "success", data: { rows, total, page: Number(page), limit: Number(limit) } });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
 });
 
 // ======================================================
