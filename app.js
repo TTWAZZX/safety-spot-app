@@ -210,11 +210,6 @@ async function showMainApp(userData) {
         AppState.currentUser = userData;
         updateUserInfoUI(AppState.currentUser);
 
-        // ถ้าผู้ใช้ยังไม่มีแผนก → บังคับเลือกก่อนใช้งาน
-        if (!userData.department) {
-            await promptSelectDepartment(userData);
-        }
-        
         // ---------------------------
         // แสดงเมนู Admin เฉพาะแอดมิน
         // ---------------------------
@@ -226,13 +221,15 @@ async function showMainApp(userData) {
         }
 
         // โหลดกิจกรรม
-        const activities = await callApi('/api/activities', { 
-            lineUserId: AppState.lineProfile.userId 
+        const activities = await callApi('/api/activities', {
+            lineUserId: AppState.lineProfile.userId
         });
 
         displayActivitiesUI(activities, 'latest-activities-list');
         displayActivitiesUI(activities, 'all-activities-list');
-        
+
+        // ปิด loading overlay ก่อน แล้วค่อยแสดง app
+        $('#loading-overlay').addClass('d-none');
         $('#main-app').fadeIn();
 
         // Pull To Refresh
@@ -249,6 +246,11 @@ async function showMainApp(userData) {
         });
 
         checkUnreadNotifications();
+
+        // ถ้าผู้ใช้ยังไม่มีแผนก → บังคับเลือกหลัง app แสดงแล้ว (ต้องไม่ชนกับ loading overlay)
+        if (!userData.department) {
+            await promptSelectDepartment(userData);
+        }
 
     } catch (error) {
         console.error("Error during showMainApp:", error);
