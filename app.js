@@ -110,8 +110,12 @@ async function initializeApp() {
     }
 }
 
-async function showMainApp(userData) { 
+async function showMainApp(userData) {
     try {
+        // ใช้รูป LINE profile ล่าสุดทันที (ไม่รอให้ refresh-profile sync กับ DB ก่อน)
+        if (AppState.lineProfile && AppState.lineProfile.pictureUrl) {
+            userData.pictureUrl = AppState.lineProfile.pictureUrl;
+        }
         AppState.currentUser = userData;
         updateUserInfoUI(AppState.currentUser);
         
@@ -266,6 +270,14 @@ function getFullImageUrl(path, opts = {}) {
 // ===============================================================
 //  UI RENDERING FUNCTIONS
 // ===============================================================
+// อัปเดตเหรียญทุกจุดพร้อมกัน (HUD + Profile page + AppState)
+function syncCoins(amount) {
+    const n = Number(amount) || 0;
+    $('#coin-display').text(n.toLocaleString());
+    $('#profile-page-coins').text(n.toLocaleString());
+    if (AppState.currentUser) AppState.currentUser.coinBalance = n;
+}
+
 function updateUserInfoUI(user) {
     $('#user-header').addClass('user-header-card');
 
@@ -2507,9 +2519,8 @@ $(document).on('click', '.answer-btn', async function() {
         }, 'POST');
 
         // 2. อัปเดตเหรียญทันที
-        $('#coin-display').text(res.newCoinBalance);
+        syncCoins(res.newCoinBalance);
         if(AppState.currentUser) {
-            AppState.currentUser.coinBalance = res.newCoinBalance;
             // อัปเดตคะแนนรวมด้วย (เผื่อมี)
             if(res.newTotalScore) AppState.currentUser.totalScore = res.newTotalScore;
         }
@@ -2560,8 +2571,7 @@ $(document).on('click', '.answer-btn', async function() {
                             const restoreRes = await callApi('/api/game/restore-streak', { lineUserId: AppState.lineProfile.userId }, 'POST');
                             
                             // อัปเดตเหรียญหลังจ่ายค่ากู้คืน
-                            $('#coin-display').text(restoreRes.newCoinBalance);
-                            if(AppState.currentUser) AppState.currentUser.coinBalance = restoreRes.newCoinBalance;
+                            syncCoins(restoreRes.newCoinBalance);
 
                             Swal.fire('สำเร็จ!', restoreRes.message, 'success').then(() => {
                                 closeQuizAndReload();
@@ -2866,16 +2876,12 @@ async function handleToggleQuestion() {
 // เก็บอันนี้ไว้ (อันเดียวพอ)
 async function loadGameDashboard() {
     console.log("Loading Game Dashboard...");
-    
+
     const user = AppState.currentUser;
-    
-    // 1. ตัวเลขวิ่ง
-    if (typeof animateCoinChange === 'function') {
-        animateCoinChange(user.coinBalance || 0);
-    } else {
-        $('#coin-display').text(user.coinBalance || 0);
-    }
-    
+    if (!user) return; // guard: ยังไม่ login
+
+    // 1. อัปเดตเหรียญ + Streak
+    syncCoins(user.coinBalance || 0);
     $('#streak-display').text((user.currentStreak || 0) + " วัน");
 
     // 2. ดึงข้อมูลการ์ด
@@ -3045,8 +3051,7 @@ async function pullGacha() {
         const res = await callApi('/api/game/gacha-pull', { lineUserId: AppState.lineProfile.userId }, 'POST');
 
         // อัปเดตเหรียญ
-        $('#coin-display').text(res.remainingCoins);
-        if (AppState.currentUser) AppState.currentUser.coinBalance = res.remainingCoins;
+        syncCoins(res.remainingCoins);
 
         // 3. ใส่ข้อมูลลงในการ์ด
         $(`#img-${overlayId}`).attr('src', getFullImageUrl(res.badge.imageUrl));
@@ -3460,12 +3465,9 @@ async function exchangeCoinsToScore() {
             const res = await callApi('/api/game/exchange-coins', { lineUserId: AppState.lineProfile.userId }, 'POST');
 
             // อัปเดต UI ทันที
-            $('#coin-display').text(res.remainingCoins);
+            syncCoins(res.remainingCoins);
             $('#user-score, #profile-page-score').text(res.newTotalScore);
-            if (AppState.currentUser) {
-                AppState.currentUser.coinBalance = res.remainingCoins;
-                AppState.currentUser.totalScore = res.newTotalScore;
-            }
+            if (AppState.currentUser) AppState.currentUser.totalScore = res.newTotalScore;
 
             triggerHaptic('heavy'); // สั่นสำเร็จ
 

@@ -1905,11 +1905,12 @@ body {
 }
 
 .now-playing-avatar {
-    width: 36px;
-    height: 36px;
+    width: 48px;
+    height: 48px;
     object-fit: cover;
-    border: 2px solid rgba(255,255,255,0.6);
-    box-shadow: 0 0 0 2px rgba(6,199,85,0.5);
+    border: 2px solid rgba(255,255,255,0.7);
+    box-shadow: 0 0 0 3px rgba(6,199,85,0.45);
+    flex-shrink: 0;
 }
 
 .now-playing-badge {
@@ -1957,4 +1958,154 @@ body {
     padding: 2px 8px;
     border-radius: 20px;
     letter-spacing: 0.3px;
+}
+
+/* ===== RESPONSIVE — USER SIDE (mobile-first) ===== */
+
+/* Extra-small phones < 380px */
+@media (max-width: 379px) {
+    .game-hero {
+        padding: 18px 12px 14px;
+    }
+    .game-hero h2 {
+        font-size: 1.1rem;
+    }
+    #streak-display, #coin-display {
+        font-size: 1.1rem;
+    }
+    .bento-grid {
+        gap: 10px;
+    }
+    .bento-card {
+        padding: 14px 12px;
+    }
+    /* Now Playing compact */
+    #now-playing-bar {
+        padding: 8px 12px;
+        gap: 10px;
+    }
+    .now-playing-avatar {
+        width: 36px;
+        height: 36px;
+    }
+    #now-playing-name {
+        font-size: 0.82rem;
+    }
+    /* Profile stats: tighten padding */
+    #profile-page .row.g-2 .rounded-3 {
+        padding: 10px 4px !important;
+    }
+    #profile-page-coins,
+    #profile-page-streak,
+    #profile-page-completion {
+        font-size: 1rem !important;
+    }
+}
+
+/* Small phones 380-575px */
+@media (max-width: 575px) {
+    /* Submission modal: fullscreen */
+    #submission-modal .modal-dialog {
+        margin: 0;
+        max-width: 100%;
+        min-height: 100%;
+    }
+    #submission-modal .modal-content {
+        min-height: 100vh;
+        border-radius: 0;
+    }
+
+    /* Card album modal: fullscreen */
+    #card-album-modal .modal-dialog {
+        margin: 0;
+        max-width: 100%;
+    }
+    #card-album-modal .modal-content {
+        border-radius: 0;
+        min-height: 100vh;
+    }
+
+    /* Leaderboard tighter */
+    .leaderboard-item {
+        padding: 10px 12px !important;
+    }
+    .leaderboard-avatar {
+        width: 36px !important;
+        height: 36px !important;
+    }
+
+    /* Profile avatar doesn't need change (80px is fine) */
+
+    /* Gacha result image */
+    #gacha-result-card-img {
+        max-width: 180px;
+    }
+}
+
+/* ===== RESPONSIVE — ADMIN SIDE (desktop + mobile) ===== */
+
+/* Admin user-details-modal: tabs need horizontal scroll on small screens */
+@media (max-width: 767px) {
+    /* Tab bar: disable nav-justified equal-width, enable horizontal scroll */
+    #userDetailTabs {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        justify-content: flex-start !important;
+    }
+    #userDetailTabs::-webkit-scrollbar {
+        display: none;
+    }
+    #userDetailTabs .nav-item {
+        flex-shrink: 0;
+    }
+    #userDetailTabs .nav-link {
+        white-space: nowrap;
+        font-size: 0.8rem;
+        padding: 8px 12px;
+    }
+
+    /* Admin stats bar: smaller text */
+    #admin-user-stats-bar {
+        font-size: 0.82rem;
+        gap: 10px !important;
+        padding: 8px 12px !important;
+    }
+
+    /* Action buttons inside admin modal: stack vertically */
+    #udt-overview .d-flex.gap-2 {
+        flex-direction: column;
+        gap: 6px !important;
+    }
+    #udt-overview .d-flex.gap-2 .btn {
+        width: 100%;
+    }
+
+    /* Admin dashboard quick-action text */
+    #admin-page .list-group-item {
+        font-size: 0.88rem;
+        padding: 10px 14px;
+    }
+}
+
+/* Admin: tables need horizontal scroll on all screen sizes in modals */
+#udt-kyt-container,
+#udt-hunter-container,
+#udt-submissions-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+#udt-kyt-container table,
+#udt-hunter-container table,
+#udt-submissions-container table {
+    min-width: 560px;
+}
+
+/* Large desktop: constrain admin dashboard content width */
+@media (min-width: 1400px) {
+    #admin-page {
+        max-width: 1100px;
+        margin: 0 auto;
+    }
 }

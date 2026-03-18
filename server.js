@@ -1987,7 +1987,8 @@ app.get('/api/admin/user/kyt-history', isAdmin, async (req, res) => {
     const { lineUserId } = req.query;
     try {
         const [rows] = await db.query(
-            `SELECT h.historyId, h.playedAt, h.isCorrect, h.earnedPoints, h.selectedOption,
+            `SELECT h.historyId, h.playedAt, h.isCorrect, h.earnedPoints,
+                    h.selectedAnswer AS selectedOption,
                     COALESCE(q.questionText, 'คำถามถูกลบไปแล้ว') AS questionText,
                     COALESCE(q.correctOption, '') AS correctOption
              FROM user_game_history h
