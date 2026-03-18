@@ -439,11 +439,18 @@ app.get('/api/activities', async (req, res) => {
             [lineUserId]
         );
 
+        // จำนวนคนส่งรายงานแต่ละกิจกรรม
+        const [counts] = await db.query(
+            "SELECT activityId, COUNT(*) AS submissionCount FROM submissions WHERE status IN ('pending','approved') GROUP BY activityId"
+        );
+        const countMap = Object.fromEntries(counts.map(c => [c.activityId, c.submissionCount]));
+
         const submittedIds = new Set(submitted.map(a => a.activityId));
 
         const result = activities.map(a => ({
             ...a,
-            userHasSubmitted: submittedIds.has(a.activityId)
+            userHasSubmitted: submittedIds.has(a.activityId),
+            submissionCount: countMap[a.activityId] || 0
         }));
 
         res.json({ status: "success", data: result });

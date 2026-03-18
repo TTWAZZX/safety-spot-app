@@ -41,11 +41,98 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     border: none;
     overflow: hidden;
+    position: relative;
+}
+
+.activity-card-done {
+    border: 2px solid #86efac !important;
+    background: #f0fdf4 !important;
+}
+
+.activity-card-img-wrap {
+    position: relative;
 }
 
 .activity-card-img {
     height: 160px;
     object-fit: cover;
+    width: 100%;
+    display: block;
+}
+
+/* Badge "ส่งแล้ว" มุมบนขวา */
+.activity-done-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #16a34a;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+/* Badge "X คนร่วม" มุมล่างซ้าย */
+.activity-count-badge {
+    position: absolute;
+    bottom: 8px;
+    left: 10px;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    backdrop-filter: blur(4px);
+}
+
+/* Compact card สำหรับหน้าหลัก */
+.home-act-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fff;
+    border-radius: 14px;
+    padding: 10px 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: transform 0.15s;
+}
+
+.home-act-card:active {
+    transform: scale(0.98);
+}
+
+.home-act-card-done {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+}
+
+.home-act-thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.home-act-info {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.home-act-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.home-act-status {
+    flex-shrink: 0;
 }
 
 .activity-card .card-title {

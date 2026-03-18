@@ -220,14 +220,14 @@ async function showMainApp(userData) {
             $('#admin-nav-item').hide();
         }
 
-        // โหลดกิจกรรม (สำหรับหน้าภารกิจเท่านั้น)
+        // โหลดกิจกรรม
         const activities = await callApi('/api/activities', {
             lineUserId: AppState.lineProfile.userId
         });
         displayActivitiesUI(activities, 'all-activities-list');
 
-        // โหลด Home Dashboard (profile card + stats + dept leaderboard)
-        loadHomeDashboard();
+        // โหลด Home Dashboard (profile card + stats + dept leaderboard + recent activities)
+        loadHomeDashboard(activities);
 
         // ปิด loading overlay ก่อน แล้วค่อยแสดง app
         $('#loading-overlay').addClass('d-none');
@@ -392,7 +392,7 @@ function updateUserInfoUI(user) {
     // completion % จะถูกอัปเดตใน loadGameDashboard() หลังโหลดการ์ด
 }
 
-async function loadHomeDashboard() {
+async function loadHomeDashboard(activities) {
     // อัปเดต profile fields จาก AppState ที่มีอยู่แล้ว
     if (AppState.currentUser) {
         updateUserInfoUI(AppState.currentUser);
@@ -404,29 +404,53 @@ async function loadHomeDashboard() {
         const rows = await callApi('/api/department-leaderboard');
         if (!rows || !rows.length) {
             container.html('<p class="text-muted text-center small py-2">ยังไม่มีข้อมูลแผนก</p>');
-            return;
+        } else {
+            const myDept = AppState.currentUser ? AppState.currentUser.department : '';
+            const myRank = rows.findIndex(r => r.department === myDept);
+            if (myRank >= 0) {
+                $('#home-dept-rank-label').text(`แผนกคุณ: อันดับ ${myRank + 1} / ${rows.length}`);
+            }
+            const medals = ['🥇', '🥈', '🥉'];
+            container.html(rows.map((r, i) => {
+                const isMe = r.department === myDept;
+                return `<div class="home-dept-row ${isMe ? 'home-dept-row-mine' : ''}">
+                    <span class="home-dept-rank">${medals[i] || (i + 1)}</span>
+                    <span class="home-dept-name-text flex-grow-1 text-truncate">${sanitizeHTML(r.department)}</span>
+                    <span class="home-dept-score">${r.avgScore} <small class="text-muted">เฉลี่ย</small></span>
+                </div>`;
+            }).join(''));
         }
-
-        const myDept = AppState.currentUser ? AppState.currentUser.department : '';
-        const myRank = rows.findIndex(r => r.department === myDept);
-
-        if (myRank >= 0) {
-            $('#home-dept-rank-label').text(`แผนกคุณ: อันดับ ${myRank + 1} / ${rows.length}`);
-        }
-
-        const medals = ['🥇', '🥈', '🥉'];
-        const html = rows.map((r, i) => {
-            const isMe = r.department === myDept;
-            return `<div class="home-dept-row ${isMe ? 'home-dept-row-mine' : ''}">
-                <span class="home-dept-rank">${medals[i] || (i + 1)}</span>
-                <span class="home-dept-name-text flex-grow-1 text-truncate">${sanitizeHTML(r.department)}</span>
-                <span class="home-dept-score">${r.avgScore} <small class="text-muted">เฉลี่ย</small></span>
-            </div>`;
-        }).join('');
-
-        container.html(html);
     } catch (e) {
         container.html('<p class="text-muted text-center small py-2">โหลดไม่ได้</p>');
+    }
+
+    // Render กิจกรรมล่าสุด (compact card สูงสุด 3 รายการ)
+    const actList = $('#home-activities-list');
+    const list = activities && activities.length ? activities : AppState._lastActivities;
+    if (list && list.length) {
+        AppState._lastActivities = list;
+        const recent = list.slice(0, 3);
+        actList.html(recent.map(act => {
+            const done = act.userHasSubmitted;
+            const countText = act.submissionCount > 0 ? `<span class="text-muted small"><i class="fas fa-users me-1"></i>${act.submissionCount} คนร่วม</span>` : '';
+            return `<div class="home-act-card mb-2 ${done ? 'home-act-card-done' : ''}"
+                        onclick="${done ? '' : `openActivitySubmission('${act.activityId}','${sanitizeHTML(act.title)}',${!act.description.includes('[no-image]')})`}"
+                        style="cursor:${done ? 'default' : 'pointer'}">
+                <img src="${getFullImageUrl(act.imageUrl, { w: 200 })}" class="home-act-thumb"
+                     onerror="this.onerror=null;this.src='https://placehold.co/80x80/e9ecef/6c757d?text=?'">
+                <div class="home-act-info">
+                    <div class="home-act-title">${sanitizeHTML(act.title)}</div>
+                    <div class="d-flex align-items-center gap-2 mt-1">${countText}</div>
+                </div>
+                <div class="home-act-status">
+                    ${done
+                        ? '<span class="badge bg-success"><i class="fas fa-check"></i> ส่งแล้ว</span>'
+                        : '<span class="badge bg-primary">เข้าร่วม</span>'}
+                </div>
+            </div>`;
+        }).join(''));
+    } else {
+        actList.html('<p class="text-muted text-center small py-2">ยังไม่มีกิจกรรม</p>');
     }
 }
 
@@ -462,25 +486,36 @@ function displayActivitiesUI(activities, listId) {
         }
         // --- จบส่วนที่เพิ่มเข้ามา ---
 
+        const doneBadge = act.userHasSubmitted
+            ? `<span class="activity-done-badge"><i class="fas fa-check-circle me-1"></i>ส่งแล้ว</span>`
+            : '';
+        const countBadge = act.submissionCount > 0
+            ? `<span class="activity-count-badge"><i class="fas fa-users me-1"></i>${act.submissionCount} คนร่วม</span>`
+            : '';
+
         const cardHtml = `
-            <div class="card activity-card mb-3">
-                 <img src="${getFullImageUrl(act.imageUrl, { w: 600 })}"
-                        loading="lazy" decoding="async"
-                        class="activity-card-img"
-                        onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
+            <div class="card activity-card mb-3 ${act.userHasSubmitted ? 'activity-card-done' : ''}">
+                <div class="activity-card-img-wrap">
+                    <img src="${getFullImageUrl(act.imageUrl, { w: 600 })}"
+                         loading="lazy" decoding="async"
+                         class="activity-card-img"
+                         onerror="this.onerror=null;this.src='https://placehold.co/600x300/e9ecef/6c757d?text=Image';">
+                    ${doneBadge}
+                    ${countBadge}
+                </div>
                 <div class="card-body">
                     <h5 class="card-title">${sanitizeHTML(act.title)}</h5>
                     <p class="card-text text-muted small preserve-whitespace">${sanitizeHTML(act.description.replace('[no-image]', ''))}</p>
                     <div class="d-flex justify-content-end align-items-center gap-2 mt-3">
-                        <button class="btn btn-sm btn-outline-secondary btn-view-activity-image" 
-                                data-image-full-url="${getFullImageUrl(act.imageUrl, { w: 1200 })}" 
+                        <button class="btn btn-sm btn-outline-secondary btn-view-activity-image"
+                                data-image-full-url="${getFullImageUrl(act.imageUrl, { w: 1200 })}"
                                 ${act.imageUrl ? '' : 'disabled'}
                                 data-bs-toggle="tooltip" title="ดูรูปภาพกิจกรรม">
                             <i class="fas fa-image"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary btn-view-report" 
-                                data-activity-id="${act.activityId}" 
-                                data-activity-title="${sanitizeHTML(act.title)}" 
+                        <button class="btn btn-sm btn-outline-secondary btn-view-report"
+                                data-activity-id="${act.activityId}"
+                                data-activity-title="${sanitizeHTML(act.title)}"
                                 data-bs-toggle="tooltip" title="ดูรายงานทั้งหมด">
                             <i class="fas fa-eye"></i>
                         </button>
@@ -761,7 +796,7 @@ async function refreshHomePageData() {
         }
 
         displayActivitiesUI(activities, 'all-activities-list');
-        loadHomeDashboard();
+        loadHomeDashboard(activities);
 
         // ⭐ 2. เพิ่มบรรทัดนี้: สั่งให้โหลดข้อมูลหน้าเกมใหม่ด้วย
         await loadGameDashboard();
@@ -1405,25 +1440,26 @@ function handleViewReport() {
     loadAndShowActivityDetails(activityId, activityTitle);
 }
 
-function handleJoinActivity() {
-    const activityId = $(this).data('activity-id');
-    const activityTitle = $(this).data('activity-title');
-
-    const isImageRequired = $(this).data('image-required');
+function openActivitySubmission(activityId, activityTitle, isImageRequired) {
     const imageUploadSection = $('#image-upload-section');
     const imageInput = $('#image-input');
-
     if (isImageRequired) {
-        imageUploadSection.show(); // แสดงส่วนอัปโหลด
-        imageInput.prop('required', true); // ตั้งให้ "ต้องมี" ไฟล์
+        imageUploadSection.show();
+        imageInput.prop('required', true);
     } else {
-        imageUploadSection.hide(); // ซ่อนส่วนอัปโหลด
-        imageInput.prop('required', false); // ตั้งให้ "ไม่จำเป็นต้องมี" ไฟล์
+        imageUploadSection.hide();
+        imageInput.prop('required', false);
     }
-
     $('#activityId-input').val(activityId);
     $('#activity-title-modal').text(activityTitle);
     AppState.allModals['submission'].show();
+}
+
+function handleJoinActivity() {
+    const activityId = $(this).data('activity-id');
+    const activityTitle = $(this).data('activity-title');
+    const isImageRequired = $(this).data('image-required');
+    openActivitySubmission(activityId, activityTitle, isImageRequired);
 }
 
 async function handleLike(e) {

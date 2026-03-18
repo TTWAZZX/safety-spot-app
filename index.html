@@ -115,6 +115,18 @@
                     </div>
                 </div>
 
+                <!-- Recent Activities -->
+                <div class="mt-4 mb-2 d-flex align-items-center justify-content-between px-1">
+                    <span class="fw-bold" style="font-size:0.9rem;">
+                        <i class="fas fa-tasks me-2 text-success"></i>กิจกรรมล่าสุด
+                    </span>
+                    <a href="#" class="text-decoration-none small text-muted"
+                       onclick="$('[data-page=activities-page]').trigger('click');return false;">
+                        ดูทั้งหมด <i class="fas fa-chevron-right"></i>
+                    </a>
+                </div>
+                <div id="home-activities-list"></div>
+
             </div>
 
             <div id="game-page" class="page">
