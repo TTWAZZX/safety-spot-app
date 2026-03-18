@@ -13,9 +13,15 @@ const AppState = {
     allModals: {},
     reportsChart: null,
     leaderboard: { currentPage: 1, hasMore: true },
-    // highlight-start
-    adminUsers: { currentPage: 1, hasMore: true, currentSearch: '', currentSort: 'score' } // เพิ่ม currentSort
-    // highlight-end
+    adminUsers: { currentPage: 1, hasMore: true, currentSearch: '', currentSort: 'score' },
+    // Cached data
+    _cachedQuestions: null,
+    _cachedCards: null,
+    _cachedBadges: null,
+    _cachedAdminUsers: null,
+    _lastCards: null,
+    // Session flags
+    _streakWarningShown: false,
 };
 
 // --- UTILS: HAPTIC FEEDBACK ---
@@ -654,6 +660,23 @@ async function loadUserBadges() {
         const progress = totalBadges > 0 ? (earnedBadges / totalBadges) * 100 : 0;
         progressBar.css('width', progress + '%').attr('aria-valuenow', progress).text(Math.round(progress) + '%');
         progressText.text(`คุณได้รับ ${earnedBadges} จาก ${totalBadges} ป้ายรางวัลทั้งหมด`);
+
+        // อัปเดต card completion stat — ใช้ cache ถ้ามี ไม่งั้น fetch
+        if (AppState._lastCards) {
+            const ownedCards = AppState._lastCards.filter(c => c.isOwned).length;
+            const totalCards = AppState._lastCards.length;
+            const cardPct = totalCards > 0 ? Math.round((ownedCards / totalCards) * 100) : 0;
+            $('#profile-page-completion').text(cardPct + '%');
+        } else {
+            callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId })
+                .then(cards => {
+                    AppState._lastCards = cards;
+                    const ownedCards = cards.filter(c => c.isOwned).length;
+                    const cardPct = cards.length > 0 ? Math.round((ownedCards / cards.length) * 100) : 0;
+                    $('#profile-page-completion').text(cardPct + '%');
+                })
+                .catch(() => {});
+        }
 
     } catch (e) {
         container.html('<p class="text-danger">ไม่สามารถโหลดป้ายรางวัลได้</p>');
@@ -1716,10 +1739,22 @@ async function handleViewUserDetails(lineUserId) {
         showError(e.message || 'ไม่สามารถโหลดข้อมูลได้');
     }
 
-    // Lazy load tabs on click
-    $('button[data-bs-target="#udt-kyt"]').off('shown.bs.tab.udt').on('shown.bs.tab.udt', () => loadUserKytHistory(adminSelectedUserId));
-    $('button[data-bs-target="#udt-hunter"]').off('shown.bs.tab.udt').on('shown.bs.tab.udt', () => loadUserHunterHistory(adminSelectedUserId));
-    $('button[data-bs-target="#udt-submissions"]').off('shown.bs.tab.udt').on('shown.bs.tab.udt', () => loadUserSubmissions(adminSelectedUserId));
+    // Lazy load tabs on click — ใช้ native addEventListener เพราะ Bootstrap 5 fire 'shown.bs.tab' เป็น custom event name
+    // jQuery ตีความ dot ใน event name เป็น namespace ทำให้ไม่ match; ต้องใช้ native addEventListener แทน
+    const udtTabMap = {
+        '#udt-kyt': () => loadUserKytHistory(adminSelectedUserId),
+        '#udt-hunter': () => loadUserHunterHistory(adminSelectedUserId),
+        '#udt-submissions': () => loadUserSubmissions(adminSelectedUserId),
+    };
+    Object.entries(udtTabMap).forEach(([target, fn]) => {
+        const btn = document.querySelector(`button[data-bs-target="${target}"]`);
+        if (btn) {
+            const handler = () => fn();
+            btn._udtTabHandler && btn.removeEventListener('shown.bs.tab', btn._udtTabHandler);
+            btn._udtTabHandler = handler;
+            btn.addEventListener('shown.bs.tab', handler);
+        }
+    });
 }
 
 async function loadUserKytHistory(lineUserId) {
@@ -2882,7 +2917,7 @@ async function loadGameDashboard() {
     // Now Playing bar
     $('#now-playing-pic').attr('src', user.pictureUrl || 'https://placehold.co/36x36');
     $('#now-playing-name').text(user.fullName || 'ผู้เล่น');
-    $('#now-playing-bar').css('display', 'flex');
+    $('#now-playing-bar').removeClass('d-none');
 
     // Card completion % for profile
     try {

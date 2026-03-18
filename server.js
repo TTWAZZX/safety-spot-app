@@ -352,7 +352,7 @@ app.get('/api/leaderboard', async (req, res) => {
         const offset = (page - 1) * limit;
 
         const [rows] = await db.query(
-            "SELECT fullName, pictureUrl, totalScore FROM users ORDER BY totalScore DESC, fullName ASC LIMIT ? OFFSET ?",
+            "SELECT lineUserId, fullName, pictureUrl, totalScore FROM users ORDER BY totalScore DESC, fullName ASC LIMIT ? OFFSET ?",
             [limit, offset]
         );
 
@@ -2074,7 +2074,7 @@ app.post('/api/admin/award-card', isAdmin, async (req, res) => {
     }
     try {
         await db.query("INSERT INTO user_cards (lineUserId, cardId) VALUES (?, ?)", [lineUserId, cardId]);
-        res.json({ status: "success", message: "มอบการ์ดเรียบร้อย" });
+        res.json({ status: "success", data: { message: "มอบการ์ดสำเร็จ" } });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
     }
