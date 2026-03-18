@@ -13,6 +13,7 @@ const { distance } = require('fastest-levenshtein');
 
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,6 +39,43 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// -----------------------------
+//   Rate Limiting
+// -----------------------------
+
+// ทั่วไป: 100 req / 1 นาที ต่อ IP
+const generalLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: 'error', message: 'Too many requests, please try again later.' }
+});
+
+// Sensitive endpoints: login/register 10 req / 5 นาที
+const authLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: 'error', message: 'Too many attempts, please wait 5 minutes.' }
+});
+
+// Upload/Submit: 20 req / 5 นาที
+const uploadLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: 'error', message: 'Too many submissions, please slow down.' }
+});
+
+app.use('/api/', generalLimiter);
+app.use('/api/user/register', authLimiter);
+app.use('/api/user/profile', authLimiter);
+app.use('/api/submissions', uploadLimiter);
+app.use('/api/upload', uploadLimiter);
 
 // -----------------------------
 //   Helper for MySQL style API
