@@ -3,6 +3,94 @@
 // ===============================================================
 const API_BASE_URL = "https://shesafety-spot-appbackend.onrender.com";
 const LIFF_ID = "2007053300-9xLKdwZp";
+
+// แผนก / หน่วยงานในบริษัท
+const DEPARTMENTS = [
+    'ACCOUNTING SEC.',
+    'COSTING & FIX ASSET SEC.',
+    'CUSTOMER SERVICE SEC.',
+    'DIRECTOR DEPT.',
+    'CIC DIV.',
+    'ENGINEERING 1 SEC.',
+    'ENGINEERING 2 SEC.',
+    'FINANCIAL SEC.',
+    'GOVERMENT RELATION SEC.',
+    'HORORARY PRESIDENT DEPT.',
+    'HUMAN RESOURCES DEVELOPMENT SEC.',
+    'HUMAN RESOURCES MANAGEMENT SEC.',
+    'INFORMATION TECHNOLOGY SEC.',
+    'MAINTENANCE SEC.',
+    'MARKETING 1 SEC.',
+    'MARKETING 2 SEC.',
+    'MARKETING 3 SEC.',
+    'MARKETING 4 SEC.',
+    'MARKETING 5 SEC.',
+    'MATERIAL CONTROL SEC.',
+    'OUT SOURCE SEC.',
+    'PRODUCTION 1 SEC.',
+    'PRODUCTION 2 SEC.',
+    'PRODUCTION CONTROL SEC.',
+    'PRODUCTION ENGINEERING SEC.',
+    'PURCHASING DIRECT SEC.',
+    'PURCHASING INDIRECT SEC.',
+    'QUALITY ASSURANCE SEC.',
+    'QUALITY CONTROL SEC.',
+    'RESEARCH & DEVELOPMENT SEC.',
+    'SAFETY HEALTH & ENVIRONMENT SEC.',
+    'SYSTEM ENGINEERING SEC.',
+    'TSH CENTER',
+    'WAREHOUSE SEC.',
+];
+
+// สร้าง <option> elements สำหรับ department select
+function buildDeptOptions(selectedVal = '') {
+    return DEPARTMENTS.map(d =>
+        `<option value="${d}"${d === selectedVal ? ' selected' : ''}>${d}</option>`
+    ).join('');
+}
+
+// Blocking prompt: บังคับเลือกแผนกก่อนใช้งาน
+async function promptSelectDepartment(userData) {
+    const selectOptions = DEPARTMENTS.map(d => `<option value="${d}">${d}</option>`).join('');
+    let confirmed = false;
+    while (!confirmed) {
+        const { value: dept, isConfirmed } = await Swal.fire({
+            title: 'กรุณาเลือกแผนก / หน่วยงาน',
+            html: `
+                <p class="text-muted mb-3" style="font-size:0.9rem;">
+                    ระบุแผนกของคุณเพื่อเริ่มใช้งาน Safety Spot<br>
+                    <strong>จำเป็นต้องเลือกก่อนดำเนินการต่อ</strong>
+                </p>
+                <select id="swal-dept-select" class="swal2-input" style="width:100%;margin:0;padding:8px 12px;height:auto;">
+                    <option value="" disabled selected>— เลือกแผนก —</option>
+                    ${selectOptions}
+                </select>`,
+            confirmButtonText: '<i class="fas fa-check me-1"></i> ยืนยัน',
+            confirmButtonColor: '#06C755',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showCancelButton: false,
+            preConfirm: () => {
+                const val = document.getElementById('swal-dept-select').value;
+                if (!val) {
+                    Swal.showValidationMessage('กรุณาเลือกแผนกก่อนยืนยัน');
+                    return false;
+                }
+                return val;
+            }
+        });
+        if (isConfirmed && dept) {
+            try {
+                await callApi('/api/user/update-department', { lineUserId: userData.lineUserId, department: dept }, 'POST');
+                AppState.currentUser.department = dept;
+                confirmed = true;
+            } catch(e) {
+                await Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: e.message });
+            }
+        }
+    }
+}
+
 // ตัวแปร global ฝั่ง frontend
 let adminSelectedUserId = null;   // เก็บ lineUserId ของ user ที่เปิด modal อยู่ตอนนี้
 
@@ -50,6 +138,9 @@ $(document).ready(function() {
     });
 
     initializeAllModals();
+    // Populate department dropdowns
+    $('#reg-department').append(buildDeptOptions());
+    $('#admin-edit-department').append(buildDeptOptions());
     initializeApp();
     bindStaticEventListeners();
     bindAdminTabEventListeners();
@@ -118,6 +209,11 @@ async function showMainApp(userData) {
         }
         AppState.currentUser = userData;
         updateUserInfoUI(AppState.currentUser);
+
+        // ถ้าผู้ใช้ยังไม่มีแผนก → บังคับเลือกก่อนใช้งาน
+        if (!userData.department) {
+            await promptSelectDepartment(userData);
+        }
         
         // ---------------------------
         // แสดงเมนู Admin เฉพาะแอดมิน
@@ -1176,9 +1272,14 @@ async function handleRegistration(e) {
     e.preventDefault();
     const fullName = $('#fullName').val().trim();
     const employeeId = $('#employeeId').val().trim();
+    const department = $('#reg-department').val();
+    if (!department) {
+        Swal.fire({ icon: 'warning', title: 'กรุณาเลือกแผนก', text: 'จำเป็นต้องระบุแผนก / หน่วยงานเพื่อลงทะเบียน' });
+        return;
+    }
     showLoading('กำลังบันทึก...');
     try {
-        const newUser = await callApi("/api/user/register", { lineUserId: AppState.lineProfile.userId, displayName: AppState.lineProfile.displayName, pictureUrl: AppState.lineProfile.pictureUrl, fullName: fullName, employeeId: employeeId }, 'POST');
+        const newUser = await callApi("/api/user/register", { lineUserId: AppState.lineProfile.userId, displayName: AppState.lineProfile.displayName, pictureUrl: AppState.lineProfile.pictureUrl, fullName: fullName, employeeId: employeeId, department: department }, 'POST');
         $('#registration-page').hide();
         await showMainApp(newUser);
         showSuccess('ลงทะเบียนเรียบร้อย!');
@@ -1691,7 +1792,8 @@ async function handleViewUserDetails(lineUserId) {
         // Profile edit fields
         $('#admin-edit-fullname').val(user.fullName);
         $('#admin-edit-empid').val(user.employeeId || '');
-        $('#admin-edit-department').val(user.department || '');
+        // Rebuild options then set selected value (dropdown may not have the right option selected)
+        $('#admin-edit-department').html('<option value="">— ไม่ระบุ —</option>' + buildDeptOptions(user.department || ''));
 
         // Streak input
         $('#adminStreakInput').val(streak ? streak.currentStreak : 0);

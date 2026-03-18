@@ -263,7 +263,7 @@ app.get('/api/user/profile', async (req, res) => {
 // -----------------------------
 app.post('/api/user/register', async (req, res) => {
     try {
-        const { lineUserId, displayName, pictureUrl, fullName, employeeId } = req.body;
+        const { lineUserId, displayName, pictureUrl, fullName, employeeId, department } = req.body;
 
         const [exists] = await db.query(
             "SELECT * FROM users WHERE lineUserId = ? OR employeeId = ?",
@@ -278,8 +278,8 @@ app.post('/api/user/register', async (req, res) => {
         }
 
         await db.query(
-            "INSERT INTO users (lineUserId, displayName, pictureUrl, fullName, employeeId, totalScore, createdAt) VALUES (?, ?, ?, ?, ?, ?, NOW())",
-            [lineUserId, displayName, pictureUrl, fullName, employeeId, 0]
+            "INSERT INTO users (lineUserId, displayName, pictureUrl, fullName, employeeId, department, totalScore, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())",
+            [lineUserId, displayName, pictureUrl, fullName, employeeId, department || '', 0]
         );
 
         res.json({
@@ -290,6 +290,7 @@ app.post('/api/user/register', async (req, res) => {
                 pictureUrl,
                 fullName,
                 employeeId,
+                department: department || '',
                 totalScore: 0,
                 isAdmin: false
             }
@@ -314,6 +315,22 @@ app.post('/api/user/refresh-profile', async (req, res) => {
         res.json({ status: "success", data: { updated: true } });
     } catch (err) {
         res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+// -----------------------------
+//   UPDATE DEPARTMENT (user self-service)
+// -----------------------------
+app.post('/api/user/update-department', async (req, res) => {
+    const { lineUserId, department } = req.body;
+    if (!lineUserId || !department) {
+        return res.status(400).json({ status: 'error', message: 'ข้อมูลไม่ครบ' });
+    }
+    try {
+        await db.query("UPDATE users SET department = ? WHERE lineUserId = ?", [department, lineUserId]);
+        res.json({ status: 'success', data: { department } });
+    } catch(e) {
+        res.status(500).json({ status: 'error', message: e.message });
     }
 });
 
