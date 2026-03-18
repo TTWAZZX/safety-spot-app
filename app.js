@@ -58,7 +58,7 @@ $(document).ready(function() {
 // ในไฟล์ app.js ค้นหา function initializeAllModals()
 function initializeAllModals() {
     // เพิ่ม 'quiz' เข้าไปใน array นี้ครับ
-    const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form', 'user-details', 'notification', 'quiz'];
+    const modalIds = ['submission', 'admin-reports', 'admin-activities', 'activity-form', 'activity-detail', 'admin-stats', 'admin-manage-badges', 'badge-form', 'user-details', 'notification', 'quiz', 'admin-analytics', 'admin-dept', 'admin-export'];
     
     modalIds.forEach(id => {
         const modalElement = document.getElementById(`${id}-modal`);
@@ -418,9 +418,7 @@ function renderSubmissions(submissions) {
                         </div>
                     </div>
 
-                    <p class="card-text submission-description mb-3 preserve-whitespace">
-                        ${sanitizeHTML(sub.description)}
-                    </p>
+                    ${buildCollapsibleDescription(sub.submissionId, sub.description)}
 
                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                         <div class="d-flex align-items-center gap-3">
@@ -758,6 +756,14 @@ function bindStaticEventListeners() {
     
     $('#leaderboard-load-more-btn').on('click', () => loadLeaderboard(true));
 
+    $(document).on('click', '.sub-expand-btn', function(e) {
+        e.preventDefault();
+        const id = $(this).data('id');
+        $(`#sub-desc-${id} .sub-desc-preview`).addClass('d-none');
+        $(`#sub-desc-${id} .sub-desc-full`).removeClass('d-none');
+        $(this).remove();
+    });
+
     // highlight-start
     // ---- เพิ่ม Event Listener สำหรับปุ่มแจ้งเตือนไว้ตรงนี้ ----
     $('#notification-bell').on('click', openNotificationCenter);
@@ -783,38 +789,6 @@ function bindAdminEventListeners() {
     $('#add-card-btn').on('click', handleAddCard);
     $('#card-form').on('submit', handleSaveCard);
     $('#card-image-input').on('change', function() { handleImagePreview(this, '#card-image-preview'); $('#card-image-preview').show(); });
-    // --- ปุ่มตามคนมาเติมไฟ ---
-    $('#btn-remind-streaks').on('click', async function() {
-        const result = await Swal.fire({
-            title: 'ส่งแจ้งเตือน?',
-            text: 'ระบบจะส่งข้อความ LINE ไปหาคนที่ยังไม่ได้เล่นเกมวันนี้ เพื่อเตือนให้รักษาสถิติ',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'ส่งเลย',
-            confirmButtonColor: '#ff5500'
-        });
-
-        if (result.isConfirmed) {
-            Swal.fire({ title: 'กำลังส่งข้อความ...', didOpen: () => Swal.showLoading() });
-            try {
-                const res = await callApi('/api/admin/remind-streaks', {}, 'POST');
-                Swal.fire('เรียบร้อย', res.message, 'success');
-            } catch (e) {
-                Swal.fire('Error', e.message, 'error');
-            }
-        }
-    });
-    // --- ปุ่มทดสอบแจ้งเตือน (ส่งหาตัวเอง) ---
-    $('#btn-test-remind').on('click', async function() {
-        Swal.fire({ title: 'กำลังทดสอบ...', didOpen: () => Swal.showLoading() });
-        try {
-            const res = await callApi('/api/admin/test-remind-self', {}, 'POST');
-            Swal.fire('สำเร็จ', res.message, 'success');
-        } catch (e) {
-            Swal.fire('Error', e.message, 'error');
-        }
-    });
-
     // Event Listener (วางไว้ใน bindAdminEventListeners หรือ document.ready)
     $(document).on('click', '.btn-edit-question', handleEditQuestion);
 
@@ -860,6 +834,23 @@ function bindAdminEventListeners() {
     });
 
     // --- GAME MONITOR LOGIC (Complete Fixed Version) ---
+
+    $('#btn-admin-analytics').on('click', async function(e) {
+        e.preventDefault();
+        AppState.allModals['admin-analytics'].show();
+        await loadAdminAnalytics();
+    });
+    $('#btn-department-scores').on('click', async function(e) {
+        e.preventDefault();
+        AppState.allModals['admin-dept'].show();
+        await loadDepartmentScores();
+    });
+    $('#btn-export-reports').on('click', function(e) {
+        e.preventDefault();
+        AppState.allModals['admin-export'].show();
+    });
+    $('#btn-export-csv').on('click', handleExportCSV);
+    $('#btn-export-pdf').on('click', handleExportPDF);
 
     // ผูกปุ่มและแท็บ
     $(document).on('click', '#btn-game-monitor', function() {
@@ -1338,6 +1329,7 @@ function handleCreateActivity() {
     $('#activity-form-title').text('สร้างกิจกรรมใหม่');
     $('#activity-form')[0].reset();
     $('#form-activity-id').val('');
+    $('#form-activity-image-url-input').val('');
     $('#activity-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
     AppState.allModals['activity-form'].show();
 }
@@ -1369,12 +1361,15 @@ async function handleSaveActivity(e) {
     e.preventDefault();
     showLoading('กำลังบันทึก...');
     const imageFile = $('#form-activity-image-input')[0].files[0];
+    const imageUrlInput = $('#form-activity-image-url-input').val().trim();
     const existingImageUrl = $('#form-activity-image-url').val();
-    
+
     try {
         let finalImageUrl = existingImageUrl;
         if (imageFile) {
             finalImageUrl = await uploadImage(imageFile);
+        } else if (imageUrlInput) {
+            finalImageUrl = imageUrlInput;
         }
 
         // ===== ส่วนที่แก้ไข =====
@@ -1514,6 +1509,7 @@ async function handleEditActivity() {
     $('#image-required-toggle').prop('checked', isImageRequired);
     $('#form-activity-desc').val(description.replace(noImageTag, ''));
     $('#form-activity-image-url').val(data.imageUrl);
+    $('#form-activity-image-url-input').val('');
     $('#activity-image-preview').attr('src', getFullImageUrl(data.imageUrl));
     AppState.allModals['activity-form'].show();
 }
@@ -1695,6 +1691,7 @@ async function handleViewUserDetails(lineUserId) {
         // Profile edit fields
         $('#admin-edit-fullname').val(user.fullName);
         $('#admin-edit-empid').val(user.employeeId || '');
+        $('#admin-edit-department').val(user.department || '');
 
         // Streak input
         $('#adminStreakInput').val(streak ? streak.currentStreak : 0);
@@ -1911,6 +1908,161 @@ async function loadAdminStats() {
         $('#stats-loading').hide(); 
     }
 }
+// ===== DASHBOARD ANALYTICS =====
+let _analyticsWeeklyChart = null;
+let _analyticsApprovalChart = null;
+
+async function loadAdminAnalytics() {
+    $('#analytics-loading').show();
+    $('#analytics-content').hide();
+    try {
+        const data = await callApi('/api/admin/analytics');
+
+        // Summary cards
+        const summaryHtml = [
+            { label: 'รายงานทั้งหมด', value: data.totalSubmissions, icon: 'fa-file-alt', color: 'primary' },
+            { label: 'อนุมัติแล้ว', value: data.approvedCount, icon: 'fa-check-circle', color: 'success' },
+            { label: 'รอตรวจ', value: data.pendingCount, icon: 'fa-clock', color: 'warning' },
+            { label: 'ผู้ใช้งาน', value: data.totalUsers, icon: 'fa-users', color: 'info' }
+        ].map(c => `
+            <div class="col-6 col-md-3">
+                <div class="card shadow-sm text-center border-0">
+                    <div class="card-body py-3">
+                        <i class="fas ${c.icon} fa-2x text-${c.color} mb-2"></i>
+                        <h4 class="fw-bold mb-0">${c.value}</h4>
+                        <small class="text-muted">${c.label}</small>
+                    </div>
+                </div>
+            </div>`).join('');
+        $('#analytics-summary-row').html(summaryHtml);
+
+        // Weekly chart
+        if (_analyticsWeeklyChart) _analyticsWeeklyChart.destroy();
+        const weekCtx = document.getElementById('analytics-weekly-chart').getContext('2d');
+        _analyticsWeeklyChart = new Chart(weekCtx, {
+            type: 'bar',
+            data: {
+                labels: data.weeklyTrend.map(w => w.label),
+                datasets: [{
+                    label: 'รายงานที่ส่ง',
+                    data: data.weeklyTrend.map(w => w.count),
+                    backgroundColor: 'rgba(6,199,85,0.7)',
+                    borderColor: '#06C755',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+
+        // Approval rate donut
+        if (_analyticsApprovalChart) _analyticsApprovalChart.destroy();
+        const approvalCtx = document.getElementById('analytics-approval-chart').getContext('2d');
+        _analyticsApprovalChart = new Chart(approvalCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['อนุมัติ', 'รอตรวจ', 'ปฏิเสธ'],
+                datasets: [{ data: [data.approvedCount, data.pendingCount, data.rejectedCount],
+                    backgroundColor: ['#06C755','#fbbf24','#ef4444'], borderWidth: 2 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        // Top reporters
+        const topHtml = data.topReporters.map((r, i) => `
+            <div class="list-group-item d-flex align-items-center gap-3">
+                <span class="fw-bold text-muted" style="min-width:24px;">${i + 1}</span>
+                <img src="${r.pictureUrl || 'https://placehold.co/36x36'}" width="36" height="36" class="rounded-circle" style="object-fit:cover;">
+                <div class="flex-grow-1">
+                    <strong>${sanitizeHTML(r.fullName)}</strong>
+                    <small class="text-muted d-block">${r.department ? sanitizeHTML(r.department) : 'ไม่ระบุแผนก'}</small>
+                </div>
+                <span class="badge bg-success rounded-pill">${r.count} รายงาน</span>
+            </div>`).join('');
+        $('#analytics-top-reporters').html(`<div class="list-group list-group-flush">${topHtml}</div>`);
+
+        $('#analytics-loading').hide();
+        $('#analytics-content').show();
+    } catch(e) {
+        $('#analytics-loading').html(`<p class="text-danger">${e.message}</p>`);
+    }
+}
+
+// ===== DEPARTMENT SAFETY SCORES =====
+let _deptChart = null;
+
+async function loadDepartmentScores() {
+    $('#dept-loading').show();
+    $('#dept-content').hide();
+    try {
+        const rows = await callApi('/api/admin/department-scores');
+        if (!rows.length) {
+            $('#dept-loading').html('<p class="text-muted text-center mt-4">ยังไม่มีข้อมูลแผนก กรุณาอัพเดตแผนกให้ผู้ใช้ก่อน</p>');
+            return;
+        }
+
+        // Chart
+        if (_deptChart) _deptChart.destroy();
+        const ctx = document.getElementById('dept-score-chart').getContext('2d');
+        _deptChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: rows.map(r => r.department),
+                datasets: [{
+                    label: 'คะแนนเฉลี่ย',
+                    data: rows.map(r => r.avgScore),
+                    backgroundColor: rows.map((_, i) => `hsl(${140 + i * 25},65%,50%)`),
+                    borderRadius: 6
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true } } }
+        });
+
+        // Table
+        const tableHtml = `<table class="table table-sm table-hover mb-0">
+            <thead class="table-dark"><tr>
+                <th>แผนก</th><th class="text-center">สมาชิก</th>
+                <th class="text-center">คะแนนเฉลี่ย</th><th class="text-center">รายงานรวม</th>
+            </tr></thead><tbody>
+            ${rows.map(r => `<tr>
+                <td class="fw-semibold">${sanitizeHTML(r.department)}</td>
+                <td class="text-center">${r.memberCount}</td>
+                <td class="text-center"><span class="badge bg-success">${Number(r.avgScore).toFixed(1)}</span></td>
+                <td class="text-center">${r.totalSubmissions}</td>
+            </tr>`).join('')}
+            </tbody></table>`;
+        $('#dept-table-container').html(`<div class="card shadow-sm"><div class="card-header fw-bold">ตารางสรุปคะแนนแผนก</div><div class="card-body p-0">${tableHtml}</div></div>`);
+
+        $('#dept-loading').hide();
+        $('#dept-content').show();
+    } catch(e) {
+        $('#dept-loading').html(`<p class="text-danger">${e.message}</p>`);
+    }
+}
+
+// ===== EXPORT =====
+async function handleExportCSV() {
+    const status = $('#export-status-select').val();
+    const from = $('#export-date-from').val();
+    const to = $('#export-date-to').val();
+    const params = new URLSearchParams({ status, from, to });
+    window.location.href = `/api/admin/export/submissions?${params.toString()}`;
+}
+
+function handleExportPDF() {
+    const status = $('#export-status-select').val();
+    const from = $('#export-date-from').val();
+    const to = $('#export-date-to').val();
+    AppState.allModals['admin-export'].hide();
+    Swal.fire({ title: 'เตรียม PDF...', text: 'ระบบจะเปิดหน้าพิมพ์ให้อัตโนมัติ กดพิมพ์เป็น PDF ได้เลย', icon: 'info',
+        confirmButtonText: 'ตกลง' }).then(() => {
+        const params = new URLSearchParams({ status, from, to, format: 'print' });
+        window.open(`/api/admin/export/submissions/print?${params.toString()}`, '_blank');
+    });
+}
+
 // แก้ไขฟังก์ชันนี้ทั้งฟังก์ชัน
 async function loadPendingSubmissions() {
     const container = $('#admin-reports-container');
@@ -1948,9 +2100,14 @@ async function loadPendingSubmissions() {
                             ${imageHtmlBlock}
                             <div class="${contentClass}">
                                 <div class="card-body">
-                                    <h6 class="card-title fw-bold">${sanitizeHTML(s.fullName)}</h6>
-                                    <p class="card-text small">${sanitizeHTML(s.description)}</p>
-                                    <p class="card-text"><small class="text-muted">${new Date(s.createdAt).toLocaleString('th-TH')}</small></p>
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <img src="${s.pictureUrl || 'https://placehold.co/32x32'}" width="32" height="32" class="rounded-circle" style="object-fit:cover;">
+                                        <div>
+                                            <h6 class="mb-0 fw-bold">${sanitizeHTML(s.fullName)}</h6>
+                                            <small class="text-muted">${new Date(s.createdAt).toLocaleString('th-TH')}</small>
+                                        </div>
+                                    </div>
+                                    <div class="report-description-formatted small border-start border-3 border-primary ps-2 mb-3">${formatReportDescription(s.description)}</div>
                                     <div class="d-flex align-items-center flex-wrap gap-2">
                                         <label class="small">ให้คะแนน:</label>
                                         <input type="number" id="score-input-${s.submissionId}" class="form-control form-control-sm" value="10" min="0" style="width: 80px;">
@@ -2278,9 +2435,10 @@ $(document).on('click', '#adminSaveProfileBtn', async function() {
     if (!adminSelectedUserId) return;
     const fullName = $('#admin-edit-fullname').val().trim();
     const employeeId = $('#admin-edit-empid').val().trim();
+    const department = $('#admin-edit-department').val().trim();
     if (!fullName) return Swal.fire('กรุณากรอกชื่อ', '', 'warning');
     try {
-        await callApi('/api/admin/user/update-profile', { lineUserId: adminSelectedUserId, fullName, employeeId }, 'POST');
+        await callApi('/api/admin/user/update-profile', { lineUserId: adminSelectedUserId, fullName, employeeId, department }, 'POST');
         $('#detailUserName').text(fullName);
         $('#detailUserEmployeeId').text('รหัส: ' + (employeeId || '-'));
         Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลสำเร็จ!', timer: 1500, showConfirmButton: false });
@@ -2448,6 +2606,53 @@ function sanitizeHTML(str) {
     const temp = document.createElement('div');
     temp.textContent = str;
     return temp.innerHTML;
+}
+
+// Collapsible submission description (user-facing feed)
+function buildCollapsibleDescription(id, text) {
+    if (!text) return '';
+    const safe = sanitizeHTML(text);
+    const LIMIT = 180;
+    if (safe.length <= LIMIT) {
+        return `<p class="card-text submission-description mb-3 preserve-whitespace">${safe}</p>`;
+    }
+    const preview = safe.slice(0, LIMIT).trimEnd() + '…';
+    return `
+        <p class="card-text submission-description mb-1 preserve-whitespace" id="sub-desc-${id}">
+            <span class="sub-desc-preview">${preview}</span>
+            <span class="sub-desc-full d-none">${safe}</span>
+        </p>
+        <a href="#" class="sub-expand-btn small text-primary mb-3 d-block" data-id="${id}">
+            <i class="fas fa-chevron-down me-1"></i>ดูเพิ่มเติม
+        </a>`;
+}
+
+// Format report/submission description into a readable structured list
+function formatReportDescription(text) {
+    if (!text) return '<span class="text-muted">ไม่มีคำอธิบาย</span>';
+    const safe = sanitizeHTML(text);
+    // Split by newlines or numbered patterns like "1.", "2. "
+    const lines = safe.split(/\n+/).map(l => l.trim()).filter(Boolean);
+    if (lines.length <= 1) {
+        // Single block — split by inline numbered items "1.", "2." etc.
+        const parts = safe.split(/(?=\d{1,2}[\.\)]\s)/);
+        if (parts.length > 2) {
+            return '<ol class="mb-0 ps-3">' +
+                parts.map(p => p.trim()).filter(Boolean)
+                     .map(p => `<li class="mb-1">${p.replace(/^\d{1,2}[\.\)]\s*/, '')}</li>`)
+                     .join('') +
+                '</ol>';
+        }
+        return `<p class="mb-0">${safe}</p>`;
+    }
+    // Multi-line: render each line, detect numbered items
+    const isNumbered = lines.filter(l => /^\d{1,2}[\.\)]\s/.test(l)).length > lines.length / 2;
+    if (isNumbered) {
+        return '<ol class="mb-0 ps-3">' +
+            lines.map(l => `<li class="mb-1">${l.replace(/^\d{1,2}[\.\)]\s*/, '')}</li>`).join('') +
+            '</ol>';
+    }
+    return lines.map(l => `<p class="mb-1">${l}</p>`).join('');
 }
 
 // --- GAME LOGIC ---

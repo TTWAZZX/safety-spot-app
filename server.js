@@ -52,6 +52,14 @@ const handleRequest = (handler) => async (req, res) => {
 };
 
 // -----------------------------
+//   Startup DB migrations
+// -----------------------------
+db.query("ALTER TABLE users ADD COLUMN department VARCHAR(100) NOT NULL DEFAULT ''")
+  .catch(() => {}); // ignore if column already exists
+db.query("ALTER TABLE submissions ADD COLUMN reviewedAt DATETIME DEFAULT NULL")
+  .catch(() => {});
+
+// -----------------------------
 //   Auto award badges by score (ADD + REMOVE)
 // -----------------------------
 async function autoAwardBadgesForUser(lineUserId, connOptional) {
@@ -1930,7 +1938,7 @@ app.get('/api/admin/user-details', isAdmin, async (req, res) => {
     const { lineUserId } = req.query;
 
     const [[user]] = await db.query(
-        `SELECT lineUserId, fullName, employeeId, pictureUrl, totalScore, coinBalance
+        `SELECT lineUserId, fullName, employeeId, pictureUrl, totalScore, coinBalance, department
          FROM users
          WHERE lineUserId = ?`,
         [lineUserId]
@@ -2083,14 +2091,14 @@ app.post('/api/admin/award-card', isAdmin, async (req, res) => {
 
 // B-9: แก้ไข Profile user (ชื่อ, รหัสพนักงาน)
 app.post('/api/admin/user/update-profile', isAdmin, async (req, res) => {
-    const { lineUserId, fullName, employeeId } = req.body;
+    const { lineUserId, fullName, employeeId, department } = req.body;
     if (!lineUserId || !fullName) {
         return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
     }
     try {
         await db.query(
-            "UPDATE users SET fullName = ?, employeeId = ? WHERE lineUserId = ?",
-            [fullName, employeeId || '', lineUserId]
+            "UPDATE users SET fullName = ?, employeeId = ?, department = ? WHERE lineUserId = ?",
+            [fullName, employeeId || '', department || '', lineUserId]
         );
         res.json({ status: "success", message: "แก้ไขข้อมูลเรียบร้อย" });
     } catch (e) {
@@ -2960,6 +2968,170 @@ cron.schedule('0 12,15 * * *', async () => {
 }, {
     scheduled: true,
     timezone: "Asia/Bangkok" // สำคัญมาก! ต้องระบุเพื่อให้ตรงกับเวลาไทย
+});
+
+// ======================================================
+// ADMIN: Analytics
+// ======================================================
+app.get('/api/admin/analytics', isAdmin, async (_req, res) => {
+    try {
+        const [[totals]] = await db.query(`
+            SELECT
+                COUNT(*) AS total,
+                SUM(status='approved') AS approved,
+                SUM(status='pending') AS pending,
+                SUM(status='rejected') AS rejected
+            FROM submissions`);
+        const [[userCount]] = await db.query("SELECT COUNT(*) AS cnt FROM users");
+
+        // 8-week trend
+        const [weeklyRows] = await db.query(`
+            SELECT YEARWEEK(createdAt, 1) AS yw,
+                   MIN(DATE(createdAt)) AS weekStart,
+                   COUNT(*) AS cnt
+            FROM submissions
+            WHERE createdAt >= NOW() - INTERVAL 56 DAY
+            GROUP BY yw ORDER BY yw`);
+        const weeklyTrend = weeklyRows.map(r => ({
+            label: new Date(r.weekStart).toLocaleDateString('th-TH', { day:'numeric', month:'short' }),
+            count: r.cnt
+        }));
+
+        // Top 10 reporters
+        const [topReporters] = await db.query(`
+            SELECT u.fullName, u.pictureUrl, u.department, COUNT(s.submissionId) AS cnt
+            FROM submissions s
+            JOIN users u ON s.lineUserId = u.lineUserId
+            WHERE s.status = 'approved'
+            GROUP BY s.lineUserId ORDER BY cnt DESC LIMIT 10`);
+
+        res.json({ status: 'success', data: {
+            totalSubmissions: Number(totals.total),
+            approvedCount: Number(totals.approved || 0),
+            pendingCount: Number(totals.pending || 0),
+            rejectedCount: Number(totals.rejected || 0),
+            totalUsers: Number(userCount.cnt),
+            weeklyTrend,
+            topReporters: topReporters.map(r => ({ ...r, count: Number(r.cnt) }))
+        }});
+    } catch(e) { res.status(500).json({ status:'error', message: e.message }); }
+});
+
+// ======================================================
+// ADMIN: Department Safety Scores
+// ======================================================
+app.get('/api/admin/department-scores', isAdmin, async (_req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT
+                COALESCE(NULLIF(u.department,''), 'ไม่ระบุแผนก') AS department,
+                COUNT(DISTINCT u.lineUserId) AS memberCount,
+                ROUND(AVG(u.totalScore), 1) AS avgScore,
+                COUNT(s.submissionId) AS totalSubmissions
+            FROM users u
+            LEFT JOIN submissions s ON u.lineUserId = s.lineUserId AND s.status = 'approved'
+            GROUP BY department
+            ORDER BY avgScore DESC`);
+        res.json({ status: 'success', data: rows.map(r => ({
+            ...r,
+            memberCount: Number(r.memberCount),
+            avgScore: Number(r.avgScore),
+            totalSubmissions: Number(r.totalSubmissions)
+        }))});
+    } catch(e) { res.status(500).json({ status:'error', message: e.message }); }
+});
+
+// ======================================================
+// ADMIN: Export Submissions (CSV)
+// ======================================================
+app.get('/api/admin/export/submissions', isAdmin, async (req, res) => {
+    const { status, from, to } = req.query;
+    try {
+        let whereClause = '1=1';
+        const params = [];
+        if (status && status !== 'all') { whereClause += ' AND s.status = ?'; params.push(status); }
+        if (from) { whereClause += ' AND DATE(s.createdAt) >= ?'; params.push(from); }
+        if (to)   { whereClause += ' AND DATE(s.createdAt) <= ?'; params.push(to); }
+
+        const [rows] = await db.query(`
+            SELECT s.submissionId, u.fullName, u.employeeId,
+                   COALESCE(u.department,'') AS department,
+                   a.title AS activityTitle,
+                   s.description, s.status, s.points,
+                   s.createdAt, s.reviewedAt
+            FROM submissions s
+            JOIN users u ON s.lineUserId = u.lineUserId
+            JOIN activities a ON s.activityId = a.activityId
+            WHERE ${whereClause}
+            ORDER BY s.createdAt DESC`, params);
+
+        const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+        const header = ['ID','ชื่อ','รหัสพนักงาน','แผนก','กิจกรรม','คำอธิบาย','สถานะ','คะแนน','วันที่ส่ง','วันที่ตรวจ'];
+        const csvLines = [
+            '\uFEFF' + header.join(','),
+            ...rows.map(r => [
+                r.submissionId, r.fullName, r.employeeId, r.department,
+                r.activityTitle, r.description, r.status, r.points || 0,
+                new Date(r.createdAt).toLocaleString('th-TH'),
+                r.reviewedAt ? new Date(r.reviewedAt).toLocaleString('th-TH') : ''
+            ].map(escape).join(','))
+        ];
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="safety-spot-reports-${new Date().toISOString().slice(0,10)}.csv"`);
+        res.send(csvLines.join('\r\n'));
+    } catch(e) { res.status(500).json({ status:'error', message: e.message }); }
+});
+
+// ======================================================
+// ADMIN: Export Submissions — Print/PDF view
+// ======================================================
+app.get('/api/admin/export/submissions/print', isAdmin, async (req, res) => {
+    const { status, from, to } = req.query;
+    try {
+        let whereClause = '1=1';
+        const params = [];
+        if (status && status !== 'all') { whereClause += ' AND s.status = ?'; params.push(status); }
+        if (from) { whereClause += ' AND DATE(s.createdAt) >= ?'; params.push(from); }
+        if (to)   { whereClause += ' AND DATE(s.createdAt) <= ?'; params.push(to); }
+
+        const [rows] = await db.query(`
+            SELECT s.submissionId, u.fullName, u.employeeId, COALESCE(u.department,'') AS department,
+                   a.title AS activityTitle, s.description, s.status, s.points, s.createdAt
+            FROM submissions s
+            JOIN users u ON s.lineUserId = u.lineUserId
+            JOIN activities a ON s.activityId = a.activityId
+            WHERE ${whereClause}
+            ORDER BY s.createdAt DESC`, params);
+
+        const statusLabel = { approved:'อนุมัติ', pending:'รอตรวจ', rejected:'ปฏิเสธ' };
+        const rowsHtml = rows.map((r, i) => `
+            <tr>
+                <td>${i+1}</td>
+                <td>${r.fullName}<br><small class="text-muted">${r.employeeId || ''} ${r.department ? '| '+r.department : ''}</small></td>
+                <td>${r.activityTitle}</td>
+                <td style="max-width:300px;font-size:0.8em;">${r.description || ''}</td>
+                <td><span class="badge" style="background:${r.status==='approved'?'#06C755':r.status==='pending'?'#f59e0b':'#ef4444'};color:#fff">${statusLabel[r.status]||r.status}</span></td>
+                <td>${r.points || 0}</td>
+                <td>${new Date(r.createdAt).toLocaleDateString('th-TH')}</td>
+            </tr>`).join('');
+
+        res.send(`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
+            <title>Safety Spot Report Export</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>@media print{.no-print{display:none}body{font-size:0.85rem}}th{background:#1a1a2e!important;color:#fff!important}</style>
+        </head><body class="p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+                <h5>Safety Spot — รายงาน Export (${rows.length} รายการ)</h5>
+                <button onclick="window.print()" class="btn btn-danger btn-sm">Print / Save PDF</button>
+            </div>
+            <h6 class="text-muted mb-3">สร้างเมื่อ: ${new Date().toLocaleString('th-TH')}</h6>
+            <table class="table table-bordered table-sm">
+                <thead><tr><th>#</th><th>ผู้ส่ง</th><th>กิจกรรม</th><th>คำอธิบาย</th><th>สถานะ</th><th>คะแนน</th><th>วันที่</th></tr></thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+        </body></html>`);
+    } catch(e) { res.status(500).send('Error: ' + e.message); }
 });
 
 // ======================================================

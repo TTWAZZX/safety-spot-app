@@ -103,7 +103,7 @@
                     <!-- NOW PLAYING INDICATOR -->
                     <div id="now-playing-bar" class="now-playing-bar d-none">
                         <div class="d-flex align-items-center gap-3">
-                            <img id="now-playing-pic" src="https://placehold.co/64x64" class="rounded-circle now-playing-avatar" width="64" height="64" alt="">
+                            <img id="now-playing-pic" src="https://placehold.co/64x64" class="now-playing-avatar" width="64" height="64" alt="">
                             <div class="flex-grow-1 overflow-hidden">
                                 <div class="d-flex align-items-center gap-2 mb-1">
                                     <span class="now-playing-badge flex-shrink-0">
@@ -456,14 +456,17 @@
                     <a href="#" id="manage-hunter-btn" class="list-group-item list-group-item-action">
                         <i class="fas fa-crosshairs me-2"></i> จัดการด่าน Safety Hunter
                     </a>
-                    <a href="#" id="btn-remind-streaks" class="list-group-item list-group-item-action text-danger">
-                        <i class="fas fa-bullhorn me-2"></i> 🔔 ส่งแจ้งเตือนคนลืมเติมไฟ (Admin Only)
-                    </a>
                     <a href="#" id="btn-game-monitor" class="list-group-item list-group-item-action text-primary">
-                        <i class="fas fa-desktop me-2"></i> 🕹️ Game Monitor (ดูความเคลื่อนไหว)
+                        <i class="fas fa-desktop me-2"></i> Game Monitor (ดูความเคลื่อนไหว)
                     </a>
-                    <a href="#" id="btn-test-remind" class="list-group-item list-group-item-action text-secondary">
-                        <i class="fas fa-flask me-2"></i> 🧪 ทดสอบส่งแจ้งเตือนหาตัวเอง
+                    <a href="#" id="btn-admin-analytics" class="list-group-item list-group-item-action">
+                        <i class="fas fa-chart-bar me-2 text-primary"></i> Dashboard Analytics
+                    </a>
+                    <a href="#" id="btn-department-scores" class="list-group-item list-group-item-action">
+                        <i class="fas fa-building me-2 text-info"></i> Safety Score ระดับแผนก
+                    </a>
+                    <a href="#" id="btn-export-reports" class="list-group-item list-group-item-action">
+                        <i class="fas fa-file-excel me-2 text-success"></i> Export รายงาน (Excel / PDF)
                     </a>
                 </div>
             </div>
@@ -574,7 +577,13 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">รูปภาพกิจกรรม</label>
-                        <input type="file" class="form-control" id="form-activity-image-input" accept="image/*">
+                        <label class="form-label small text-muted mb-1">อัปโหลดจากไฟล์</label>
+                        <input type="file" class="form-control form-control-sm" id="form-activity-image-input" accept="image/*">
+                        <div class="d-flex align-items-center gap-2 my-2">
+                            <hr class="flex-grow-1 my-0"><span class="text-muted small">หรือ</span><hr class="flex-grow-1 my-0">
+                        </div>
+                        <label class="form-label small text-muted mb-1">URL รูปภาพ</label>
+                        <input type="url" class="form-control form-control-sm" id="form-activity-image-url-input" placeholder="https://example.com/image.jpg">
                         <div class="image-preview-container mt-2">
                             <img id="activity-image-preview" src="https://placehold.co/400x300/e9ecef/6c757d?text=Preview" class="image-preview">
                         </div>
@@ -594,6 +603,101 @@
     <div class="modal fade" id="activity-detail-modal"><div class="modal-dialog modal-fullscreen"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="activity-detail-title">...</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body bg-light"><div id="submissions-container" class="container-fluid"></div><div id="submissions-loading" class="text-center my-5"><div class="spinner-border" style="color: var(--line-green);"></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">ปิด</button></div></div></div></div>
     <div class="modal fade" id="imageViewerModal"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="imageViewerModalLabel">รูปภาพกิจกรรม</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body text-center p-0"><img id="imageViewerContent" src="" class="img-fluid" alt="Activity Image" style="max-height: 80vh; width: auto;"></div><div class="modal-footer justify-content-center"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button><a id="downloadImageBtn" class="btn btn-primary" download><i class="fas fa-download me-2"></i> บันทึกรูปภาพ</a></div></div></div></div>
     <div class="modal fade" id="admin-stats-modal"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">ข้อมูลสรุป Dashboard</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3"><div class="col-12"><div style="position:relative;height:280px;"><canvas id="reportsChart"></canvas></div></div></div><div id="stats-container" class="row g-3 mt-3"></div><div id="stats-loading" class="text-center my-4"><div class="spinner-border"></div></div></div></div></div></div>
+    <!-- ===== ANALYTICS MODAL ===== -->
+    <div class="modal fade" id="admin-analytics-modal">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-chart-bar me-2"></i>Dashboard Analytics</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light overflow-auto">
+                    <div id="analytics-loading" class="text-center py-5"><div class="spinner-border text-primary"></div></div>
+                    <div id="analytics-content" style="display:none;">
+                        <!-- Summary Cards -->
+                        <div class="row g-3 mb-4" id="analytics-summary-row"></div>
+                        <!-- Weekly Submissions Chart -->
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header fw-bold"><i class="fas fa-chart-line me-2 text-primary"></i>รายงานย้อนหลัง 8 สัปดาห์</div>
+                            <div class="card-body"><div style="position:relative;height:260px;"><canvas id="analytics-weekly-chart"></canvas></div></div>
+                        </div>
+                        <!-- Approval Rate -->
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header fw-bold"><i class="fas fa-chart-pie me-2 text-success"></i>อัตราการอนุมัติรายงาน</div>
+                            <div class="card-body"><div style="position:relative;height:220px;"><canvas id="analytics-approval-chart"></canvas></div></div>
+                        </div>
+                        <!-- Top Reporters -->
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header fw-bold"><i class="fas fa-trophy me-2 text-warning"></i>Top 10 ผู้รายงานมากที่สุด</div>
+                            <div class="card-body p-0"><div id="analytics-top-reporters"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== DEPARTMENT SCORES MODAL ===== -->
+    <div class="modal fade" id="admin-dept-modal">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="fas fa-building me-2"></i>Safety Score ระดับแผนก</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light overflow-auto">
+                    <div id="dept-loading" class="text-center py-5"><div class="spinner-border text-info"></div></div>
+                    <div id="dept-content" style="display:none;">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header fw-bold"><i class="fas fa-chart-bar me-2 text-info"></i>คะแนนเฉลี่ยต่อแผนก</div>
+                            <div class="card-body"><div style="position:relative;height:300px;"><canvas id="dept-score-chart"></canvas></div></div>
+                        </div>
+                        <div id="dept-table-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== EXPORT MODAL ===== -->
+    <div class="modal fade" id="admin-export-modal">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-file-export me-2 text-success"></i>Export รายงาน</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">สถานะรายงาน</label>
+                        <select class="form-select" id="export-status-select">
+                            <option value="all">ทั้งหมด</option>
+                            <option value="approved">อนุมัติแล้ว</option>
+                            <option value="pending">รอตรวจสอบ</option>
+                            <option value="rejected">ปฏิเสธ</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">ช่วงวันที่</label>
+                        <div class="row g-2">
+                            <div class="col-6"><input type="date" class="form-control" id="export-date-from"></div>
+                            <div class="col-6"><input type="date" class="form-control" id="export-date-to"></div>
+                        </div>
+                        <small class="text-muted">ปล่อยว่างเพื่อ export ทั้งหมด</small>
+                    </div>
+                </div>
+                <div class="modal-footer gap-2">
+                    <button class="btn btn-success flex-grow-1" id="btn-export-csv">
+                        <i class="fas fa-file-csv me-2"></i>Export CSV (Excel)
+                    </button>
+                    <button class="btn btn-danger flex-grow-1" id="btn-export-pdf">
+                        <i class="fas fa-file-pdf me-2"></i>Export PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="admin-manage-badges-modal">
     <div class="modal-dialog modal-fullscreen">
         <div class="modal-content">
@@ -668,7 +772,7 @@
                 </div>
 
                 <!-- Stats Bar -->
-                <div class="bg-white border-bottom px-3 py-2 d-flex gap-4 flex-wrap" id="admin-user-stats-bar">
+                <div class="bg-white border-bottom px-3 py-2 d-flex gap-4" id="admin-user-stats-bar" style="overflow-x:auto;white-space:nowrap;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
                     <span><i class="fas fa-star text-warning me-1"></i>คะแนน: <strong id="detailUserScore">0</strong></span>
                     <span><i class="fas fa-coins text-warning me-1"></i>เหรียญ: <strong id="detailUserCoins">0</strong></span>
                     <span><i class="fas fa-fire text-danger me-1"></i>Streak: <strong id="detailUserStreak">0</strong> วัน</span>
@@ -684,7 +788,7 @@
                     <li class="nav-item"><button class="nav-link" data-bs-target="#udt-submissions" data-bs-toggle="tab"><i class="fas fa-file-alt me-1"></i> Submissions</button></li>
                 </ul>
 
-                <div class="tab-content overflow-auto flex-grow-1 bg-light p-3">
+                <div class="tab-content overflow-auto flex-grow-1 bg-light p-3" style="padding-bottom:80px!important;">
 
                     <!-- Tab: ภาพรวม -->
                     <div class="tab-pane fade show active" id="udt-overview">
@@ -699,9 +803,13 @@
                                             <label class="form-label small">ชื่อ-นามสกุล</label>
                                             <input type="text" id="admin-edit-fullname" class="form-control form-control-sm">
                                         </div>
-                                        <div class="mb-3">
+                                        <div class="mb-2">
                                             <label class="form-label small">รหัสพนักงาน</label>
                                             <input type="text" id="admin-edit-empid" class="form-control form-control-sm">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label small">แผนก / หน่วยงาน</label>
+                                            <input type="text" id="admin-edit-department" class="form-control form-control-sm" placeholder="เช่น ฝ่ายผลิต, ฝ่ายบำรุงรักษา">
                                         </div>
                                         <button id="adminSaveProfileBtn" class="btn btn-primary btn-sm w-100">
                                             <i class="fas fa-save me-1"></i> บันทึกข้อมูล
