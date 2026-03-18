@@ -268,6 +268,9 @@ function updateUserInfoUI(user) {
     $('#user-employee-id').text(`รหัส: ${user.employeeId}`);
     $('#profile-page-employee-id').text(`รหัสพนักงาน: ${user.employeeId}`);
     $('#user-score, #profile-page-score').text(user.totalScore);
+    $('#profile-page-coins').text(user.coinBalance || 0);
+    $('#profile-page-streak').text((user.currentStreak || 0) + ' วัน');
+    // completion % จะถูกอัปเดตใน loadGameDashboard() หลังโหลดการ์ด
 }
 
 // ในไฟล์ app.js
@@ -558,11 +561,14 @@ async function loadLeaderboard(isLoadMore = false) {
             else if (rank === 2) rankDisplay = '<i class="fas fa-medal text-secondary"></i>';
             else if (rank === 3) rankDisplay = '<i class="fas fa-medal" style="color:#cd7f32;"></i>';
 
+            const isSelf = AppState.lineProfile && user.lineUserId === AppState.lineProfile.userId;
+            const selfBadge = isSelf ? `<span class="badge bg-success ms-1 rounded-pill" style="font-size:0.6rem;">คุณ</span>` : '';
+            const selfClass = isSelf ? 'leaderboard-item-self' : 'bg-white';
             const itemHtml = `
-                <div class="d-flex align-items-center p-2 mb-2 bg-white rounded-3 shadow-sm leaderboard-item">
+                <div class="d-flex align-items-center p-2 mb-2 rounded-3 shadow-sm leaderboard-item ${selfClass}">
                     <div class="leaderboard-rank me-3">${rankDisplay}</div>
                     <img src="${user.pictureUrl}" class="rounded-circle me-3" width="45" height="45" onerror="this.onerror=null;this.src='https://placehold.co/45x45';">
-                    <div class="flex-grow-1"><div class="fw-bold">${sanitizeHTML(user.fullName)}</div></div>
+                    <div class="flex-grow-1"><div class="fw-bold">${sanitizeHTML(user.fullName)}${selfBadge}</div></div>
                     <div class="fw-bold" style="color: var(--line-green);">${user.totalScore} คะแนน</div>
                 </div>`;
             list.append(itemHtml);
@@ -1153,6 +1159,13 @@ async function handleRegistration(e) {
     } catch (error) { showError(error.message); }
 }
 
+function setUploadProgress(label, pct) {
+    $('#upload-progress-area').show();
+    $('#upload-progress-label').text(label);
+    $('#upload-progress-pct').text(pct + '%');
+    $('#upload-progress-bar').css('width', pct + '%');
+}
+
 async function handleSubmitReport(e) {
     e.preventDefault();
     const imageFile = $('#image-input')[0].files[0];
@@ -1160,17 +1173,24 @@ async function handleSubmitReport(e) {
     if (!description) { return showWarning('กรุณากรอกรายละเอียดจุดเสี่ยง'); }
     const submitBtn = $('#submission-form button[type="submit"]');
     submitBtn.prop('disabled', true);
-    showLoading('กำลังอัปโหลดและส่งรายงาน...');
     try {
         let imageUrl = null;
-        if (imageFile) { imageUrl = await uploadImage(imageFile); }
+        if (imageFile) {
+            setUploadProgress('กำลังบีบอัดและอัปโหลดรูปภาพ...', 20);
+            imageUrl = await uploadImage(imageFile);
+            setUploadProgress('อัปโหลดรูปภาพสำเร็จ ✓', 70);
+        } else {
+            setUploadProgress('กำลังส่งรายงาน...', 40);
+        }
+        setUploadProgress('กำลังบันทึกรายงาน...', 85);
         const payload = { lineUserId: AppState.lineProfile.userId, activityId: $('#activityId-input').val(), description: description, imageUrl: imageUrl };
         await callApi('/api/submissions', payload, 'POST');
+        setUploadProgress('ส่งรายงานสำเร็จ! ✓', 100);
+        await new Promise(r => setTimeout(r, 400));
         AppState.allModals.submission.hide();
         $('#submission-form')[0].reset();
         $('#submission-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
-        showSuccess('รายงานของคุณถูกส่งเพื่อรอการตรวจสอบ');
-        // หาปุ่มของกิจกรรมที่เราเพิ่งส่งไป แล้วเปลี่ยนสถานะมัน
+        showSuccess('รายงานของคุณถูกส่งเพื่อรอการตรวจสอบแล้ว 🎉');
         const activityId = $('#activityId-input').val();
         const activityButton = $(`.btn-join-activity[data-activity-id="${activityId}"]`);
         if (activityButton.length > 0) {
@@ -1184,6 +1204,8 @@ async function handleSubmitReport(e) {
         showError(error.message);
     } finally {
         submitBtn.prop('disabled', false);
+        $('#upload-progress-area').hide();
+        $('#upload-progress-bar').css('width', '0%');
     }
 }
 
@@ -2824,9 +2846,10 @@ async function loadGameDashboard() {
     // 2. ดึงข้อมูลการ์ด
     try {
         const cards = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
-        
+        AppState._lastCards = cards; // cache for profile completion stat
+
         // ⭐ ต้องมีท่อนคำนวณหลอดตรงนี้ ⭐
-        const totalCards = cards.length; 
+        const totalCards = cards.length;
         const ownedCount = cards.filter(c => c.isOwned).length;
         
         if (typeof updateCollectionProgressBar === 'function') {
@@ -2855,6 +2878,58 @@ async function loadGameDashboard() {
             [...tooltips].map(el => new bootstrap.Tooltip(el));
         }
     } catch (e) { console.error(e); }
+
+    // Now Playing bar
+    $('#now-playing-pic').attr('src', user.pictureUrl || 'https://placehold.co/36x36');
+    $('#now-playing-name').text(user.fullName || 'ผู้เล่น');
+    $('#now-playing-bar').css('display', 'flex');
+
+    // Card completion % for profile
+    try {
+        const cards = AppState._lastCards;
+        if (cards) {
+            const owned = cards.filter(c => c.isOwned).length;
+            const pct = cards.length > 0 ? Math.round((owned / cards.length) * 100) : 0;
+            $('#profile-page-completion').text(pct + '%');
+        }
+    } catch(e) {}
+
+    // ตรวจสอบสถานะ Daily Quiz + เตือน Streak
+    try {
+        const quizStatus = await callApi('/api/game/daily-question', { lineUserId: AppState.lineProfile.userId });
+
+        // U-2: อัปเดต badge บน Daily Quiz bento card
+        const quizBadge = $('#daily-quiz-status-badge');
+        if (quizStatus.played) {
+            quizBadge.removeClass('bg-success-subtle text-success')
+                     .addClass('bg-secondary-subtle text-secondary')
+                     .html('<i class="fas fa-check me-1"></i>เล่นแล้ววันนี้');
+            $('#daily-quiz-btn-card').css('opacity', '0.75');
+        } else {
+            quizBadge.removeClass('bg-secondary-subtle text-secondary')
+                     .addClass('bg-success-subtle text-success')
+                     .text('Daily Mission');
+            $('#daily-quiz-btn-card').css('opacity', '1');
+        }
+
+        // U-5: เตือน Streak ถ้ายังไม่เล่นวันนี้และมี streak อยู่
+        const streak = user.currentStreak || 0;
+        if (!quizStatus.played && streak > 0 && !AppState._streakWarningShown) {
+            AppState._streakWarningShown = true;
+            setTimeout(() => {
+                Swal.fire({
+                    icon: 'warning',
+                    title: '⚠️ Streak กำลังจะหาย!',
+                    html: `สาย <b class="text-danger">${streak} วัน</b> ของคุณจะหายถ้าไม่เล่น KYT วันนี้!`,
+                    confirmButtonText: '<i class="fas fa-helmet-safety me-1"></i> ไปเล่น Quiz เลย!',
+                    showCancelButton: true,
+                    cancelButtonText: 'ทีหลัง',
+                    confirmButtonColor: '#06C755',
+                    cancelButtonColor: '#adb5bd',
+                }).then(r => { if (r.isConfirmed) startDailyQuiz(); });
+            }, 1000);
+        }
+    } catch(e) { console.error('Quiz status check failed:', e); }
 }
 
 // 2. ฟังก์ชันเริ่ม Quiz (ผูกกับปุ่ม "เริ่มเล่นเลย")
@@ -2886,6 +2961,19 @@ async function pullGacha() {
             confirmButtonText: 'โอเค'
         });
     }
+
+    // ยืนยันก่อนสุ่ม
+    const confirmResult = await Swal.fire({
+        icon: 'question',
+        title: 'ยืนยันการสุ่มการ์ด',
+        html: `ใช้ <b class="text-warning fs-5">100 เหรียญ</b> เพื่อสุ่มการ์ด Safety 1 ใบ`,
+        confirmButtonText: '<i class="fas fa-wand-magic-sparkles me-1"></i> สุ่มเลย!',
+        cancelButtonText: 'ยกเลิก',
+        showCancelButton: true,
+        confirmButtonColor: '#06C755',
+        cancelButtonColor: '#adb5bd',
+    });
+    if (!confirmResult.isConfirmed) return;
 
     triggerHaptic('medium');
 
@@ -3002,60 +3090,67 @@ async function pullGacha() {
 
 // --- CARD ALBUM LOGIC ---
 
-async function openCardAlbum() {
-    // ⭐ แก้ Console Error: สั่งปลด Focus ออกจากปุ่มกดก่อนเปิด Modal
-    if (document.activeElement) {
-        document.activeElement.blur();
-    }
-    const modal = new bootstrap.Modal(document.getElementById('card-album-modal'));
-    modal.show();
-    
+function renderAlbumGrid(cards, query) {
     const container = $('#album-grid');
-    container.html('<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div></div>');
+    container.empty();
+    const filtered = query
+        ? cards.filter(c => c.cardName.toLowerCase().includes(query.toLowerCase()))
+        : cards;
 
-    try {
-        const res = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
-        const cards = res; // API คืนค่าเป็น Array ใน data
-
-        container.empty();
-        
-        let ownedCount = 0;
-        cards.forEach(c => {
-            if (c.isOwned) ownedCount++;
-            
-            // กำหนดสีตาม Rarity
-            let borderColor = '#dee2e6'; // Common
+    if (filtered.length === 0) {
+        container.html('<div class="col-12 text-center text-muted py-5">ไม่พบการ์ดที่ค้นหา</div>');
+    } else {
+        filtered.forEach(c => {
+            let borderColor = '#dee2e6';
             let bgBadge = 'bg-secondary';
             if (c.rarity === 'R') { borderColor = '#0dcaf0'; bgBadge = 'bg-info'; }
             if (c.rarity === 'SR') { borderColor = '#d63384'; bgBadge = 'bg-danger'; }
             if (c.rarity === 'UR') { borderColor = '#ffc107'; bgBadge = 'bg-warning text-dark'; }
-
-            // Effect การ์ดที่ยังไม่มี (Greyscale)
             const imgFilter = c.isOwned ? '' : 'filter: grayscale(100%); opacity: 0.5;';
             const countBadge = c.count > 1 ? `<span class="position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger border border-white">+${c.count}</span>` : '';
-
-            const html = `
+            container.append(`
                 <div class="col-4 col-sm-3 mb-2">
                     <div class="card h-100 border-0 shadow-sm position-relative" style="overflow: visible;">
                         ${countBadge}
                         <div class="card-body p-2 text-center d-flex flex-column align-items-center">
-                            <div class="rounded-3 mb-2 d-flex align-items-center justify-content-center" 
-                                 style="width: 100%; aspect-ratio: 1/1; border: 2px solid ${borderColor}; background: #fff; overflow: hidden;">
+                            <div class="rounded-3 mb-2 d-flex align-items-center justify-content-center"
+                                 style="width:100%;aspect-ratio:1/1;border:2px solid ${borderColor};background:#fff;overflow:hidden;">
                                 <img src="${getFullImageUrl(c.imageUrl)}" class="img-fluid" style="${imgFilter}" onerror="this.src='https://placehold.co/100?text=?'">
                             </div>
-                            <span class="badge ${bgBadge} mb-1" style="font-size: 0.6rem;">${c.rarity}</span>
-                            <small class="d-block text-truncate w-100 fw-bold" style="font-size: 0.7rem;">${c.cardName}</small>
+                            <span class="badge ${bgBadge} mb-1" style="font-size:0.6rem;">${c.rarity}</span>
+                            <small class="d-block text-truncate w-100 fw-bold" style="font-size:0.7rem;">${c.cardName}</small>
                         </div>
                     </div>
                 </div>
-            `;
-            container.append(html);
+            `);
         });
+    }
 
-        // Update Progress
-        const progress = Math.round((ownedCount / cards.length) * 100);
-        $('#album-progress-text').text(`${ownedCount}/${cards.length}`);
-        $('#album-progress-bar').css('width', `${progress}%`);
+    // Update progress (always based on full list)
+    const ownedCount = cards.filter(c => c.isOwned).length;
+    const progress = cards.length > 0 ? Math.round((ownedCount / cards.length) * 100) : 0;
+    $('#album-progress-text').text(`${ownedCount}/${cards.length}`);
+    $('#album-progress-bar').css('width', `${progress}%`);
+}
+
+async function openCardAlbum() {
+    if (document.activeElement) document.activeElement.blur();
+    const modal = new bootstrap.Modal(document.getElementById('card-album-modal'));
+    modal.show();
+
+    const container = $('#album-grid');
+    container.html('<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div></div>');
+    $('#album-search-input').val('');
+
+    try {
+        const cards = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
+
+        renderAlbumGrid(cards, '');
+
+        // Search binding
+        $('#album-search-input').off('input').on('input', function () {
+            renderAlbumGrid(cards, $(this).val().trim());
+        });
 
     } catch (e) {
         console.error(e);
@@ -3580,16 +3675,21 @@ async function openHunterMenu() {
             const safeTitle = sanitizeHTML(l.title);
             const isLocked = l.playedCount >= l.maxPlays;
             const lockedClass = isLocked ? 'locked' : '';
-            
+
+            // Difficulty badge based on hazard count
+            let diffLabel = 'ง่าย', diffBg = 'bg-success';
+            if (l.totalHazards >= 4 && l.totalHazards <= 6) { diffLabel = 'กลาง'; diffBg = 'bg-warning text-dark'; }
+            if (l.totalHazards >= 7) { diffLabel = 'ยาก'; diffBg = 'bg-danger'; }
+
             // HTML ใหม่: ใช้ Class mission-card
             list.append(`
                 <div class="col-12 col-md-6">
-                    <div class="mission-card ${lockedClass} btn-hunter-level" 
+                    <div class="mission-card ${lockedClass} btn-hunter-level"
                         data-level-id="${l.levelId}"
                         data-image-url="${l.imageUrl}"
                         data-hazards="${l.totalHazards}"
                         data-locked="${isLocked}">
-                        
+
                         <div class="mission-img-wrapper">
                             <img src="${getFullImageUrl(l.imageUrl)}" class="mission-img">
                             <div class="mission-status-badge">${statusBadge}</div>
@@ -3600,12 +3700,15 @@ async function openHunterMenu() {
                                 <h6 class="fw-bold mb-0 text-white text-shadow">${safeTitle}</h6>
                             </div>
                         </div>
-                        
+
                         <div class="p-3 d-flex justify-content-between align-items-center">
-                            <small class="text-muted">
-                                <i class="fas fa-crosshairs text-danger me-1"></i> 
-                                เป้าหมาย: <b>${l.totalHazards} จุด</b>
-                            </small>
+                            <div class="d-flex align-items-center gap-2">
+                                <small class="text-muted">
+                                    <i class="fas fa-crosshairs text-danger me-1"></i>
+                                    เป้าหมาย: <b>${l.totalHazards} จุด</b>
+                                </small>
+                                <span class="badge ${diffBg} difficulty-badge">${diffLabel}</span>
+                            </div>
                             <button class="btn btn-sm btn-light rounded-circle shadow-sm">
                                 <i class="fas fa-play text-primary"></i>
                             </button>
