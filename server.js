@@ -2929,7 +2929,7 @@ app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
                 h.isCorrect,
                 h.earnedPoints,
                 h.playedAt,
-                h.selectedOption,
+                h.selectedAnswer AS selectedOption,
                 COALESCE(q.questionText, 'คำถามถูกลบไปแล้ว') AS questionText,
                 COALESCE(q.correctOption, '') AS correctOption
             FROM user_game_history h

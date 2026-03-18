@@ -18,7 +18,7 @@ LINE LIFF (frontend) → callApi() → Express REST API → MySQL (Aiven)
 ## Key Files
 | File | หน้าที่ |
 |------|---------|
-| `server.js` | Express backend ~2900 บรรทัด — API ทั้งหมด |
+| `server.js` | Express backend ~3250 บรรทัด — API ทั้งหมด |
 | `db.js` | MySQL connection pool — export `query()` และ `getClient()` |
 | `schema.sql` | Full schema สำหรับ fresh install (DROP + CREATE) |
 | `migration.sql` | ALTER statements สำหรับ patch production ที่มีข้อมูลแล้ว |
@@ -30,7 +30,7 @@ LINE LIFF (frontend) → callApi() → Express REST API → MySQL (Aiven)
 - **Host:** Aiven Cloud MySQL 8.0
 - **Connection:** ผ่าน `DATABASE_URL` env variable
 - **Pool:** `db.getClient()` สำหรับ transaction, `db.query()` สำหรับ query ธรรมดา
-- **Tables:** 18 ตาราง (ดู `schema.sql` สำหรับ full schema)
+- **Tables:** 19 ตาราง (ดู `schema.sql` สำหรับ full schema) — รวม `audit_logs` ที่สร้างอัตโนมัติตอน server start
 
 ## Environment Variables (.env)
 ```
@@ -121,6 +121,31 @@ formData.append('lineUserId', AppState.lineProfile.userId);
 | `hunter_attempts` | จำนวนครั้งที่เล่นแต่ละด่าน (max 3) |
 | `user_hunter_history` | ผลดาวและ UNIQUE per (lineUserId, levelId) |
 
+## Features Added
+
+### Rate Limiting (`express-rate-limit`)
+- `generalLimiter`: 100 req/min — ครอบ `/api/`
+- `authLimiter`: 10 req/5min — `/api/user/register`, `/api/user/profile`
+- `uploadLimiter`: 20 req/5min — `/api/submissions`, `/api/upload`
+
+### Department System
+- 34 แผนกคงที่ใน `DEPARTMENTS` constant (app.js)
+- `promptSelectDepartment()` — บังคับ existing user เลือกแผนกก่อนใช้งาน
+- Column `department VARCHAR(100)` ใน `users` table (migration อัตโนมัติ)
+
+### Admin Analytics
+- `GET /api/admin/analytics` — ยอดรวม, trend 8 สัปดาห์, top reporters
+- `GET /api/admin/department-scores` — Safety Score ระดับแผนก (avg score, member count)
+- `GET /api/admin/export/submissions` — CSV with UTF-8 BOM
+- `GET /api/admin/export/submissions/print` — HTML page สำหรับ print PDF
+
+### Admin Audit Log
+- ตาราง `audit_logs` — สร้างอัตโนมัติด้วย `CREATE TABLE IF NOT EXISTS`
+- `logAdminAction(adminId, action, targetType, targetId, targetName, detail)` — helper fire-and-forget ไม่บล็อก response
+- บันทึกทุก action สำคัญ: APPROVE/REJECT/DELETE_SUBMISSION, ADD/DEDUCT_SCORE, ADD/DEDUCT_COINS, UPDATE_STREAK, AWARD/REVOKE_BADGE, AWARD_CARD, UPDATE_PROFILE
+- `GET /api/admin/audit-logs` — paginated 50/page, filter ตาม action/dateFrom/dateTo
+- UI: modal fullscreen พร้อม filter bar + pagination ในหน้า Admin
+
 ## Fixed Bugs Log
 
 ### รอบที่ 1 — Backend Audit (server.js)
@@ -182,6 +207,7 @@ npm start     # production
 
 ## Known Limitations (ไม่ใช่ bug แต่ควรรู้)
 - Auth ฝั่ง server ไม่มี token verification — trust lineUserId จาก client (LINE LIFF handles auth)
-- Render.com free tier อาจ spin down → cold start ~30 วินาที
+- Render.com free tier อาจ spin down → cold start ~30 วินาที (UptimeRobot ping ทุก 5 นาทีเพื่อ keep alive)
 - Notification ไม่มี pagination (ถ้ามีมากจะ render ทีเดียว)
 - Admin user list ไม่มี server-side pagination (คืนทุก row, sort/filter ใน SQL)
+- `audit_logs.detail` เก็บเป็น JSON string — ถ้า MySQL ไม่รองรับ JSON type จะ fallback เป็น TEXT
