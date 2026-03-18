@@ -110,37 +110,43 @@ app.use('/uploads', express.static(uploadsDir));
 //   Multer Memory Storage
 // -----------------------------
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10 MB limit
+});
 
 // -----------------------------
 //   Cloudflare R2 Upload
 // -----------------------------
-async function uploadToR2(buffer, mime = "image/jpeg") {
-    const {
-        R2_ACCOUNT_ID,
-        R2_ACCESS_KEY_ID,
-        R2_SECRET_ACCESS_KEY,
-        R2_BUCKET_NAME,
-        R2_PUBLIC_BASE_URL,
-    } = process.env;
+const {
+    R2_ACCOUNT_ID,
+    R2_ACCESS_KEY_ID,
+    R2_SECRET_ACCESS_KEY,
+    R2_BUCKET_NAME,
+    R2_PUBLIC_BASE_URL,
+} = process.env;
 
-    if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {
-        throw new Error("R2 config missing");
-    }
-
-    const s3 = new S3Client({
+// สร้าง S3Client ครั้งเดียวแล้ว reuse (ไม่ต้องสร้างใหม่ทุก request)
+const s3Client = (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY)
+    ? new S3Client({
         region: "auto",
         endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
         credentials: {
             accessKeyId: R2_ACCESS_KEY_ID,
             secretAccessKey: R2_SECRET_ACCESS_KEY,
         },
-    });
+    })
+    : null;
+
+async function uploadToR2(buffer, mime = "image/jpeg") {
+    if (!s3Client || !R2_BUCKET_NAME) {
+        throw new Error("R2 config missing");
+    }
 
     const ext = mime === "image/png" ? "png" : "jpg";
     const key = `safety-spot/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
-    await s3.send(new PutObjectCommand({
+    await s3Client.send(new PutObjectCommand({
         Bucket: R2_BUCKET_NAME,
         Key: key,
         Body: buffer,
@@ -157,15 +163,19 @@ const isAdmin = async (req, res, next) => {
     const requesterId = req.body.requesterId || req.query.requesterId;
     if (!requesterId) return res.status(401).json({ status: 'error', message: 'Missing requester' });
 
-    const [rows] = await db.query(
-        "SELECT * FROM admins WHERE lineUserId = ?",
-        [requesterId]
-    );
+    try {
+        const [rows] = await db.query(
+            "SELECT lineUserId FROM admins WHERE lineUserId = ?",
+            [requesterId]
+        );
 
-    if (rows.length === 0)
-        return res.status(403).json({ status: "error", message: "Not admin" });
+        if (rows.length === 0)
+            return res.status(403).json({ status: "error", message: "Not admin" });
 
-    next();
+        next();
+    } catch (err) {
+        res.status(500).json({ status: "error", message: "Auth check failed" });
+    }
 };
 
 // -----------------------------
@@ -174,6 +184,14 @@ const isAdmin = async (req, res, next) => {
 app.post('/api/upload', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ status: 'error', message: "Missing file" });
+
+        // MIME validation — accept images only
+        if (!req.file.mimetype.startsWith('image/')) {
+            return res.status(400).json({ status: 'error', message: "ไฟล์ต้องเป็นรูปภาพเท่านั้น" });
+        }
+
+        const { lineUserId } = req.body;
+        if (!lineUserId) return res.status(400).json({ status: 'error', message: "ต้องระบุ lineUserId" });
 
         const url = await uploadToR2(req.file.buffer, req.file.mimetype);
 
@@ -210,11 +228,11 @@ app.get('/api/user/profile', async (req, res) => {
         // ⭐ LOGIC: ถ้าไม่ได้เล่นมาเกิน 1 วัน ให้แสดงเป็น 0 (Visual Reset)
         let displayStreak = 0;
         if (user.currentStreak && user.lastPlayedDate) {
-            const now = new Date();
-            const last = new Date(user.lastPlayedDate);
-            const diffTime = Math.abs(now - last);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-            
+            const todayStr = new Date().toISOString().split('T')[0];
+            const lastStr = new Date(user.lastPlayedDate).toISOString().split('T')[0];
+            const diffTime = new Date(todayStr) - new Date(lastStr);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
             // ถ้าเล่นวันนี้ (0) หรือเมื่อวาน (1) -> โชว์เลขเดิม
             if (diffDays <= 1) {
                 displayStreak = user.currentStreak;
@@ -349,27 +367,30 @@ app.get('/api/leaderboard', async (req, res) => {
 // ======================================================
 app.get('/api/user/badges', async (req, res) => {
     const { lineUserId } = req.query;
+    try {
+        const [allBadges] = await db.query(
+            "SELECT badgeId, badgeName, description, imageUrl FROM badges"
+        );
 
-    const [allBadges] = await db.query(
-        "SELECT badgeId, badgeName, description, imageUrl FROM badges"
-    );
+        const [earned] = await db.query(
+            "SELECT badgeId FROM user_badges WHERE lineUserId = ?",
+            [lineUserId]
+        );
 
-    const [earned] = await db.query(
-        "SELECT badgeId FROM user_badges WHERE lineUserId = ?",
-        [lineUserId]
-    );
+        const earnedSet = new Set(earned.map(x => x.badgeId));
 
-    const earnedSet = new Set(earned.map(x => x.badgeId));
+        const result = allBadges.map(b => ({
+            id: b.badgeId,
+            name: b.badgeName,
+            desc: b.description,
+            img: b.imageUrl || "https://placehold.co/200x200?text=Badge",
+            isEarned: earnedSet.has(b.badgeId)
+        }));
 
-    const result = allBadges.map(b => ({
-        id: b.badgeId,
-        name: b.badgeName,
-        desc: b.description,
-        img: b.imageUrl || "https://placehold.co/200x200?text=Badge",
-        isEarned: earnedSet.has(b.badgeId)
-    }));
-
-    res.json({ status: "success", data: result });
+        res.json({ status: "success", data: result });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 
@@ -721,79 +742,77 @@ app.post('/api/submissions/comment', async (req, res) => {
 app.get('/api/game/daily-question', async (req, res) => {
     const { lineUserId } = req.query;
     const today = new Date().toISOString().split('T')[0];
+    try {
+        // เช็คว่าวันนี้เล่นไปหรือยัง
+        const [history] = await db.query(
+            "SELECT historyId FROM user_game_history WHERE lineUserId = ? AND playedAt = ?",
+            [lineUserId, today]
+        );
 
-    // เช็คว่าวันนี้เล่นไปหรือยัง
-    const [history] = await db.query(
-        "SELECT * FROM user_game_history WHERE lineUserId = ? AND playedAt = ?",
-        [lineUserId, today]
-    );
+        if (history.length > 0) {
+            return res.json({ status: "success", data: { played: true } });
+        }
 
-    if (history.length > 0) {
-        return res.json({ status: "success", data: { played: true } });
-    }
+        // สุ่มคำถามมา 1 ข้อ
+        const [questions] = await db.query(
+            "SELECT * FROM kyt_questions WHERE isActive = TRUE ORDER BY RAND() LIMIT 1"
+        );
 
-    // สุ่มคำถามมา 1 ข้อ
-    const [questions] = await db.query(
-        "SELECT * FROM kyt_questions WHERE isActive = TRUE ORDER BY RAND() LIMIT 1"
-    );
+        if (questions.length === 0) {
+            return res.json({ status: "error", message: "ไม่พบคำถามในระบบ" });
+        }
 
-    if (questions.length === 0) {
-        return res.json({ status: "error", message: "ไม่พบคำถามในระบบ" });
-    }
-
-    const q = questions[0];
-    res.json({
-        status: "success",
-        data: {
-            played: false,
-            question: {
-                questionId: q.questionId,
-                text: q.questionText,
-                image: q.imageUrl,
-                // ส่ง options ครบ 8 ตัว
-                options: { 
-                    A: q.optionA, B: q.optionB, C: q.optionC, D: q.optionD,
-                    E: q.optionE, F: q.optionF, G: q.optionG, H: q.optionH
+        const q = questions[0];
+        res.json({
+            status: "success",
+            data: {
+                played: false,
+                question: {
+                    questionId: q.questionId,
+                    text: q.questionText,
+                    image: q.imageUrl,
+                    options: {
+                        A: q.optionA, B: q.optionB, C: q.optionC, D: q.optionD,
+                        E: q.optionE, F: q.optionF, G: q.optionG, H: q.optionH
+                    }
                 }
             }
-        }
-    });
+        });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
-// --- API: ส่งคำตอบ (แก้ใหม่: ส่งยอดเหรียญล่าสุดกลับไปด้วย) ---
+// --- API: ส่งคำตอบ (v1) ---
 app.post('/api/game/submit-answer', async (req, res) => {
     const { lineUserId, questionId, selectedOption } = req.body;
+
+    // Input validation
+    if (!lineUserId || !questionId || !selectedOption) {
+        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ (lineUserId, questionId, selectedOption)" });
+    }
+
     const today = new Date().toISOString().split('T')[0];
     const conn = await db.getClient();
 
     try {
         await conn.beginTransaction();
 
-        // 1. เช็คว่าเล่นไปหรือยัง (ถ้าอยากให้เล่นซ้ำได้เพื่อเทส ให้คอมเมนต์บรรทัดเช็ค history ออกก่อนได้ครับ)
-        /*
-        const [history] = await conn.query(
-            "SELECT * FROM user_game_history WHERE lineUserId = ? AND playedAt = ?",
-            [lineUserId, today]
-        );
-        if (history.length > 0) throw new Error("คุณเล่นเกมของวันนี้ไปแล้ว");
-        */
-
-        // 2. ตรวจคำตอบ
+        // 1. ตรวจคำตอบ
         const [qs] = await conn.query("SELECT * FROM kyt_questions WHERE questionId = ?", [questionId]);
         if (qs.length === 0) throw new Error("คำถามไม่ถูกต้อง");
-        
+
         const question = qs[0];
         const isCorrect = (selectedOption === question.correctOption);
-        
-        // 3. กำหนดรางวัล (Coins & Score)
-        // ตอบถูก: 50 เหรียญ / ตอบผิด: 10 เหรียญ
-        let earnedCoins = isCorrect ? 50 : 10; 
-        let earnedScore = isCorrect ? question.scoreReward : 2; 
 
-        // 4. ระบบ Streak (นับวันต่อเนื่อง)
+        // 2. กำหนดรางวัล
+        let earnedCoins = isCorrect ? 50 : 10;
+        let earnedScore = isCorrect ? question.scoreReward : 2;
+
+        // 3. ระบบ Streak
         const [streakRow] = await conn.query("SELECT * FROM user_streaks WHERE lineUserId = ?", [lineUserId]);
         let currentStreak = 1;
-        
+
         if (streakRow.length > 0) {
             const lastDate = new Date(streakRow[0].lastPlayedDate);
             const diffTime = Math.abs(new Date(today) - lastDate);
@@ -801,46 +820,44 @@ app.post('/api/game/submit-answer', async (req, res) => {
 
             if (diffDays === 1) currentStreak = streakRow[0].currentStreak + 1;
             else if (diffDays > 1) currentStreak = 1;
-            else currentStreak = streakRow[0].currentStreak; // เล่นวันเดิม
-            
+            else currentStreak = streakRow[0].currentStreak;
+
             await conn.query("UPDATE user_streaks SET currentStreak = ?, lastPlayedDate = ? WHERE lineUserId = ?", [currentStreak, today, lineUserId]);
         } else {
             await conn.query("INSERT INTO user_streaks VALUES (?, 1, ?, 1)", [lineUserId, today]);
         }
 
-        // 5. บันทึกประวัติ
-        await conn.query(
-            "INSERT INTO user_game_history (lineUserId, questionId, isCorrect, earnedPoints, playedAt) VALUES (?, ?, ?, ?, ?)",
-            [lineUserId, questionId, isCorrect, earnedCoins, today]
-        );
+        // 4. บันทึกประวัติ — UNIQUE(lineUserId, playedAt) ป้องกัน race condition
+        try {
+            await conn.query(
+                "INSERT INTO user_game_history (lineUserId, questionId, isCorrect, earnedPoints, playedAt) VALUES (?, ?, ?, ?, ?)",
+                [lineUserId, questionId, isCorrect, earnedCoins, today]
+            );
+        } catch (insertErr) {
+            if (insertErr.code === 'ER_DUP_ENTRY') {
+                throw new Error("คุณเล่นเกมของวันนี้ไปแล้ว");
+            }
+            throw insertErr;
+        }
 
-        // 6. อัปเดต User (บวกเหรียญและคะแนน)
+        // 5. อัปเดต User
         await conn.query(
-            "UPDATE users SET totalScore = totalScore + ?, coinBalance = coinBalance + ? WHERE lineUserId = ?", 
+            "UPDATE users SET totalScore = totalScore + ?, coinBalance = coinBalance + ? WHERE lineUserId = ?",
             [earnedScore, earnedCoins, lineUserId]
         );
 
-        // 7. ดึงยอดเหรียญล่าสุดมาส่งกลับ
+        // 6. ดึงยอดล่าสุด
         const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
 
-        // ==========================================
-        // ✨ เพิ่มแจ้งเตือน: ผลการเล่นเกม ✨
-        // ==========================================
-        const notifMsg = isCorrect 
+        // 7. แจ้งเตือน
+        const notifMsg = isCorrect
             ? `ภารกิจสำเร็จ! คุณได้รับ ${earnedCoins} เหรียญจากการตอบคำถามประจำวัน`
             : `ตอบผิดรับรางวัลปลอบใจ ${earnedCoins} เหรียญ`;
 
         await conn.query(
-            `INSERT INTO notifications 
-            (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
              VALUES (?, ?, ?, 'game_quiz', ?, ?, NOW())`,
-            [
-                "NOTIF" + uuidv4(),
-                lineUserId,
-                notifMsg,
-                questionId, // relatedItemId (ใช้เก็บ ID คำถามที่เล่น)
-                lineUserId  // triggeringUserId (ตัวเองเป็นคนทำ)
-            ]
+            ["NOTIF" + uuidv4(), lineUserId, notifMsg, questionId, lineUserId]
         );
 
         await conn.commit();
@@ -849,17 +866,17 @@ app.post('/api/game/submit-answer', async (req, res) => {
             status: "success",
             data: {
                 isCorrect,
-                earnedCoins,       // เหรียญที่ได้รอบนี้
+                earnedCoins,
                 currentStreak,
                 correctOption: question.correctOption,
-                newCoinBalance: updatedUser.coinBalance, // ยอดรวมล่าสุด
+                newCoinBalance: updatedUser.coinBalance,
                 newTotalScore: updatedUser.totalScore
             }
         });
 
     } catch (e) {
         await conn.rollback();
-        res.status(500).json({ status: "error", message: e.message });
+        res.status(e.message === "คุณเล่นเกมของวันนี้ไปแล้ว" ? 400 : 500).json({ status: "error", message: e.message });
     } finally {
         conn.release();
     }
@@ -1112,12 +1129,13 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // หาว่ารายงานนี้เป็นของใคร
+        // หาว่ารายงานนี้เป็นของใคร + เช็คสถานะ (idempotency)
         const [sub] = await conn.query(
-            "SELECT lineUserId FROM submissions WHERE submissionId = ?",
+            "SELECT lineUserId, status FROM submissions WHERE submissionId = ?",
             [submissionId]
         );
         if (sub.length === 0) throw new Error("Submission not found");
+        if (sub[0].status === 'approved') throw new Error("รายงานนี้ถูก approve ไปแล้ว");
 
         const ownerId = sub[0].lineUserId;
 
@@ -1210,34 +1228,39 @@ app.post('/api/admin/submissions/reject', isAdmin, async (req, res) => {
 // ADMIN: Delete Submission
 // ======================================================
 app.delete('/api/admin/submissions/:submissionId', isAdmin, async (req, res) => {
-    await db.query(
-        "DELETE FROM submissions WHERE submissionId = ?",
-        [req.params.submissionId]
-    );
-    res.json({ status: "success", data: { removed: true } });
+    try {
+        await db.query("DELETE FROM likes WHERE submissionId = ?", [req.params.submissionId]);
+        await db.query("DELETE FROM comments WHERE submissionId = ?", [req.params.submissionId]);
+        await db.query("DELETE FROM submissions WHERE submissionId = ?", [req.params.submissionId]);
+        res.json({ status: "success", data: { removed: true } });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 // ======================================================
 // ADMIN: Activities
 // ======================================================
 app.get('/api/admin/activities', isAdmin, async (req, res) => {
-    const [rows] = await db.query(
-        "SELECT * FROM activities ORDER BY createdAt DESC"
-    );
-    res.json({ status: "success", data: rows });
+    try {
+        const [rows] = await db.query("SELECT * FROM activities ORDER BY createdAt DESC");
+        res.json({ status: "success", data: rows });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 app.post('/api/admin/activities', isAdmin, async (req, res) => {
     const { title, description, imageUrl } = req.body;
-
-    await db.query(
-        `INSERT INTO activities 
-        (activityId, title, description, imageUrl, status, createdAt)
-         VALUES (?, ?, ?, ?, 'active', NOW())`,
-        ["ACT" + uuidv4(), title, description, imageUrl]
-    );
-
-    res.json({ status: "success", data: { created: true } });
+    try {
+        await db.query(
+            `INSERT INTO activities (activityId, title, description, imageUrl, status, createdAt) VALUES (?, ?, ?, ?, 'active', NOW())`,
+            ["ACT" + uuidv4(), title, description, imageUrl]
+        );
+        res.json({ status: "success", data: { created: true } });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 app.put('/api/admin/activities', isAdmin, async (req, res) => {
@@ -1257,23 +1280,26 @@ app.put('/api/admin/activities', isAdmin, async (req, res) => {
 
 app.post('/api/admin/activities/toggle', isAdmin, async (req, res) => {
     const { activityId } = req.body;
+    try {
+        const [rows] = await db.query(
+            "SELECT status FROM activities WHERE activityId = ?",
+            [activityId]
+        );
 
-    const [rows] = await db.query(
-        "SELECT status FROM activities WHERE activityId = ?",
-        [activityId]
-    );
+        if (rows.length === 0)
+            return res.status(404).json({ status: "error", message: "Not found" });
 
-    if (rows.length === 0)
-        return res.status(404).json({ status: "error", message: "Not found" });
+        const newStatus = rows[0].status === "active" ? "inactive" : "active";
 
-    const newStatus = rows[0].status === "active" ? "inactive" : "active";
+        await db.query(
+            "UPDATE activities SET status = ? WHERE activityId = ?",
+            [newStatus, activityId]
+        );
 
-    await db.query(
-        "UPDATE activities SET status = ? WHERE activityId = ?",
-        [newStatus, activityId]
-    );
-
-    res.json({ status: "success", data: { newStatus } });
+        res.json({ status: "success", data: { newStatus } });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 // ======================================================
@@ -1283,7 +1309,17 @@ app.delete('/api/admin/activities/:activityId', isAdmin, async (req, res) => {
     try {
         const { activityId } = req.params;
 
-        // ลบ submission ทั้งหมดของกิจกรรมนี้ก่อน
+        // ลบ likes และ comments ของ submissions ในกิจกรรมนี้ก่อน (ป้องกัน FK constraint)
+        await db.query(
+            "DELETE FROM likes WHERE submissionId IN (SELECT submissionId FROM submissions WHERE activityId = ?)",
+            [activityId]
+        );
+        await db.query(
+            "DELETE FROM comments WHERE submissionId IN (SELECT submissionId FROM submissions WHERE activityId = ?)",
+            [activityId]
+        );
+
+        // ลบ submission ทั้งหมดของกิจกรรมนี้
         await db.query(
             "DELETE FROM submissions WHERE activityId = ?",
             [activityId]
@@ -1306,24 +1342,25 @@ app.delete('/api/admin/activities/:activityId', isAdmin, async (req, res) => {
 // ADMIN: Badge Management
 // ======================================================
 app.get('/api/admin/badges', isAdmin, async (req, res) => {
-    const [rows] = await db.query(
-        "SELECT * FROM badges ORDER BY badgeName ASC"
-    );
-    res.json({ status: "success", data: rows });
+    try {
+        const [rows] = await db.query("SELECT * FROM badges ORDER BY badgeName ASC");
+        res.json({ status: "success", data: rows });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 app.post('/api/admin/badges', isAdmin, async (req, res) => {
     const { badgeName, description, imageUrl } = req.body;
-
-    await db.query(
-        `
-        INSERT INTO badges (badgeId, badgeName, description, imageUrl)
-        VALUES (?, ?, ?, ?)
-        `,
-        ["BADGE" + uuidv4(), badgeName, description, imageUrl]
-    );
-
-    res.json({ status: "success", data: { created: true } });
+    try {
+        await db.query(
+            `INSERT INTO badges (badgeId, badgeName, description, imageUrl) VALUES (?, ?, ?, ?)`,
+            ["BADGE" + uuidv4(), badgeName, description, imageUrl]
+        );
+        res.json({ status: "success", data: { created: true } });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 app.put('/api/admin/badges/:badgeId', isAdmin, async (req, res) => {
@@ -1342,11 +1379,20 @@ app.put('/api/admin/badges/:badgeId', isAdmin, async (req, res) => {
 });
 
 app.delete('/api/admin/badges/:badgeId', isAdmin, async (req, res) => {
-    await db.query(
-        "DELETE FROM badges WHERE badgeId = ?",
-        [req.params.badgeId]
-    );
-    res.json({ status: "success", data: { removed: true } });
+    try {
+        // ลบ user_badges ที่อ้างอิง badge นี้ก่อน (ป้องกัน FK constraint)
+        await db.query(
+            "DELETE FROM user_badges WHERE badgeId = ?",
+            [req.params.badgeId]
+        );
+        await db.query(
+            "DELETE FROM badges WHERE badgeId = ?",
+            [req.params.badgeId]
+        );
+        res.json({ status: "success", data: { removed: true } });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 // Award/revoke badge
@@ -1418,17 +1464,6 @@ app.post('/api/admin/revoke-badge', isAdmin, async (req, res) => {
             badgeId,
             requesterId || null
         ]
-    );
-
-    res.json({ status: "success", data: { revoked: true } });
-});
-
-app.post('/api/admin/revoke-badge', isAdmin, async (req, res) => {
-    const { lineUserId, badgeId } = req.body;
-
-    await db.query(
-        "DELETE FROM user_badges WHERE lineUserId = ? AND badgeId = ?",
-        [lineUserId, badgeId]
     );
 
     res.json({ status: "success", data: { revoked: true } });
@@ -1584,23 +1619,26 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
 // --- API: จบเกม V2 (กู้ชีพ Streak + เก็บช้อยส์ + แจ้งเตือน) ---
 app.post('/api/game/submit-answer-v2', async (req, res) => {
     const { lineUserId, questionId, selectedOption } = req.body;
+    if (!lineUserId || !questionId || !selectedOption) {
+        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+    }
     const today = new Date().toISOString().split('T')[0];
     const conn = await db.getClient();
 
     try {
         await conn.beginTransaction();
-        
-        // 1. ตรวจคำตอบ
+
+        // 2. ตรวจคำตอบ
         const [qs] = await conn.query("SELECT * FROM kyt_questions WHERE questionId = ?", [questionId]);
         if (qs.length === 0) throw new Error("ไม่พบคำถาม");
-        
+
         const question = qs[0];
         const isCorrect = (selectedOption === question.correctOption);
-        
-        let earnedCoins = isCorrect ? 50 : 10;
-        let earnedScore = isCorrect ? question.scoreReward : 2; 
 
-        // 2. ระบบ Streak (Logic ใหม่: เก็บสถิติเก่าไว้กู้คืน)
+        let earnedCoins = isCorrect ? 50 : 10;
+        let earnedScore = isCorrect ? question.scoreReward : 2;
+
+        // 3. ระบบ Streak (Logic ใหม่: เก็บสถิติเก่าไว้กู้คืน)
         const [streakRow] = await conn.query("SELECT * FROM user_streaks WHERE lineUserId = ?", [lineUserId]);
         let currentStreak = 1;
         let recoverableStreak = 0;
@@ -1645,16 +1683,21 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
             earnedCoins += 100; 
         }
 
-        // 3. อัปเดต User
+        // 4. อัปเดต User
         await conn.query("UPDATE users SET totalScore = totalScore + ?, coinBalance = coinBalance + ? WHERE lineUserId = ?", [earnedScore, earnedCoins, lineUserId]);
 
-        // ⭐ 4. บันทึกประวัติ (เพิ่ม selectedAnswer เพื่อเก็บ A-H)
-        await conn.query(
-            "INSERT INTO user_game_history (lineUserId, questionId, isCorrect, earnedPoints, playedAt, selectedAnswer) VALUES (?, ?, ?, ?, ?, ?)",
-            [lineUserId, questionId, isCorrect, earnedCoins, today, selectedOption]
-        );
+        // ⭐ 5. บันทึกประวัติ — UNIQUE(lineUserId, playedAt) ป้องกัน race condition
+        try {
+            await conn.query(
+                "INSERT INTO user_game_history (lineUserId, questionId, isCorrect, earnedPoints, playedAt, selectedAnswer) VALUES (?, ?, ?, ?, ?, ?)",
+                [lineUserId, questionId, isCorrect, earnedCoins, today, selectedOption]
+            );
+        } catch (insertErr) {
+            if (insertErr.code === 'ER_DUP_ENTRY') throw new Error("คุณเล่นเกมของวันนี้ไปแล้ว");
+            throw insertErr;
+        }
 
-        // ⭐ 5. แจ้งเตือนลง App
+        // ⭐ 6. แจ้งเตือนลง App
         const notifMsg = isCorrect 
             ? `ภารกิจสำเร็จ! คุณได้รับ ${earnedCoins} เหรียญจากการตอบคำถามประจำวัน`
             : `ตอบผิดรับรางวัลปลอบใจ ${earnedCoins} เหรียญ`;
@@ -1663,7 +1706,7 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
             `INSERT INTO notifications 
             (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
              VALUES (?, ?, ?, 'game_quiz', ?, ?, NOW())`,
-            ["NOTIF" + Date.now(), lineUserId, notifMsg, questionId, lineUserId]
+            ["NOTIF" + uuidv4(), lineUserId, notifMsg, questionId, lineUserId]
         );
 
         const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
@@ -1723,7 +1766,7 @@ app.post('/api/game/restore-streak', async (req, res) => {
         // 4. แจ้งเตือน
         await conn.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt) VALUES (?, ?, ?, 'system_alert', 'restore', ?, NOW())`,
-            ["NOTIF" + Date.now(), lineUserId, `กู้ชีพสำเร็จ! 🔥 ไฟกลับมาเป็น ${restoredStreak} วันแล้ว`, lineUserId]
+            ["NOTIF" + uuidv4(), lineUserId, `กู้ชีพสำเร็จ! 🔥 ไฟกลับมาเป็น ${restoredStreak} วันแล้ว`, lineUserId]
         );
 
         const [[updatedUser]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
@@ -1825,24 +1868,23 @@ app.post('/api/game/gacha-pull', async (req, res) => {
 // --- API: ดึงการ์ดสะสมของผู้ใช้ (แยกจาก Badges) ---
 app.get('/api/user/cards', async (req, res) => {
     const { lineUserId } = req.query;
-    
-    // ดึงการ์ดทั้งหมดที่มีในระบบ
-    const [allCards] = await db.query("SELECT * FROM safety_cards ORDER BY rarity DESC, cardName ASC");
-    
-    // ดึงการ์ดที่ user มี
-    const [userCards] = await db.query("SELECT cardId, COUNT(*) as count FROM user_cards WHERE lineUserId = ? GROUP BY cardId", [lineUserId]);
-    
-    // แปลงเป็น Map เพื่อเช็คว่ามีกี่ใบ
-    const ownedMap = {};
-    userCards.forEach(c => ownedMap[c.cardId] = c.count);
+    try {
+        const [allCards] = await db.query("SELECT * FROM safety_cards ORDER BY rarity DESC, cardName ASC");
+        const [userCards] = await db.query("SELECT cardId, COUNT(*) as count FROM user_cards WHERE lineUserId = ? GROUP BY cardId", [lineUserId]);
 
-    const result = allCards.map(c => ({
-        ...c,
-        isOwned: !!ownedMap[c.cardId], // มีหรือไม่มี
-        count: ownedMap[c.cardId] || 0 // จำนวนที่ซ้ำ
-    }));
+        const ownedMap = {};
+        userCards.forEach(c => ownedMap[c.cardId] = c.count);
 
-    res.json({ status: "success", data: result });
+        const result = allCards.map(c => ({
+            ...c,
+            isOwned: !!ownedMap[c.cardId],
+            count: ownedMap[c.cardId] || 0
+        }));
+
+        res.json({ status: "success", data: result });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 // ======================================================
@@ -1852,24 +1894,27 @@ app.get('/api/user/cards', async (req, res) => {
 app.get('/api/admin/users', isAdmin, async (req, res) => {
     const { search, sortBy } = req.query;
 
-    // ⭐ เพิ่ม coinBalance เข้าไปตรงนี้ครับ
     let sql = `
-        SELECT lineUserId, fullName, pictureUrl, employeeId, totalScore, coinBalance
-        FROM users
+        SELECT u.lineUserId, u.fullName, u.pictureUrl, u.employeeId, u.totalScore, u.coinBalance,
+               COUNT(ub.badgeId) AS badgeCount
+        FROM users u
+        LEFT JOIN user_badges ub ON u.lineUserId = ub.lineUserId
         WHERE 1=1
     `;
 
     let params = [];
 
     if (search) {
-        sql += ` AND (fullName LIKE ? OR employeeId LIKE ?) `;
+        sql += ` AND (u.fullName LIKE ? OR u.employeeId LIKE ?) `;
         params.push(`%${search}%`, `%${search}%`);
     }
 
+    sql += ` GROUP BY u.lineUserId, u.fullName, u.pictureUrl, u.employeeId, u.totalScore, u.coinBalance`;
+
     if (sortBy === "name") {
-        sql += ` ORDER BY fullName ASC`;
+        sql += ` ORDER BY u.fullName ASC`;
     } else {
-        sql += ` ORDER BY totalScore DESC`;
+        sql += ` ORDER BY u.totalScore DESC`;
     }
 
     try {
@@ -1913,7 +1958,7 @@ app.put('/api/admin/questions', isAdmin, async (req, res) => {
     const { questionId, questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, scoreReward, imageUrl } = req.body;
     try {
         await db.query(`
-            UPDATE daily_questions 
+            UPDATE kyt_questions
             SET questionText=?, optionA=?, optionB=?, optionC=?, optionD=?, optionE=?, optionF=?, optionG=?, optionH=?, correctOption=?, scoreReward=?, imageUrl=?
             WHERE questionId=?
         `, [questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, scoreReward, imageUrl, questionId]);
@@ -1926,7 +1971,7 @@ app.put('/api/admin/cards', isAdmin, async (req, res) => {
     const { cardId, cardName, description, rarity, imageUrl } = req.body;
     try {
         await db.query(`
-            UPDATE cards 
+            UPDATE safety_cards
             SET cardName=?, description=?, rarity=?, imageUrl=?
             WHERE cardId=?
         `, [cardName, description, rarity, imageUrl, cardId]);
@@ -1964,7 +2009,7 @@ app.put('/api/admin/badges/:id', isAdmin, async (req, res) => {
 // 5. แก้ไขด่าน Hunter (อันนี้เดิมใช้ POST path update อยู่แล้ว แต่ใส่เผื่อไว้)
 app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     const { levelId, title, imageUrl, hazards } = req.body;
-    const conn = await db.getConnection();
+    const conn = await db.getClient();
     try {
         await conn.beginTransaction();
         // อัปเดตข้อมูลด่าน
@@ -2063,37 +2108,41 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
 // ======================================================
 app.get('/api/notifications', async (req, res) => {
     const { requesterId } = req.query;
-
-    const [rows] = await db.query(
-        "SELECT * FROM notifications WHERE recipientUserId = ? ORDER BY createdAt DESC",
-        [requesterId]
-    );
-
-    res.json({ status: "success", data: rows });
+    try {
+        const [rows] = await db.query(
+            "SELECT * FROM notifications WHERE recipientUserId = ? ORDER BY createdAt DESC",
+            [requesterId]
+        );
+        res.json({ status: "success", data: rows });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 app.get('/api/notifications/unread-count', async (req, res) => {
     const { requesterId } = req.query;
-
-    const [rows] = await db.query(
-        "SELECT COUNT(*) AS count FROM notifications WHERE recipientUserId = ? AND isRead = FALSE",
-        [requesterId]
-    );
-    res.json({
-      status: "success",
-      data: { unreadCount: rows[0].count }
-    });
+    try {
+        const [rows] = await db.query(
+            "SELECT COUNT(*) AS count FROM notifications WHERE recipientUserId = ? AND isRead = FALSE",
+            [requesterId]
+        );
+        res.json({ status: "success", data: { unreadCount: rows[0].count } });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 app.post('/api/notifications/mark-read', async (req, res) => {
     const { requesterId } = req.body;
-
-    await db.query(
-        "UPDATE notifications SET isRead = TRUE WHERE recipientUserId = ?",
-        [requesterId]
-    );
-
-    res.json({ status: "success", data: { updated: true } });
+    try {
+        await db.query(
+            "UPDATE notifications SET isRead = TRUE WHERE recipientUserId = ?",
+            [requesterId]
+        );
+        res.json({ status: "success", data: { updated: true } });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 // --- API: แลกเหรียญเป็นคะแนน (Exchange Coins to Score) ---
@@ -2178,11 +2227,8 @@ app.post('/api/game/recycle-cards', async (req, res) => {
                 "SELECT count(*) as total FROM user_cards WHERE lineUserId = ? AND cardId = ?", 
                 [lineUserId, item.cardId]
             );
-            if (rows[0].total <= item.count) { 
-                // ต้องเหลือไว้อย่างน้อย 1 ใบ (ห้ามย่อยหมดเกลี้ยง) 
-                // หรือถ้าอนุญาตให้ย่อยหมดก็ได้ แต่ตามหลักเกมมักจะเก็บใบหลักไว้
-                // ในที่นี้สมมติยอมให้ย่อยเฉพาะตัวซ้ำ (Frontend ต้องกรองมา)
-                // แต่ Backend เช็คแค่ว่ามีของให้ลบไหมพอ
+            if (rows[0].total < item.count) {
+                throw new Error(`การ์ด ${item.cardId} มีไม่พอสำหรับย่อย (มี ${rows[0].total} ใบ, ต้องการ ${item.count} ใบ)`);
             }
 
             // คำสั่งลบแบบจำกัดจำนวน (LIMIT)
@@ -2269,41 +2315,40 @@ app.post('/api/admin/hunter/level', isAdmin, async (req, res) => {
 // 2. USER: ดึงรายชื่อด่านทั้งหมด (พร้อมดาว + จำนวนครั้งที่เล่น)
 app.get('/api/game/hunter/levels', async (req, res) => {
     const { lineUserId } = req.query;
-    
-    // ดึงด่านทั้งหมด
-    const [levels] = await db.query("SELECT * FROM hunter_levels ORDER BY createdAt DESC");
-    
-    // ดึงดาวสูงสุด (Best Stars)
-    const [history] = await db.query(`
-        SELECT levelId, MAX(stars) as bestStars 
-        FROM user_hunter_history 
-        WHERE lineUserId = ? 
-        GROUP BY levelId
-    `, [lineUserId]);
-    
-    const historyMap = {};
-    history.forEach(h => { historyMap[h.levelId] = h.bestStars; });
+    try {
+        const [levels] = await db.query("SELECT * FROM hunter_levels ORDER BY createdAt DESC");
 
-    // ⭐ ดึงจำนวนครั้งที่เล่น (Attempts)
-    const [attempts] = await db.query(`
-        SELECT levelId, attempt_count 
-        FROM hunter_attempts 
-        WHERE lineUserId = ?
-    `, [lineUserId]);
+        const [history] = await db.query(`
+            SELECT levelId, MAX(stars) as bestStars
+            FROM user_hunter_history
+            WHERE lineUserId = ?
+            GROUP BY levelId
+        `, [lineUserId]);
 
-    const attemptsMap = {};
-    attempts.forEach(a => { attemptsMap[a.levelId] = a.attempt_count; });
+        const historyMap = {};
+        history.forEach(h => { historyMap[h.levelId] = h.bestStars; });
 
-    const result = levels.map(l => ({
-        ...l,
-        isCleared: historyMap.hasOwnProperty(l.levelId),
-        bestStars: historyMap[l.levelId] || 0,
-        // เพิ่มฟิลด์นี้ส่งกลับไป
-        playedCount: attemptsMap[l.levelId] || 0,
-        maxPlays: 3 // กำหนดค่า Max ไว้ตรงนี้เลย
-    }));
+        const [attempts] = await db.query(`
+            SELECT levelId, attempt_count
+            FROM hunter_attempts
+            WHERE lineUserId = ?
+        `, [lineUserId]);
 
-    res.json({ status: "success", data: result });
+        const attemptsMap = {};
+        attempts.forEach(a => { attemptsMap[a.levelId] = a.attempt_count; });
+
+        const result = levels.map(l => ({
+            ...l,
+            isCleared: historyMap.hasOwnProperty(l.levelId),
+            bestStars: historyMap[l.levelId] || 0,
+            playedCount: attemptsMap[l.levelId] || 0,
+            maxPlays: 3
+        }));
+
+        res.json({ status: "success", data: result });
+    } catch (err) {
+        res.status(500).json({ status: "error", message: err.message });
+    }
 });
 
 // 3. USER: ตรวจสอบพิกัด (Check Hit)

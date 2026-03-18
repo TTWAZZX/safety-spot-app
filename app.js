@@ -215,6 +215,9 @@ async function uploadImage(file) {
   // 2) upload via existing backend
   const formData = new FormData();
   formData.append('image', optimized);
+  if (AppState.lineProfile && AppState.lineProfile.userId) {
+    formData.append('lineUserId', AppState.lineProfile.userId);
+  }
 
   const response = await fetch(`${API_BASE_URL}/api/upload`, { method: 'POST', body: formData });
   if (!response.ok) {
@@ -1124,6 +1127,8 @@ async function handleSubmitReport(e) {
     const imageFile = $('#image-input')[0].files[0];
     const description = $('#description-input').val().trim();
     if (!description) { return showWarning('กรุณากรอกรายละเอียดจุดเสี่ยง'); }
+    const submitBtn = $('#submission-form button[type="submit"]');
+    submitBtn.prop('disabled', true);
     showLoading('กำลังอัปโหลดและส่งรายงาน...');
     try {
         let imageUrl = null;
@@ -1134,7 +1139,6 @@ async function handleSubmitReport(e) {
         $('#submission-form')[0].reset();
         $('#submission-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
         showSuccess('รายงานของคุณถูกส่งเพื่อรอการตรวจสอบ');
-        // --- ส่วนที่เพิ่มเข้ามา ---
         // หาปุ่มของกิจกรรมที่เราเพิ่งส่งไป แล้วเปลี่ยนสถานะมัน
         const activityId = $('#activityId-input').val();
         const activityButton = $(`.btn-join-activity[data-activity-id="${activityId}"]`);
@@ -1145,9 +1149,11 @@ async function handleSubmitReport(e) {
                 .addClass('btn-success')
                 .html('<i class="fas fa-check-circle me-1"></i> เข้าร่วมแล้ว');
         }
-        // --- จบส่วนที่เพิ่มเข้ามา ---
-
-    } catch (error) { showError(error.message); }
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        submitBtn.prop('disabled', false);
+    }
 }
 
 function handleViewReport() {
@@ -1776,6 +1782,9 @@ async function loadPendingSubmissions() {
                 container.append(cardHtml);
             });
         }
+    } catch (e) {
+        console.error('loadPendingSubmissions error:', e);
+        container.html('<p class="text-center text-danger mt-4">ไม่สามารถโหลดรายงานได้ กรุณาลองใหม่</p>');
     } finally {
         $('#reports-loading').hide();
     }
@@ -1882,33 +1891,8 @@ async function fetchAdminUsers(page, query, isLoadMore = false) {
             return;
         }
 
-        // 2) ดึง badge ของแต่ละคนจาก /api/admin/user-details แล้วนับจำนวนป้าย
-        const usersWithBadgeCounts = await Promise.all(
-            users.map(async (u) => {
-                try {
-                    const detail = await callApi('/api/admin/user-details', {
-                        lineUserId: u.lineUserId
-                    });
-                    const badgesArr = Array.isArray(detail.badges) ? detail.badges : [];
-                    const badgeCount = badgesArr.length;
-
-                    // รวมค่าเดิม + badgeCount ใหม่เข้าไป
-                    return {
-                        ...u,
-                        badgeCount
-                    };
-                } catch (err) {
-                    console.error('โหลดจำนวนป้ายของผู้ใช้ไม่สำเร็จ', u.lineUserId, err);
-                    return {
-                        ...u,
-                        badgeCount: 0
-                    };
-                }
-            })
-        );
-
-        // 3) แสดงผลใน list (ตอนนี้แต่ละ user จะมี field badgeCount แน่นอนแล้ว)
-        renderUserListForAdmin(usersWithBadgeCounts, resultsContainer);
+        // 2) แสดงผลใน list (badgeCount มาจาก API แล้ว ไม่ต้อง fetch แยก)
+        renderUserListForAdmin(users, resultsContainer);
 
         // 4) จัดการ state สำหรับปุ่ม "โหลดเพิ่มเติม"
         if (users.length < 30) {
@@ -2152,10 +2136,18 @@ async function loadGamePage() {
             const q = result.question;
             $('#game-content').data('qid', q.questionId);
             $('#question-text').text(q.text);
-            $('#option-a').text(q.options.A); $('#option-b').text(q.options.B);
-            $('#option-c').text(q.options.C); $('#option-d').text(q.options.D);
-            $('#option-e').text(q.options.E); $('#option-f').text(q.options.F);
-            $('#option-g').text(q.options.G); $('#option-h').text(q.options.H);
+            // แสดงเฉพาะ options ที่มีข้อความ ซ่อน options ที่ว่าง
+            ['a','b','c','d','e','f','g','h'].forEach(function(letter) {
+                const text = q.options[letter.toUpperCase()];
+                const span = $('#option-' + letter);
+                const col  = span.closest('.col-6');
+                if (text) {
+                    span.text(text);
+                    col.show();
+                } else {
+                    col.hide();
+                }
+            });
             
             if(q.image) {
                 $('#question-image').attr('src', q.image).show();
@@ -2237,8 +2229,8 @@ $(document).on('click', '.answer-btn', async function() {
                     html: `คุณพลาดการเล่นทำให้สถิติ <b>${res.recoverableStreak} วัน</b> หายไป<br>ต้องการใช้ <b>200 เหรียญ</b> เพื่อกู้คืนไหม?`,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonColor: '#d33', // สีแดง
-                    cancelButtonColor: '#3085d6',
+                    confirmButtonColor: '#06C755', // เขียว = ยืนยัน
+                    cancelButtonColor: '#6c757d',  // เทา = ยกเลิก
                     confirmButtonText: 'กู้คืนเดี๋ยวนี้! (200💰)',
                     cancelButtonText: 'ไม่เป็นไร เริ่มใหม่'
                 }).then(async (result) => {
@@ -3058,8 +3050,14 @@ async function exchangeCoinsToScore() {
 
         try {
             const res = await callApi('/api/game/exchange-coins', { lineUserId: AppState.lineProfile.userId }, 'POST');
-            
-            // ... (โค้ดอัปเดต UI เดิม) ...
+
+            // อัปเดต UI ทันที
+            $('#coin-display').text(res.remainingCoins);
+            $('#user-score, #profile-page-score').text(res.newTotalScore);
+            if (AppState.currentUser) {
+                AppState.currentUser.coinBalance = res.remainingCoins;
+                AppState.currentUser.totalScore = res.newTotalScore;
+            }
 
             triggerHaptic('heavy'); // สั่นสำเร็จ
 
@@ -3193,7 +3191,7 @@ async function confirmRecycle() {
             cardsToRecycle 
         }, 'POST');
 
-        $('#recycle-modal').modal('hide');
+        bootstrap.Modal.getInstance(document.getElementById('recycle-modal'))?.hide();
         $('#coin-display').text(res.newCoinBalance);
         if(AppState.currentUser) AppState.currentUser.coinBalance = res.newCoinBalance;
 
@@ -3360,7 +3358,7 @@ function startHunterGame(id, imgUrl, total) {
     updateHunterTimerUI();
     
     $('.hunter-marker').remove(); 
-    $('#hunter-menu-modal').modal('hide');
+    bootstrap.Modal.getInstance(document.getElementById('hunter-menu-modal'))?.hide();
 
     if (!AppState.allModals['hunter-game']) {
         AppState.allModals['hunter-game'] = new bootstrap.Modal(document.getElementById('hunter-game-modal'));
@@ -4030,7 +4028,7 @@ $('#admin-edit-user-form').on('submit', async function(e) {
         await callApi('/api/admin/user/update-full', payload, 'POST');
         
         Swal.fire('สำเร็จ', 'อัปเดตข้อมูลเรียบร้อย', 'success');
-        $('#admin-edit-user-modal').modal('hide');
+        bootstrap.Modal.getInstance(document.getElementById('admin-edit-user-modal'))?.hide();
 
         // ⭐ หัวใจสำคัญ: สั่งโหลดข้อมูลใหม่ทันที เพื่อให้ตารางอัปเดต
         loadUsersForAdmin(); 
@@ -4083,7 +4081,7 @@ $('#admin-edit-kyt-form').on('submit', async function(e) {
         await callApi('/api/admin/kyt/update-answer', payload, 'POST');
         
         Swal.fire('สำเร็จ', 'แก้ไขและแจ้งเตือนผู้ใช้แล้ว', 'success');
-        $('#admin-edit-kyt-modal').modal('hide');
+        bootstrap.Modal.getInstance(document.getElementById('admin-edit-kyt-modal'))?.hide();
         
         // รีโหลดหน้า Monitor ทันที
         // (ต้องมั่นใจว่าฟังก์ชัน loadKytMonitor เข้าถึงได้ หรือกด tab ใหม่)
