@@ -68,6 +68,7 @@
                         <div class="text-end flex-shrink-0">
                             <div class="home-score-value" id="user-score">0</div>
                             <small class="text-muted" style="font-size:0.68rem;">คะแนนสะสม</small>
+                            <div id="home-percentile-label" class="home-percentile-chip d-none"></div>
                         </div>
                     </div>
                 </div>
@@ -126,6 +127,16 @@
                     </a>
                 </div>
                 <div id="home-activities-list"></div>
+
+                <!-- Social Feed -->
+                <div class="mt-4 mb-2 d-flex align-items-center justify-content-between px-1">
+                    <span class="fw-bold" style="font-size:0.9rem;">
+                        <i class="fas fa-rss me-2 text-danger"></i>ความเคลื่อนไหวล่าสุด
+                    </span>
+                </div>
+                <div id="home-social-feed">
+                    <div class="text-center py-2"><div class="spinner-border spinner-border-sm text-secondary"></div></div>
+                </div>
 
             </div>
 
@@ -399,18 +410,29 @@
                     <h4 class="fw-bold mb-0">ภารกิจความปลอดภัย</h4>
                     <small class="text-muted">เลือกกิจกรรมที่ต้องการเข้าร่วมและส่งรายงาน</small>
                 </div>
+                <!-- Filter Tabs -->
+                <div class="activity-filter-tabs mb-3">
+                    <button class="act-filter-btn active" data-filter="all">ทั้งหมด</button>
+                    <button class="act-filter-btn" data-filter="pending">ยังไม่ได้ร่วม</button>
+                    <button class="act-filter-btn" data-filter="done">ร่วมแล้ว ✓</button>
+                </div>
                 <div id="all-activities-list"></div>
             </div>
 
-            <div id="leaderboard-page" class="page">
+            <div id="leaderboard-page" class="page" style="padding-bottom:80px;">
                 <h4 class="mb-3 fw-bold">กระดานผู้นำ</h4>
                 <div id="leaderboard-list"></div>
                 <div id="leaderboard-loading" class="text-center my-5">
                    <div class="spinner-border" role="status"></div>
                 </div>
-
                 <div id="leaderboard-load-more-container" class="text-center mt-3" style="display: none;">
                      <button id="leaderboard-load-more-btn" class="btn btn-outline-secondary">โหลดเพิ่มเติม</button>
+                </div>
+                <!-- Sticky My Rank Bar -->
+                <div id="my-rank-bar" class="my-rank-bar d-none">
+                    <img id="my-rank-pic" src="" width="32" height="32" class="rounded-circle me-2">
+                    <span id="my-rank-name" class="fw-bold me-2 text-truncate"></span>
+                    <span class="ms-auto fw-bold" id="my-rank-text"></span>
                 </div>
             </div>
 
@@ -1641,6 +1663,7 @@
     <link rel="stylesheet" href="https://unpkg.com/pulltorefreshjs@0.1.22/dist/index.css">
     <script src="https://unpkg.com/pulltorefreshjs@0.1.22/dist/index.umd.js"></script>
     <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
     <script src="app.js"></script>
     
 </body>

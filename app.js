@@ -210,6 +210,9 @@ async function showMainApp(userData) {
         AppState.currentUser = userData;
         updateUserInfoUI(AppState.currentUser);
 
+        // Check streak milestone celebration
+        checkStreakMilestone(userData.currentStreak);
+
         // ---------------------------
         // แสดงเมนู Admin เฉพาะแอดมิน
         // ---------------------------
@@ -389,7 +392,107 @@ function updateUserInfoUI(user) {
     $('#home-coins-display').text((user.coinBalance || 0).toLocaleString());
     $('#home-streak-display').text(user.currentStreak || 0);
     $('#home-dept-name').text(user.department || 'ยังไม่ระบุแผนก');
+    // Percentile chip
+    if (user.percentile !== undefined && user.percentile !== null) {
+        const pct = user.percentile;
+        const chip = $('#home-percentile-label');
+        chip.text(`Top ${pct}%`).removeClass('d-none');
+        chip.removeClass('pct-top pct-mid pct-low');
+        if (pct <= 10) chip.addClass('pct-top');
+        else if (pct <= 50) chip.addClass('pct-mid');
+        else chip.addClass('pct-low');
+    }
     // completion % จะถูกอัปเดตใน loadGameDashboard() หลังโหลดการ์ด
+}
+
+// ===============================================================
+//  CONFETTI CELEBRATION
+// ===============================================================
+function fireConfetti(type = 'default') {
+    if (typeof confetti !== 'function') return;
+    if (type === 'big') {
+        // Full celebration: 3 bursts
+        const burst = () => confetti({
+            particleCount: 120,
+            spread: 80,
+            origin: { y: 0.6 },
+            colors: ['#06C755', '#FFD700', '#FF6B6B', '#4DA6FF', '#FF9F43']
+        });
+        burst();
+        setTimeout(burst, 350);
+        setTimeout(burst, 700);
+    } else if (type === 'streak') {
+        confetti({ particleCount: 80, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#06C755', '#FFD700'] });
+        confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#06C755', '#FFD700'] });
+    } else {
+        confetti({ particleCount: 60, spread: 60, origin: { y: 0.65 } });
+    }
+}
+
+// ===============================================================
+//  STREAK MILESTONE CHECK
+// ===============================================================
+function checkStreakMilestone(streak) {
+    if (!streak || streak < 7) return;
+    const milestones = [7, 30, 60, 100];
+    const hit = milestones.filter(m => streak >= m).pop();
+    if (!hit) return;
+    const key = `streak_milestone_${hit}_shown`;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, '1');
+
+    const labels = { 7: '7 วัน', 30: '1 เดือน', 60: '2 เดือน', 100: '100 วัน' };
+    const icons  = { 7: '🔥', 30: '⭐', 60: '🏆', 100: '👑' };
+    setTimeout(() => {
+        fireConfetti('streak');
+        Swal.fire({
+            title: `${icons[hit]} Streak ${labels[hit]}!`,
+            html: `<p class="mb-0">คุณ Login ต่อเนื่องมาถึง <strong>${hit} วัน</strong> แล้ว!<br>ยอดเยี่ยมมาก ขอบคุณที่ใส่ใจความปลอดภัย</p>`,
+            icon: 'success',
+            confirmButtonColor: '#06C755',
+            confirmButtonText: 'เยี่ยมมาก! 🎉',
+            timer: 8000,
+            timerProgressBar: true
+        });
+    }, 1200);
+}
+
+// ===============================================================
+//  SOCIAL FEED
+// ===============================================================
+async function loadSocialFeed() {
+    const container = $('#home-social-feed');
+    try {
+        const items = await callApi('/api/social-feed');
+        if (!items || !items.length) {
+            container.html('<div class="empty-state-small"><i class="fas fa-rss"></i><p>ยังไม่มีความเคลื่อนไหว</p></div>');
+            return;
+        }
+        container.html(items.map(item => {
+            const timeAgo = formatTimeAgo(item.createdAt);
+            const pic = item.pictureUrl || 'https://placehold.co/36x36';
+            return `<div class="feed-item">
+                <img src="${pic}" class="feed-avatar" onerror="this.onerror=null;this.src='https://placehold.co/36x36'">
+                <div class="feed-body">
+                    <span class="feed-name">${sanitizeHTML(item.fullName || '')}</span>
+                    <span class="feed-action"> ร่วมกิจกรรม </span>
+                    <span class="feed-act">${sanitizeHTML(item.activityTitle || '')}</span>
+                    <div class="feed-time">${timeAgo}</div>
+                </div>
+            </div>`;
+        }).join(''));
+    } catch (e) {
+        container.html('<div class="empty-state-small"><i class="fas fa-wifi-slash"></i><p>โหลดไม่ได้</p></div>');
+    }
+}
+
+function formatTimeAgo(dateStr) {
+    if (!dateStr) return '';
+    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+    if (diff < 60) return 'เมื่อกี้';
+    if (diff < 3600) return `${Math.floor(diff / 60)} นาทีที่แล้ว`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} ชั่วโมงที่แล้ว`;
+    return `${Math.floor(diff / 86400)} วันที่แล้ว`;
 }
 
 async function loadHomeDashboard(activities) {
@@ -450,8 +553,11 @@ async function loadHomeDashboard(activities) {
             </div>`;
         }).join(''));
     } else {
-        actList.html('<p class="text-muted text-center small py-2">ยังไม่มีกิจกรรม</p>');
+        actList.html(`<div class="empty-state-small"><i class="fas fa-clipboard-list"></i><p>ยังไม่มีกิจกรรม</p></div>`);
     }
+
+    // Load social feed
+    loadSocialFeed();
 }
 
 // ในไฟล์ app.js
@@ -459,8 +565,12 @@ function displayActivitiesUI(activities, listId) {
     const listElement = $(`#${listId}`);
     listElement.empty();
     if (!activities || activities.length === 0) {
-        listElement.html('<p class="text-center text-muted">ยังไม่มีกิจกรรมในขณะนี้</p>');
+        listElement.html(`<div class="empty-state"><i class="fas fa-clipboard-list"></i><h6>ยังไม่มีกิจกรรม</h6><p>ติดตามกิจกรรมความปลอดภัยได้ที่นี่</p></div>`);
         return;
+    }
+    // Cache full list for filter tabs (only from the full activities page, not filtered subsets)
+    if (listId === 'all-activities-list' && !AppState._filterActive) {
+        AppState._lastActivities = activities;
     }
     activities.forEach(act => {
         // --- ส่วนที่เพิ่มเข้ามา ---
@@ -765,13 +875,30 @@ async function loadLeaderboard(isLoadMore = false) {
         });
 
         if (users.length < 30) {
-            // ถ้าข้อมูลที่ได้มาน้อยกว่า 30 แสดงว่าหมดแล้ว
             AppState.leaderboard.hasMore = false;
             $('#leaderboard-load-more-container').hide();
         } else {
-            // ถ้ายังมีอีก ให้แสดงปุ่ม
             AppState.leaderboard.currentPage++;
             $('#leaderboard-load-more-container').show();
+        }
+
+        // Show sticky "My Rank" bar
+        if (!isLoadMore && AppState.currentUser) {
+            const myRankData = users.find(u => u.lineUserId === AppState.lineProfile.userId);
+            if (myRankData) {
+                const myIdx = users.indexOf(myRankData);
+                const myRank = myIdx + 1;
+                $('#my-rank-pic').attr('src', AppState.currentUser.pictureUrl || 'https://placehold.co/32x32');
+                $('#my-rank-name').text(AppState.currentUser.fullName || '');
+                $('#my-rank-text').text(`อันดับ ${myRank} · ${myRankData.totalScore} คะแนน`);
+                $('#my-rank-bar').removeClass('d-none');
+            } else if (AppState.currentUser.userRank) {
+                // User is not in current page — show from profile data
+                $('#my-rank-pic').attr('src', AppState.currentUser.pictureUrl || 'https://placehold.co/32x32');
+                $('#my-rank-name').text(AppState.currentUser.fullName || '');
+                $('#my-rank-text').text(`อันดับ ${AppState.currentUser.userRank} · ${AppState.currentUser.totalScore} คะแนน`);
+                $('#my-rank-bar').removeClass('d-none');
+            }
         }
 
     } catch (error) {
@@ -933,6 +1060,21 @@ function bindStaticEventListeners() {
     });
     
     $('#leaderboard-load-more-btn').on('click', () => loadLeaderboard(true));
+
+    // Activity filter tabs
+    $(document).on('click', '.act-filter-btn', function() {
+        $('.act-filter-btn').removeClass('active');
+        $(this).addClass('active');
+        const filter = $(this).data('filter');
+        const all = AppState._lastActivities || [];
+        let filtered;
+        if (filter === 'done') filtered = all.filter(a => a.userHasSubmitted);
+        else if (filter === 'pending') filtered = all.filter(a => !a.userHasSubmitted);
+        else filtered = all;
+        AppState._filterActive = (filter !== 'all');
+        displayActivitiesUI(filtered, 'all-activities-list');
+        AppState._filterActive = false;
+    });
 
     $(document).on('click', '.sub-expand-btn', function(e) {
         e.preventDefault();
@@ -1415,6 +1557,7 @@ async function handleSubmitReport(e) {
         AppState.allModals.submission.hide();
         $('#submission-form')[0].reset();
         $('#submission-image-preview').attr('src', 'https://placehold.co/400x300/e9ecef/6c757d?text=Preview');
+        fireConfetti('default');
         showSuccess('รายงานของคุณถูกส่งเพื่อรอการตรวจสอบแล้ว 🎉');
         const activityId = $('#activityId-input').val();
         const activityButton = $(`.btn-join-activity[data-activity-id="${activityId}"]`);
@@ -1685,8 +1828,9 @@ async function handleApprovalAction() {
                 requesterId: AppState.lineProfile.userId
             }, 'POST');
         }
-        card.slideUp(500, function() { 
-            $(this).remove(); 
+        if (action === 'approve') fireConfetti('default');
+        card.slideUp(500, function() {
+            $(this).remove();
             const newCount = $('.report-card').length;
             $('#pending-count-modal').text(newCount);
             if(newCount === 0) $('#no-reports-message').show();

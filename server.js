@@ -317,6 +317,18 @@ app.get('/api/user/profile', async (req, res) => {
         const [adminRows] = await db.query("SELECT * FROM admins WHERE lineUserId = ?", [lineUserId]);
         user.isAdmin = adminRows.length > 0;
 
+        // Rank & Percentile
+        const [[rankRow]] = await db.query(
+            "SELECT COUNT(*) AS betterCount FROM users WHERE totalScore > ?",
+            [user.totalScore]
+        );
+        const [[totalRow]] = await db.query("SELECT COUNT(*) AS total FROM users");
+        user.userRank = rankRow.betterCount + 1;
+        user.totalUsers = totalRow.total;
+        user.percentile = totalRow.total > 1
+            ? Math.round(100 - (rankRow.betterCount / totalRow.total) * 100)
+            : 100;
+
         res.json({ status: "success", data: { registered: true, user } });
     } catch (err) {
         res.status(500).json({ status: "error", message: err.message });
@@ -402,6 +414,26 @@ app.post('/api/user/update-department', async (req, res) => {
 // -----------------------------
 //   ACTIVITIES LIST
 // -----------------------------
+// Public: Social Feed — recent approved submissions
+app.get('/api/social-feed', async (_req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT s.submissionId, s.createdAt,
+                   u.fullName, u.pictureUrl, u.department,
+                   a.title AS activityTitle
+            FROM submissions s
+            JOIN users u ON s.lineUserId = u.lineUserId
+            JOIN activities a ON s.activityId = a.activityId
+            WHERE s.status = 'approved'
+            ORDER BY s.createdAt DESC
+            LIMIT 10
+        `);
+        res.json({ status: "success", data: rows });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
 // Public: Department Leaderboard (top 10 by avg score)
 app.get('/api/department-leaderboard', async (_req, res) => {
     try {

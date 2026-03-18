@@ -2318,3 +2318,143 @@ body {
         margin: 0 auto;
     }
 }
+
+/* ===== ACTIVITY FILTER TABS ===== */
+.activity-filter-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+.activity-filter-tabs::-webkit-scrollbar { display: none; }
+.act-filter-btn {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1.5px solid #dee2e6;
+    background: #fff;
+    color: #6c757d;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.act-filter-btn.active {
+    background: var(--line-green, #06C755);
+    border-color: var(--line-green, #06C755);
+    color: #fff;
+    font-weight: 600;
+}
+.act-filter-btn:active { transform: scale(0.95); }
+
+/* ===== STICKY MY RANK BAR ===== */
+.my-rank-bar {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: linear-gradient(135deg, #06C755 0%, #04a844 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -4px 16px rgba(6,199,85,0.25);
+    margin: 0 -18px;
+}
+.my-rank-bar img {
+    width: 32px;
+    height: 32px;
+    border: 2px solid rgba(255,255,255,0.6);
+    object-fit: cover;
+}
+.my-rank-bar #my-rank-name {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+.my-rank-bar #my-rank-text {
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+/* ===== SOCIAL FEED ===== */
+.feed-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+.feed-item:last-child { border-bottom: none; }
+.feed-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+.feed-body {
+    font-size: 0.84rem;
+    line-height: 1.4;
+    flex: 1;
+}
+.feed-name { font-weight: 600; color: #212529; }
+.feed-action { color: #6c757d; }
+.feed-act { color: var(--line-green, #06C755); font-weight: 500; }
+.feed-time { font-size: 0.75rem; color: #adb5bd; margin-top: 2px; }
+
+/* ===== EMPTY STATES ===== */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #adb5bd;
+}
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    display: block;
+    opacity: 0.4;
+}
+.empty-state h6 { color: #6c757d; margin-bottom: 4px; }
+.empty-state p { font-size: 0.85rem; margin: 0; }
+
+.empty-state-small {
+    text-align: center;
+    padding: 16px 12px;
+    color: #adb5bd;
+}
+.empty-state-small i {
+    font-size: 1.6rem;
+    display: block;
+    margin-bottom: 6px;
+    opacity: 0.4;
+}
+.empty-state-small p { font-size: 0.8rem; margin: 0; }
+
+/* ===== PERCENTILE CHIP ===== */
+.home-percentile-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    margin-top: 4px;
+    letter-spacing: 0.3px;
+}
+.home-percentile-chip.pct-top {
+    background: #ffd700;
+    color: #7a5900;
+}
+.home-percentile-chip.pct-mid {
+    background: #d1f5df;
+    color: #0a6e32;
+}
+.home-percentile-chip.pct-low {
+    background: #e9ecef;
+    color: #6c757d;
+}
