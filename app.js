@@ -463,8 +463,10 @@ function renderAdminChart(chartData) {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-                title: { display: true, text: 'จำนวนรายงาน 7 วันล่าสุด' }
+                title: { display: true, text: 'จำนวนรายงาน 7 วันล่าสุด' },
+                legend: { display: false }
             },
             scales: {
                 y: { beginAtZero: true, ticks: { stepSize: 1 } }
@@ -842,17 +844,21 @@ function bindAdminEventListeners() {
             list.append(`<div class="list-group-item bg-success text-white fw-bold"><i class="fas fa-users me-2"></i> เล่นแล้ววันนี้: ${data.length} คน</div>`);
 
             data.forEach(u => {
-                const status = u.isCorrect ? '<span class="badge bg-success">ถูกต้อง</span>' : '<span class="badge bg-danger">ผิด</span>';
-                
-                // ⭐ เข้ารหัสข้อมูลเพื่อใส่ในปุ่ม
-            const kytData = encodeURIComponent(JSON.stringify({
-                id: u.id,
-                userId: u.lineUserId,
-                name: u.fullName,
-                isCorrect: u.isCorrect,
-                score: u.earnedPoints,
-                question: u.questionText // ⭐ เพิ่มบรรทัดนี้
-            }));
+                const statusBadge = u.isCorrect
+                    ? '<span class="badge bg-success">ถูกต้อง ✅</span>'
+                    : '<span class="badge bg-danger">ผิด ❌</span>';
+                const answerText = u.selectedOption
+                    ? `ตอบ: <strong>${u.selectedOption}</strong>${u.isCorrect ? '' : ` (ถูก: ${u.correctOption})`}`
+                    : '';
+
+                const kytData = encodeURIComponent(JSON.stringify({
+                    id: u.id,
+                    userId: u.lineUserId,
+                    name: u.fullName,
+                    isCorrect: u.isCorrect,
+                    score: u.earnedPoints,
+                    question: u.questionText
+                }));
 
                 list.append(`
                     <div class="list-group-item d-flex align-items-center justify-content-between">
@@ -861,11 +867,12 @@ function bindAdminEventListeners() {
                             <div>
                                 <div class="fw-bold">${u.fullName}</div>
                                 <small class="text-muted">รหัส: ${u.employeeId}</small>
+                                ${answerText ? `<br><small class="text-muted">${answerText}</small>` : ''}
                             </div>
                         </div>
                         <div class="text-end">
-                            ${status}<br>
-                            <small class="text-muted">+${u.earnedPoints}</small>
+                            ${statusBadge}<br>
+                            <small class="text-muted">+${u.earnedPoints} คะแนน</small>
                             <button class="btn btn-sm btn-outline-warning ms-2 btn-edit-kyt" data-kyt="${kytData}">
                                 <i class="fas fa-edit"></i>
                             </button>
@@ -995,8 +1002,30 @@ function bindAdminTabEventListeners() {
     });
 
     $('#users-load-more-btn').on('click', () => {
-        // เรียกใช้ fetchAdminUsers โดยบอกว่าเป็น "Load More" (isLoadMore = true)
         fetchAdminUsers(AppState.adminUsers.currentPage, AppState.adminUsers.currentSearch, true);
+    });
+
+    $('#export-users-csv-btn').on('click', function() {
+        const users = AppState._cachedAdminUsers;
+        if (!users || users.length === 0) {
+            return Swal.fire('ไม่มีข้อมูล', 'กรุณาโหลดรายชื่อผู้ใช้ก่อน', 'warning');
+        }
+        const headers = ['ชื่อ-นามสกุล', 'รหัสพนักงาน', 'คะแนนรวม', 'เหรียญ', 'จำนวนป้าย'];
+        const rows = users.map(u => [
+            `"${(u.fullName || '').replace(/"/g, '""')}"`,
+            `"${(u.employeeId || '').replace(/"/g, '""')}"`,
+            u.totalScore || 0,
+            u.coinBalance || 0,
+            u.badgeCount || 0
+        ].join(','));
+        const csv = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `users_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
     });
 
     // ---- เพิ่ม Event Listener สำหรับปุ่ม Sort ----
@@ -1006,12 +1035,14 @@ function bindAdminTabEventListeners() {
 
         // ถ้ากดปุ่มที่ Active อยู่แล้ว ไม่ต้องทำอะไร
         if (btn.hasClass('active')) {
-            return; 
+            return;
         }
 
-        // อัปเดต UI ของปุ่ม
-        $('#user-sort-options .btn-sort').removeClass('active');
-        btn.addClass('active');
+        // อัปเดต UI ของปุ่ม — สลับ active style ให้ชัดเจน
+        $('#user-sort-options .btn-sort')
+            .removeClass('active btn-secondary')
+            .addClass('btn-outline-secondary');
+        btn.removeClass('btn-outline-secondary').addClass('active btn-secondary');
 
         // อัปเดต state
         AppState.adminUsers.currentSort = sortBy;
@@ -1370,7 +1401,23 @@ async function handleApprovalAction() {
     const action = btn.hasClass('btn-approve') ? 'approve' : 'reject';
     const id = btn.data('id');
     const score = $(`#score-input-${id}`).val();
-    const card = $(`#report-card-${id}`); 
+
+    // ถามยืนยันก่อนทำการ Approve/Reject
+    const actionLabel = action === 'approve' ? 'อนุมัติ' : 'ปฏิเสธ';
+    const actionColor = action === 'approve' ? '#06C755' : '#dc3545';
+    const confirm = await Swal.fire({
+        title: `ยืนยันการ${actionLabel}?`,
+        text: action === 'approve' ? `จะให้คะแนน ${score} คะแนนแก่ผู้ส่ง` : 'รายงานนี้จะถูกปฏิเสธ',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: actionColor,
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: `ใช่, ${actionLabel}`,
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!confirm.isConfirmed) return;
+
+    const card = $(`#report-card-${id}`);
     card.css('opacity', '0.5');
     btn.prop('disabled', true).closest('.d-flex').find('button, input').prop('disabled', true);
     try {
@@ -1416,6 +1463,22 @@ async function handleEditActivity() {
 async function handleToggleActivity() {
     const btn = $(this);
     const id = btn.data('id');
+    const currentLabel = btn.text().trim();
+    const isActivating = currentLabel === 'เปิดใช้งาน';
+    const actionLabel = isActivating ? 'เปิดใช้งาน' : 'ปิดใช้งาน';
+
+    const confirmResult = await Swal.fire({
+        title: `ยืนยันการ${actionLabel}?`,
+        text: isActivating ? 'ผู้ใช้จะมองเห็นกิจกรรมนี้ทันที' : 'ผู้ใช้จะไม่สามารถส่งงานกิจกรรมนี้ได้',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: isActivating ? '#06C755' : '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: `ใช่, ${actionLabel}`,
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!confirmResult.isConfirmed) return;
+
     btn.prop('disabled', true);
     try {
         await callApi('/api/admin/activities/toggle', { activityId: id }, 'POST');
@@ -1537,65 +1600,170 @@ async function handleViewUserDetails(lineUserId) {
     const modal = AppState.allModals['user-details'];
     if (!modal) return;
 
-    // ⭐ ตั้งค่าผู้ใช้ที่เลือกไว้สำหรับปรับคะแนน
     adminSelectedUserId = lineUserId;
-
-    $("#admin-score-box").hide(); // ซ่อนไว้ก่อน
-
-    $('#user-details-badges-container').html(
-        '<div class="text-center"><div class="spinner-border"></div></div>'
-    );
     modal.show();
 
+    // Reset tabs to overview
+    $('#userDetailTabs .nav-link').removeClass('active');
+    $('#userDetailTabs .nav-link[data-bs-target="#udt-overview"]').addClass('active');
+    $('.tab-pane').removeClass('show active');
+    $('#udt-overview').addClass('show active');
+
+    // Show loading in all containers
+    ['#user-details-badges-container','#udt-cards-container','#udt-kyt-container','#udt-hunter-container','#udt-submissions-container'].forEach(id => {
+        $(id).html('<div class="text-center py-4"><div class="spinner-border"></div></div>');
+    });
+
     try {
-        // 1) โหลดข้อมูล user + badges
-        const userData = await callApi('/api/admin/user-details', { lineUserId });
+        const [userData, allBadges] = await Promise.all([
+            callApi('/api/admin/user-details', { lineUserId }),
+            callApi('/api/admin/badges')
+        ]);
         const user = userData.user;
         const earnedBadges = Array.isArray(userData.badges) ? userData.badges : [];
+        const streak = userData.streak;
+        const userCards = Array.isArray(userData.cards) ? userData.cards : [];
 
-        // 2) โหลด badge ทั้งหมด
-        const allBadges = await callApi('/api/admin/badges');
+        // Stats bar
+        $('#detailUserPicture').attr('src', user.pictureUrl || 'https://placehold.co/44x44');
+        $('#detailUserName').text(user.fullName);
+        $('#detailUserEmployeeId').text('รหัส: ' + (user.employeeId || '-'));
+        $('#detailUserScore').text(user.totalScore || 0);
+        $('#detailUserCoins').text(user.coinBalance || 0);
+        $('#detailUserStreak').text(streak ? streak.currentStreak : 0);
+        $('#detailUserLastPlayed').text(streak && streak.lastPlayedDate
+            ? new Date(streak.lastPlayedDate).toLocaleDateString('th-TH')
+            : '-');
 
-        // 3) แสดงข้อมูลผู้ใช้
-        $("#detailUserName").text(user.fullName);
-        $("#detailUserEmployeeId").text(user.employeeId);
-        $("#detailUserScore").text(user.totalScore);
-        $("#detailUserPicture").attr("src", user.pictureUrl || "https://placehold.co/60x60");
+        // Profile edit fields
+        $('#admin-edit-fullname').val(user.fullName);
+        $('#admin-edit-empid').val(user.employeeId || '');
 
-        // ⭐⭐ แสดง admin-score-box เฉพาะแอดมิน ⭐⭐
-        if (AppState.currentUser && AppState.currentUser.isAdmin) {
-            $("#admin-score-box").show();
-            $("#adminUserCurrentScore").text(user.totalScore);
-        }
+        // Streak input
+        $('#adminStreakInput').val(streak ? streak.currentStreak : 0);
 
-        // 4) แสดง badge
-        const badgesContainer = $('#user-details-badges-container');
-        badgesContainer.empty();
-
+        // Badges tab
         const earnedIds = new Set(earnedBadges.map(b => b.badgeId));
-
-        const badgesHtml = allBadges.map(badge => {
-            const isEarned = earnedIds.has(badge.badgeId);
-            return `
-                <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
-                    <span>${sanitizeHTML(badge.badgeName)}</span>
+        const badgesHtml = allBadges.length === 0
+            ? '<p class="text-muted">ยังไม่มีป้ายรางวัลในระบบ</p>'
+            : allBadges.map(badge => {
+                const isEarned = earnedIds.has(badge.badgeId);
+                return `<div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <img src="${getFullImageUrl(badge.imageUrl)}" width="32" height="32" class="rounded" onerror="this.src='https://placehold.co/32x32'">
+                        <span>${sanitizeHTML(badge.badgeName)}</span>
+                    </div>
                     <button class="btn btn-sm ${isEarned ? 'btn-outline-danger' : 'btn-success'} badge-toggle-btn"
-                            data-userid="${lineUserId}"
-                            data-badgeid="${badge.badgeId}"
-                            data-action="${isEarned ? 'revoke' : 'award'}">
-                        <i class="fas ${isEarned ? 'fa-times' : 'fa-check'} me-1"></i>
-                        ${isEarned ? 'เพิกถอน' : 'มอบรางวัล'}
+                            data-userid="${lineUserId}" data-badgeid="${badge.badgeId}" data-action="${isEarned ? 'revoke' : 'award'}">
+                        <i class="fas ${isEarned ? 'fa-times' : 'fa-check'} me-1"></i>${isEarned ? 'เพิกถอน' : 'มอบรางวัล'}
                     </button>
                 </div>`;
-        }).join('');
+            }).join('');
+        $('#user-details-badges-container').html(badgesHtml);
 
-        badgesContainer.html(badgesHtml);
+        // Cards tab
+        if (userCards.length === 0) {
+            $('#udt-cards-container').html('<p class="text-muted col-12">ยังไม่มีการ์ด</p>');
+        } else {
+            const cardHtml = userCards.map(c => {
+                let rarityClass = 'bg-secondary';
+                if (c.rarity === 'R') rarityClass = 'bg-info text-dark';
+                if (c.rarity === 'SR') rarityClass = 'bg-danger';
+                if (c.rarity === 'UR') rarityClass = 'bg-warning text-dark';
+                return `<div class="col-6 col-md-3 col-lg-2">
+                    <div class="card h-100 shadow-sm text-center">
+                        <img src="${getFullImageUrl(c.imageUrl)}" class="card-img-top" style="height:100px;object-fit:contain;padding:8px;background:#f8f9fa;">
+                        <div class="card-body p-2">
+                            <span class="badge ${rarityClass} mb-1">${c.rarity}</span>
+                            <p class="small fw-bold mb-0 text-truncate">${sanitizeHTML(c.cardName)}</p>
+                            <small class="text-muted">x${c.qty}</small>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+            $('#udt-cards-container').html(cardHtml);
+        }
+
+        // Load award card dropdown
+        const allCards = await callApi('/api/admin/cards');
+        const cardOptions = allCards.map(c => `<option value="${c.cardId}">${sanitizeHTML(c.cardName)} (${c.rarity})</option>`).join('');
+        $('#award-card-select').html('<option value="">-- เลือกการ์ด --</option>' + cardOptions);
 
     } catch (e) {
         console.error('handleViewUserDetails error:', e);
         showError(e.message || 'ไม่สามารถโหลดข้อมูลได้');
-        $('#user-details-badges-container').html('<p class="text-danger">ไม่สามารถโหลดข้อมูลได้</p>');
     }
+
+    // Lazy load tabs on click
+    $('button[data-bs-target="#udt-kyt"]').off('shown.bs.tab.udt').on('shown.bs.tab.udt', () => loadUserKytHistory(adminSelectedUserId));
+    $('button[data-bs-target="#udt-hunter"]').off('shown.bs.tab.udt').on('shown.bs.tab.udt', () => loadUserHunterHistory(adminSelectedUserId));
+    $('button[data-bs-target="#udt-submissions"]').off('shown.bs.tab.udt').on('shown.bs.tab.udt', () => loadUserSubmissions(adminSelectedUserId));
+}
+
+async function loadUserKytHistory(lineUserId) {
+    const container = $('#udt-kyt-container');
+    container.html('<div class="text-center py-4"><div class="spinner-border"></div></div>');
+    try {
+        const rows = await callApi('/api/admin/user/kyt-history', { lineUserId });
+        if (rows.length === 0) { container.html('<p class="text-muted text-center mt-4">ยังไม่มีประวัติ KYT</p>'); return; }
+        const html = rows.map(r => {
+            const d = new Date(r.playedAt).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+            const badge = r.isCorrect ? '<span class="badge bg-success">ถูก ✅</span>' : '<span class="badge bg-danger">ผิด ❌</span>';
+            const answer = r.selectedOption ? `ตอบ: <strong>${r.selectedOption}</strong>${!r.isCorrect && r.correctOption ? ` (เฉลย: ${r.correctOption})` : ''}` : '';
+            return `<div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div><p class="mb-1 small fw-bold">${sanitizeHTML(r.questionText)}</p>
+                    <small class="text-muted">${answer}</small></div>
+                    <div class="text-end">${badge}<br><small class="text-muted">+${r.earnedPoints} คะแนน</small><br><small class="text-muted">${d}</small></div>
+                </div>
+            </div>`;
+        }).join('');
+        container.html(`<div class="list-group">${html}</div>`);
+    } catch(e) { container.html(`<p class="text-danger">${e.message}</p>`); }
+}
+
+async function loadUserHunterHistory(lineUserId) {
+    const container = $('#udt-hunter-container');
+    container.html('<div class="text-center py-4"><div class="spinner-border"></div></div>');
+    try {
+        const rows = await callApi('/api/admin/user/hunter-history', { lineUserId });
+        if (rows.length === 0) { container.html('<p class="text-muted text-center mt-4">ยังไม่มีประวัติ Hunter</p>'); return; }
+        const html = rows.map(r => {
+            const d = new Date(r.clearedAt).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
+            let stars = '';
+            for(let i=1; i<=3; i++) stars += i <= r.stars ? '⭐' : '⚫';
+            return `<div class="list-group-item d-flex align-items-center gap-3">
+                <img src="${getFullImageUrl(r.imageUrl)}" width="48" height="48" class="rounded" style="object-fit:cover;" onerror="this.src='https://placehold.co/48x48'">
+                <div class="flex-grow-1"><strong>${sanitizeHTML(r.levelTitle)}</strong><br><small class="text-muted">${d}</small></div>
+                <span>${stars}</span>
+            </div>`;
+        }).join('');
+        container.html(`<div class="list-group">${html}</div>`);
+    } catch(e) { container.html(`<p class="text-danger">${e.message}</p>`); }
+}
+
+async function loadUserSubmissions(lineUserId) {
+    const container = $('#udt-submissions-container');
+    container.html('<div class="text-center py-4"><div class="spinner-border"></div></div>');
+    try {
+        const rows = await callApi('/api/admin/user/submissions', { lineUserId });
+        if (rows.length === 0) { container.html('<p class="text-muted text-center mt-4">ยังไม่มีการส่งงาน</p>'); return; }
+        const html = rows.map(r => {
+            const d = new Date(r.createdAt).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
+            const statusMap = { pending: '<span class="badge bg-warning text-dark">รอตรวจ</span>', approved: '<span class="badge bg-success">อนุมัติ</span>', rejected: '<span class="badge bg-danger">ปฏิเสธ</span>' };
+            const statusBadge = statusMap[r.status] || `<span class="badge bg-secondary">${r.status}</span>`;
+            const img = r.imageUrl ? `<img src="${getFullImageUrl(r.imageUrl)}" width="56" height="56" class="rounded" style="object-fit:cover;">` : '';
+            return `<div class="list-group-item d-flex align-items-center gap-3">
+                ${img}
+                <div class="flex-grow-1">
+                    <strong>${sanitizeHTML(r.activityTitle)}</strong><br>
+                    <small class="text-muted">${sanitizeHTML(r.description || '')}</small>
+                </div>
+                <div class="text-end">${statusBadge}<br><small class="text-muted">${d}</small></div>
+            </div>`;
+        }).join('');
+        container.html(`<div class="list-group">${html}</div>`);
+    } catch(e) { container.html(`<p class="text-danger">${e.message}</p>`); }
 }
 
 async function handleToggleBadge() {
@@ -1632,59 +1800,9 @@ async function handleToggleBadge() {
 }
 // ===== END: New functions for Idea 3 =====
 
-// =====================================================
-// โหลดข้อมูล user + badge + score สำหรับหน้า Admin
-// =====================================================
+// loadAdminUserDetails — ใช้ handleViewUserDetails แทนเพื่อไม่ให้ code ซ้ำ
 async function loadAdminUserDetails(lineUserId) {
-
-    try {
-        const detail = await callApi('/api/admin/user-details', {
-            lineUserId
-        });
-
-        const user = detail.user;
-        const earnedBadges = Array.isArray(detail.badges) ? detail.badges : [];
-
-        // อัปเดต UI: ข้อมูลผู้ใช้
-        $("#detailUserName").text(user.fullName);
-        $("#detailUserEmployeeId").text(user.employeeId);
-        $("#detailUserScore").text(user.totalScore);
-        $("#detailUserPicture").attr("src", user.pictureUrl || "https://placehold.co/80x80");
-
-        // อัปเดต UI: กล่องปรับคะแนน
-        $("#adminUserCurrentScore").text(user.totalScore);
-
-        // อัปเดต badge list
-        const badgesContainer = $('#user-details-badges-container');
-        badgesContainer.html('<div class="spinner-border"></div>');
-
-        const allBadges = await callApi('/api/admin/badges');
-        badgesContainer.empty();
-
-        const earnedIds = new Set(earnedBadges.map(b => b.badgeId));
-
-        allBadges.forEach(badge => {
-            const isEarned = earnedIds.has(badge.badgeId);
-
-            const row = `
-                <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
-                    <span>${sanitizeHTML(badge.badgeName)}</span>
-                    <button class="btn btn-sm ${isEarned ? 'btn-outline-danger' : 'btn-success'} badge-toggle-btn"
-                        data-userid="${lineUserId}"
-                        data-badgeid="${badge.badgeId}"
-                        data-action="${isEarned ? 'revoke' : 'award'}">
-                        <i class="fas ${isEarned ? 'fa-times' : 'fa-check'} me-1"></i>
-                        ${isEarned ? 'เพิกถอน' : 'มอบรางวัล'}
-                    </button>
-                </div>
-            `;
-            badgesContainer.append(row);
-        });
-
-    } catch (err) {
-        console.error("loadAdminUserDetails failed:", err);
-        showError("โหลดข้อมูลผู้ใช้ไม่สำเร็จ");
-    }
+    await handleViewUserDetails(lineUserId);
 }
 
 async function loadAdminDashboard() {
@@ -1799,39 +1917,56 @@ async function loadAllActivitiesForAdmin() {
         list.html('<p class="text-danger">ไม่สามารถโหลดกิจกรรมได้</p>');
     }
 }
+function renderFilteredBadges(badges, query) {
+    const list = $('#badges-list');
+    list.empty();
+    const filtered = query
+        ? badges.filter(b => b.badgeName.toLowerCase().includes(query.toLowerCase()))
+        : badges;
+    if (filtered.length === 0) {
+        list.html('<p class="text-center text-muted my-4">ไม่พบป้ายรางวัลที่ค้นหา</p>');
+        return;
+    }
+    filtered.forEach(b => {
+        const html = `
+            <div class="col-6 col-md-4 col-lg-3 mb-3">
+                <div class="card h-100 shadow-sm text-center admin-badge-card">
+                    <div class="card-body">
+                        <img src="${getFullImageUrl(b.imageUrl)}" class="badge-icon mb-2" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';" alt="${sanitizeHTML(b.badgeName)}">
+                        <h6 class="fw-bold mb-1">${sanitizeHTML(b.badgeName)}</h6>
+                        <small class="text-muted d-block mb-3 preserve-whitespace">${sanitizeHTML(b.description)}</small>
+                        <div class="d-flex justify-content-center gap-2">
+                            <button class="btn btn-sm btn-outline-primary btn-edit-badge"
+                                data-badge-id="${b.badgeId}"
+                                data-badge-name="${sanitizeHTML(b.badgeName)}"
+                                data-badge-desc="${sanitizeHTML(b.description)}"
+                                data-badge-url="${getFullImageUrl(b.imageUrl)}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger delete-badge-btn" data-badge-id="${b.badgeId}">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        list.append(html);
+    });
+}
+
 async function loadBadgesForAdmin() {
     const list = $('#badges-list');
     list.html('<div class="text-center my-4"><div class="spinner-border text-success"></div><p class="text-muted mt-2">กำลังโหลดป้ายรางวัล...</p></div>');
     try {
         const badges = await callApi('/api/admin/badges');
-        list.empty();
+        AppState._cachedBadges = badges;
         if (badges.length === 0) {
             list.html('<p class="text-center text-muted my-4">ยังไม่มีป้ายรางวัลในระบบ</p>');
         } else {
-            badges.forEach(b => {
-                const html = `
-                    <div class="col-6 col-md-4 col-lg-3 mb-3">
-                        <div class="card h-100 shadow-sm text-center admin-badge-card">
-                            <div class="card-body">
-                                <img src="${getFullImageUrl(b.imageUrl)}" class="badge-icon mb-2" onerror="this.onerror=null;this.src='https://placehold.co/60x60/e9ecef/6c757d?text=Badge';" alt="${sanitizeHTML(b.badgeName)}">
-                                <h6 class="fw-bold mb-1">${sanitizeHTML(b.badgeName)}</h6>
-                                <small class="text-muted d-block mb-3 preserve-whitespace">${sanitizeHTML(b.description)}</small>
-                                <div class="d-flex justify-content-center gap-2">
-                                    <button class="btn btn-sm btn-outline-primary btn-edit-badge"
-                                        data-badge-id="${b.badgeId}"
-                                        data-badge-name="${sanitizeHTML(b.badgeName)}"
-                                        data-badge-desc="${sanitizeHTML(b.description)}"
-                                        data-badge-url="${getFullImageUrl(b.imageUrl)}">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger delete-badge-btn" data-badge-id="${b.badgeId}">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>`;
-                list.append(html);
+            const query = $('#badge-search-input').val() || '';
+            renderFilteredBadges(badges, query);
+            $('#badge-search-input').off('input.bsearch').on('input.bsearch', function() {
+                renderFilteredBadges(AppState._cachedBadges || [], $(this).val());
             });
         }
     } catch (e) {
@@ -1886,9 +2021,18 @@ async function fetchAdminUsers(page, query, isLoadMore = false) {
             if (!isLoadMore) {
                 resultsContainer.html('<p class="text-center text-muted my-4">ไม่พบผู้ใช้งาน</p>');
                 loadMoreContainer.hide();
+                $('#user-count-label').text('');
             }
             AppState.adminUsers.hasMore = false;
             return;
+        }
+
+        // อัปเดต cache และจำนวน user
+        if (!isLoadMore) {
+            AppState._cachedAdminUsers = users;
+            $('#user-count-label').text(`พบ ${users.length} คน`);
+        } else {
+            AppState._cachedAdminUsers = (AppState._cachedAdminUsers || []).concat(users);
         }
 
         // 2) แสดงผลใน list (badgeCount มาจาก API แล้ว ไม่ต้อง fetch แยก)
@@ -1968,11 +2112,27 @@ $(document).on("click", "#adminApplyScoreBtn", async function () {
     const delta = Number($("#adminScoreDeltaInput").val());
     const mode = $("input[name='adminScoreMode']:checked").val(); // add / sub
 
-    if (!delta || delta <= 0) {
-        return Swal.fire("กรุณากรอกจำนวนคะแนนให้ถูกต้อง", "", "warning");
+    if (!delta || delta <= 0 || !Number.isInteger(delta)) {
+        return Swal.fire("กรุณากรอกจำนวนคะแนนเป็นตัวเลขจำนวนเต็มที่มากกว่า 0", "", "warning");
+    }
+    if (delta > 10000) {
+        return Swal.fire("จำนวนคะแนนมากเกินไป", "ไม่สามารถปรับเกิน 10,000 คะแนนต่อครั้ง", "warning");
     }
 
     const deltaScore = mode === "sub" ? -Math.abs(delta) : Math.abs(delta);
+    const userName = $('#detailUserName').text() || 'ผู้ใช้นี้';
+    const actionLabel = mode === "sub" ? `หัก ${delta} คะแนน` : `เพิ่ม ${delta} คะแนน`;
+    const confirmResult = await Swal.fire({
+        title: `ยืนยันการปรับคะแนน?`,
+        html: `<b>${userName}</b><br>${actionLabel}`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: mode === "sub" ? '#dc3545' : '#06C755',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'ยืนยัน',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!confirmResult.isConfirmed) return;
 
     // UI Loading
     const applyBtnText = $("#adminScoreBtnText");
@@ -2007,7 +2167,110 @@ $(document).on("click", "#adminApplyScoreBtn", async function () {
     loadingIcon.addClass("d-none");
 });
 
-// ปุ่มกากบาทปิดกล่องจัดการคะแนน (ซ่อนเฉพาะกล่องนี้ ไม่ได้ปิด modal ทั้งหมด)
+// B-1: ปรับ Coins
+$(document).on('click', '#adminApplyCoinBtn', async function() {
+    if (!adminSelectedUserId) return Swal.fire('ไม่พบผู้ใช้', '', 'warning');
+    const delta = Number($('#adminCoinDeltaInput').val());
+    const mode = $("input[name='adminCoinMode']:checked").val();
+    if (!delta || delta <= 0 || !Number.isInteger(delta)) {
+        return Swal.fire('กรุณากรอกจำนวนเหรียญเป็นตัวเลขจำนวนเต็มที่มากกว่า 0', '', 'warning');
+    }
+    if (delta > 10000) return Swal.fire('จำนวนมากเกินไป', 'ไม่เกิน 10,000 ต่อครั้ง', 'warning');
+    const deltaCoins = mode === 'sub' ? -Math.abs(delta) : Math.abs(delta);
+    const name = $('#detailUserName').text();
+    const label = mode === 'sub' ? `หัก ${delta} เหรียญ` : `เพิ่ม ${delta} เหรียญ`;
+    const conf = await Swal.fire({ title: 'ยืนยัน?', html: `<b>${name}</b><br>${label}`, icon: 'question', showCancelButton: true, confirmButtonColor: mode === 'sub' ? '#dc3545' : '#06C755', cancelButtonColor: '#6c757d', confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก' });
+    if (!conf.isConfirmed) return;
+    try {
+        const res = await callApi('/api/admin/user/update-coins', { lineUserId: adminSelectedUserId, deltaCoins }, 'POST');
+        $('#detailUserCoins').text(res.newBalance);
+        Swal.fire({ icon: 'success', title: 'อัปเดตเหรียญสำเร็จ!', timer: 1500, showConfirmButton: false });
+        $('#adminCoinDeltaInput').val('');
+    } catch(e) { Swal.fire('Error', e.message, 'error'); }
+});
+
+// B-7: ตั้งค่า Streak
+$(document).on('click', '#adminApplyStreakBtn', async function() {
+    if (!adminSelectedUserId) return;
+    const newStreak = Number($('#adminStreakInput').val());
+    if (isNaN(newStreak) || newStreak < 0) return Swal.fire('กรุณากรอกจำนวนวันที่ถูกต้อง', '', 'warning');
+    const name = $('#detailUserName').text();
+    const conf = await Swal.fire({ title: 'ยืนยันการตั้ง Streak?', html: `<b>${name}</b><br>Streak = ${newStreak} วัน`, icon: 'question', showCancelButton: true, confirmButtonColor: '#0dcaf0', cancelButtonColor: '#6c757d', confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก' });
+    if (!conf.isConfirmed) return;
+    try {
+        await callApi('/api/admin/user/update-streak', { lineUserId: adminSelectedUserId, newStreak }, 'POST');
+        $('#detailUserStreak').text(newStreak);
+        Swal.fire({ icon: 'success', title: 'ตั้ง Streak สำเร็จ!', timer: 1500, showConfirmButton: false });
+    } catch(e) { Swal.fire('Error', e.message, 'error'); }
+});
+
+// B-9: บันทึก Profile
+$(document).on('click', '#adminSaveProfileBtn', async function() {
+    if (!adminSelectedUserId) return;
+    const fullName = $('#admin-edit-fullname').val().trim();
+    const employeeId = $('#admin-edit-empid').val().trim();
+    if (!fullName) return Swal.fire('กรุณากรอกชื่อ', '', 'warning');
+    try {
+        await callApi('/api/admin/user/update-profile', { lineUserId: adminSelectedUserId, fullName, employeeId }, 'POST');
+        $('#detailUserName').text(fullName);
+        $('#detailUserEmployeeId').text('รหัส: ' + (employeeId || '-'));
+        Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลสำเร็จ!', timer: 1500, showConfirmButton: false });
+    } catch(e) { Swal.fire('Error', e.message, 'error'); }
+});
+
+// B-8: Show/hide award card form
+$(document).on('click', '#adminAwardCardBtn', function() {
+    $('#award-card-form').toggle();
+});
+$(document).on('click', '#adminCancelAwardCardBtn', function() {
+    $('#award-card-form').hide();
+});
+$(document).on('click', '#adminConfirmAwardCardBtn', async function() {
+    const cardId = $('#award-card-select').val();
+    if (!cardId || !adminSelectedUserId) return Swal.fire('กรุณาเลือกการ์ด', '', 'warning');
+    const cardName = $('#award-card-select option:selected').text();
+    const name = $('#detailUserName').text();
+    const conf = await Swal.fire({ title: 'ยืนยันการมอบการ์ด?', html: `<b>${name}</b> จะได้รับ<br><b>${cardName}</b>`, icon: 'question', showCancelButton: true, confirmButtonColor: '#06C755', cancelButtonColor: '#6c757d', confirmButtonText: 'มอบเลย', cancelButtonText: 'ยกเลิก' });
+    if (!conf.isConfirmed) return;
+    try {
+        await callApi('/api/admin/award-card', { lineUserId: adminSelectedUserId, cardId }, 'POST');
+        $('#award-card-form').hide();
+        Swal.fire({ icon: 'success', title: 'มอบการ์ดสำเร็จ!', timer: 1500, showConfirmButton: false });
+        // reload cards tab
+        loadUserCardsTab(adminSelectedUserId);
+    } catch(e) { Swal.fire('Error', e.message, 'error'); }
+});
+
+// helper reload cards tab
+async function loadUserCardsTab(lineUserId) {
+    try {
+        const userData = await callApi('/api/admin/user-details', { lineUserId });
+        const userCards = Array.isArray(userData.cards) ? userData.cards : [];
+        if (userCards.length === 0) {
+            $('#udt-cards-container').html('<p class="text-muted col-12">ยังไม่มีการ์ด</p>');
+            return;
+        }
+        const cardHtml = userCards.map(c => {
+            let rarityClass = 'bg-secondary';
+            if (c.rarity === 'R') rarityClass = 'bg-info text-dark';
+            if (c.rarity === 'SR') rarityClass = 'bg-danger';
+            if (c.rarity === 'UR') rarityClass = 'bg-warning text-dark';
+            return `<div class="col-6 col-md-3 col-lg-2">
+                <div class="card h-100 shadow-sm text-center">
+                    <img src="${getFullImageUrl(c.imageUrl)}" class="card-img-top" style="height:100px;object-fit:contain;padding:8px;background:#f8f9fa;">
+                    <div class="card-body p-2">
+                        <span class="badge ${rarityClass} mb-1">${c.rarity}</span>
+                        <p class="small fw-bold mb-0 text-truncate">${sanitizeHTML(c.cardName)}</p>
+                        <small class="text-muted">x${c.qty}</small>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+        $('#udt-cards-container').html(cardHtml);
+    } catch(e) { console.error(e); }
+}
+
+// ปุ่มปิด admin-score-box (backward compat — hidden แล้ว แต่คง handler ไว้)
 $(document).on('click', '#admin-score-box-close', function () {
     $('#admin-score-box').slideUp(150);
 });
@@ -2293,9 +2556,22 @@ function handleManageQuestions() {
         AppState.allModals['admin-questions'] = new bootstrap.Modal(document.getElementById('admin-questions-modal'));
     }
     AppState.allModals['admin-questions'].show();
-    
-    // โหลดข้อมูล
+    $('#question-search-input').val('');
     loadAdminQuestions();
+}
+
+// Filter + Render คำถามจากข้อมูลที่ cache ไว้
+function renderFilteredQuestions(questions, query) {
+    const list = $('#questions-list-admin');
+    list.empty();
+    const filtered = query
+        ? questions.filter(q => q.questionText.toLowerCase().includes(query.toLowerCase()))
+        : questions;
+    if (filtered.length === 0) {
+        list.html('<div class="col-12 text-center text-muted mt-5">ไม่พบคำถามที่ค้นหา</div>');
+        return;
+    }
+    filtered.forEach(q => renderQuestionCard(list, q));
 }
 
 // 2. ฟังก์ชันดึงรายการคำถามมาแสดง (แยกออกมาเพื่อ reuse ตอนบันทึกเสร็จ)
@@ -2305,6 +2581,7 @@ async function loadAdminQuestions() {
 
     try {
         const questions = await callApi('/api/admin/questions');
+        AppState._cachedQuestions = questions;
         list.empty();
 
         if (questions.length === 0) {
@@ -2312,61 +2589,57 @@ async function loadAdminQuestions() {
             return;
         }
 
-        questions.forEach(q => {
-            const isActive = q.isActive;
-            const statusBadge = isActive 
-                ? '<span class="badge bg-success">ใช้งาน</span>' 
-                : '<span class="badge bg-secondary">ปิด</span>';
-            const statusBtnClass = isActive ? 'btn-outline-secondary' : 'btn-outline-success';
-            const statusBtnText = isActive ? 'ปิด' : 'เปิด';
-            
-            // ✨ Encode ข้อมูลให้ปลอดภัยสำหรับใส่ในปุ่ม (แก้ปัญหา JSON Error)
-            const qData = encodeURIComponent(JSON.stringify(q));
-            
-            const imgHtml = q.imageUrl 
-                ? `<img src="${getFullImageUrl(q.imageUrl)}" class="rounded mb-2" style="height: 80px; object-fit: cover;">` 
-                : '';
+        const query = $('#question-search-input').val() || '';
+        renderFilteredQuestions(questions, query);
 
-            const html = `
-            <div class="col-12 col-md-6 col-lg-4">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-body position-relative">
-                        <div class="d-flex justify-content-between mb-2">
-                            ${statusBadge}
-                            <small class="text-muted"><i class="fas fa-star text-warning"></i> ${q.scoreReward} คะแนน</small>
-                        </div>
-                        
-                        <div class="d-flex gap-3">
-                            ${imgHtml}
-                            <div style="min-width: 0;">
-                                <h6 class="fw-bold mb-1 text-dark text-truncate">${sanitizeHTML(q.questionText)}</h6>
-                                <p class="mb-0 small text-muted text-truncate">
-                                    <span class="${q.correctOption === 'A' ? 'text-success fw-bold' : ''}">A: ${sanitizeHTML(q.optionA)}</span><br>
-                                    <span class="${q.correctOption === 'B' ? 'text-success fw-bold' : ''}">B: ${sanitizeHTML(q.optionB)}</span>
-                                </p>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-3 d-flex gap-2 justify-content-end">
-                            <button class="btn btn-sm ${statusBtnClass} btn-toggle-q" data-id="${q.questionId}">
-                                ${statusBtnText}
-                            </button>
-                            <button class="btn btn-sm btn-primary btn-edit-question" data-question="${qData}">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-sm btn-danger btn-delete-q" data-id="${q.questionId}">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-            list.append(html);
+        // bind search
+        $('#question-search-input').off('input.qsearch').on('input.qsearch', function() {
+            renderFilteredQuestions(AppState._cachedQuestions || [], $(this).val());
         });
 
     } catch (e) {
         list.html(`<div class="col-12 text-center text-danger">เกิดข้อผิดพลาด: ${e.message}</div>`);
     }
+}
+
+function renderQuestionCard(list, q) {
+    const isActive = q.isActive;
+    const statusBadge = isActive
+        ? '<span class="badge bg-success">ใช้งาน</span>'
+        : '<span class="badge bg-secondary">ปิด</span>';
+    const statusBtnClass = isActive ? 'btn-outline-secondary' : 'btn-outline-success';
+    const statusBtnText = isActive ? 'ปิด' : 'เปิด';
+    const qData = encodeURIComponent(JSON.stringify(q));
+    const imgHtml = q.imageUrl
+        ? `<img src="${getFullImageUrl(q.imageUrl)}" class="rounded mb-2" style="height: 80px; object-fit: cover;">`
+        : '';
+    const html = `
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body position-relative">
+                <div class="d-flex justify-content-between mb-2">
+                    ${statusBadge}
+                    <small class="text-muted"><i class="fas fa-star text-warning"></i> ${q.scoreReward} คะแนน</small>
+                </div>
+                <div class="d-flex gap-3">
+                    ${imgHtml}
+                    <div style="min-width: 0;">
+                        <h6 class="fw-bold mb-1 text-dark text-truncate">${sanitizeHTML(q.questionText)}</h6>
+                        <p class="mb-0 small text-muted text-truncate">
+                            <span class="${q.correctOption === 'A' ? 'text-success fw-bold' : ''}">A: ${sanitizeHTML(q.optionA)}</span><br>
+                            <span class="${q.correctOption === 'B' ? 'text-success fw-bold' : ''}">B: ${sanitizeHTML(q.optionB)}</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="mt-3 d-flex gap-2 justify-content-end">
+                    <button class="btn btn-sm ${statusBtnClass} btn-toggle-q" data-id="${q.questionId}">${statusBtnText}</button>
+                    <button class="btn btn-sm btn-primary btn-edit-question" data-question="${qData}"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-sm btn-danger btn-delete-q" data-id="${q.questionId}"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+    list.append(html);
 }
 
 // 3. ฟังก์ชันกดปุ่ม "เพิ่มคำถามใหม่"
@@ -2792,58 +3065,64 @@ async function openCardAlbum() {
 
 // --- ADMIN: CARD MANAGEMENT ---
 
+function renderFilteredCards(cards, query) {
+    const list = $('#cards-list-admin');
+    list.empty();
+    const filtered = query
+        ? cards.filter(c => c.cardName.toLowerCase().includes(query.toLowerCase()))
+        : cards;
+    if (filtered.length === 0) {
+        list.html('<div class="col-12 text-center text-muted mt-5">ไม่พบการ์ดที่ค้นหา</div>');
+        return;
+    }
+    filtered.forEach(c => {
+        let badgeClass = 'bg-secondary';
+        if (c.rarity === 'R') badgeClass = 'bg-info text-dark';
+        if (c.rarity === 'SR') badgeClass = 'bg-danger';
+        if (c.rarity === 'UR') badgeClass = 'bg-warning text-dark';
+        const cardData = encodeURIComponent(JSON.stringify(c));
+        const imgHtml = c.imageUrl
+            ? `<img src="${getFullImageUrl(c.imageUrl)}" class="card-img-top" style="height: 140px; object-fit: contain; padding: 10px; background: #f8f9fa;">`
+            : '<div class="bg-light" style="height:140px;"></div>';
+        const html = `
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="position-relative">
+                    ${imgHtml}
+                    <span class="position-absolute top-0 end-0 badge ${badgeClass} m-2 shadow-sm">${c.rarity}</span>
+                </div>
+                <div class="card-body p-2 text-center">
+                    <h6 class="fw-bold text-dark mb-1 text-truncate">${sanitizeHTML(c.cardName)}</h6>
+                    <small class="text-muted d-block text-truncate mb-2" style="font-size: 0.7rem;">${sanitizeHTML(c.description || '-')}</small>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button class="btn btn-sm btn-outline-primary btn-edit-card" data-card='${cardData}'><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-outline-danger btn-delete-card" data-id="${c.cardId}"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+        list.append(html);
+    });
+}
+
 async function handleManageCards() {
     const list = $('#cards-list-admin');
     list.html('<div class="col-12 text-center my-5"><div class="spinner-border text-success"></div></div>');
     const modal = new bootstrap.Modal(document.getElementById('admin-cards-modal'));
     modal.show();
+    $('#card-search-input').val('');
 
     try {
         const cards = await callApi('/api/admin/cards');
-        list.empty();
-
+        AppState._cachedCards = cards;
         if (cards.length === 0) {
             list.html('<div class="col-12 text-center text-muted mt-5">ยังไม่มีการ์ดในระบบ</div>');
             return;
         }
-
-        cards.forEach(c => {
-            // สี Badge ตาม Rarity
-            let badgeClass = 'bg-secondary';
-            if (c.rarity === 'R') badgeClass = 'bg-info text-dark';
-            if (c.rarity === 'SR') badgeClass = 'bg-danger';
-            if (c.rarity === 'UR') badgeClass = 'bg-warning text-dark';
-
-            const cardData = encodeURIComponent(JSON.stringify(c));
-            const imgHtml = c.imageUrl 
-                ? `<img src="${getFullImageUrl(c.imageUrl)}" class="card-img-top" style="height: 140px; object-fit: contain; padding: 10px; background: #f8f9fa;">` 
-                : '<div class="bg-light" style="height:140px;"></div>';
-
-            const html = `
-            <div class="col-6 col-md-4 col-lg-3">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="position-relative">
-                        ${imgHtml}
-                        <span class="position-absolute top-0 end-0 badge ${badgeClass} m-2 shadow-sm">${c.rarity}</span>
-                    </div>
-                    <div class="card-body p-2 text-center">
-                        <h6 class="fw-bold text-dark mb-1 text-truncate">${sanitizeHTML(c.cardName)}</h6>
-                        <small class="text-muted d-block text-truncate mb-2" style="font-size: 0.7rem;">${sanitizeHTML(c.description || '-')}</small>
-                        
-                        <div class="d-flex justify-content-center gap-2">
-                            <button class="btn btn-sm btn-outline-primary btn-edit-card" data-card='${cardData}'>
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger btn-delete-card" data-id="${c.cardId}">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-            list.append(html);
+        renderFilteredCards(cards, '');
+        $('#card-search-input').off('input.csearch').on('input.csearch', function() {
+            renderFilteredCards(AppState._cachedCards || [], $(this).val());
         });
-
     } catch (e) {
         list.html(`<div class="col-12 text-center text-danger">เกิดข้อผิดพลาด: ${e.message}</div>`);
     }
@@ -2965,11 +3244,11 @@ async function handleSaveCard(e) {
         // ปิด Modal และรีเฟรชลิสต์
         bootstrap.Modal.getInstance(document.getElementById('card-form-modal')).hide();
         showSuccess('บันทึกข้อมูลเรียบร้อย');
-        
-        // รีเฟรชหน้า Card List
-        const listModal = bootstrap.Modal.getInstance(document.getElementById('admin-cards-modal'));
-        listModal.hide();
-        setTimeout(() => handleManageCards(), 500);
+
+        // รีเฟรช card list โดยตรง ไม่ต้อง hide/show modal ใหม่
+        const cards = await callApi('/api/admin/cards');
+        AppState._cachedCards = cards;
+        renderFilteredCards(cards, $('#card-search-input').val() || '');
 
     } catch (e) {
         showError(e.message);
@@ -2993,12 +3272,11 @@ async function handleDeleteCard() {
         try {
             await callApi(`/api/admin/cards/${id}`, {}, 'DELETE');
             showSuccess('ลบเรียบร้อย');
-            
-            // Refresh List
-            const listModalEl = document.getElementById('admin-cards-modal');
-            const listModal = bootstrap.Modal.getInstance(listModalEl);
-            listModal.hide();
-            setTimeout(() => handleManageCards(), 500);
+
+            // รีเฟรช card list โดยตรง
+            const cards = await callApi('/api/admin/cards');
+            AppState._cachedCards = cards;
+            renderFilteredCards(cards, $('#card-search-input').val() || '');
 
         } catch (e) {
             showError(e.message);

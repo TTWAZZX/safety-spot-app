@@ -1946,7 +1946,155 @@ app.get('/api/admin/user-details', isAdmin, async (req, res) => {
         [lineUserId]
     );
 
-    res.json({ status: "success", data: { user, badges } });
+    // ดึง streak
+    const [[streakRow]] = await db.query(
+        `SELECT currentStreak, lastPlayedDate, recoverableStreak FROM user_streaks WHERE lineUserId = ?`,
+        [lineUserId]
+    );
+
+    // ดึง card collection
+    const [cards] = await db.query(
+        `SELECT uc.cardId, sc.cardName, sc.imageUrl, sc.rarity, COUNT(*) AS qty
+         FROM user_cards uc
+         JOIN safety_cards sc ON uc.cardId = sc.cardId
+         WHERE uc.lineUserId = ?
+         GROUP BY uc.cardId, sc.cardName, sc.imageUrl, sc.rarity`,
+        [lineUserId]
+    );
+
+    res.json({ status: "success", data: { user, badges, streak: streakRow || null, cards } });
+});
+
+// B-1: ปรับ Coins โดยตรง
+app.post('/api/admin/user/update-coins', isAdmin, async (req, res) => {
+    const { lineUserId, deltaCoins } = req.body;
+    if (!lineUserId || deltaCoins === undefined) {
+        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+    }
+    try {
+        const [[user]] = await db.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
+        if (!user) return res.status(404).json({ status: "error", message: "ไม่พบผู้ใช้" });
+        const newBalance = Math.max(0, user.coinBalance + Number(deltaCoins));
+        await db.query("UPDATE users SET coinBalance = ? WHERE lineUserId = ?", [newBalance, lineUserId]);
+        res.json({ status: "success", data: { newBalance } });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
+// B-4: ประวัติ KYT ของ user
+app.get('/api/admin/user/kyt-history', isAdmin, async (req, res) => {
+    const { lineUserId } = req.query;
+    try {
+        const [rows] = await db.query(
+            `SELECT h.historyId, h.playedAt, h.isCorrect, h.earnedPoints, h.selectedOption,
+                    COALESCE(q.questionText, 'คำถามถูกลบไปแล้ว') AS questionText,
+                    COALESCE(q.correctOption, '') AS correctOption
+             FROM user_game_history h
+             LEFT JOIN kyt_questions q ON h.questionId = q.questionId
+             WHERE h.lineUserId = ?
+             ORDER BY h.playedAt DESC
+             LIMIT 60`,
+            [lineUserId]
+        );
+        res.json({ status: "success", data: rows });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
+// B-5: ประวัติ Hunter ของ user
+app.get('/api/admin/user/hunter-history', isAdmin, async (req, res) => {
+    const { lineUserId } = req.query;
+    try {
+        const [rows] = await db.query(
+            `SELECT h.stars, h.clearedAt, l.title AS levelTitle, l.imageUrl
+             FROM user_hunter_history h
+             JOIN hunter_levels l ON h.levelId = l.levelId
+             WHERE h.lineUserId = ?
+             ORDER BY h.clearedAt DESC`,
+            [lineUserId]
+        );
+        res.json({ status: "success", data: rows });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
+// B-6: ประวัติ Submissions ของ user
+app.get('/api/admin/user/submissions', isAdmin, async (req, res) => {
+    const { lineUserId } = req.query;
+    try {
+        const [rows] = await db.query(
+            `SELECT s.submissionId, s.status, s.createdAt, s.imageUrl, s.description,
+                    a.title AS activityTitle
+             FROM submissions s
+             JOIN activities a ON s.activityId = a.activityId
+             WHERE s.lineUserId = ?
+             ORDER BY s.createdAt DESC`,
+            [lineUserId]
+        );
+        res.json({ status: "success", data: rows });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
+// B-7: Reset / แก้ไข Streak
+app.post('/api/admin/user/update-streak', isAdmin, async (req, res) => {
+    const { lineUserId, newStreak } = req.body;
+    if (!lineUserId || newStreak === undefined) {
+        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+    }
+    try {
+        const streak = Math.max(0, Number(newStreak));
+        const [[existing]] = await db.query("SELECT lineUserId FROM user_streaks WHERE lineUserId = ?", [lineUserId]);
+        if (existing) {
+            await db.query(
+                "UPDATE user_streaks SET currentStreak = ?, lastPlayedDate = CURDATE() WHERE lineUserId = ?",
+                [streak, lineUserId]
+            );
+        } else {
+            await db.query(
+                "INSERT INTO user_streaks (lineUserId, currentStreak, lastPlayedDate) VALUES (?, ?, CURDATE())",
+                [lineUserId, streak]
+            );
+        }
+        res.json({ status: "success", data: { newStreak: streak } });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
+// B-8: มอบการ์ดให้ user โดยตรง
+app.post('/api/admin/award-card', isAdmin, async (req, res) => {
+    const { lineUserId, cardId } = req.body;
+    if (!lineUserId || !cardId) {
+        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+    }
+    try {
+        await db.query("INSERT INTO user_cards (lineUserId, cardId) VALUES (?, ?)", [lineUserId, cardId]);
+        res.json({ status: "success", message: "มอบการ์ดเรียบร้อย" });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
+// B-9: แก้ไข Profile user (ชื่อ, รหัสพนักงาน)
+app.post('/api/admin/user/update-profile', isAdmin, async (req, res) => {
+    const { lineUserId, fullName, employeeId } = req.body;
+    if (!lineUserId || !fullName) {
+        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+    }
+    try {
+        await db.query(
+            "UPDATE users SET fullName = ?, employeeId = ? WHERE lineUserId = ?",
+            [fullName, employeeId || '', lineUserId]
+        );
+        res.json({ status: "success", message: "แก้ไขข้อมูลเรียบร้อย" });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
 });
 
 // ==========================================
@@ -2667,18 +2815,20 @@ app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
         const thaiDate = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
         const todayStr = thaiDate.toISOString().split('T')[0];
 
-        // ⭐ แก้ไข SQL: Join ด้วย questionId และดึง questionText
+        // ดึง questionText, selectedOption และ correctOption เพื่อแสดงใน Monitor
         const [rows] = await db.query(`
-            SELECT 
-                h.historyId AS id, 
-                u.lineUserId, 
-                u.fullName, 
-                u.employeeId, 
-                u.pictureUrl, 
-                h.isCorrect, 
-                h.earnedPoints, 
+            SELECT
+                h.historyId AS id,
+                u.lineUserId,
+                u.fullName,
+                u.employeeId,
+                u.pictureUrl,
+                h.isCorrect,
+                h.earnedPoints,
                 h.playedAt,
-                COALESCE(q.questionText, 'คำถามถูกลบไปแล้ว') AS questionText
+                h.selectedOption,
+                COALESCE(q.questionText, 'คำถามถูกลบไปแล้ว') AS questionText,
+                COALESCE(q.correctOption, '') AS correctOption
             FROM user_game_history h
             JOIN users u ON h.lineUserId = u.lineUserId
             LEFT JOIN kyt_questions q ON h.questionId = q.questionId
