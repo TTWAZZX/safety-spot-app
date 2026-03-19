@@ -890,7 +890,7 @@ app.post('/api/submissions/comment', async (req, res) => {
 // 1. ดึงคำถามประจำวัน (สุ่มมา 1 ข้อ ที่ยังไม่เคยตอบในวันนี้)
 app.get('/api/game/daily-question', async (req, res) => {
     const { lineUserId } = req.query;
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
     try {
         // เช็คว่าวันนี้เล่นไปหรือยัง
         const [history] = await db.query(
@@ -941,7 +941,7 @@ app.post('/api/game/submit-answer', async (req, res) => {
         return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ (lineUserId, questionId, selectedOption)" });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
     const conn = await db.getClient();
 
     try {
@@ -1778,7 +1778,7 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
     if (!lineUserId || !questionId || !selectedOption) {
         return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
     }
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
     const conn = await db.getClient();
 
     try {
@@ -1868,21 +1868,24 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
         const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
         await conn.commit();
         
-        res.json({ 
-            status: "success", 
-            data: { 
-                isCorrect, 
-                earnedCoins, 
+        res.json({
+            status: "success",
+            data: {
+                isCorrect,
+                earnedCoins,
+                earnedScore,
                 currentStreak,
                 recoverableStreak,
                 newCoinBalance: updatedUser.coinBalance,
-                isStreakBroken 
-            } 
+                newTotalScore: updatedUser.totalScore,
+                isStreakBroken
+            }
         });
 
     } catch (e) {
         await conn.rollback();
-        res.status(500).json({message: e.message});
+        const status = e.message === "คุณเล่นเกมของวันนี้ไปแล้ว" ? 400 : 500;
+        res.status(status).json({ status: "error", message: e.message });
     } finally { conn.release(); }
 });
 

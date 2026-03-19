@@ -3172,11 +3172,11 @@ $(document).on('click', '.answer-btn', async function() {
             selectedOption: choice
         }, 'POST');
 
-        // 2. อัปเดตเหรียญทันที
+        // 2. อัปเดตเหรียญและคะแนนทันที
         syncCoins(res.newCoinBalance);
-        if(AppState.currentUser) {
-            // อัปเดตคะแนนรวมด้วย (เผื่อมี)
-            if(res.newTotalScore) AppState.currentUser.totalScore = res.newTotalScore;
+        if (AppState.currentUser) {
+            AppState.currentUser.totalScore = res.newTotalScore;
+            $('#user-score, #profile-page-score').text(res.newTotalScore);
         }
 
         // 3. แสดงผล ถูก/ผิด
@@ -3186,10 +3186,10 @@ $(document).on('click', '.answer-btn', async function() {
             Swal.fire({
                 icon: 'success',
                 title: 'ถูกต้อง! เก่งมาก',
-                html: `คุณได้รับ <b class="text-warning">${res.earnedCoins} เหรียญ</b> 💰`,
+                html: `คุณได้รับ <b class="text-warning">${res.earnedCoins} เหรียญ</b> 💰 และ <b class="text-success">+${res.earnedScore} คะแนน</b> ⭐`,
                 confirmButtonText: 'เยี่ยมเลย',
                 confirmButtonColor: '#06C755',
-                timer: 2000
+                timer: 2500
             });
         } else {
             triggerHaptic('heavy');
@@ -3197,10 +3197,10 @@ $(document).on('click', '.answer-btn', async function() {
             Swal.fire({
                 icon: 'error',
                 title: 'ยังไม่ถูกนะ...',
-                html: `คำตอบยังไม่ถูกต้อง<br>รับรางวัลปลอบใจไป <b class="text-warning">${res.earnedCoins} เหรียญ</b> 💰`,
+                html: `คำตอบยังไม่ถูกต้อง<br>รับรางวัลปลอบใจไป <b class="text-warning">${res.earnedCoins} เหรียญ</b> 💰 และ <b class="text-success">+${res.earnedScore} คะแนน</b>`,
                 confirmButtonText: 'ไปต่อ',
                 confirmButtonColor: '#6c757d',
-                timer: 2000
+                timer: 2500
             });
         }
 
