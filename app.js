@@ -558,6 +558,48 @@ async function loadHomeDashboard(activities) {
 
     // Load social feed
     loadSocialFeed();
+
+    // Show safety tip
+    initSafetyTip();
+}
+
+function initSafetyTip() {
+    const tips = [
+        'สวมอุปกรณ์ PPE ทุกครั้งก่อนเข้าพื้นที่อันตราย',
+        'ตรวจสอบสภาพเครื่องมือก่อนใช้งานทุกครั้ง',
+        'อย่าเดินในเส้นทางที่กำหนดสำหรับยานพาหนะ',
+        'รายงานความเสี่ยงทันทีที่พบ อย่ารอให้เกิดอุบัติเหตุก่อน',
+        'ล้างมือก่อนและหลังสัมผัสสารเคมี',
+        'ตรวจสอบป้ายเตือนและปฏิบัติตามอย่างเคร่งครัด',
+        'อย่าทำงานคนเดียวในพื้นที่อันตราย',
+        'รู้ตำแหน่งถังดับเพลิงและทางหนีไฟเสมอ',
+        'ยกของหนักด้วยท่าทางที่ถูกต้อง งอเข่าไม่ใช่หลัง',
+        'ห้ามใช้โทรศัพท์ขณะควบคุมเครื่องจักร',
+        'ตรวจสอบ Lock Out/Tag Out ก่อนซ่อมบำรุงเครื่องจักร',
+        'สื่อสารชัดเจนเมื่อทำงานเป็นทีมในพื้นที่เสี่ยง',
+        'รักษาความสะอาดและความเป็นระเบียบในพื้นที่ทำงาน',
+        'ตรวจสอบสายไฟและอุปกรณ์ไฟฟ้าก่อนใช้งาน',
+        'อย่าวิ่งในโรงงาน เดินอย่างระมัดระวัง',
+        'แจ้งหัวหน้าทันทีหากรู้สึกไม่สบายขณะทำงาน',
+        'ใช้สารเคมีตามปริมาณที่กำหนด อย่าเกินขนาด',
+        'สวมสายรัดนิรภัยเมื่อทำงานบนที่สูงเกิน 2 เมตร',
+        'อ่านและทำความเข้าใจ SDS ก่อนใช้สารเคมีใหม่',
+        'ฝึกซ้อมแผนฉุกเฉินสม่ำเสมอ เพื่อพร้อมรับสถานการณ์จริง',
+        'ตรวจสอบความพร้อมของอุปกรณ์ปฐมพยาบาลในพื้นที่ทำงาน',
+        'รักษาระยะห่างที่ปลอดภัยจากเครื่องจักรที่กำลังทำงาน',
+        'ห้ามดัดแปลงอุปกรณ์ความปลอดภัยโดยไม่ได้รับอนุญาต',
+        'รายงาน Near Miss ทุกครั้ง แม้จะไม่มีใครได้รับบาดเจ็บ',
+        'ดูแลสุขภาพให้แข็งแรง คนที่เหนื่อยล้าเสี่ยงอุบัติเหตุสูงกว่า',
+        'ตรวจสอบอุณหภูมิและความชื้นในพื้นที่ทำงานให้อยู่ในเกณฑ์',
+        'ใช้เส้นทางที่กำหนดเท่านั้นในการเคลื่อนย้ายสินค้า',
+        'ปิดฝาครอบเครื่องจักรทุกครั้งหลังซ่อมบำรุงเสร็จ',
+        'แจ้งเตือนเพื่อนร่วมงานเมื่อพบความเสี่ยง ความปลอดภัยเป็นของทุกคน',
+        'อย่าข้ามขั้นตอนเพื่อความเร็ว ความปลอดภัยสำคัญกว่า',
+    ];
+    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+    const tip = tips[dayOfYear % tips.length];
+    $('#safety-tip-text').text(tip);
+    $('#safety-tip-card').show();
 }
 
 // ในไฟล์ app.js
@@ -692,6 +734,16 @@ function renderSubmissions(submissions) {
                </button>`
             : '';
 
+        // Build reactions HTML
+        const EMOJIS = ['👍', '🔥', '💪'];
+        const reactHtml = EMOJIS.map(e => {
+            const cnt = (sub.reactions && sub.reactions[e]) ? sub.reactions[e] : 0;
+            const reacted = sub.myReactions && sub.myReactions.includes(e);
+            return `<button class="reaction-btn ${reacted ? 'reacted' : ''}" data-submission-id="${sub.submissionId}" data-emoji="${e}">
+                ${e} <span class="reaction-count">${cnt || ''}</span>
+            </button>`;
+        }).join('');
+
         const cardHtml = `
             <div class="card shadow-sm mb-3 submission-card">
                 ${imageHtml}
@@ -715,6 +767,7 @@ function renderSubmissions(submissions) {
                                 <i class="fas fa-heart"></i>
                                 <span class="like-count">${sub.likes || 0}</span>
                             </a>
+                            ${reactHtml}
                             <a href="#" class="text-decoration-none comment-btn"
                                data-bs-toggle="collapse"
                                data-bs-target="#comments-${sub.submissionId}">
@@ -1069,7 +1122,41 @@ function bindStaticEventListeners() {
     $(document).on('click', '.btn-join-activity', handleJoinActivity);
     $(document).on('click', '.like-btn', handleLike);
     $(document).on('click', '.send-comment-button', handleComment);
-    
+
+    // Select all reports checkbox
+    $('#select-all-reports').on('change', function() {
+        $('.report-select-cb').prop('checked', $(this).is(':checked'));
+        updateBulkCount();
+    });
+    $(document).on('change', '.report-select-cb', updateBulkCount);
+
+    // Bulk approve
+    $('#btn-bulk-approve').on('click', async function() {
+        const ids = $('.report-select-cb:checked').map((_, el) => $(el).data('id')).get();
+        if (ids.length === 0) return Swal.fire('กรุณาเลือกรายการ', '', 'warning');
+        const score = parseInt($('#bulk-score-input').val()) || 10;
+        const confirm = await Swal.fire({
+            title: `อนุมัติ ${ids.length} รายการ?`,
+            html: `ให้ <b>${score} คะแนน</b> ต่อรายการ`,
+            icon: 'question', showCancelButton: true,
+            confirmButtonColor: '#06C755', cancelButtonColor: '#6c757d',
+            confirmButtonText: 'อนุมัติเลย', cancelButtonText: 'ยกเลิก'
+        });
+        if (!confirm.isConfirmed) return;
+        const btn = $(this);
+        btn.prop('disabled', true);
+        try {
+            const res = await callApi('/api/admin/submissions/bulk-approve',
+                { submissionIds: ids, score, requesterId: AppState.lineProfile.userId }, 'POST');
+            Swal.fire('สำเร็จ!', `อนุมัติ ${res.approved} รายการ${res.skipped ? `, ข้าม ${res.skipped} รายการ` : ''}`, 'success');
+            await loadPendingSubmissions();
+        } catch(e) {
+            Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+        } finally {
+            btn.prop('disabled', false);
+        }
+    });
+
     $('#add-badge-btn').on('click', handleAddBadge);
 
     $('#image-input').on('change', function() { handleImagePreview(this, '#submission-image-preview'); });
@@ -1659,6 +1746,23 @@ async function handleLike(e) {
     }
 }
 
+$(document).on('click', '.reaction-btn', async function() {
+    const btn = $(this);
+    const submissionId = btn.data('submission-id');
+    const emoji = btn.data('emoji');
+    btn.prop('disabled', true);
+    try {
+        const res = await callApi('/api/submissions/react', { submissionId, lineUserId: AppState.lineProfile.userId, emoji }, 'POST');
+        const countSpan = btn.find('.reaction-count');
+        countSpan.text(res.newCount);
+        btn.toggleClass('reacted', res.reacted);
+    } catch(e) {
+        console.error('React failed:', e);
+    } finally {
+        btn.prop('disabled', false);
+    }
+});
+
 // app.js (แก้ไขในฟังก์ชัน handleComment)
 
 async function handleComment(e) {
@@ -1699,6 +1803,10 @@ function handleImagePreview(input, previewSelector) {
         reader.onload = function(e) { $(previewSelector).attr('src', e.target.result); }
         reader.readAsDataURL(input.files[0]);
     }
+}
+
+function updateBulkCount() {
+    $('#bulk-selected-count').text($('.report-select-cb:checked').length);
 }
 
 // --- Admin Handlers ---
@@ -2524,7 +2632,9 @@ async function loadPendingSubmissions() {
 
         if (subs.length === 0) {
             $('#no-reports-message').show();
+            $('#bulk-action-bar').hide();
         } else {
+            $('#bulk-action-bar').css('display', 'flex');
             subs.forEach(s => {
                 // ----- START: ส่วนที่แก้ไข -----
                 let imageHtmlBlock = '';
@@ -2541,7 +2651,7 @@ async function loadPendingSubmissions() {
                     // และปรับขนาดคลาสของส่วนเนื้อหา
                     contentClass = 'col-md-7 col-lg-8';
                 }
-                
+
                 // นำตัวแปรที่สร้างมาประกอบร่างเป็น Card ที่สมบูรณ์
                 const cardHtml = `
                     <div class="card shadow-sm mb-3 report-card" id="report-card-${s.submissionId}">
@@ -2550,6 +2660,7 @@ async function loadPendingSubmissions() {
                             <div class="${contentClass}">
                                 <div class="card-body">
                                     <div class="d-flex align-items-center gap-2 mb-2">
+                                        <input type="checkbox" class="report-select-cb form-check-input mt-0 flex-shrink-0" data-id="${s.submissionId}">
                                         <img src="${s.pictureUrl || 'https://placehold.co/32x32'}" width="32" height="32" class="rounded-circle" style="object-fit:cover;">
                                         <div>
                                             <h6 class="mb-0 fw-bold">${sanitizeHTML(s.fullName)}</h6>

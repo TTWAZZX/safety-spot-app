@@ -109,6 +109,17 @@ db.query(`
   )
 `).catch(() => {});
 
+db.query(`
+  CREATE TABLE IF NOT EXISTS submission_reactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    submissionId VARCHAR(100) NOT NULL,
+    lineUserId VARCHAR(100) NOT NULL,
+    emoji VARCHAR(10) NOT NULL,
+    createdAt DATETIME DEFAULT NOW(),
+    UNIQUE KEY uq_react (submissionId, lineUserId, emoji)
+  )
+`).catch(() => {});
+
 // -------------------------
 //   Admin Audit Log Helper
 // -------------------------
@@ -611,6 +622,25 @@ app.get('/api/submissions', async (req, res) => {
             });
         }
 
+        // Fetch reactions
+        let reactionsMap = {};
+        let userReactionsSet = new Set();
+        if (ids.length > 0) {
+            const [reactions] = await db.query(
+                `SELECT submissionId, emoji, COUNT(*) AS cnt FROM submission_reactions WHERE submissionId IN (?) GROUP BY submissionId, emoji`,
+                [ids]
+            );
+            reactions.forEach(r => {
+                if (!reactionsMap[r.submissionId]) reactionsMap[r.submissionId] = {};
+                reactionsMap[r.submissionId][r.emoji] = Number(r.cnt);
+            });
+            const [userReacts] = await db.query(
+                `SELECT submissionId, emoji FROM submission_reactions WHERE lineUserId = ? AND submissionId IN (?)`,
+                [lineUserId, ids]
+            );
+            userReacts.forEach(r => userReactionsSet.add(`${r.submissionId}:${r.emoji}`));
+        }
+
         // รวมผลลัพธ์
         const result = rows.map(sub => ({
             submissionId: sub.submissionId,
@@ -624,7 +654,9 @@ app.get('/api/submissions', async (req, res) => {
             },
             likes: sub.likes,
             didLike: likedSet.has(sub.submissionId),
-            comments: commentsMap[sub.submissionId] || []
+            comments: commentsMap[sub.submissionId] || [],
+            reactions: reactionsMap[sub.submissionId] || {},
+            myReactions: ['👍','🔥','💪'].filter(e => userReactionsSet.has(`${sub.submissionId}:${e}`))
         }));
 
         res.json({ status: "success", data: result });
@@ -798,6 +830,34 @@ app.post('/api/submissions/like', async (req, res) => {
         res.status(500).json({ status: "error", message: err.message });
     } finally {
         client.release();
+    }
+});
+
+// --- REACT ---
+app.post('/api/submissions/react', async (req, res) => {
+    const { submissionId, lineUserId, emoji } = req.body;
+    const ALLOWED = ['👍', '🔥', '💪'];
+    if (!submissionId || !lineUserId || !ALLOWED.includes(emoji)) {
+        return res.status(400).json({ status: 'error', message: 'ข้อมูลไม่ถูกต้อง' });
+    }
+    try {
+        // Toggle: try insert, if dup then delete
+        const [existing] = await db.query(
+            'SELECT id FROM submission_reactions WHERE submissionId = ? AND lineUserId = ? AND emoji = ?',
+            [submissionId, lineUserId, emoji]
+        );
+        let reacted;
+        if (existing.length > 0) {
+            await db.query('DELETE FROM submission_reactions WHERE submissionId = ? AND lineUserId = ? AND emoji = ?', [submissionId, lineUserId, emoji]);
+            reacted = false;
+        } else {
+            await db.query('INSERT INTO submission_reactions (submissionId, lineUserId, emoji) VALUES (?, ?, ?)', [submissionId, lineUserId, emoji]);
+            reacted = true;
+        }
+        const [[{ cnt }]] = await db.query('SELECT COUNT(*) AS cnt FROM submission_reactions WHERE submissionId = ? AND emoji = ?', [submissionId, emoji]);
+        res.json({ status: 'success', data: { reacted, newCount: Number(cnt), emoji } });
+    } catch (e) {
+        res.status(500).json({ status: 'error', message: e.message });
     }
 });
 
@@ -1390,6 +1450,48 @@ app.post('/api/admin/submissions/reject', isAdmin, async (req, res) => {
     } finally {
         conn.release();
     }
+});
+
+// --- BULK APPROVE ---
+app.post('/api/admin/submissions/bulk-approve', isAdmin, async (req, res) => {
+    const { submissionIds, score, requesterId } = req.body;
+    if (!Array.isArray(submissionIds) || submissionIds.length === 0) {
+        return res.status(400).json({ status: 'error', message: 'ไม่มีรายการที่เลือก' });
+    }
+    const conn = await db.getClient();
+    let approved = 0;
+    let skipped = 0;
+    try {
+        await conn.beginTransaction();
+        for (const submissionId of submissionIds) {
+            const [[sub]] = await conn.query(
+                'SELECT lineUserId, status FROM submissions WHERE submissionId = ?', [submissionId]
+            );
+            if (!sub || sub.status !== 'pending') { skipped++; continue; }
+            const pts = Math.max(0, Number(score) || 10);
+            await conn.query(
+                "UPDATE submissions SET status = 'approved', points = ?, reviewedAt = NOW() WHERE submissionId = ?",
+                [pts, submissionId]
+            );
+            await conn.query(
+                "UPDATE users SET totalScore = totalScore + ? WHERE lineUserId = ?",
+                [pts, sub.lineUserId]
+            );
+            await conn.query(
+                `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+                 VALUES (?, ?, ?, 'approved', ?, ?, NOW())`,
+                ["NOTIF" + uuidv4(), sub.lineUserId,
+                 `รายงานของคุณได้รับการอนุมัติ! คุณได้รับ ${pts} คะแนน 🎉`, submissionId, requesterId]
+            );
+            logAdminAction(requesterId, 'APPROVE_SUBMISSION', 'submission', submissionId, `Submission #${submissionId}`, { score: pts, ownerId: sub.lineUserId });
+            approved++;
+        }
+        await conn.commit();
+        res.json({ status: 'success', data: { approved, skipped } });
+    } catch (e) {
+        await conn.rollback();
+        res.status(500).json({ status: 'error', message: e.message });
+    } finally { conn.release(); }
 });
 
 // ======================================================

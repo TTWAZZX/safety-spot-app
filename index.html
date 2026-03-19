@@ -116,6 +116,15 @@
                     </div>
                 </div>
 
+                <!-- Safety Tip of the Day -->
+                <div class="safety-tip-card mb-4" id="safety-tip-card">
+                    <div class="safety-tip-icon">💡</div>
+                    <div class="safety-tip-content">
+                        <div class="safety-tip-label">เคล็ดลับความปลอดภัยประจำวัน</div>
+                        <div class="safety-tip-text" id="safety-tip-text">กำลังโหลด...</div>
+                    </div>
+                </div>
+
                 <!-- Recent Activities -->
                 <div class="mt-4 mb-2 d-flex align-items-center justify-content-between px-1">
                     <span class="fw-bold" style="font-size:0.9rem;">
@@ -644,6 +653,17 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <div id="bulk-action-bar" class="d-flex align-items-center gap-2 mb-3 p-2 bg-light rounded" style="display:none!important;">
+                        <input type="checkbox" id="select-all-reports" class="form-check-input mt-0">
+                        <label for="select-all-reports" class="form-check-label small fw-bold">เลือกทั้งหมด</label>
+                        <div class="ms-auto d-flex align-items-center gap-2">
+                            <span class="small text-muted">คะแนน:</span>
+                            <input type="number" id="bulk-score-input" class="form-control form-control-sm" value="10" min="0" style="width:70px;">
+                            <button id="btn-bulk-approve" class="btn btn-success btn-sm">
+                                <i class="fas fa-check-double me-1"></i>อนุมัติที่เลือก (<span id="bulk-selected-count">0</span>)
+                            </button>
+                        </div>
+                    </div>
                     <div id="admin-reports-container" class="container-fluid px-0"></div>
                     <div id="reports-loading" class="text-center my-4" style="display: none;"><div class="spinner-border"></div></div>
                     <div id="no-reports-message" class="text-center my-4" style="display:none;"><p class="text-muted">ไม่มีรายการที่รอตรวจสอบ</p></div>

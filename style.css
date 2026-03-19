@@ -2464,3 +2464,33 @@ body {
     background: #e9ecef;
     color: #6c757d;
 }
+
+/* Safety Tip Card */
+.safety-tip-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border: 1px solid #bbf7d0;
+    border-radius: 16px;
+    padding: 14px 16px;
+}
+.safety-tip-icon { font-size: 1.6rem; flex-shrink: 0; line-height: 1; margin-top: 2px; }
+.safety-tip-label { font-size: 0.7rem; font-weight: 700; color: #16a34a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.safety-tip-text { font-size: 0.875rem; color: #166534; line-height: 1.5; }
+
+/* Emoji Reaction Buttons */
+.reaction-btn {
+    background: none;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: #6b7280;
+    line-height: 1.6;
+}
+.reaction-btn:hover { border-color: #06C755; background: #f0fdf4; }
+.reaction-btn.reacted { border-color: #06C755; background: #dcfce7; color: #166534; font-weight: 600; }
+.reaction-count { font-size: 0.75rem; margin-left: 2px; }
