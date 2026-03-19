@@ -359,6 +359,13 @@ app.post('/api/user/register', async (req, res) => {
             [lineUserId, displayName, pictureUrl, fullName, employeeId, department || '', 0]
         );
 
+        // Welcome notification
+        db.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'system_alert', ?, ?, NOW())`,
+            ["NOTIF" + uuidv4(), lineUserId, `ยินดีต้อนรับสู่ Safety Spot, ${fullName}! 🎉 เริ่มเล่น Daily Quiz วันนี้เพื่อสะสมเหรียญและคะแนนได้เลย`, null, lineUserId]
+        ).catch(() => {});
+
         res.json({
             status: "success",
             data: {
@@ -670,12 +677,22 @@ app.post('/api/submissions', async (req, res) => {
         }
 
         // Insert submission
+        const [[activity]] = await db.query("SELECT title FROM activities WHERE activityId = ?", [activityId]);
+        const activityTitle = activity ? activity.title : 'กิจกรรม';
+
         await db.query(
-            `INSERT INTO submissions 
+            `INSERT INTO submissions
              (submissionId, activityId, lineUserId, description, imageUrl, status, createdAt)
              VALUES (?, ?, ?, ?, ?, 'pending', NOW())`,
             ["SUB" + uuidv4(), activityId, lineUserId, normalized, imageUrl]
         );
+
+        // แจ้งเตือนตัวเอง — รายงานรออนุมัติ
+        db.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'submission', ?, ?, NOW())`,
+            ["NOTIF" + uuidv4(), lineUserId, `รายงาน "${activityTitle}" ของคุณอยู่ระหว่างรอการพิจารณาจากแอดมิน`, activityId, lineUserId]
+        ).catch(() => {});
 
         res.json({ status: "success", data: { message: "Submission created." } });
     } catch (err) {
@@ -1381,10 +1398,24 @@ app.post('/api/admin/submissions/reject', isAdmin, async (req, res) => {
 app.delete('/api/admin/submissions/:submissionId', isAdmin, async (req, res) => {
     const requesterId = req.query.requesterId;
     try {
+        // ดึงข้อมูลเจ้าของก่อนลบ
+        const [[sub]] = await db.query(
+            `SELECT s.lineUserId, a.title FROM submissions s
+             LEFT JOIN activities a ON s.activityId = a.activityId
+             WHERE s.submissionId = ?`, [req.params.submissionId]
+        );
         await db.query("DELETE FROM likes WHERE submissionId = ?", [req.params.submissionId]);
         await db.query("DELETE FROM comments WHERE submissionId = ?", [req.params.submissionId]);
         await db.query("DELETE FROM submissions WHERE submissionId = ?", [req.params.submissionId]);
         logAdminAction(requesterId, 'DELETE_SUBMISSION', 'submission', req.params.submissionId, `Submission #${req.params.submissionId}`, {});
+        // แจ้งเจ้าของ
+        if (sub) {
+            db.query(
+                `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+                 VALUES (?, ?, ?, 'system_alert', ?, ?, NOW())`,
+                ["NOTIF" + uuidv4(), sub.lineUserId, `รายงาน "${sub.title || 'กิจกรรม'}" ของคุณถูกลบโดยแอดมิน`, req.params.submissionId, requesterId]
+            ).catch(() => {});
+        }
         res.json({ status: "success", data: { removed: true } });
     } catch (err) {
         res.status(500).json({ status: "error", message: err.message });
@@ -2136,6 +2167,15 @@ app.post('/api/admin/user/update-coins', isAdmin, async (req, res) => {
         const newBalance = Math.max(0, user.coinBalance + Number(deltaCoins));
         await db.query("UPDATE users SET coinBalance = ? WHERE lineUserId = ?", [newBalance, lineUserId]);
         logAdminAction(requesterId, Number(deltaCoins) >= 0 ? 'ADD_COINS' : 'DEDUCT_COINS', 'user', lineUserId, lineUserId, { deltaCoins, newBalance });
+        const delta = Number(deltaCoins);
+        const msg = delta >= 0
+            ? `แอดมินเพิ่ม ${delta} เหรียญให้คุณ (คงเหลือ: ${newBalance} เหรียญ)`
+            : `แอดมินหัก ${Math.abs(delta)} เหรียญจากบัญชีคุณ (คงเหลือ: ${newBalance} เหรียญ)`;
+        db.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'system_alert', ?, ?, NOW())`,
+            ["NOTIF" + uuidv4(), lineUserId, msg, null, requesterId]
+        ).catch(() => {});
         res.json({ status: "success", data: { newBalance } });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
@@ -2222,6 +2262,11 @@ app.post('/api/admin/user/update-streak', isAdmin, async (req, res) => {
             );
         }
         logAdminAction(requesterId, 'UPDATE_STREAK', 'user', lineUserId, lineUserId, { newStreak: streak });
+        db.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'system_alert', ?, ?, NOW())`,
+            ["NOTIF" + uuidv4(), lineUserId, `แอดมินปรับ Streak ของคุณเป็น ${streak} วัน 🔥`, null, requesterId]
+        ).catch(() => {});
         res.json({ status: "success", data: { newStreak: streak } });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
@@ -2235,8 +2280,15 @@ app.post('/api/admin/award-card', isAdmin, async (req, res) => {
         return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
     }
     try {
+        const [[card]] = await db.query("SELECT cardName FROM safety_cards WHERE cardId = ?", [cardId]);
         await db.query("INSERT INTO user_cards (lineUserId, cardId) VALUES (?, ?)", [lineUserId, cardId]);
         logAdminAction(requesterId, 'AWARD_CARD', 'user', lineUserId, lineUserId, { cardId });
+        const cardName = card ? card.cardName : cardId;
+        db.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'game_gacha', ?, ?, NOW())`,
+            ["NOTIF" + uuidv4(), lineUserId, `แอดมินมอบการ์ด "${cardName}" ให้คุณ 🎁`, cardId, requesterId]
+        ).catch(() => {});
         res.json({ status: "success", data: { message: "มอบการ์ดสำเร็จ" } });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
