@@ -1454,7 +1454,7 @@ app.post('/api/admin/submissions/reject', isAdmin, async (req, res) => {
 
 // --- BULK APPROVE ---
 app.post('/api/admin/submissions/bulk-approve', isAdmin, async (req, res) => {
-    const { submissionIds, score, requesterId } = req.body;
+    const { submissionIds, scores, requesterId } = req.body;
     if (!Array.isArray(submissionIds) || submissionIds.length === 0) {
         return res.status(400).json({ status: 'error', message: 'ไม่มีรายการที่เลือก' });
     }
@@ -1468,7 +1468,8 @@ app.post('/api/admin/submissions/bulk-approve', isAdmin, async (req, res) => {
                 'SELECT lineUserId, status FROM submissions WHERE submissionId = ?', [submissionId]
             );
             if (!sub || sub.status !== 'pending') { skipped++; continue; }
-            const pts = Math.max(0, Number(score) || 10);
+            // รองรับ scores map {submissionId: score} หรือ fallback เป็น 10
+            const pts = Math.max(0, Number((scores && scores[submissionId]) ?? 10));
             await conn.query(
                 "UPDATE submissions SET status = 'approved', points = ?, reviewedAt = NOW() WHERE submissionId = ?",
                 [pts, submissionId]

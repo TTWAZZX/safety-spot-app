@@ -1134,20 +1134,33 @@ function bindStaticEventListeners() {
     $('#btn-bulk-approve').on('click', async function() {
         const ids = $('.report-select-cb:checked').map((_, el) => $(el).data('id')).get();
         if (ids.length === 0) return Swal.fire('กรุณาเลือกรายการ', '', 'warning');
-        const score = parseInt($('#bulk-score-input').val()) || 10;
-        const confirm = await Swal.fire({
+
+        // อ่านคะแนนจาก input ของแต่ละ card (ต่างคนต่างคะแนน)
+        const scores = {};
+        ids.forEach(id => {
+            scores[id] = parseInt($(`#score-input-${id}`).val()) || 10;
+        });
+
+        // สร้างรายการสรุปเพื่อยืนยัน
+        const summaryRows = ids.map(id =>
+            `<tr><td class="text-muted small">${id.slice(-6)}</td><td class="fw-bold text-success text-end">${scores[id]} คะแนน</td></tr>`
+        ).join('');
+        const confirmed = await Swal.fire({
             title: `อนุมัติ ${ids.length} รายการ?`,
-            html: `ให้ <b>${score} คะแนน</b> ต่อรายการ`,
+            html: `<div style="max-height:200px;overflow-y:auto;">
+                     <table class="table table-sm mb-0"><tbody>${summaryRows}</tbody></table>
+                   </div>`,
             icon: 'question', showCancelButton: true,
             confirmButtonColor: '#06C755', cancelButtonColor: '#6c757d',
             confirmButtonText: 'อนุมัติเลย', cancelButtonText: 'ยกเลิก'
         });
-        if (!confirm.isConfirmed) return;
+        if (!confirmed.isConfirmed) return;
+
         const btn = $(this);
         btn.prop('disabled', true);
         try {
             const res = await callApi('/api/admin/submissions/bulk-approve',
-                { submissionIds: ids, score, requesterId: AppState.lineProfile.userId }, 'POST');
+                { submissionIds: ids, scores, requesterId: AppState.lineProfile.userId }, 'POST');
             Swal.fire('สำเร็จ!', `อนุมัติ ${res.approved} รายการ${res.skipped ? `, ข้าม ${res.skipped} รายการ` : ''}`, 'success');
             await loadPendingSubmissions();
         } catch(e) {
