@@ -3055,11 +3055,6 @@ async function broadcastStreakReminders() {
             WHERE currentStreak > 0 AND DATEDIFF(CURDATE(), lastPlayedDate) = 1
         `);
 
-        // กลุ่ม 2: Lost (หายไป 2 วัน - แจ้งแค่ครั้งเดียว)
-        const [lostUsers] = await conn.query(`
-            SELECT lineUserId, currentStreak FROM user_streaks 
-            WHERE currentStreak > 0 AND DATEDIFF(CURDATE(), lastPlayedDate) = 2
-        `);
 
         // Helper function ยิงไลน์
         const sendPush = async (users, title, text, color, btnText) => {
@@ -3097,10 +3092,8 @@ async function broadcastStreakReminders() {
         };
 
         const sentWarning = await sendPush(warningUsers, "⚠️ เตือนภัย! ไฟจะดับ", "คุณรักษาสถิติมา {streak} วันแล้ว รีบเข้ามาเล่นก่อนเที่ยงคืน!", "#ffaa00", "เข้าเติมไฟ 🔥");
-        
-        const sentLost = await sendPush(lostUsers, "😭 ไฟดับแล้วเหลือ 0...", "เสียดายจัง! สถิติ {streak} วันสิ้นสุดลงแล้ว แต่เริ่มใหม่ได้เสมอนะ!", "#ff0000", "เริ่มจุดไฟใหม่ 🕯️");
 
-        return { success: true, message: `Warning: ${sentWarning}, Lost: ${sentLost}` };
+        return { success: true, message: `Warning: ${sentWarning}` };
 
     } catch (e) {
         return { success: false, message: e.message };
@@ -3108,10 +3101,9 @@ async function broadcastStreakReminders() {
 }
 
 // --- ตั้งเวลา Auto (Cron Job) ---
-// รูปแบบเวลา: 'นาที ชั่วโมง * * *'
-// '0 12,15 * * *' แปลว่า: นาทีที่ 0 ของชั่วโมงที่ 12 และ 15 (เที่ยงตรง และ บ่ายสามโมงตรง)
-cron.schedule('0 12,15 * * *', async () => {
-    console.log(`[${new Date().toLocaleString()}] ⏰ ถึงเวลาแจ้งเตือนอัตโนมัติ (รอบ 12:00 / 15:00)...`);
+// '0 12 * * *' แปลว่า: นาทีที่ 0 ของชั่วโมงที่ 12 (เที่ยงตรง)
+cron.schedule('0 12 * * *', async () => {
+    console.log(`[${new Date().toLocaleString()}] ⏰ ถึงเวลาแจ้งเตือนอัตโนมัติ (รอบ 12:00)...`);
     
     // เรียกฟังก์ชันแจ้งเตือน
     const result = await broadcastStreakReminders();
