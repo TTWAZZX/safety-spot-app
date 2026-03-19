@@ -439,7 +439,12 @@
             <div id="profile-page" class="page">
                  <div class="card profile-card border-0">
                     <div class="card-body text-center p-4">
-                        <img id="profile-page-pic" src="https://placehold.co/80x80" class="rounded-circle mb-3 border border-3" style="border-color: var(--line-green) !important;" width="80" height="80" alt="Profile Picture">
+                        <img id="profile-page-pic" src="https://placehold.co/80x80" class="rounded-circle mb-2 border border-3" style="border-color: var(--line-green) !important;" width="80" height="80" alt="Profile Picture">
+                        <div class="mb-3">
+                            <button id="btn-sync-profile-pic" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-sync-alt me-1"></i>ซิงค์รูปโปรไฟล์
+                            </button>
+                        </div>
                         <h4 id="profile-page-name" class="fw-bold">...</h4>
                         <p class="text-muted" id="profile-page-employee-id">รหัสพนักงาน: ...</p>
                         <p class="text-muted mb-3">คะแนนสะสม: <span class="fw-bold" id="profile-page-score" style="color: var(--line-green);">0</span></p>
@@ -921,7 +926,7 @@
 
     <div class="modal fade" id="user-details-modal">
         <div class="modal-dialog modal-fullscreen">
-            <div class="modal-content">
+            <div class="modal-content d-flex flex-column overflow-hidden">
                 <!-- Header -->
                 <div class="modal-header bg-dark text-white py-2">
                     <div class="d-flex align-items-center gap-3">
@@ -943,12 +948,12 @@
                 </div>
 
                 <!-- Tabs -->
-                <ul class="nav nav-tabs nav-justified bg-light border-bottom" id="userDetailTabs">
-                    <li class="nav-item"><button class="nav-link active" data-bs-target="#udt-overview" data-bs-toggle="tab"><i class="fas fa-user me-1"></i> ภาพรวม</button></li>
-                    <li class="nav-item"><button class="nav-link" data-bs-target="#udt-cards" data-bs-toggle="tab"><i class="fas fa-id-card me-1"></i> การ์ด</button></li>
-                    <li class="nav-item"><button class="nav-link" data-bs-target="#udt-kyt" data-bs-toggle="tab"><i class="fas fa-question-circle me-1"></i> KYT</button></li>
-                    <li class="nav-item"><button class="nav-link" data-bs-target="#udt-hunter" data-bs-toggle="tab"><i class="fas fa-crosshairs me-1"></i> Hunter</button></li>
-                    <li class="nav-item"><button class="nav-link" data-bs-target="#udt-submissions" data-bs-toggle="tab"><i class="fas fa-file-alt me-1"></i> Submissions</button></li>
+                <ul class="nav nav-tabs nav-justified bg-light border-bottom flex-shrink-0" id="userDetailTabs">
+                    <li class="nav-item"><button class="nav-link active" data-bs-target="#udt-overview" data-bs-toggle="tab"><i class="fas fa-user"></i><span class="d-none d-sm-inline ms-1">ภาพรวม</span></button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-target="#udt-cards" data-bs-toggle="tab"><i class="fas fa-id-card"></i><span class="d-none d-sm-inline ms-1">การ์ด</span></button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-target="#udt-kyt" data-bs-toggle="tab"><i class="fas fa-question-circle"></i><span class="d-none d-sm-inline ms-1">KYT</span></button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-target="#udt-hunter" data-bs-toggle="tab"><i class="fas fa-crosshairs"></i><span class="d-none d-sm-inline ms-1">Hunter</span></button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-target="#udt-submissions" data-bs-toggle="tab"><i class="fas fa-file-alt"></i><span class="d-none d-sm-inline ms-1">Submissions</span></button></li>
                 </ul>
 
                 <div class="tab-content overflow-auto flex-grow-1 bg-light p-3" style="padding-bottom:80px!important;">

@@ -1039,6 +1039,27 @@ function bindStaticEventListeners() {
         }
     });
 
+    $('#btn-sync-profile-pic').on('click', async function() {
+        const btn = $(this);
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>กำลังซิงค์...');
+        try {
+            const freshProfile = await liff.getProfile();
+            await callApi('/api/user/refresh-profile', {
+                lineUserId: freshProfile.userId,
+                displayName: freshProfile.displayName,
+                pictureUrl: freshProfile.pictureUrl
+            }, 'POST');
+            AppState.lineProfile.pictureUrl = freshProfile.pictureUrl;
+            AppState.lineProfile.displayName = freshProfile.displayName;
+            $('#user-profile-pic, #profile-page-pic, #now-playing-pic').attr('src', freshProfile.pictureUrl);
+            await Swal.fire({ icon: 'success', title: 'ซิงค์สำเร็จ!', text: 'อัปเดตรูปโปรไฟล์จาก LINE เรียบร้อยแล้ว', timer: 1800, showConfirmButton: false });
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: e.message });
+        } finally {
+            btn.prop('disabled', false).html('<i class="fas fa-sync-alt me-1"></i>ซิงค์รูปโปรไฟล์');
+        }
+    });
+
     $('#registration-form').on('submit', handleRegistration);
     $('#submission-form').on('submit', handleSubmitReport);
     $('#activity-form').on('submit', handleSaveActivity);
