@@ -2518,6 +2518,58 @@ app.post('/api/game/exchange-coins', async (req, res) => {
     } finally { conn.release(); }
 });
 
+// --- API: แลกคะแนน → เหรียญ ---
+app.post('/api/game/exchange-score', async (req, res) => {
+    const { lineUserId } = req.body;
+    const SCORE_COST = 2;   // จ่าย 2 คะแนน
+    const COIN_GAIN = 10;   // ได้ 10 เหรียญ
+
+    if (!lineUserId) return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+
+    const conn = await db.getClient();
+    try {
+        await conn.beginTransaction();
+
+        const [[user]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
+        if (!user) throw new Error("ไม่พบผู้ใช้");
+        if (user.totalScore < SCORE_COST) {
+            throw new Error(`คะแนนไม่พอครับ (มี ${user.totalScore} คะแนน, ต้องการ ${SCORE_COST} คะแนน)`);
+        }
+
+        await conn.query(
+            "UPDATE users SET totalScore = totalScore - ?, coinBalance = coinBalance + ? WHERE lineUserId = ?",
+            [SCORE_COST, COIN_GAIN, lineUserId]
+        );
+
+        await conn.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'exchange', ?, ?, NOW())`,
+            [
+                "NOTIF" + uuidv4(),
+                lineUserId,
+                `แลกเปลี่ยนสำเร็จ! คุณใช้ ${SCORE_COST} คะแนน แลกรับ ${COIN_GAIN} เหรียญเรียบร้อยแล้ว`,
+                "exchange",
+                null,
+                lineUserId
+            ]
+        );
+
+        const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
+        await conn.commit();
+
+        res.json({
+            status: "success",
+            data: {
+                newCoinBalance: updatedUser.coinBalance,
+                newTotalScore: updatedUser.totalScore
+            }
+        });
+    } catch (e) {
+        await conn.rollback();
+        res.status(e.message.includes("ไม่พอ") || e.message.includes("ไม่พบ") ? 400 : 500).json({ status: "error", message: e.message });
+    } finally { conn.release(); }
+});
+
 // --- API: ย่อยการ์ด (Recycle Cards) ---
 app.post('/api/game/recycle-cards', async (req, res) => {
     const { lineUserId, cardsToRecycle } = req.body; 

@@ -4075,6 +4075,91 @@ async function handleDeleteCard() {
 
 // --- EXCHANGE SYSTEM ---
 
+async function openExchangeModal() {
+    const currentCoins = parseInt($('#coin-display').text().replace(/,/g, '')) || 0;
+    const currentScore = AppState.currentUser ? AppState.currentUser.totalScore : 0;
+
+    const { value: direction } = await Swal.fire({
+        title: 'แลกแต้ม',
+        html: `
+            <p class="text-muted mb-3" style="font-size:0.9rem;">เลือกทิศทางที่ต้องการแลก</p>
+            <div class="d-flex flex-column gap-2">
+                <button id="swal-btn-coins" class="btn btn-warning w-100 py-3">
+                    <i class="fas fa-coins me-2"></i>
+                    <b>10 เหรียญ → 2 คะแนน</b>
+                    <div class="small opacity-75 mt-1">คงเหลือ: ${currentCoins.toLocaleString()} เหรียญ</div>
+                </button>
+                <button id="swal-btn-score" class="btn btn-success w-100 py-3">
+                    <i class="fas fa-star me-2"></i>
+                    <b>2 คะแนน → 10 เหรียญ</b>
+                    <div class="small opacity-75 mt-1">คงเหลือ: ${currentScore.toLocaleString()} คะแนน</div>
+                </button>
+            </div>
+        `,
+        showConfirmButton: false,
+        showCancelButton: true,
+        cancelButtonText: 'ยกเลิก',
+        cancelButtonColor: '#6c757d',
+        didOpen: () => {
+            document.getElementById('swal-btn-coins').addEventListener('click', () => Swal.close({ value: 'coins' }));
+            document.getElementById('swal-btn-score').addEventListener('click', () => Swal.close({ value: 'score' }));
+        }
+    });
+
+    if (direction === 'coins') exchangeCoinsToScore();
+    else if (direction === 'score') exchangeScoreToCoins();
+}
+
+async function exchangeScoreToCoins() {
+    const SCORE_COST = 2;
+    const COIN_GAIN = 10;
+    const currentScore = AppState.currentUser ? AppState.currentUser.totalScore : 0;
+
+    if (currentScore < SCORE_COST) {
+        return Swal.fire({
+            icon: 'warning',
+            title: 'คะแนนไม่พอ!',
+            text: `ต้องใช้ ${SCORE_COST} คะแนน เพื่อแลก ${COIN_GAIN} เหรียญ`,
+            confirmButtonText: 'โอเค',
+            confirmButtonColor: '#6c757d'
+        });
+    }
+
+    const confirm = await Swal.fire({
+        title: 'ยืนยันการแลก?',
+        html: `คุณต้องการใช้ <b class="text-success">${SCORE_COST} คะแนน</b><br>เพื่อแลกรับ <b class="text-warning">${COIN_GAIN} เหรียญ</b> ใช่ไหม?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'แลกเลย!',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#06C755',
+        cancelButtonColor: '#6c757d',
+        reverseButtons: true
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    triggerHaptic('medium');
+    Swal.fire({ title: 'กำลังแลกเปลี่ยน...', showConfirmButton: false, allowOutsideClick: false, timer: 1000 });
+
+    try {
+        const res = await callApi('/api/game/exchange-score', { lineUserId: AppState.lineProfile.userId }, 'POST');
+        syncCoins(res.newCoinBalance);
+        if (AppState.currentUser) AppState.currentUser.totalScore = res.newTotalScore;
+        $('#user-score, #profile-page-score').text(res.newTotalScore);
+        triggerHaptic('heavy');
+        Swal.fire({
+            icon: 'success',
+            title: 'แลกสำเร็จ!',
+            html: `ยอดคงเหลือ: <b class="text-success">${res.newTotalScore} คะแนน</b><br>เหรียญใหม่: <b class="text-warning">${res.newCoinBalance} เหรียญ</b>`,
+            confirmButtonText: 'ตกลง',
+            confirmButtonColor: '#06C755'
+        });
+    } catch (e) {
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
+
 async function exchangeCoinsToScore() {
     // 1. ดึงค่าเหรียญปัจจุบันจากหน้าจอมาเช็คเบื้องต้น
     // ⭐ แก้ตรงนี้: สั่งลบลูกน้ำ (,) ออกก่อนแปลงเป็นตัวเลข
