@@ -2579,7 +2579,7 @@ async function handleExportCSV() {
     const status = $('#export-status-select').val();
     const from = $('#export-date-from').val();
     const to = $('#export-date-to').val();
-    const params = new URLSearchParams({ status, from, to });
+    const params = new URLSearchParams({ status, from, to, requesterId: AppState.lineProfile.userId });
     window.location.href = `/api/admin/export/submissions?${params.toString()}`;
 }
 
@@ -2590,7 +2590,7 @@ function handleExportPDF() {
     AppState.allModals['admin-export'].hide();
     Swal.fire({ title: 'เตรียม PDF...', text: 'ระบบจะเปิดหน้าพิมพ์ให้อัตโนมัติ กดพิมพ์เป็น PDF ได้เลย', icon: 'info',
         confirmButtonText: 'ตกลง' }).then(() => {
-        const params = new URLSearchParams({ status, from, to, format: 'print' });
+        const params = new URLSearchParams({ status, from, to, requesterId: AppState.lineProfile.userId });
         window.open(`/api/admin/export/submissions/print?${params.toString()}`, '_blank');
     });
 }
