@@ -1281,7 +1281,7 @@ app.get('/api/admin/dashboard-stats', isAdmin, async (req, res) => {
         const [acts]          = await db.query("SELECT COUNT(*) AS count FROM activities WHERE status = 'active'");
         const [approvedToday] = await db.query("SELECT COUNT(*) AS count FROM submissions WHERE status = 'approved' AND DATE(reviewedAt) = CURDATE()");
         const [quizToday]     = await db.query("SELECT COUNT(*) AS count FROM user_game_history WHERE DATE(playedAt) = CURDATE()");
-        const [atRisk]        = await db.query("SELECT COUNT(*) AS count FROM user_streaks WHERE currentStreak > 0 AND DATE(lastActive) = CURDATE() - INTERVAL 1 DAY");
+        const [atRisk]        = await db.query("SELECT COUNT(*) AS count FROM user_streaks WHERE currentStreak > 0 AND DATE(lastPlayedDate) = CURDATE() - INTERVAL 1 DAY");
 
         res.json({
             status: "success",
