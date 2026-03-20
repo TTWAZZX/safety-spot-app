@@ -1276,16 +1276,22 @@ app.get('/api/admin/stats', isAdmin, async (req, res) => {
 // ======================================================
 app.get('/api/admin/dashboard-stats', isAdmin, async (req, res) => {
     try {
-        const [pending] = await db.query("SELECT COUNT(*) AS count FROM submissions WHERE status = 'pending'");
-        const [users] = await db.query("SELECT COUNT(*) AS count FROM users");
-        const [acts] = await db.query("SELECT COUNT(*) AS count FROM activities WHERE status = 'active'");
+        const [pending]       = await db.query("SELECT COUNT(*) AS count FROM submissions WHERE status = 'pending'");
+        const [users]         = await db.query("SELECT COUNT(*) AS count FROM users");
+        const [acts]          = await db.query("SELECT COUNT(*) AS count FROM activities WHERE status = 'active'");
+        const [approvedToday] = await db.query("SELECT COUNT(*) AS count FROM submissions WHERE status = 'approved' AND DATE(reviewedAt) = CURDATE()");
+        const [quizToday]     = await db.query("SELECT COUNT(*) AS count FROM user_game_history WHERE DATE(playedAt) = CURDATE()");
+        const [atRisk]        = await db.query("SELECT COUNT(*) AS count FROM user_streaks WHERE currentStreak > 0 AND DATE(lastActive) = CURDATE() - INTERVAL 1 DAY");
 
         res.json({
             status: "success",
             data: {
                 pendingCount: pending[0].count,
                 userCount: users[0].count,
-                activeActivitiesCount: acts[0].count
+                activeActivitiesCount: acts[0].count,
+                approvedToday: approvedToday[0].count,
+                quizTodayCount: quizToday[0].count,
+                atRiskCount: atRisk[0].count
             }
         });
     } catch (err) {
@@ -2204,11 +2210,13 @@ app.get('/api/admin/users', isAdmin, async (req, res) => {
 
     sql += ` GROUP BY u.lineUserId, u.fullName, u.pictureUrl, u.employeeId, u.totalScore, u.coinBalance`;
 
-    if (sortBy === "name") {
-        sql += ` ORDER BY u.fullName ASC`;
-    } else {
-        sql += ` ORDER BY u.totalScore DESC`;
-    }
+    const sortMap = {
+        name:    `ORDER BY u.fullName ASC`,
+        coins:   `ORDER BY u.coinBalance DESC`,
+        newest:  `ORDER BY u.createdAt DESC`,
+        score:   `ORDER BY u.totalScore DESC`,
+    };
+    sql += ` ${sortMap[sortBy] || sortMap.score}`;
 
     try {
         const [rows] = await db.query(sql, params);

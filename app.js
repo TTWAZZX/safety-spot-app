@@ -1083,6 +1083,9 @@ function bindStaticEventListeners() {
             }
             if (pageId === 'admin-page') {
                 loadAdminDashboard();
+                startAdminFeedPolling();
+            } else {
+                stopAdminFeedPolling();
             }
             // เพิ่มเงื่อนไขนี้เข้าไป
             if (pageId === 'game-page') {
@@ -1323,6 +1326,30 @@ function bindAdminEventListeners() {
         const total = Number($('#btn-audit-prev').data('total') || 0);
         const limit = 50;
         if (cur * limit < total) loadAdminAuditLogs(cur + 1);
+    });
+
+    // Refresh KPI button
+    $('#btn-refresh-kpi').on('click', async function() {
+        const btn = $(this);
+        btn.prop('disabled', true).find('i').addClass('fa-spin');
+        await loadAdminDashboard();
+        btn.prop('disabled', false).find('i').removeClass('fa-spin');
+        showToast('รีเฟรชข้อมูลแล้ว', 'success', 2000);
+    });
+
+    // Keyboard shortcuts: A = approve, R = reject, (when reports modal open)
+    $(document).on('keydown', function(e) {
+        if (!$('#admin-reports-modal').hasClass('show')) return;
+        if ($(e.target).is('input, textarea, select')) return;
+        const firstCard = $('.report-card:visible').first();
+        if (!firstCard.length) return;
+        if (e.key === 'a' || e.key === 'A') {
+            e.preventDefault();
+            firstCard.find('.btn-approve').trigger('click');
+        } else if (e.key === 'r' || e.key === 'R') {
+            e.preventDefault();
+            firstCard.find('.btn-reject').trigger('click');
+        }
     });
 
     // ผูกปุ่มและแท็บ
@@ -1986,12 +2013,19 @@ async function handleApprovalAction() {
                 requesterId: AppState.lineProfile.userId
             }, 'POST');
         }
-        if (action === 'approve') fireConfetti('default');
+        if (action === 'approve') {
+            fireConfetti('default');
+            showToast('อนุมัติรายงานเรียบร้อย ✓', 'success', 2500);
+        } else {
+            showToast('ปฏิเสธรายงานแล้ว', 'warning', 2500);
+        }
         card.slideUp(500, function() {
             $(this).remove();
             const newCount = $('.report-card').length;
             $('#pending-count-modal').text(newCount);
-            if(newCount === 0) $('#no-reports-message').show();
+            $('#quick-action-pending-count').text(newCount);
+            $('#stat-pending-count').text(newCount);
+            if (newCount === 0) $('#no-reports-message').show();
         });
     } catch (e) {
         showError('เกิดข้อผิดพลาด');
@@ -2407,13 +2441,74 @@ async function loadAdminDashboard() {
     try {
         const stats = await callApi('/api/admin/dashboard-stats');
         $('#stat-pending-count').text(stats.pendingCount);
+        $('#stat-approved-today').text(stats.approvedToday ?? '-');
+        $('#stat-quiz-today').text(stats.quizTodayCount ?? '-');
+        $('#stat-at-risk').text(stats.atRiskCount ?? '-');
         $('#stat-user-count').text(stats.userCount);
         $('#stat-activities-count').text(stats.activeActivitiesCount);
         $('#quick-action-pending-count').text(stats.pendingCount);
+        // แสดง badge แดงถ้ามี pending
+        if (stats.pendingCount > 0) $('#kpi-pending-badge').show().text(stats.pendingCount);
+        else $('#kpi-pending-badge').hide();
     } catch (e) {
         console.error("Failed to load dashboard stats:", e);
-        $('#dashboard-stats').html('<p class="text-danger">ไม่สามารถโหลดข้อมูลสรุปได้</p>');
     }
+    // โหลด live feed ด้วยทุกครั้ง
+    loadAdminLiveFeed();
+}
+
+// ===== ADMIN LIVE FEED =====
+let _adminFeedTimer = null;
+async function loadAdminLiveFeed() {
+    try {
+        const data = await callApi('/api/admin/audit-logs', { page: 1 });
+        const logs = (data.logs || []).slice(0, 8);
+        const LABEL = {
+            APPROVE_SUBMISSION: { icon: 'fa-check', color: '#06C755', text: 'อนุมัติรายงาน' },
+            REJECT_SUBMISSION:  { icon: 'fa-times', color: '#ef4444', text: 'ปฏิเสธรายงาน' },
+            DELETE_SUBMISSION:  { icon: 'fa-trash', color: '#6b7280', text: 'ลบรายงาน' },
+            ADD_SCORE:          { icon: 'fa-star', color: '#f59e0b', text: 'เพิ่มคะแนน' },
+            DEDUCT_SCORE:       { icon: 'fa-minus', color: '#ef4444', text: 'หักคะแนน' },
+            ADD_COINS:          { icon: 'fa-coins', color: '#f59e0b', text: 'เพิ่มเหรียญ' },
+            DEDUCT_COINS:       { icon: 'fa-coins', color: '#ef4444', text: 'หักเหรียญ' },
+            AWARD_BADGE:        { icon: 'fa-certificate', color: '#8b5cf6', text: 'มอบป้ายรางวัล' },
+            REVOKE_BADGE:       { icon: 'fa-ban', color: '#6b7280', text: 'ถอดป้ายรางวัล' },
+            AWARD_CARD:         { icon: 'fa-layer-group', color: '#3b82f6', text: 'มอบการ์ด' },
+            UPDATE_STREAK:      { icon: 'fa-fire', color: '#f97316', text: 'แก้ Streak' },
+            UPDATE_PROFILE:     { icon: 'fa-user-edit', color: '#6b7280', text: 'แก้ข้อมูล' },
+        };
+        if (logs.length === 0) {
+            $('#admin-live-feed-body').html('<div class="admin-feed-item text-muted text-center py-3">ยังไม่มีกิจกรรม</div>');
+        } else {
+            const html = logs.map(log => {
+                const meta = LABEL[log.action] || { icon: 'fa-circle', color: '#9ca3af', text: log.action };
+                const timeAgo = formatTimeAgo(log.createdAt);
+                const adminName = log.adminName ? log.adminName.split(' ')[0] : 'Admin';
+                return `<div class="admin-feed-item d-flex align-items-start gap-2">
+                    <div style="width:24px;height:24px;border-radius:50%;background:${meta.color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">
+                        <i class="fas ${meta.icon}" style="font-size:0.65rem;color:${meta.color};"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <span class="admin-feed-action"><span class="admin-feed-actor">${sanitizeHTML(adminName)}</span> ${meta.text}</span>
+                        ${log.targetName && log.targetName !== log.adminId ? `<span class="text-muted"> · ${sanitizeHTML(log.targetName.slice(0,20))}</span>` : ''}
+                        <span class="admin-feed-time">${timeAgo}</span>
+                    </div>
+                </div>`;
+            }).join('');
+            $('#admin-live-feed-body').html(html);
+        }
+        const now = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        $('#admin-feed-updated').text(`อัปเดต ${now}`);
+    } catch(e) { /* silent fail */ }
+}
+
+function startAdminFeedPolling() {
+    if (_adminFeedTimer) return;
+    _adminFeedTimer = setInterval(loadAdminLiveFeed, 30000);
+}
+function stopAdminFeedPolling() {
+    clearInterval(_adminFeedTimer);
+    _adminFeedTimer = null;
 }
 
 async function loadAdminStats() {
@@ -3221,6 +3316,26 @@ function renderNotifications(notifications, container) {
 function showLoading(title) { Swal.fire({ title: title, text: 'กรุณารอสักครู่', allowOutsideClick: false, didOpen: () => Swal.showLoading() }); }
 function showSuccess(title) { Swal.fire({icon: 'success', title: 'สำเร็จ!', text: title, timer: 1500, showConfirmButton: false}); }
 function showError(title) { Swal.fire('เกิดข้อผิดพลาด', title, 'error'); }
+
+// ===== ADMIN TOAST SYSTEM =====
+function showToast(message, type = 'success', duration = 3000) {
+    const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-exclamation-triangle', info: 'fa-info-circle' };
+    const colors = { success: '#06C755', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' };
+    const id = 'toast-' + Date.now() + Math.random().toString(36).slice(2,5);
+    const html = `<div class="admin-toast" id="${id}">
+        <i class="fas ${icons[type] || icons.info} admin-toast-icon" style="color:${colors[type] || colors.info};"></i>
+        <span class="admin-toast-msg">${message}</span>
+        <i class="fas fa-times admin-toast-close" onclick="dismissToast('${id}')"></i>
+    </div>`;
+    $('#admin-toast-container').append(html);
+    if (duration > 0) setTimeout(() => dismissToast(id), duration);
+}
+function dismissToast(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('toast-out');
+    setTimeout(() => el.remove(), 220);
+}
 function showWarning(title) { Swal.fire('คำเตือน', title, 'warning'); }
 function sanitizeHTML(str) {
     if (!str) return '';
