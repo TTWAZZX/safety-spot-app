@@ -186,15 +186,17 @@
                     <!-- NOW PLAYING INDICATOR -->
                     <div id="now-playing-bar" class="now-playing-bar d-none">
                         <div class="d-flex align-items-center gap-3">
-                            <img id="now-playing-pic" src="https://placehold.co/64x64" class="now-playing-avatar" width="64" height="64" alt="">
+                            <!-- Avatar + ชื่อ (column) -->
+                            <div class="now-playing-player-card">
+                                <img id="now-playing-pic" src="https://placehold.co/56x56" class="now-playing-avatar" width="56" height="56" alt="">
+                                <div class="now-playing-player-name" id="now-playing-name">...</div>
+                            </div>
+                            <!-- Info ด้านขวา -->
                             <div class="flex-grow-1 overflow-hidden">
-                                <div class="d-flex align-items-center gap-2 mb-1">
-                                    <span class="now-playing-badge flex-shrink-0">
-                                        <span class="now-playing-dot"></span>ONLINE
-                                    </span>
-                                </div>
-                                <div class="text-white fw-bold text-truncate now-playing-name-text" id="now-playing-name">...</div>
-                                <div class="now-playing-subtitle">กำลังเล่น Safety Spot Arcade</div>
+                                <span class="now-playing-badge">
+                                    <span class="now-playing-dot"></span>ONLINE
+                                </span>
+                                <div class="now-playing-subtitle mt-1">Safety Spot Arcade</div>
                             </div>
                         </div>
                     </div>
