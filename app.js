@@ -2297,21 +2297,70 @@ async function loadUserSubmissions(lineUserId) {
     try {
         const rows = await callApi('/api/admin/user/submissions', { lineUserId });
         if (rows.length === 0) { container.html('<p class="text-muted text-center mt-4">ยังไม่มีการส่งงาน</p>'); return; }
-        const html = rows.map(r => {
+
+        const statusMap = {
+            pending:  { cls: 'bg-warning text-dark', label: 'รอตรวจ',  icon: 'fa-clock' },
+            approved: { cls: 'bg-success',           label: 'อนุมัติ', icon: 'fa-check' },
+            rejected: { cls: 'bg-danger',            label: 'ปฏิเสธ',  icon: 'fa-times' }
+        };
+
+        const approved = rows.filter(r => r.status === 'approved').length;
+        const totalPts = rows.filter(r => r.status === 'approved').reduce((s, r) => s + (r.points || 0), 0);
+
+        const summary = `<div class="d-flex gap-3 mb-3 px-1">
+            <span class="text-muted small">ทั้งหมด <strong>${rows.length}</strong> รายการ</span>
+            <span class="text-muted small">อนุมัติ <strong class="text-success">${approved}</strong></span>
+            <span class="text-muted small">คะแนนรวม <strong class="text-warning">${totalPts}</strong></span>
+        </div>`;
+
+        const html = rows.map((r, i) => {
             const d = new Date(r.createdAt).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
-            const statusMap = { pending: '<span class="badge bg-warning text-dark">รอตรวจ</span>', approved: '<span class="badge bg-success">อนุมัติ</span>', rejected: '<span class="badge bg-danger">ปฏิเสธ</span>' };
-            const statusBadge = statusMap[r.status] || `<span class="badge bg-secondary">${r.status}</span>`;
-            const img = r.imageUrl ? `<img src="${getFullImageUrl(r.imageUrl)}" width="56" height="56" class="rounded" style="object-fit:cover;">` : '';
-            return `<div class="list-group-item d-flex align-items-center gap-3">
-                ${img}
-                <div class="flex-grow-1">
-                    <strong>${sanitizeHTML(r.activityTitle)}</strong><br>
-                    <small class="text-muted">${sanitizeHTML(r.description || '')}</small>
+            const st = statusMap[r.status] || { cls: 'bg-secondary', label: r.status, icon: 'fa-question' };
+            const statusBadge = `<span class="badge ${st.cls}"><i class="fas ${st.icon} me-1"></i>${st.label}</span>`;
+            const pointsBadge = r.status === 'approved' && r.points
+                ? `<span class="badge bg-warning text-dark ms-1">+${r.points} คะแนน</span>` : '';
+            const img = r.imageUrl
+                ? `<img src="${getFullImageUrl(r.imageUrl)}" class="udt-sub-thumb" style="width:72px;height:72px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer;"
+                       onclick="window.open('${getFullImageUrl(r.imageUrl)}','_blank')">`
+                : `<div style="width:72px;height:72px;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                       <i class="fas fa-file-alt text-muted"></i></div>`;
+            const desc = sanitizeHTML(r.description || '');
+            const descId = `sub-desc-${i}`;
+            const descBlock = desc.length > 120
+                ? `<p class="small text-muted mb-1 udt-sub-desc" id="${descId}" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${desc}</p>
+                   <a href="#" class="small text-primary udt-expand-link" data-target="${descId}" style="user-select:none;">ดูเพิ่มเติม</a>`
+                : `<p class="small text-muted mb-0">${desc}</p>`;
+
+            return `<div class="udt-sub-card">
+                <div class="d-flex gap-3">
+                    ${img}
+                    <div class="flex-grow-1 min-width-0">
+                        <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+                            <strong class="small text-truncate">${sanitizeHTML(r.activityTitle)}</strong>
+                            <div class="d-flex flex-column align-items-end gap-1" style="flex-shrink:0;">
+                                ${statusBadge}${pointsBadge}
+                                <small class="text-muted">${d}</small>
+                            </div>
+                        </div>
+                        ${descBlock}
+                    </div>
                 </div>
-                <div class="text-end">${statusBadge}<br><small class="text-muted">${d}</small></div>
             </div>`;
         }).join('');
-        container.html(`<div class="list-group">${html}</div>`);
+
+        container.html(summary + `<div class="udt-sub-list">${html}</div>`);
+
+        // expand/collapse
+        container.off('click.expand').on('click.expand', '.udt-expand-link', function(e) {
+            e.preventDefault();
+            const el = document.getElementById($(this).data('target'));
+            if (!el) return;
+            const expanded = el.style.webkitLineClamp === 'unset';
+            el.style.cssText = expanded
+                ? 'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'
+                : 'display:block;-webkit-line-clamp:unset;overflow:visible;';
+            $(this).text(expanded ? 'ดูเพิ่มเติม' : 'ย่อ');
+        });
     } catch(e) { container.html(`<p class="text-danger">${e.message}</p>`); }
 }
 
@@ -2921,7 +2970,7 @@ $(document).on("click", "#adminApplyScoreBtn", async function () {
 
     try {
         // callApi() คืนค่าเฉพาะ result.data → ไม่มี result.status
-        const result = await callApi('/api/admin/users/update-score', {
+        await callApi('/api/admin/users/update-score', {
             lineUserId: adminSelectedUserId,
             deltaScore: deltaScore,
         }, 'POST');

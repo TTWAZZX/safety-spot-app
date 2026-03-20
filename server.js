@@ -2331,7 +2331,7 @@ app.get('/api/admin/user/submissions', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(
             `SELECT s.submissionId, s.status, s.createdAt, s.imageUrl, s.description,
-                    a.title AS activityTitle
+                    s.points, a.title AS activityTitle
              FROM submissions s
              JOIN activities a ON s.activityId = a.activityId
              WHERE s.lineUserId = ?

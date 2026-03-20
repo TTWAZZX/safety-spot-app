@@ -2302,12 +2302,33 @@ body {
 #udt-kyt-container,
 #udt-hunter-container,
 #udt-submissions-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow-x: hidden;
 }
+
+/* Submission card list */
+.udt-sub-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.udt-sub-card {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 12px;
+    transition: box-shadow 0.15s;
+}
+.udt-sub-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.udt-expand-link {
+    font-size: 0.75rem;
+    text-decoration: none;
+}
+.udt-expand-link:hover { text-decoration: underline; }
+
 #udt-kyt-container table,
-#udt-hunter-container table,
-#udt-submissions-container table {
+#udt-hunter-container table {
     min-width: 560px;
 }
 
