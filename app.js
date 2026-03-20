@@ -2219,27 +2219,7 @@ async function handleViewUserDetails(lineUserId) {
         $('#user-details-badges-container').html(badgesHtml);
 
         // Cards tab
-        if (userCards.length === 0) {
-            $('#udt-cards-container').html('<p class="text-muted col-12">ยังไม่มีการ์ด</p>');
-        } else {
-            const cardHtml = userCards.map(c => {
-                let rarityClass = 'bg-secondary';
-                if (c.rarity === 'R') rarityClass = 'bg-info text-dark';
-                if (c.rarity === 'SR') rarityClass = 'bg-danger';
-                if (c.rarity === 'UR') rarityClass = 'bg-warning text-dark';
-                return `<div class="col-6 col-md-3 col-lg-2">
-                    <div class="card h-100 shadow-sm text-center">
-                        <img src="${getFullImageUrl(c.imageUrl)}" class="card-img-top" style="height:100px;object-fit:contain;padding:8px;background:#f8f9fa;">
-                        <div class="card-body p-2">
-                            <span class="badge ${rarityClass} mb-1">${c.rarity}</span>
-                            <p class="small fw-bold mb-0 text-truncate">${sanitizeHTML(c.cardName)}</p>
-                            <small class="text-muted">x${c.qty}</small>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
-            $('#udt-cards-container').html(cardHtml);
-        }
+        renderAdminUserCards(userCards);
 
         // Load award card dropdown
         const allCards = await callApi('/api/admin/cards');
@@ -3041,32 +3021,51 @@ $(document).on('click', '#adminConfirmAwardCardBtn', async function() {
     } catch(e) { Swal.fire('Error', e.message, 'error'); }
 });
 
+// helper: render cards sorted by rarity UR>SR>R>C with total count header
+function renderAdminUserCards(userCards) {
+    if (userCards.length === 0) {
+        $('#udt-cards-container').html('<p class="text-muted col-12">ยังไม่มีการ์ด</p>');
+        return;
+    }
+    const rarityOrder = { UR: 0, SR: 1, R: 2, C: 3 };
+    const sorted = [...userCards].sort((a, b) => (rarityOrder[a.rarity] ?? 9) - (rarityOrder[b.rarity] ?? 9));
+    const totalQty = userCards.reduce((s, c) => s + (c.qty || 1), 0);
+    const totalUniq = userCards.length;
+    const cardHtml = sorted.map(c => {
+        let rarityClass = 'bg-secondary';
+        if (c.rarity === 'R') rarityClass = 'bg-info text-dark';
+        if (c.rarity === 'SR') rarityClass = 'bg-danger';
+        if (c.rarity === 'UR') rarityClass = 'bg-warning text-dark';
+        return `<div class="col-6 col-md-3 col-lg-2">
+            <div class="card h-100 shadow-sm text-center">
+                <img src="${getFullImageUrl(c.imageUrl)}" class="card-img-top" style="height:100px;object-fit:contain;padding:8px;background:#f8f9fa;">
+                <div class="card-body p-2">
+                    <span class="badge ${rarityClass} mb-1">${c.rarity}</span>
+                    <p class="small fw-bold mb-0 text-truncate">${sanitizeHTML(c.cardName)}</p>
+                    <small class="text-muted">x${c.qty}</small>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+    $('#udt-cards-container').html(`
+        <div class="col-12 mb-2">
+            <span class="text-muted small">สะสมแล้ว <strong>${totalUniq} ชนิด</strong> รวม <strong>${totalQty} ใบ</strong>
+                &nbsp;·&nbsp;
+                <span class="badge bg-warning text-dark">UR</span>
+                <span class="badge bg-danger">SR</span>
+                <span class="badge bg-info text-dark">R</span>
+                <span class="badge bg-secondary">C</span>
+            </span>
+        </div>
+        ${cardHtml}
+    `);
+}
+
 // helper reload cards tab
 async function loadUserCardsTab(lineUserId) {
     try {
         const userData = await callApi('/api/admin/user-details', { lineUserId });
-        const userCards = Array.isArray(userData.cards) ? userData.cards : [];
-        if (userCards.length === 0) {
-            $('#udt-cards-container').html('<p class="text-muted col-12">ยังไม่มีการ์ด</p>');
-            return;
-        }
-        const cardHtml = userCards.map(c => {
-            let rarityClass = 'bg-secondary';
-            if (c.rarity === 'R') rarityClass = 'bg-info text-dark';
-            if (c.rarity === 'SR') rarityClass = 'bg-danger';
-            if (c.rarity === 'UR') rarityClass = 'bg-warning text-dark';
-            return `<div class="col-6 col-md-3 col-lg-2">
-                <div class="card h-100 shadow-sm text-center">
-                    <img src="${getFullImageUrl(c.imageUrl)}" class="card-img-top" style="height:100px;object-fit:contain;padding:8px;background:#f8f9fa;">
-                    <div class="card-body p-2">
-                        <span class="badge ${rarityClass} mb-1">${c.rarity}</span>
-                        <p class="small fw-bold mb-0 text-truncate">${sanitizeHTML(c.cardName)}</p>
-                        <small class="text-muted">x${c.qty}</small>
-                    </div>
-                </div>
-            </div>`;
-        }).join('');
-        $('#udt-cards-container').html(cardHtml);
+        renderAdminUserCards(Array.isArray(userData.cards) ? userData.cards : []);
     } catch(e) { console.error(e); }
 }
 
