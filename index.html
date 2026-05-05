@@ -329,6 +329,20 @@
                             </div>
                         </div>
 
+                        <!-- SAFETY LOTTERY -->
+                        <div class="bento-card theme-lottery" onclick="openLotteryModal()">
+                            <div class="d-flex flex-column justify-content-between h-100">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="badge lottery-badge-green fw-semibold">Lottery</span>
+                                    <i class="fas fa-ticket text-success fs-4 opacity-60"></i>
+                                </div>
+                                <div>
+                                    <div class="bento-title text-success">Safety Lottery</div>
+                                    <div class="bento-sub text-success">ซื้อตั๋วด้วย Coins ลุ้นรางวัล</div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- RECYCLE HOUSE (เต็มแถวด้านล่าง) -->
                         <div class="bento-card theme-dark span-2 flex-row justify-content-between align-items-center px-3" onclick="openRecycleModal()">
                             <div class="d-flex align-items-center">
@@ -600,6 +614,9 @@
                     </a>
                     <a href="#" id="btn-game-monitor" class="list-group-item list-group-item-action">
                         <i class="fas fa-desktop me-2 text-primary"></i>Game Monitor
+                    </a>
+                    <a href="#" id="btn-admin-lottery" class="list-group-item list-group-item-action" onclick="openAdminLotteryModal();return false;">
+                        <i class="fas fa-ticket me-2 text-success"></i>Safety Lottery
                     </a>
                 </div>
 
@@ -1758,6 +1775,343 @@
 
     <!-- Admin Toast Container -->
     <div id="admin-toast-container"></div>
+
+    <!-- ================================================== -->
+    <!-- SAFETY LOTTERY — Main Modal                        -->
+    <!-- ================================================== -->
+    <div class="modal fade" id="lottery-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg lottery-modal-content">
+                <div class="modal-header border-0 lottery-modal-header p-4">
+                    <div>
+                        <h5 class="modal-title fw-bold text-white">
+                            <i class="fas fa-ticket me-2"></i>Safety Lottery
+                        </h5>
+                        <p class="mb-0 small text-white opacity-75" id="lottery-round-label">กำลังโหลด...</p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body p-0">
+                    <!-- Countdown Banner -->
+                    <div class="lottery-countdown-bar" id="lottery-countdown-bar">
+                        <i class="fas fa-clock me-1"></i>
+                        <span id="lottery-countdown-text">กำลังโหลด...</span>
+                    </div>
+
+                    <!-- Tabs -->
+                    <ul class="nav lottery-tabs" id="lotteryTabs" role="tablist">
+                        <li class="nav-item flex-fill" role="presentation">
+                            <button class="lottery-tab-btn active w-100" data-bs-toggle="tab" data-bs-target="#tab-buy" type="button">
+                                <i class="fas fa-cart-plus me-1"></i>ซื้อตั๋ว
+                            </button>
+                        </li>
+                        <li class="nav-item flex-fill" role="presentation">
+                            <button class="lottery-tab-btn w-100" data-bs-toggle="tab" data-bs-target="#tab-my-tickets" type="button"
+                                    onclick="loadMyLotteryTickets()">
+                                <i class="fas fa-ticket me-1"></i>ตั๋วของฉัน
+                            </button>
+                        </li>
+                        <li class="nav-item flex-fill" role="presentation">
+                            <button class="lottery-tab-btn w-100" data-bs-toggle="tab" data-bs-target="#tab-results" type="button"
+                                    onclick="loadLotteryResults()">
+                                <i class="fas fa-trophy me-1"></i>ผลรางวัล
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content p-3">
+                        <!-- Tab: ซื้อตั๋ว -->
+                        <div class="tab-pane fade show active" id="tab-buy">
+                            <div id="lottery-buy-section">
+                                <!-- Daily quota info -->
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1 text-primary"></i>
+                                        ซื้อได้สูงสุด 5 ใบ/วัน
+                                    </small>
+                                    <span class="badge bg-light text-dark border" id="lottery-daily-quota-badge">0/5 ใบวันนี้</span>
+                                </div>
+
+                                <!-- Gold Ticket claim -->
+                                <div class="lottery-gold-claim mb-3" id="lottery-gold-claim">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="lottery-gold-icon">🏆</div>
+                                        <div class="flex-grow-1">
+                                            <div class="fw-bold small">Gold Ticket</div>
+                                            <div class="small text-muted" id="lottery-gold-status">กำลังตรวจสอบสิทธิ์...</div>
+                                        </div>
+                                        <button class="btn btn-warning btn-sm fw-bold" id="btn-claim-gold-ticket"
+                                                onclick="claimLotteryGoldTicket()" disabled>
+                                            รับฟรี
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Type Selection -->
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                        <div class="lottery-type-card active" id="type-two-card" onclick="selectLotteryType('two')">
+                                            <div class="lottery-type-icon">🟢</div>
+                                            <div class="lottery-type-name">2 ตัวท้าย</div>
+                                            <div class="lottery-type-price">10 เหรียญ</div>
+                                            <div class="lottery-type-prize">รางวัล 500 pts</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="lottery-type-card" id="type-three-card" onclick="selectLotteryType('three')">
+                                            <div class="lottery-type-icon">🔴</div>
+                                            <div class="lottery-type-name">3 ตัวท้าย</div>
+                                            <div class="lottery-type-price">30 เหรียญ</div>
+                                            <div class="lottery-type-prize">รางวัล 3,000 pts</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Number Input -->
+                                <div class="lottery-number-input-area mb-3">
+                                    <label class="fw-semibold mb-2 d-block">
+                                        <i class="fas fa-hashtag me-1 text-success"></i>
+                                        เลือกเลข <span id="lottery-digit-hint" class="text-muted">(00-99)</span>
+                                    </label>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <input type="text" class="form-control form-control-lg lottery-number-input text-center fw-bold"
+                                               id="lottery-number-input" maxlength="2" placeholder="00"
+                                               inputmode="numeric" pattern="[0-9]*">
+                                        <button class="btn btn-outline-secondary btn-lg" onclick="randomLotteryNumber()" title="สุ่มเลข">
+                                            <i class="fas fa-dice"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button class="btn btn-success w-100 fw-bold py-3 lottery-buy-btn" id="btn-lottery-buy" onclick="startLotteryQuiz()">
+                                    <i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety แล้วซื้อ
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tab: ตั๋วของฉัน -->
+                        <div class="tab-pane fade" id="tab-my-tickets">
+                            <div id="my-lottery-tickets-list">
+                                <div class="text-center py-4">
+                                    <div class="spinner-border spinner-border-sm text-success"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab: ผลรางวัล -->
+                        <div class="tab-pane fade" id="tab-results">
+                            <div id="lottery-results-list">
+                                <div class="text-center py-4">
+                                    <div class="spinner-border spinner-border-sm text-success"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================== -->
+    <!-- SAFETY LOTTERY — Quiz Modal (ก่อนซื้อ)            -->
+    <!-- ================================================== -->
+    <div class="modal fade" id="lottery-quiz-modal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+                <div class="modal-header border-0 text-white p-4" style="background: linear-gradient(135deg, #1a6b3c 0%, #06C755 100%);">
+                    <div>
+                        <h5 class="modal-title fw-bold">
+                            <i class="fas fa-shield-alt me-2"></i>Safety Quiz
+                        </h5>
+                        <p class="mb-0 small opacity-75">ตอบถูก = ซื้อได้ + รับโบนัส 2 เหรียญ!</p>
+                    </div>
+                </div>
+                <div class="modal-body p-4" id="lottery-quiz-body">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-success"></div>
+                        <p class="mt-2 text-muted">กำลังโหลดคำถาม...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================== -->
+    <!-- ADMIN — Safety Lottery Modal                       -->
+    <!-- ================================================== -->
+    <div class="modal fade" id="admin-lottery-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-xl modal-fullscreen-sm-down">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="fas fa-ticket me-2"></i>จัดการ Safety Lottery
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <!-- Admin Sub-tabs -->
+                    <ul class="nav nav-tabs px-3 pt-2 bg-light" id="adminLotteryTabs">
+                        <li class="nav-item">
+                            <button class="nav-link active small" data-bs-toggle="tab" data-bs-target="#al-tab-dashboard"
+                                    onclick="loadAdminLotteryDashboard()">
+                                <i class="fas fa-chart-bar me-1"></i>Dashboard
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link small" data-bs-toggle="tab" data-bs-target="#al-tab-result">
+                                <i class="fas fa-flag-checkered me-1"></i>กรอกผล
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link small" data-bs-toggle="tab" data-bs-target="#al-tab-questions"
+                                    onclick="loadAdminLotteryQuestions()">
+                                <i class="fas fa-question-circle me-1"></i>คำถาม
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content p-3">
+
+                        <!-- Dashboard Tab -->
+                        <div class="tab-pane fade show active" id="al-tab-dashboard">
+                            <div id="admin-lottery-dashboard">
+                                <div class="text-center py-4"><div class="spinner-border text-success"></div></div>
+                            </div>
+                        </div>
+
+                        <!-- กรอกผล Tab -->
+                        <div class="tab-pane fade" id="al-tab-result">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">เลือกงวด</label>
+                                <select class="form-select" id="admin-lottery-round-select"></select>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-4">
+                                    <label class="form-label small">2 ตัวท้าย</label>
+                                    <input type="text" class="form-control text-center fw-bold" id="admin-lottery-last2"
+                                           maxlength="2" placeholder="XX" inputmode="numeric">
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small">3 ตัวหน้า</label>
+                                    <input type="text" class="form-control text-center" id="admin-lottery-last3f"
+                                           maxlength="3" placeholder="XXX" inputmode="numeric">
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small">3 ตัวท้าย</label>
+                                    <input type="text" class="form-control text-center fw-bold" id="admin-lottery-last3b"
+                                           maxlength="3" placeholder="XXX" inputmode="numeric">
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-warning fw-bold" onclick="adminSaveLotteryResult()">
+                                    <i class="fas fa-save me-1"></i>บันทึกผลรางวัล
+                                </button>
+                                <button class="btn btn-success fw-bold" onclick="adminConfirmLotteryResult()">
+                                    <i class="fas fa-check-circle me-1"></i>ยืนยันผล
+                                </button>
+                                <button class="btn btn-danger fw-bold" onclick="adminProcessLotteryPrizes()">
+                                    <i class="fas fa-coins me-1"></i>ประมวลผลและจ่ายรางวัล
+                                </button>
+                            </div>
+                            <hr>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">สร้างงวดใหม่</label>
+                                <div class="d-flex gap-2">
+                                    <input type="date" class="form-control" id="admin-new-round-date">
+                                    <button class="btn btn-outline-success" onclick="adminCreateLotteryRound()">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- คำถาม Tab -->
+                        <div class="tab-pane fade" id="al-tab-questions">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold mb-0">คำถาม Safety</h6>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-primary btn-sm" onclick="openAddLotteryQuestionForm()">
+                                        <i class="fas fa-plus me-1"></i>เพิ่มเอง
+                                    </button>
+                                    <button class="btn btn-dark btn-sm" onclick="aiGenerateLotteryQuestions()">
+                                        <i class="fas fa-robot me-1"></i>AI สร้าง 10 ข้อ
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Filter by category -->
+                            <select class="form-select form-select-sm mb-3" id="admin-lottery-q-filter"
+                                    onchange="loadAdminLotteryQuestions()">
+                                <option value="">ทุกหมวด</option>
+                                <option value="PPE">PPE</option>
+                                <option value="ดับเพลิง">ดับเพลิง</option>
+                                <option value="สารเคมี">สารเคมี</option>
+                                <option value="ไฟฟ้า">ไฟฟ้า</option>
+                                <option value="การทำงานที่สูง">การทำงานที่สูง</option>
+                                <option value="กฎหมาย">กฎหมาย</option>
+                                <option value="การยศาสตร์">การยศาสตร์</option>
+                                <option value="สิ่งแวดล้อม">สิ่งแวดล้อม</option>
+                                <option value="ทั่วไป">ทั่วไป</option>
+                            </select>
+
+                            <!-- Add Question Form (hidden by default) -->
+                            <div id="add-lottery-q-form" class="card mb-3 border-success" style="display:none;">
+                                <div class="card-body">
+                                    <h6 class="card-title fw-bold text-success">
+                                        <span id="lottery-q-form-title">เพิ่มคำถามใหม่</span>
+                                    </h6>
+                                    <input type="hidden" id="lottery-q-edit-id">
+                                    <div class="mb-2">
+                                        <textarea class="form-control form-control-sm" id="lottery-q-text" rows="2"
+                                                  placeholder="คำถาม..."></textarea>
+                                    </div>
+                                    <div class="row g-1 mb-2">
+                                        <div class="col-6"><input class="form-control form-control-sm" id="lottery-q-a" placeholder="ตัวเลือก A"></div>
+                                        <div class="col-6"><input class="form-control form-control-sm" id="lottery-q-b" placeholder="ตัวเลือก B"></div>
+                                        <div class="col-6"><input class="form-control form-control-sm" id="lottery-q-c" placeholder="ตัวเลือก C"></div>
+                                        <div class="col-6"><input class="form-control form-control-sm" id="lottery-q-d" placeholder="ตัวเลือก D"></div>
+                                    </div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <select class="form-select form-select-sm" id="lottery-q-correct">
+                                                <option value="A">เฉลย: A</option>
+                                                <option value="B">เฉลย: B</option>
+                                                <option value="C">เฉลย: C</option>
+                                                <option value="D">เฉลย: D</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-6">
+                                            <select class="form-select form-select-sm" id="lottery-q-category">
+                                                <option value="ทั่วไป">ทั่วไป</option>
+                                                <option value="PPE">PPE</option>
+                                                <option value="ดับเพลิง">ดับเพลิง</option>
+                                                <option value="สารเคมี">สารเคมี</option>
+                                                <option value="ไฟฟ้า">ไฟฟ้า</option>
+                                                <option value="การทำงานที่สูง">การทำงานที่สูง</option>
+                                                <option value="กฎหมาย">กฎหมาย</option>
+                                                <option value="การยศาสตร์">การยศาสตร์</option>
+                                                <option value="สิ่งแวดล้อม">สิ่งแวดล้อม</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-success btn-sm flex-fill" onclick="saveLotteryQuestion()">บันทึก</button>
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="$('#add-lottery-q-form').hide()">ยกเลิก</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="admin-lottery-questions-list">
+                                <div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div></div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>

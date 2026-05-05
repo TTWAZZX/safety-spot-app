@@ -4,6 +4,12 @@ const mysql = require('mysql2/promise');
 // -----------------------------
 // Parse DATABASE_URL manually
 // -----------------------------
+if (!process.env.DATABASE_URL) {
+    throw new Error(
+        "Missing DATABASE_URL. Create a local .env file with DATABASE_URL=mysql://user:password@host:3306/database before running npm start."
+    );
+}
+
 const url = new URL(process.env.DATABASE_URL);
 
 // Extract credentials
@@ -38,5 +44,6 @@ pool.getConnection()
 
 module.exports = {
     query: (...args) => pool.query(...args),
-    getClient: () => pool.getConnection()
+    getClient: () => pool.getConnection(),
+    getConnection: () => pool.getConnection()
 };

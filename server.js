@@ -1,5 +1,5 @@
-// =============================================
-// server.js  (FULL VERSION — R2 UPLOAD ONLY)
+﻿// =============================================
+// server.js  (FULL VERSION โ€” R2 UPLOAD ONLY)
 // =============================================
 require('dotenv').config();
 const express = require('express');
@@ -17,7 +17,7 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const cron = require('node-cron'); // เพิ่มบรรทัดนี้ต่อจาก require อื่นๆ
+const cron = require('node-cron'); // เน€เธเธดเนเธกเธเธฃเธฃเธ—เธฑเธ”เธเธตเนเธ•เนเธญเธเธฒเธ require เธญเธทเนเธเน
 
 // -----------------------------
 //   CORS
@@ -44,7 +44,7 @@ app.use(express.json());
 //   Rate Limiting
 // -----------------------------
 
-// ทั่วไป: 100 req / 1 นาที ต่อ IP
+// เธ—เธฑเนเธงเนเธ: 100 req / 1 เธเธฒเธ—เธต เธ•เนเธญ IP
 const generalLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 100,
@@ -53,7 +53,7 @@ const generalLimiter = rateLimit({
     message: { status: 'error', message: 'Too many requests, please try again later.' }
 });
 
-// Sensitive endpoints: login/register 10 req / 5 นาที
+// Sensitive endpoints: login/register 10 req / 5 เธเธฒเธ—เธต
 const authLimiter = rateLimit({
     windowMs: 5 * 60 * 1000,
     max: 10,
@@ -62,7 +62,7 @@ const authLimiter = rateLimit({
     message: { status: 'error', message: 'Too many attempts, please wait 5 minutes.' }
 });
 
-// Upload/Submit: 20 req / 5 นาที
+// Upload/Submit: 20 req / 5 เธเธฒเธ—เธต
 const uploadLimiter = rateLimit({
     windowMs: 5 * 60 * 1000,
     max: 20,
@@ -139,13 +139,13 @@ async function logAdminAction(adminId, action, targetType, targetId, targetName,
 //   Auto award badges by score (ADD + REMOVE)
 // -----------------------------
 async function autoAwardBadgesForUser(lineUserId, connOptional) {
-    // ถ้ามีส่ง connection จาก transaction เข้ามาให้ใช้ตัวนั้น
-    // ถ้าไม่ส่งมา ใช้ db ปกติ (pool)
+    // เธ–เนเธฒเธกเธตเธชเนเธ connection เธเธฒเธ transaction เน€เธเนเธฒเธกเธฒเนเธซเนเนเธเนเธ•เธฑเธงเธเธฑเนเธ
+    // เธ–เนเธฒเนเธกเนเธชเนเธเธกเธฒ เนเธเน db เธเธเธ•เธด (pool)
     const conn = connOptional || db;
 
-    // 1) ลบป้าย auto ที่คะแนน "ไม่ถึงเกณฑ์แล้ว"
-    //    - ป้าย auto: badges.minScore IS NOT NULL
-    //    - ผู้ใช้คะแนนปัจจุบัน < minScore  ⇒ ต้องถูกลบออก
+    // 1) เธฅเธเธเนเธฒเธข auto เธ—เธตเนเธเธฐเนเธเธ "เนเธกเนเธ–เธถเธเน€เธเธ“เธ‘เนเนเธฅเนเธง"
+    //    - เธเนเธฒเธข auto: badges.minScore IS NOT NULL
+    //    - เธเธนเนเนเธเนเธเธฐเนเธเธเธเธฑเธเธเธธเธเธฑเธ < minScore  โ’ เธ•เนเธญเธเธ–เธนเธเธฅเธเธญเธญเธ
     await conn.query(
         `
         DELETE ub
@@ -159,7 +159,7 @@ async function autoAwardBadgesForUser(lineUserId, connOptional) {
         [lineUserId]
     );
 
-    // 2) เพิ่มป้าย auto ที่คะแนนถึงเกณฑ์ แต่ยังไม่มีใน user_badges
+    // 2) เน€เธเธดเนเธกเธเนเธฒเธข auto เธ—เธตเนเธเธฐเนเธเธเธ–เธถเธเน€เธเธ“เธ‘เน เนเธ•เนเธขเธฑเธเนเธกเนเธกเธตเนเธ user_badges
     await conn.query(
         `
         INSERT INTO user_badges (lineUserId, badgeId, earnedAt)
@@ -169,13 +169,13 @@ async function autoAwardBadgesForUser(lineUserId, connOptional) {
             NOW()
         FROM users u
         JOIN badges b
-          ON b.minScore IS NOT NULL          -- เฉพาะป้าย auto
-         AND u.totalScore >= b.minScore      -- คะแนนถึงเกณฑ์
+          ON b.minScore IS NOT NULL          -- เน€เธเธเธฒเธฐเธเนเธฒเธข auto
+         AND u.totalScore >= b.minScore      -- เธเธฐเนเธเธเธ–เธถเธเน€เธเธ“เธ‘เน
         LEFT JOIN user_badges ub
           ON ub.lineUserId = u.lineUserId
-         AND ub.badgeId   = b.badgeId        -- ถ้ามีป้ายนี้อยู่แล้วจะเจอใน ub
+         AND ub.badgeId   = b.badgeId        -- เธ–เนเธฒเธกเธตเธเนเธฒเธขเธเธตเนเธญเธขเธนเนเนเธฅเนเธงเธเธฐเน€เธเธญเนเธ ub
         WHERE u.lineUserId = ?
-          AND ub.badgeId IS NULL;            -- แทรกเฉพาะป้ายที่ยังไม่มี
+          AND ub.badgeId IS NULL;            -- เนเธ—เธฃเธเน€เธเธเธฒเธฐเธเนเธฒเธขเธ—เธตเนเธขเธฑเธเนเธกเนเธกเธต
         `,
         [lineUserId]
     );
@@ -210,7 +210,7 @@ const {
     R2_PUBLIC_BASE_URL,
 } = process.env;
 
-// สร้าง S3Client ครั้งเดียวแล้ว reuse (ไม่ต้องสร้างใหม่ทุก request)
+// เธชเธฃเนเธฒเธ S3Client เธเธฃเธฑเนเธเน€เธ”เธตเธขเธงเนเธฅเนเธง reuse (เนเธกเนเธ•เนเธญเธเธชเธฃเนเธฒเธเนเธซเธกเนเธ—เธธเธ request)
 const s3Client = (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY)
     ? new S3Client({
         region: "auto",
@@ -269,13 +269,13 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ status: 'error', message: "Missing file" });
 
-        // MIME validation — accept images only
+        // MIME validation โ€” accept images only
         if (!req.file.mimetype.startsWith('image/')) {
-            return res.status(400).json({ status: 'error', message: "ไฟล์ต้องเป็นรูปภาพเท่านั้น" });
+            return res.status(400).json({ status: 'error', message: "เนเธเธฅเนเธ•เนเธญเธเน€เธเนเธเธฃเธนเธเธ เธฒเธเน€เธ—เนเธฒเธเธฑเนเธ" });
         }
 
         const { lineUserId } = req.body;
-        if (!lineUserId) return res.status(400).json({ status: 'error', message: "ต้องระบุ lineUserId" });
+        if (!lineUserId) return res.status(400).json({ status: 'error', message: "เธ•เนเธญเธเธฃเธฐเธเธธ lineUserId" });
 
         const url = await uploadToR2(req.file.buffer, req.file.mimetype);
 
@@ -286,10 +286,10 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 });
 
 // ======================================================
-// PART 2 — USER / ACTIVITIES / LEADERBOARD
+// PART 2 โ€” USER / ACTIVITIES / LEADERBOARD
 // ======================================================
 
-// --- API: USER PROFILE (ฉบับแก้: โชว์ Streak 0 ถ้าขาดช่วง) ---
+// --- API: USER PROFILE (เธเธเธฑเธเนเธเน: เนเธเธงเน Streak 0 เธ–เนเธฒเธเธฒเธ”เธเนเธงเธ) ---
 app.get('/api/user/profile', async (req, res) => {
     try {
         const { lineUserId } = req.query;
@@ -309,7 +309,7 @@ app.get('/api/user/profile', async (req, res) => {
 
         const user = rows[0];
         
-        // ⭐ LOGIC: ถ้าไม่ได้เล่นมาเกิน 1 วัน ให้แสดงเป็น 0 (Visual Reset)
+        // โญ LOGIC: เธ–เนเธฒเนเธกเนเนเธ”เนเน€เธฅเนเธเธกเธฒเน€เธเธดเธ 1 เธงเธฑเธ เนเธซเนเนเธชเธ”เธเน€เธเนเธ 0 (Visual Reset)
         let displayStreak = 0;
         if (user.currentStreak && user.lastPlayedDate) {
             const todayStr = new Date().toISOString().split('T')[0];
@@ -317,14 +317,14 @@ app.get('/api/user/profile', async (req, res) => {
             const diffTime = new Date(todayStr) - new Date(lastStr);
             const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-            // ถ้าเล่นวันนี้ (0) หรือเมื่อวาน (1) -> โชว์เลขเดิม
+            // เธ–เนเธฒเน€เธฅเนเธเธงเธฑเธเธเธตเน (0) เธซเธฃเธทเธญเน€เธกเธทเนเธญเธงเธฒเธ (1) -> เนเธเธงเนเน€เธฅเธเน€เธ”เธดเธก
             if (diffDays <= 1) {
                 displayStreak = user.currentStreak;
             }
         }
         user.currentStreak = displayStreak;
 
-        // เช็ค Admin
+        // เน€เธเนเธ Admin
         const [adminRows] = await db.query("SELECT * FROM admins WHERE lineUserId = ?", [lineUserId]);
         user.isAdmin = adminRows.length > 0;
 
@@ -361,7 +361,7 @@ app.post('/api/user/register', async (req, res) => {
         if (exists.length > 0) {
             return res.status(400).json({
                 status: "error",
-                message: "LINE User ID หรือ Employee ID มีอยู่แล้ว"
+                message: "LINE User ID เธซเธฃเธทเธญ Employee ID เธกเธตเธญเธขเธนเนเนเธฅเนเธง"
             });
         }
 
@@ -374,7 +374,7 @@ app.post('/api/user/register', async (req, res) => {
         db.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
              VALUES (?, ?, ?, 'system_alert', ?, ?, NOW())`,
-            ["NOTIF" + uuidv4(), lineUserId, `ยินดีต้อนรับสู่ Safety Spot, ${fullName}! 🎉 เริ่มเล่น Daily Quiz วันนี้เพื่อสะสมเหรียญและคะแนนได้เลย`, null, lineUserId]
+            ["NOTIF" + uuidv4(), lineUserId, `เธขเธดเธเธ”เธตเธ•เนเธญเธเธฃเธฑเธเธชเธนเน Safety Spot, ${fullName}! ๐ เน€เธฃเธดเนเธกเน€เธฅเนเธ Daily Quiz เธงเธฑเธเธเธตเนเน€เธเธทเนเธญเธชเธฐเธชเธกเน€เธซเธฃเธตเธขเธเนเธฅเธฐเธเธฐเนเธเธเนเธ”เนเน€เธฅเธข`, null, lineUserId]
         ).catch(() => {});
 
         res.json({
@@ -419,7 +419,7 @@ app.post('/api/user/refresh-profile', async (req, res) => {
 app.post('/api/user/update-department', async (req, res) => {
     const { lineUserId, department } = req.body;
     if (!lineUserId || !department) {
-        return res.status(400).json({ status: 'error', message: 'ข้อมูลไม่ครบ' });
+        return res.status(400).json({ status: 'error', message: 'เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ' });
     }
     try {
         await db.query("UPDATE users SET department = ? WHERE lineUserId = ?", [department, lineUserId]);
@@ -432,7 +432,7 @@ app.post('/api/user/update-department', async (req, res) => {
 // -----------------------------
 //   ACTIVITIES LIST
 // -----------------------------
-// Public: Social Feed — recent approved submissions
+// Public: Social Feed โ€” recent approved submissions
 app.get('/api/social-feed', async (_req, res) => {
     try {
         const [rows] = await db.query(`
@@ -489,7 +489,7 @@ app.get('/api/activities', async (req, res) => {
             [lineUserId]
         );
 
-        // จำนวนคนส่งรายงานแต่ละกิจกรรม
+        // เธเธณเธเธงเธเธเธเธชเนเธเธฃเธฒเธขเธเธฒเธเนเธ•เนเธฅเธฐเธเธดเธเธเธฃเธฃเธก
         const [counts] = await db.query(
             "SELECT activityId, COUNT(*) AS submissionCount FROM submissions WHERE status IN ('pending','approved') GROUP BY activityId"
         );
@@ -530,7 +530,7 @@ app.get('/api/leaderboard', async (req, res) => {
 });
 
 // ======================================================
-// USER BADGES (frontend ต้องใช้ endpoint นี้)
+// USER BADGES (frontend เธ•เนเธญเธเนเธเน endpoint เธเธตเน)
 // ======================================================
 app.get('/api/user/badges', async (req, res) => {
     const { lineUserId } = req.query;
@@ -562,7 +562,7 @@ app.get('/api/user/badges', async (req, res) => {
 
 
 // ======================================================
-// PART 3 — SUBMISSIONS / LIKE / COMMENT
+// PART 3 โ€” SUBMISSIONS / LIKE / COMMENT
 // ======================================================
 
 // -----------------------------
@@ -586,7 +586,7 @@ app.get('/api/submissions', async (req, res) => {
 
         const [rows] = await db.query(sql, [activityId]);
 
-        // เช็คว่า user กดไลก์โพสต์ไหนบ้าง
+        // เน€เธเนเธเธงเนเธฒ user เธเธ”เนเธฅเธเนเนเธเธชเธ•เนเนเธซเธเธเนเธฒเธ
         const [likedRows] = await db.query(
             "SELECT submissionId FROM likes WHERE lineUserId = ?",
             [lineUserId]
@@ -594,7 +594,7 @@ app.get('/api/submissions', async (req, res) => {
 
         const likedSet = new Set(likedRows.map(l => l.submissionId));
 
-        // คอมเมนต์ทั้งหมดของ submission เหล่านี้
+        // เธเธญเธกเน€เธกเธเธ•เนเธ—เธฑเนเธเธซเธกเธ”เธเธญเธ submission เน€เธซเธฅเนเธฒเธเธตเน
         const ids = rows.map(r => r.submissionId);
         let commentsMap = {};
 
@@ -641,7 +641,7 @@ app.get('/api/submissions', async (req, res) => {
             userReacts.forEach(r => userReactionsSet.add(`${r.submissionId}:${r.emoji}`));
         }
 
-        // รวมผลลัพธ์
+        // เธฃเธงเธกเธเธฅเธฅเธฑเธเธเน
         const result = rows.map(sub => ({
             submissionId: sub.submissionId,
             description: sub.description,
@@ -656,7 +656,7 @@ app.get('/api/submissions', async (req, res) => {
             didLike: likedSet.has(sub.submissionId),
             comments: commentsMap[sub.submissionId] || [],
             reactions: reactionsMap[sub.submissionId] || {},
-            myReactions: ['👍','🔥','💪'].filter(e => userReactionsSet.has(`${sub.submissionId}:${e}`))
+            myReactions: ['๐‘','๐”ฅ','๐’ช'].filter(e => userReactionsSet.has(`${sub.submissionId}:${e}`))
         }));
 
         res.json({ status: "success", data: result });
@@ -677,7 +677,7 @@ app.post('/api/submissions', async (req, res) => {
         if (!normalized)
             return res.status(400).json({
                 status: "error",
-                message: "กรุณากรอกรายละเอียดของรายงาน"
+                message: "เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธเธญเธเธฃเธฒเธขเธเธฒเธ"
             });
 
         // Prevent similar spam
@@ -690,7 +690,7 @@ app.post('/api/submissions', async (req, res) => {
             if (distance(normalized, r.description) < 5) {
                 return res.status(400).json({
                     status: "error",
-                    message: "เนื้อหารายงานคล้ายกับรายงานที่มีอยู่แล้ว"
+                    message: "เน€เธเธทเนเธญเธซเธฒเธฃเธฒเธขเธเธฒเธเธเธฅเนเธฒเธขเธเธฑเธเธฃเธฒเธขเธเธฒเธเธ—เธตเนเธกเธตเธญเธขเธนเนเนเธฅเนเธง"
                 });
             }
         }
@@ -704,13 +704,13 @@ app.post('/api/submissions', async (req, res) => {
         if (exists.length > 0) {
             return res.status(400).json({
                 status: "error",
-                message: "คุณเคยส่งรายงานกิจกรรมนี้ไปแล้ว"
+                message: "เธเธธเธ“เน€เธเธขเธชเนเธเธฃเธฒเธขเธเธฒเธเธเธดเธเธเธฃเธฃเธกเธเธตเนเนเธเนเธฅเนเธง"
             });
         }
 
         // Insert submission
         const [[activity]] = await db.query("SELECT title FROM activities WHERE activityId = ?", [activityId]);
-        const activityTitle = activity ? activity.title : 'กิจกรรม';
+        const activityTitle = activity ? activity.title : 'เธเธดเธเธเธฃเธฃเธก';
 
         await db.query(
             `INSERT INTO submissions
@@ -719,11 +719,11 @@ app.post('/api/submissions', async (req, res) => {
             ["SUB" + uuidv4(), activityId, lineUserId, normalized, imageUrl]
         );
 
-        // แจ้งเตือนตัวเอง — รายงานรออนุมัติ
+        // เนเธเนเธเน€เธ•เธทเธญเธเธ•เธฑเธงเน€เธญเธ โ€” เธฃเธฒเธขเธเธฒเธเธฃเธญเธญเธเธธเธกเธฑเธ•เธด
         db.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
              VALUES (?, ?, ?, 'submission', ?, ?, NOW())`,
-            ["NOTIF" + uuidv4(), lineUserId, `รายงาน "${activityTitle}" ของคุณอยู่ระหว่างรอการพิจารณาจากแอดมิน`, activityId, lineUserId]
+            ["NOTIF" + uuidv4(), lineUserId, `เธฃเธฒเธขเธเธฒเธ "${activityTitle}" เธเธญเธเธเธธเธ“เธญเธขเธนเนเธฃเธฐเธซเธงเนเธฒเธเธฃเธญเธเธฒเธฃเธเธดเธเธฒเธฃเธ“เธฒเธเธฒเธเนเธญเธ”เธกเธดเธ`, activityId, lineUserId]
         ).catch(() => {});
 
         res.json({ status: "success", data: { message: "Submission created." } });
@@ -800,7 +800,7 @@ app.post('/api/submissions/like', async (req, res) => {
                             [
                                 "NOTIF" + uuidv4(),
                                 ownerId,
-                                `${u[0].fullName} ได้กดไลค์รายงานของคุณ`,
+                                `${u[0].fullName} เนเธ”เนเธเธ”เนเธฅเธเนเธฃเธฒเธขเธเธฒเธเธเธญเธเธเธธเธ“`,
                                 submissionId,
                                 lineUserId
                             ]
@@ -836,9 +836,9 @@ app.post('/api/submissions/like', async (req, res) => {
 // --- REACT ---
 app.post('/api/submissions/react', async (req, res) => {
     const { submissionId, lineUserId, emoji } = req.body;
-    const ALLOWED = ['👍', '🔥', '💪'];
+    const ALLOWED = ['๐‘', '๐”ฅ', '๐’ช'];
     if (!submissionId || !lineUserId || !ALLOWED.includes(emoji)) {
-        return res.status(400).json({ status: 'error', message: 'ข้อมูลไม่ถูกต้อง' });
+        return res.status(400).json({ status: 'error', message: 'เธเนเธญเธกเธนเธฅเนเธกเนเธ–เธนเธเธ•เนเธญเธ' });
     }
     try {
         // Toggle: try insert, if dup then delete
@@ -922,7 +922,7 @@ app.post('/api/submissions/comment', async (req, res) => {
                         [
                             "NOTIF" + uuidv4(),
                             ownerId,
-                            `${u[0].fullName} ได้แสดงความคิดเห็นบนรายงานของคุณ`,
+                            `${u[0].fullName} เนเธ”เนเนเธชเธ”เธเธเธงเธฒเธกเธเธดเธ”เน€เธซเนเธเธเธเธฃเธฒเธขเธเธฒเธเธเธญเธเธเธธเธ“`,
                             submissionId,
                             lineUserId
                         ]
@@ -961,15 +961,15 @@ app.post('/api/submissions/comment', async (req, res) => {
 });
 
 // ======================================================
-// PART 3.5 — GAME API (Safety Card Gacha)
+// PART 3.5 โ€” GAME API (Safety Card Gacha)
 // ======================================================
 
-// 1. ดึงคำถามประจำวัน (สุ่มมา 1 ข้อ ที่ยังไม่เคยตอบในวันนี้)
+// 1. เธ”เธถเธเธเธณเธ–เธฒเธกเธเธฃเธฐเธเธณเธงเธฑเธ (เธชเธธเนเธกเธกเธฒ 1 เธเนเธญ เธ—เธตเนเธขเธฑเธเนเธกเนเน€เธเธขเธ•เธญเธเนเธเธงเธฑเธเธเธตเน)
 app.get('/api/game/daily-question', async (req, res) => {
     const { lineUserId } = req.query;
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
     try {
-        // เช็คว่าวันนี้เล่นไปหรือยัง
+        // เน€เธเนเธเธงเนเธฒเธงเธฑเธเธเธตเนเน€เธฅเนเธเนเธเธซเธฃเธทเธญเธขเธฑเธ
         const [history] = await db.query(
             "SELECT historyId FROM user_game_history WHERE lineUserId = ? AND playedAt = ?",
             [lineUserId, today]
@@ -979,13 +979,13 @@ app.get('/api/game/daily-question', async (req, res) => {
             return res.json({ status: "success", data: { played: true } });
         }
 
-        // สุ่มคำถามมา 1 ข้อ
+        // เธชเธธเนเธกเธเธณเธ–เธฒเธกเธกเธฒ 1 เธเนเธญ
         const [questions] = await db.query(
             "SELECT * FROM kyt_questions WHERE isActive = TRUE ORDER BY RAND() LIMIT 1"
         );
 
         if (questions.length === 0) {
-            return res.json({ status: "error", message: "ไม่พบคำถามในระบบ" });
+            return res.json({ status: "error", message: "เนเธกเนเธเธเธเธณเธ–เธฒเธกเนเธเธฃเธฐเธเธ" });
         }
 
         const q = questions[0];
@@ -1009,13 +1009,13 @@ app.get('/api/game/daily-question', async (req, res) => {
     }
 });
 
-// --- API: ส่งคำตอบ (v1) ---
+// --- API: เธชเนเธเธเธณเธ•เธญเธ (v1) ---
 app.post('/api/game/submit-answer', async (req, res) => {
     const { lineUserId, questionId, selectedOption } = req.body;
 
     // Input validation
     if (!lineUserId || !questionId || !selectedOption) {
-        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ (lineUserId, questionId, selectedOption)" });
+        return res.status(400).json({ status: "error", message: "เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ (lineUserId, questionId, selectedOption)" });
     }
 
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
@@ -1024,18 +1024,18 @@ app.post('/api/game/submit-answer', async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // 1. ตรวจคำตอบ
+        // 1. เธ•เธฃเธงเธเธเธณเธ•เธญเธ
         const [qs] = await conn.query("SELECT * FROM kyt_questions WHERE questionId = ?", [questionId]);
-        if (qs.length === 0) throw new Error("คำถามไม่ถูกต้อง");
+        if (qs.length === 0) throw new Error("เธเธณเธ–เธฒเธกเนเธกเนเธ–เธนเธเธ•เนเธญเธ");
 
         const question = qs[0];
         const isCorrect = (selectedOption === question.correctOption);
 
-        // 2. กำหนดรางวัล
+        // 2. เธเธณเธซเธเธ”เธฃเธฒเธเธงเธฑเธฅ
         let earnedCoins = isCorrect ? 50 : 10;
         let earnedScore = isCorrect ? question.scoreReward : 2;
 
-        // 3. ระบบ Streak
+        // 3. เธฃเธฐเธเธ Streak
         const [streakRow] = await conn.query("SELECT * FROM user_streaks WHERE lineUserId = ?", [lineUserId]);
         let currentStreak = 1;
 
@@ -1053,7 +1053,7 @@ app.post('/api/game/submit-answer', async (req, res) => {
             await conn.query("INSERT INTO user_streaks VALUES (?, 1, ?, 1)", [lineUserId, today]);
         }
 
-        // 4. บันทึกประวัติ — UNIQUE(lineUserId, playedAt) ป้องกัน race condition
+        // 4. เธเธฑเธเธ—เธถเธเธเธฃเธฐเธงเธฑเธ•เธด โ€” UNIQUE(lineUserId, playedAt) เธเนเธญเธเธเธฑเธ race condition
         try {
             await conn.query(
                 "INSERT INTO user_game_history (lineUserId, questionId, isCorrect, earnedPoints, playedAt) VALUES (?, ?, ?, ?, ?)",
@@ -1061,24 +1061,24 @@ app.post('/api/game/submit-answer', async (req, res) => {
             );
         } catch (insertErr) {
             if (insertErr.code === 'ER_DUP_ENTRY') {
-                throw new Error("คุณเล่นเกมของวันนี้ไปแล้ว");
+                throw new Error("เธเธธเธ“เน€เธฅเนเธเน€เธเธกเธเธญเธเธงเธฑเธเธเธตเนเนเธเนเธฅเนเธง");
             }
             throw insertErr;
         }
 
-        // 5. อัปเดต User
+        // 5. เธญเธฑเธเน€เธ”เธ• User
         await conn.query(
             "UPDATE users SET totalScore = totalScore + ?, coinBalance = coinBalance + ? WHERE lineUserId = ?",
             [earnedScore, earnedCoins, lineUserId]
         );
 
-        // 6. ดึงยอดล่าสุด
+        // 6. เธ”เธถเธเธขเธญเธ”เธฅเนเธฒเธชเธธเธ”
         const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
 
-        // 7. แจ้งเตือน
+        // 7. เนเธเนเธเน€เธ•เธทเธญเธ
         const notifMsg = isCorrect
-            ? `ภารกิจสำเร็จ! คุณได้รับ ${earnedCoins} เหรียญจากการตอบคำถามประจำวัน`
-            : `ตอบผิดรับรางวัลปลอบใจ ${earnedCoins} เหรียญ`;
+            ? `เธ เธฒเธฃเธเธดเธเธชเธณเน€เธฃเนเธ! เธเธธเธ“เนเธ”เนเธฃเธฑเธ ${earnedCoins} เน€เธซเธฃเธตเธขเธเธเธฒเธเธเธฒเธฃเธ•เธญเธเธเธณเธ–เธฒเธกเธเธฃเธฐเธเธณเธงเธฑเธ`
+            : `เธ•เธญเธเธเธดเธ”เธฃเธฑเธเธฃเธฒเธเธงเธฑเธฅเธเธฅเธญเธเนเธ ${earnedCoins} เน€เธซเธฃเธตเธขเธ`;
 
         await conn.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
@@ -1102,17 +1102,17 @@ app.post('/api/game/submit-answer', async (req, res) => {
 
     } catch (e) {
         await conn.rollback();
-        res.status(e.message === "คุณเล่นเกมของวันนี้ไปแล้ว" ? 400 : 500).json({ status: "error", message: e.message });
+        res.status(e.message === "เธเธธเธ“เน€เธฅเนเธเน€เธเธกเธเธญเธเธงเธฑเธเธเธตเนเนเธเนเธฅเนเธง" ? 400 : 500).json({ status: "error", message: e.message });
     } finally {
         conn.release();
     }
 });
 
 // ======================================================
-// PART 3.6 — ADMIN: Manage Game Questions
+// PART 3.6 โ€” ADMIN: Manage Game Questions
 // ======================================================
 
-// 1. ดึงคำถามทั้งหมด (Admin View)
+// 1. เธ”เธถเธเธเธณเธ–เธฒเธกเธ—เธฑเนเธเธซเธกเธ” (Admin View)
 app.get('/api/admin/questions', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query("SELECT * FROM kyt_questions ORDER BY questionId DESC");
@@ -1122,9 +1122,9 @@ app.get('/api/admin/questions', isAdmin, async (req, res) => {
     }
 });
 
-// 2. เพิ่ม/แก้ไข คำถาม
+// 2. เน€เธเธดเนเธก/เนเธเนเนเธ เธเธณเธ–เธฒเธก
 app.post('/api/admin/questions', isAdmin, async (req, res) => {
-    // รับ option A-H
+    // เธฃเธฑเธ option A-H
     const { questionId, questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, imageUrl, scoreReward } = req.body;
 
     try {
@@ -1151,7 +1151,7 @@ app.post('/api/admin/questions', isAdmin, async (req, res) => {
     }
 });
 
-// 3. ลบคำถาม
+// 3. เธฅเธเธเธณเธ–เธฒเธก
 app.delete('/api/admin/questions/:id', isAdmin, async (req, res) => {
     try {
         await db.query("DELETE FROM kyt_questions WHERE questionId = ?", [req.params.id]);
@@ -1161,11 +1161,11 @@ app.delete('/api/admin/questions/:id', isAdmin, async (req, res) => {
     }
 });
 
-// 4. เปิด/ปิด คำถาม (Toggle Active)
+// 4. เน€เธเธดเธ”/เธเธดเธ” เธเธณเธ–เธฒเธก (Toggle Active)
 app.post('/api/admin/questions/toggle', isAdmin, async (req, res) => {
     try {
         const { questionId } = req.body;
-        // เช็คสถานะปัจจุบันก่อน
+        // เน€เธเนเธเธชเธ–เธฒเธเธฐเธเธฑเธเธเธธเธเธฑเธเธเนเธญเธ
         const [rows] = await db.query("SELECT isActive FROM kyt_questions WHERE questionId = ?", [questionId]);
         if (rows.length === 0) return res.status(404).json({status:"error"});
 
@@ -1179,10 +1179,10 @@ app.post('/api/admin/questions/toggle', isAdmin, async (req, res) => {
 });
 
 // ======================================================
-// PART 3.7 — ADMIN: Manage Safety Cards
+// PART 3.7 โ€” ADMIN: Manage Safety Cards
 // ======================================================
 
-// 1. ดึงการ์ดทั้งหมด (สำหรับ Admin)
+// 1. เธ”เธถเธเธเธฒเธฃเนเธ”เธ—เธฑเนเธเธซเธกเธ” (เธชเธณเธซเธฃเธฑเธ Admin)
 app.get('/api/admin/cards', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query("SELECT * FROM safety_cards ORDER BY createdAt DESC");
@@ -1192,7 +1192,7 @@ app.get('/api/admin/cards', isAdmin, async (req, res) => {
     }
 });
 
-// 2. เพิ่ม/แก้ไข การ์ด
+// 2. เน€เธเธดเนเธก/เนเธเนเนเธ เธเธฒเธฃเนเธ”
 app.post('/api/admin/cards', isAdmin, async (req, res) => {
     const { cardId, cardName, description, imageUrl, rarity } = req.body;
 
@@ -1206,7 +1206,7 @@ app.post('/api/admin/cards', isAdmin, async (req, res) => {
             res.json({ status: "success", data: { message: "Updated" } });
         } else {
             // Create
-            // สร้าง ID แบบง่ายๆ (หรือจะใช้ UUID ก็ได้)
+            // เธชเธฃเนเธฒเธ ID เนเธเธเธเนเธฒเธขเน (เธซเธฃเธทเธญเธเธฐเนเธเน UUID เธเนเนเธ”เน)
             const newId = "CARD_" + Date.now(); 
             await db.query(
                 "INSERT INTO safety_cards (cardId, cardName, description, imageUrl, rarity) VALUES (?, ?, ?, ?, ?)",
@@ -1219,13 +1219,13 @@ app.post('/api/admin/cards', isAdmin, async (req, res) => {
     }
 });
 
-// 3. ลบการ์ด
+// 3. เธฅเธเธเธฒเธฃเนเธ”
 app.delete('/api/admin/cards/:id', isAdmin, async (req, res) => {
     try {
-        // ลบข้อมูลการครอบครองของผู้เล่นก่อน (เพื่อไม่ให้ติด Foreign Key)
+        // เธฅเธเธเนเธญเธกเธนเธฅเธเธฒเธฃเธเธฃเธญเธเธเธฃเธญเธเธเธญเธเธเธนเนเน€เธฅเนเธเธเนเธญเธ (เน€เธเธทเนเธญเนเธกเนเนเธซเนเธ•เธดเธ” Foreign Key)
         await db.query("DELETE FROM user_cards WHERE cardId = ?", [req.params.id]);
         
-        // ลบตัวการ์ด
+        // เธฅเธเธ•เธฑเธงเธเธฒเธฃเนเธ”
         await db.query("DELETE FROM safety_cards WHERE cardId = ?", [req.params.id]);
         
         res.json({ status: "success", data: { deleted: true } });
@@ -1235,7 +1235,7 @@ app.delete('/api/admin/cards/:id', isAdmin, async (req, res) => {
 });
 
 // ======================================================
-// PART 4 — ADMIN PANEL / NOTIFICATIONS / SERVER START
+// PART 4 โ€” ADMIN PANEL / NOTIFICATIONS / SERVER START
 // ======================================================
 
 // ======================================================
@@ -1361,29 +1361,29 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // หาว่ารายงานนี้เป็นของใคร + เช็คสถานะ (idempotency)
+        // เธซเธฒเธงเนเธฒเธฃเธฒเธขเธเธฒเธเธเธตเนเน€เธเนเธเธเธญเธเนเธเธฃ + เน€เธเนเธเธชเธ–เธฒเธเธฐ (idempotency)
         const [sub] = await conn.query(
             "SELECT lineUserId, status FROM submissions WHERE submissionId = ?",
             [submissionId]
         );
         if (sub.length === 0) throw new Error("Submission not found");
-        if (sub[0].status === 'approved') throw new Error("รายงานนี้ถูก approve ไปแล้ว");
+        if (sub[0].status === 'approved') throw new Error("เธฃเธฒเธขเธเธฒเธเธเธตเนเธ–เธนเธ approve เนเธเนเธฅเนเธง");
 
         const ownerId = sub[0].lineUserId;
 
-        // อัปเดตสถานะ + ให้คะแนนในตาราง submissions
+        // เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐ + เนเธซเนเธเธฐเนเธเธเนเธเธ•เธฒเธฃเธฒเธ submissions
         await conn.query(
             "UPDATE submissions SET status = 'approved', points = ? WHERE submissionId = ?",
             [score, submissionId]
         );
 
-        // เพิ่มคะแนนให้ user
+        // เน€เธเธดเนเธกเธเธฐเนเธเธเนเธซเน user
         await conn.query(
             "UPDATE users SET totalScore = totalScore + ? WHERE lineUserId = ?",
             [score, ownerId]
         );
 
-        // แจ้งเตือน
+        // เนเธเนเธเน€เธ•เธทเธญเธ
         await conn.query(`
             INSERT INTO notifications 
             (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
@@ -1391,12 +1391,12 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
         `, [
             "NOTIF" + uuidv4(),
             ownerId,
-            `รายงานของคุณได้รับการอนุมัติ (${score} คะแนน)`,
+            `เธฃเธฒเธขเธเธฒเธเธเธญเธเธเธธเธ“เนเธ”เนเธฃเธฑเธเธเธฒเธฃเธญเธเธธเธกเธฑเธ•เธด (${score} เธเธฐเนเธเธ)`,
             submissionId,
             requesterId
         ]);
 
-        // 🔥 เรียก autoAwardBadgesForUser ภายใต้ transaction เดียวกัน
+        // ๐”ฅ เน€เธฃเธตเธขเธ autoAwardBadgesForUser เธ เธฒเธขเนเธ•เน transaction เน€เธ”เธตเธขเธงเธเธฑเธ
         await autoAwardBadgesForUser(ownerId, conn);
 
         await conn.commit();
@@ -1442,7 +1442,7 @@ app.post('/api/admin/submissions/reject', isAdmin, async (req, res) => {
         `, [
             "NOTIF" + uuidv4(),
             ownerId,
-            `น่าเสียดาย รายงานของคุณไม่ผ่านการตรวจสอบ`,
+            `เธเนเธฒเน€เธชเธตเธขเธ”เธฒเธข เธฃเธฒเธขเธเธฒเธเธเธญเธเธเธธเธ“เนเธกเนเธเนเธฒเธเธเธฒเธฃเธ•เธฃเธงเธเธชเธญเธ`,
             submissionId,
             requesterId
         ]);
@@ -1462,7 +1462,7 @@ app.post('/api/admin/submissions/reject', isAdmin, async (req, res) => {
 app.post('/api/admin/submissions/bulk-approve', isAdmin, async (req, res) => {
     const { submissionIds, scores, requesterId } = req.body;
     if (!Array.isArray(submissionIds) || submissionIds.length === 0) {
-        return res.status(400).json({ status: 'error', message: 'ไม่มีรายการที่เลือก' });
+        return res.status(400).json({ status: 'error', message: 'เนเธกเนเธกเธตเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเน€เธฅเธทเธญเธ' });
     }
     const conn = await db.getClient();
     let approved = 0;
@@ -1474,7 +1474,7 @@ app.post('/api/admin/submissions/bulk-approve', isAdmin, async (req, res) => {
                 'SELECT lineUserId, status FROM submissions WHERE submissionId = ?', [submissionId]
             );
             if (!sub || sub.status !== 'pending') { skipped++; continue; }
-            // รองรับ scores map {submissionId: score} หรือ fallback เป็น 10
+            // เธฃเธญเธเธฃเธฑเธ scores map {submissionId: score} เธซเธฃเธทเธญ fallback เน€เธเนเธ 10
             const pts = Math.max(0, Number((scores && scores[submissionId]) ?? 10));
             await conn.query(
                 "UPDATE submissions SET status = 'approved', points = ?, reviewedAt = NOW() WHERE submissionId = ?",
@@ -1488,7 +1488,7 @@ app.post('/api/admin/submissions/bulk-approve', isAdmin, async (req, res) => {
                 `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
                  VALUES (?, ?, ?, 'approved', ?, ?, NOW())`,
                 ["NOTIF" + uuidv4(), sub.lineUserId,
-                 `รายงานของคุณได้รับการอนุมัติ! คุณได้รับ ${pts} คะแนน 🎉`, submissionId, requesterId]
+                 `เธฃเธฒเธขเธเธฒเธเธเธญเธเธเธธเธ“เนเธ”เนเธฃเธฑเธเธเธฒเธฃเธญเธเธธเธกเธฑเธ•เธด! เธเธธเธ“เนเธ”เนเธฃเธฑเธ ${pts} เธเธฐเนเธเธ ๐`, submissionId, requesterId]
             );
             logAdminAction(requesterId, 'APPROVE_SUBMISSION', 'submission', submissionId, `Submission #${submissionId}`, { score: pts, ownerId: sub.lineUserId });
             approved++;
@@ -1507,7 +1507,7 @@ app.post('/api/admin/submissions/bulk-approve', isAdmin, async (req, res) => {
 app.delete('/api/admin/submissions/:submissionId', isAdmin, async (req, res) => {
     const requesterId = req.query.requesterId;
     try {
-        // ดึงข้อมูลเจ้าของก่อนลบ
+        // เธ”เธถเธเธเนเธญเธกเธนเธฅเน€เธเนเธฒเธเธญเธเธเนเธญเธเธฅเธ
         const [[sub]] = await db.query(
             `SELECT s.lineUserId, a.title FROM submissions s
              LEFT JOIN activities a ON s.activityId = a.activityId
@@ -1517,12 +1517,12 @@ app.delete('/api/admin/submissions/:submissionId', isAdmin, async (req, res) => 
         await db.query("DELETE FROM comments WHERE submissionId = ?", [req.params.submissionId]);
         await db.query("DELETE FROM submissions WHERE submissionId = ?", [req.params.submissionId]);
         logAdminAction(requesterId, 'DELETE_SUBMISSION', 'submission', req.params.submissionId, `Submission #${req.params.submissionId}`, {});
-        // แจ้งเจ้าของ
+        // เนเธเนเธเน€เธเนเธฒเธเธญเธ
         if (sub) {
             db.query(
                 `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
                  VALUES (?, ?, ?, 'system_alert', ?, ?, NOW())`,
-                ["NOTIF" + uuidv4(), sub.lineUserId, `รายงาน "${sub.title || 'กิจกรรม'}" ของคุณถูกลบโดยแอดมิน`, req.params.submissionId, requesterId]
+                ["NOTIF" + uuidv4(), sub.lineUserId, `เธฃเธฒเธขเธเธฒเธ "${sub.title || 'เธเธดเธเธเธฃเธฃเธก'}" เธเธญเธเธเธธเธ“เธ–เธนเธเธฅเธเนเธ”เธขเนเธญเธ”เธกเธดเธ`, req.params.submissionId, requesterId]
             ).catch(() => {});
         }
         res.json({ status: "success", data: { removed: true } });
@@ -1602,7 +1602,7 @@ app.delete('/api/admin/activities/:activityId', isAdmin, async (req, res) => {
     try {
         const { activityId } = req.params;
 
-        // ลบ likes และ comments ของ submissions ในกิจกรรมนี้ก่อน (ป้องกัน FK constraint)
+        // เธฅเธ likes เนเธฅเธฐ comments เธเธญเธ submissions เนเธเธเธดเธเธเธฃเธฃเธกเธเธตเนเธเนเธญเธ (เธเนเธญเธเธเธฑเธ FK constraint)
         await db.query(
             "DELETE FROM likes WHERE submissionId IN (SELECT submissionId FROM submissions WHERE activityId = ?)",
             [activityId]
@@ -1612,13 +1612,13 @@ app.delete('/api/admin/activities/:activityId', isAdmin, async (req, res) => {
             [activityId]
         );
 
-        // ลบ submission ทั้งหมดของกิจกรรมนี้
+        // เธฅเธ submission เธ—เธฑเนเธเธซเธกเธ”เธเธญเธเธเธดเธเธเธฃเธฃเธกเธเธตเน
         await db.query(
             "DELETE FROM submissions WHERE activityId = ?",
             [activityId]
         );
 
-        // ลบกิจกรรม
+        // เธฅเธเธเธดเธเธเธฃเธฃเธก
         await db.query(
             "DELETE FROM activities WHERE activityId = ?",
             [activityId]
@@ -1673,7 +1673,7 @@ app.put('/api/admin/badges/:badgeId', isAdmin, async (req, res) => {
 
 app.delete('/api/admin/badges/:badgeId', isAdmin, async (req, res) => {
     try {
-        // ลบ user_badges ที่อ้างอิง badge นี้ก่อน (ป้องกัน FK constraint)
+        // เธฅเธ user_badges เธ—เธตเนเธญเนเธฒเธเธญเธดเธ badge เธเธตเนเธเนเธญเธ (เธเนเธญเธเธเธฑเธ FK constraint)
         await db.query(
             "DELETE FROM user_badges WHERE badgeId = ?",
             [req.params.badgeId]
@@ -1692,7 +1692,7 @@ app.delete('/api/admin/badges/:badgeId', isAdmin, async (req, res) => {
 app.post('/api/admin/award-badge', isAdmin, async (req, res) => {
     const { lineUserId, badgeId, requesterId } = req.body;
 
-    // หา badgeName เพื่อใช้ในข้อความแจ้งเตือน
+    // เธซเธฒ badgeName เน€เธเธทเนเธญเนเธเนเนเธเธเนเธญเธเธงเธฒเธกเนเธเนเธเน€เธ•เธทเธญเธ
     const [[badge]] = await db.query(
         "SELECT badgeName FROM badges WHERE badgeId = ?",
         [badgeId]
@@ -1703,10 +1703,10 @@ app.post('/api/admin/award-badge', isAdmin, async (req, res) => {
         [lineUserId, badgeId]
     );
 
-    // แจ้งเตือนว่าถูกมอบป้ายโดยแอดมิน
+    // เนเธเนเธเน€เธ•เธทเธญเธเธงเนเธฒเธ–เธนเธเธกเธญเธเธเนเธฒเธขเนเธ”เธขเนเธญเธ”เธกเธดเธ
     const msg = badge
-        ? `คุณได้รับป้ายรางวัลใหม่จากผู้ดูแลระบบ: ${badge.badgeName}`
-        : "คุณได้รับป้ายรางวัลใหม่จากผู้ดูแลระบบ";
+        ? `เธเธธเธ“เนเธ”เนเธฃเธฑเธเธเนเธฒเธขเธฃเธฒเธเธงเธฑเธฅเนเธซเธกเนเธเธฒเธเธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธ: ${badge.badgeName}`
+        : "เธเธธเธ“เนเธ”เนเธฃเธฑเธเธเนเธฒเธขเธฃเธฒเธเธงเธฑเธฅเนเธซเธกเนเธเธฒเธเธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธ";
 
     await db.query(
         `
@@ -1740,10 +1740,10 @@ app.post('/api/admin/revoke-badge', isAdmin, async (req, res) => {
         [lineUserId, badgeId]
     );
 
-    // แจ้งเตือนว่าป้ายถูกเพิกถอน
+    // เนเธเนเธเน€เธ•เธทเธญเธเธงเนเธฒเธเนเธฒเธขเธ–เธนเธเน€เธเธดเธเธ–เธญเธ
     const msg = badge
-        ? `ป้ายรางวัลของคุณถูกเพิกถอน: ${badge.badgeName}`
-        : "ป้ายรางวัลบางรายการของคุณถูกเพิกถอนโดยผู้ดูแลระบบ";
+        ? `เธเนเธฒเธขเธฃเธฒเธเธงเธฑเธฅเธเธญเธเธเธธเธ“เธ–เธนเธเน€เธเธดเธเธ–เธญเธ: ${badge.badgeName}`
+        : "เธเนเธฒเธขเธฃเธฒเธเธงเธฑเธฅเธเธฒเธเธฃเธฒเธขเธเธฒเธฃเธเธญเธเธเธธเธ“เธ–เธนเธเน€เธเธดเธเธ–เธญเธเนเธ”เธขเธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธ";
 
     await db.query(
         `
@@ -1772,12 +1772,12 @@ app.post('/api/admin/recalculate-badges', isAdmin, async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // ดึง user ทั้งหมด
+        // เธ”เธถเธ user เธ—เธฑเนเธเธซเธกเธ”
         const [users] = await conn.query(
             "SELECT lineUserId FROM users"
         );
 
-        // วนทุกคนแล้วให้ autoAwardBadgesForUser จัดการให้
+        // เธงเธเธ—เธธเธเธเธเนเธฅเนเธงเนเธซเน autoAwardBadgesForUser เธเธฑเธ”เธเธฒเธฃเนเธซเน
         for (const u of users) {
             await autoAwardBadgesForUser(u.lineUserId, conn);
         }
@@ -1802,11 +1802,11 @@ app.post('/api/admin/recalculate-badges', isAdmin, async (req, res) => {
 app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
     const { lineUserId, deltaScore, requesterId } = req.body;
 
-    // ตรวจค่าพื้นฐาน
+    // เธ•เธฃเธงเธเธเนเธฒเธเธทเนเธเธเธฒเธ
     if (!lineUserId || typeof deltaScore !== 'number' || isNaN(deltaScore)) {
         return res.status(400).json({
             status: "error",
-            message: "ต้องระบุ lineUserId และ deltaScore (ตัวเลข)"
+            message: "เธ•เนเธญเธเธฃเธฐเธเธธ lineUserId เนเธฅเธฐ deltaScore (เธ•เธฑเธงเน€เธฅเธ)"
         });
     }
 
@@ -1815,7 +1815,7 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // 1) อัปเดตคะแนน (ไม่ให้ติดลบ)
+        // 1) เธญเธฑเธเน€เธ”เธ•เธเธฐเนเธเธ (เนเธกเนเนเธซเนเธ•เธดเธ”เธฅเธ)
         await conn.query(
             `
             UPDATE users
@@ -1825,14 +1825,14 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
             [deltaScore, lineUserId]
         );
 
-        // 2) ดึงคะแนนรวมล่าสุด
+        // 2) เธ”เธถเธเธเธฐเนเธเธเธฃเธงเธกเธฅเนเธฒเธชเธธเธ”
         const [[userRow]] = await conn.query(
             "SELECT totalScore FROM users WHERE lineUserId = ?",
             [lineUserId]
         );
         const newTotalScore = userRow ? userRow.totalScore : 0;
 
-        // 3) บันทึก history การปรับคะแนน (เผื่อดูย้อนหลัง)
+        // 3) เธเธฑเธเธ—เธถเธ history เธเธฒเธฃเธเธฃเธฑเธเธเธฐเนเธเธ (เน€เธเธทเนเธญเธ”เธนเธขเนเธญเธเธซเธฅเธฑเธ)
         await conn.query(
             `
             INSERT INTO user_score_history
@@ -1851,14 +1851,14 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
         await conn.commit();
         conn.release();
 
-        // 4) หลัง commit แล้วค่อยให้ระบบเช็กป้าย auto ตามคะแนนใหม่
+        // 4) เธซเธฅเธฑเธ commit เนเธฅเนเธงเธเนเธญเธขเนเธซเนเธฃเธฐเธเธเน€เธเนเธเธเนเธฒเธข auto เธ•เธฒเธกเธเธฐเนเธเธเนเธซเธกเน
         await autoAwardBadgesForUser(lineUserId);
 
-        // 5) แจ้งเตือนเรื่องคะแนน
+        // 5) เนเธเนเธเน€เธ•เธทเธญเธเน€เธฃเธทเนเธญเธเธเธฐเนเธเธ
         const messageScore =
             deltaScore > 0
-                ? `คะแนนของคุณถูกเพิ่ม ${Math.abs(deltaScore)} คะแนน (รวมเป็น ${newTotalScore} คะแนน)`
-                : `คะแนนของคุณถูกลด ${Math.abs(deltaScore)} คะแนน (เหลือ ${newTotalScore} คะแนน)`;
+                ? `เธเธฐเนเธเธเธเธญเธเธเธธเธ“เธ–เธนเธเน€เธเธดเนเธก ${Math.abs(deltaScore)} เธเธฐเนเธเธ (เธฃเธงเธกเน€เธเนเธ ${newTotalScore} เธเธฐเนเธเธ)`
+                : `เธเธฐเนเธเธเธเธญเธเธเธธเธ“เธ–เธนเธเธฅเธ” ${Math.abs(deltaScore)} เธเธฐเนเธเธ (เน€เธซเธฅเธทเธญ ${newTotalScore} เธเธฐเนเธเธ)`;
 
         await db.query(
             `
@@ -1876,8 +1876,8 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
             ]
         );
 
-        // 6) แจ้งเตือนว่าระบบตรวจสอบ/อัปเดตป้ายให้แล้ว (auto badge)
-        const messageBadgeAuto = "ระบบได้ตรวจสอบและอัปเดตป้ายรางวัลของคุณตามคะแนนล่าสุดแล้ว";
+        // 6) เนเธเนเธเน€เธ•เธทเธญเธเธงเนเธฒเธฃเธฐเธเธเธ•เธฃเธงเธเธชเธญเธ/เธญเธฑเธเน€เธ”เธ•เธเนเธฒเธขเนเธซเนเนเธฅเนเธง (auto badge)
+        const messageBadgeAuto = "เธฃเธฐเธเธเนเธ”เนเธ•เธฃเธงเธเธชเธญเธเนเธฅเธฐเธญเธฑเธเน€เธ”เธ•เธเนเธฒเธขเธฃเธฒเธเธงเธฑเธฅเธเธญเธเธเธธเธ“เธ•เธฒเธกเธเธฐเนเธเธเธฅเนเธฒเธชเธธเธ”เนเธฅเนเธง";
         await db.query(
             `
             INSERT INTO notifications
@@ -1912,11 +1912,11 @@ app.post('/api/admin/users/update-score', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: จบเกม V2 (กู้ชีพ Streak + เก็บช้อยส์ + แจ้งเตือน) ---
+// --- API: เธเธเน€เธเธก V2 (เธเธนเนเธเธตเธ Streak + เน€เธเนเธเธเนเธญเธขเธชเน + เนเธเนเธเน€เธ•เธทเธญเธ) ---
 app.post('/api/game/submit-answer-v2', async (req, res) => {
     const { lineUserId, questionId, selectedOption } = req.body;
     if (!lineUserId || !questionId || !selectedOption) {
-        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+        return res.status(400).json({ status: "error", message: "เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ" });
     }
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
     const conn = await db.getClient();
@@ -1924,9 +1924,9 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // 2. ตรวจคำตอบ
+        // 2. เธ•เธฃเธงเธเธเธณเธ•เธญเธ
         const [qs] = await conn.query("SELECT * FROM kyt_questions WHERE questionId = ?", [questionId]);
-        if (qs.length === 0) throw new Error("ไม่พบคำถาม");
+        if (qs.length === 0) throw new Error("เนเธกเนเธเธเธเธณเธ–เธฒเธก");
 
         const question = qs[0];
         const isCorrect = (selectedOption === question.correctOption);
@@ -1934,7 +1934,7 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
         let earnedCoins = isCorrect ? 50 : 10;
         let earnedScore = isCorrect ? question.scoreReward : 2;
 
-        // 3. ระบบ Streak (Logic ใหม่: เก็บสถิติเก่าไว้กู้คืน)
+        // 3. เธฃเธฐเธเธ Streak (Logic เนเธซเธกเน: เน€เธเนเธเธชเธ–เธดเธ•เธดเน€เธเนเธฒเนเธงเนเธเธนเนเธเธทเธ)
         const [streakRow] = await conn.query("SELECT * FROM user_streaks WHERE lineUserId = ?", [lineUserId]);
         let currentStreak = 1;
         let recoverableStreak = 0;
@@ -1946,15 +1946,15 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             if (diffDays === 1) { 
-                // ต่อเนื่อง
+                // เธ•เนเธญเน€เธเธทเนเธญเธ
                 currentStreak = streakRow[0].currentStreak + 1;
                 recoverableStreak = 0; 
             } else if (diffDays === 0) {
-                // ซ้ำวันเดิม
+                // เธเนเธณเธงเธฑเธเน€เธ”เธดเธก
                 currentStreak = streakRow[0].currentStreak;
                 recoverableStreak = streakRow[0].recoverableStreak; 
             } else {
-                // ❄️ ขาดช่วง (ไฟดับ!): เก็บของเก่าไว้กู้คืน
+                // โ๏ธ เธเธฒเธ”เธเนเธงเธ (เนเธเธ”เธฑเธ!): เน€เธเนเธเธเธญเธเน€เธเนเธฒเนเธงเนเธเธนเนเธเธทเธ
                 isStreakBroken = true;
                 if (streakRow[0].currentStreak >= 3) { 
                     recoverableStreak = streakRow[0].currentStreak;
@@ -1967,36 +1967,36 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
                 [currentStreak, today, recoverableStreak, lineUserId]
             );
         } else {
-            // เล่นครั้งแรก
+            // เน€เธฅเนเธเธเธฃเธฑเนเธเนเธฃเธ
             await conn.query(
                 "INSERT INTO user_streaks (lineUserId, currentStreak, lastPlayedDate, recoverableStreak) VALUES (?, 1, ?, 0)", 
                 [lineUserId, today]
             );
         }
 
-        // Streak Bonus (ทุก 7 วัน)
+        // Streak Bonus (เธ—เธธเธ 7 เธงเธฑเธ)
         if (!isStreakBroken && currentStreak > 0 && currentStreak % 7 === 0) {
             earnedCoins += 100; 
         }
 
-        // 4. อัปเดต User
+        // 4. เธญเธฑเธเน€เธ”เธ• User
         await conn.query("UPDATE users SET totalScore = totalScore + ?, coinBalance = coinBalance + ? WHERE lineUserId = ?", [earnedScore, earnedCoins, lineUserId]);
 
-        // ⭐ 5. บันทึกประวัติ — UNIQUE(lineUserId, playedAt) ป้องกัน race condition
+        // โญ 5. เธเธฑเธเธ—เธถเธเธเธฃเธฐเธงเธฑเธ•เธด โ€” UNIQUE(lineUserId, playedAt) เธเนเธญเธเธเธฑเธ race condition
         try {
             await conn.query(
                 "INSERT INTO user_game_history (lineUserId, questionId, isCorrect, earnedPoints, playedAt, selectedAnswer) VALUES (?, ?, ?, ?, ?, ?)",
                 [lineUserId, questionId, isCorrect, earnedCoins, today, selectedOption]
             );
         } catch (insertErr) {
-            if (insertErr.code === 'ER_DUP_ENTRY') throw new Error("คุณเล่นเกมของวันนี้ไปแล้ว");
+            if (insertErr.code === 'ER_DUP_ENTRY') throw new Error("เธเธธเธ“เน€เธฅเนเธเน€เธเธกเธเธญเธเธงเธฑเธเธเธตเนเนเธเนเธฅเนเธง");
             throw insertErr;
         }
 
-        // ⭐ 6. แจ้งเตือนลง App
+        // โญ 6. เนเธเนเธเน€เธ•เธทเธญเธเธฅเธ App
         const notifMsg = isCorrect 
-            ? `ภารกิจสำเร็จ! คุณได้รับ ${earnedCoins} เหรียญจากการตอบคำถามประจำวัน`
-            : `ตอบผิดรับรางวัลปลอบใจ ${earnedCoins} เหรียญ`;
+            ? `เธ เธฒเธฃเธเธดเธเธชเธณเน€เธฃเนเธ! เธเธธเธ“เนเธ”เนเธฃเธฑเธ ${earnedCoins} เน€เธซเธฃเธตเธขเธเธเธฒเธเธเธฒเธฃเธ•เธญเธเธเธณเธ–เธฒเธกเธเธฃเธฐเธเธณเธงเธฑเธ`
+            : `เธ•เธญเธเธเธดเธ”เธฃเธฑเธเธฃเธฒเธเธงเธฑเธฅเธเธฅเธญเธเนเธ ${earnedCoins} เน€เธซเธฃเธตเธขเธ`;
 
         await conn.query(
             `INSERT INTO notifications 
@@ -2024,35 +2024,35 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
 
     } catch (e) {
         await conn.rollback();
-        const status = e.message === "คุณเล่นเกมของวันนี้ไปแล้ว" ? 400 : 500;
+        const status = e.message === "เธเธธเธ“เน€เธฅเนเธเน€เธเธกเธเธญเธเธงเธฑเธเธเธตเนเนเธเนเธฅเนเธง" ? 400 : 500;
         res.status(status).json({ status: "error", message: e.message });
     } finally { conn.release(); }
 });
 
-// --- API: ใช้ไอเทมกู้คืน Streak (Restore) ---
+// --- API: เนเธเนเนเธญเน€เธ—เธกเธเธนเนเธเธทเธ Streak (Restore) ---
 app.post('/api/game/restore-streak', async (req, res) => {
     const { lineUserId } = req.body;
-    const RESTORE_COST = 200; // ราคาค่ากู้คืน
+    const RESTORE_COST = 200; // เธฃเธฒเธเธฒเธเนเธฒเธเธนเนเธเธทเธ
     const conn = await db.getClient();
 
     try {
         await conn.beginTransaction();
 
-        // 1. เช็คว่ามีอะไรให้กู้ไหม
+        // 1. เน€เธเนเธเธงเนเธฒเธกเธตเธญเธฐเนเธฃเนเธซเนเธเธนเนเนเธซเธก
         const [streakRow] = await conn.query("SELECT * FROM user_streaks WHERE lineUserId = ?", [lineUserId]);
         if (streakRow.length === 0 || streakRow[0].recoverableStreak <= 0) {
-            throw new Error("ไม่มีสถิติให้กู้คืนครับ");
+            throw new Error("เนเธกเนเธกเธตเธชเธ–เธดเธ•เธดเนเธซเนเธเธนเนเธเธทเธเธเธฃเธฑเธ");
         }
         const lostStreak = streakRow[0].recoverableStreak;
 
-        // 2. เช็คเงิน
+        // 2. เน€เธเนเธเน€เธเธดเธ
         const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
         if (user.coinBalance < RESTORE_COST) {
-            throw new Error(`เหรียญไม่พอครับ (ต้องการ ${RESTORE_COST} เหรียญ)`);
+            throw new Error(`เน€เธซเธฃเธตเธขเธเนเธกเนเธเธญเธเธฃเธฑเธ (เธ•เนเธญเธเธเธฒเธฃ ${RESTORE_COST} เน€เธซเธฃเธตเธขเธ)`);
         }
 
-        // 3. หักเงิน + กู้คืน
-        // สูตร: เอาของเก่า (lost) + ของปัจจุบัน (current) รวมกัน
+        // 3. เธซเธฑเธเน€เธเธดเธ + เธเธนเนเธเธทเธ
+        // เธชเธนเธ•เธฃ: เน€เธญเธฒเธเธญเธเน€เธเนเธฒ (lost) + เธเธญเธเธเธฑเธเธเธธเธเธฑเธ (current) เธฃเธงเธกเธเธฑเธ
         const restoredStreak = lostStreak + streakRow[0].currentStreak;
 
         await conn.query("UPDATE users SET coinBalance = coinBalance - ? WHERE lineUserId = ?", [RESTORE_COST, lineUserId]);
@@ -2062,10 +2062,10 @@ app.post('/api/game/restore-streak', async (req, res) => {
             [restoredStreak, lineUserId]
         );
 
-        // 4. แจ้งเตือน
+        // 4. เนเธเนเธเน€เธ•เธทเธญเธ
         await conn.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt) VALUES (?, ?, ?, 'system_alert', 'restore', ?, NOW())`,
-            ["NOTIF" + uuidv4(), lineUserId, `กู้ชีพสำเร็จ! 🔥 ไฟกลับมาเป็น ${restoredStreak} วันแล้ว`, lineUserId]
+            ["NOTIF" + uuidv4(), lineUserId, `เธเธนเนเธเธตเธเธชเธณเน€เธฃเนเธ! ๐”ฅ เนเธเธเธฅเธฑเธเธกเธฒเน€เธเนเธ ${restoredStreak} เธงเธฑเธเนเธฅเนเธง`, lineUserId]
         );
 
         const [[updatedUser]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
@@ -2077,7 +2077,7 @@ app.post('/api/game/restore-streak', async (req, res) => {
                 success: true, 
                 newStreak: restoredStreak,
                 newCoinBalance: updatedUser.coinBalance,
-                message: `กู้คืนสำเร็จ! ไฟกลับมาลุกโชน ${restoredStreak} วัน 🔥`
+                message: `เธเธนเนเธเธทเธเธชเธณเน€เธฃเนเธ! เนเธเธเธฅเธฑเธเธกเธฒเธฅเธธเธเนเธเธ ${restoredStreak} เธงเธฑเธ ๐”ฅ`
             } 
         });
 
@@ -2087,28 +2087,28 @@ app.post('/api/game/restore-streak', async (req, res) => {
     } finally { conn.release(); }
 });
 
-// --- API: หมุนกาชา (ฉบับอัปเดต: มี Bonus Coin Cashback) ---
+// --- API: เธซเธกเธธเธเธเธฒเธเธฒ (เธเธเธฑเธเธญเธฑเธเน€เธ”เธ•: เธกเธต Bonus Coin Cashback) ---
 app.post('/api/game/gacha-pull', async (req, res) => {
     const { lineUserId } = req.body;
-    const GACHA_COST = 100; // ค่าหมุน 100 เหรียญ
+    const GACHA_COST = 100; // เธเนเธฒเธซเธกเธธเธ 100 เน€เธซเธฃเธตเธขเธ
     const conn = await db.getClient();
 
-    // ⭐ กำหนดเรทเงินคืนตามระดับ (Cashback)
+    // โญ เธเธณเธซเธเธ”เน€เธฃเธ—เน€เธเธดเธเธเธทเธเธ•เธฒเธกเธฃเธฐเธ”เธฑเธ (Cashback)
     const BONUS_RATES = {
-        'C': 20,    // ปลอบใจ
-        'R': 40,   // คืนทุน 10%
-        'SR': 80,  // คืนทุน 50%
-        'UR': 100  // กำไร! (ได้การ์ดแถมได้เงินเพิ่ม)
+        'C': 20,    // เธเธฅเธญเธเนเธ
+        'R': 40,   // เธเธทเธเธ—เธธเธ 10%
+        'SR': 80,  // เธเธทเธเธ—เธธเธ 50%
+        'UR': 100  // เธเธณเนเธฃ! (เนเธ”เนเธเธฒเธฃเนเธ”เนเธ–เธกเนเธ”เนเน€เธเธดเธเน€เธเธดเนเธก)
     };
 
     try {
         await conn.beginTransaction();
 
-        // 1. เช็คเงิน
+        // 1. เน€เธเนเธเน€เธเธดเธ
         const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
-        if (user.coinBalance < GACHA_COST) throw new Error("เหรียญไม่พอครับ (ต้องการ 100 เหรียญ)");
+        if (user.coinBalance < GACHA_COST) throw new Error("เน€เธซเธฃเธตเธขเธเนเธกเนเธเธญเธเธฃเธฑเธ (เธ•เนเธญเธเธเธฒเธฃ 100 เน€เธซเธฃเธตเธขเธ)");
 
-        // 2. สุ่มการ์ด (แยกตาม Rarity)
+        // 2. เธชเธธเนเธกเธเธฒเธฃเนเธ” (เนเธขเธเธ•เธฒเธก Rarity)
         const rand = Math.random() * 100;
         let rarityPool = ['C']; 
         if (rand < 5) rarityPool = ['UR'];        // 5%
@@ -2123,38 +2123,38 @@ app.post('/api/game/gacha-pull', async (req, res) => {
             card = cards[0];
         } else {
             const [backup] = await conn.query("SELECT * FROM safety_cards ORDER BY RAND() LIMIT 1");
-            if (backup.length === 0) throw new Error("ระบบยังไม่มีข้อมูลการ์ด");
+            if (backup.length === 0) throw new Error("เธฃเธฐเธเธเธขเธฑเธเนเธกเนเธกเธตเธเนเธญเธกเธนเธฅเธเธฒเธฃเนเธ”");
             card = backup[0];
         }
 
-        // ⭐ 3. คำนวณเงินสุทธิ (ลบค่าสุ่ม + บวกโบนัสที่ซ่อนในการ์ด)
+        // โญ 3. เธเธณเธเธงเธ“เน€เธเธดเธเธชเธธเธ—เธเธด (เธฅเธเธเนเธฒเธชเธธเนเธก + เธเธงเธเนเธเธเธฑเธชเธ—เธตเนเธเนเธญเธเนเธเธเธฒเธฃเนเธ”)
         const bonusCoins = BONUS_RATES[card.rarity] || 5;
         const netChange = -GACHA_COST + bonusCoins;
 
-        // อัปเดตเงิน
+        // เธญเธฑเธเน€เธ”เธ•เน€เธเธดเธ
         await conn.query("UPDATE users SET coinBalance = coinBalance + ? WHERE lineUserId = ?", [netChange, lineUserId]);
 
-        // 4. บันทึกการได้การ์ด
+        // 4. เธเธฑเธเธ—เธถเธเธเธฒเธฃเนเธ”เนเธเธฒเธฃเนเธ”
         await conn.query("INSERT INTO user_cards (lineUserId, cardId) VALUES (?, ?)", [lineUserId, card.cardId]);
 
-        // 5. แจ้งเตือน
+        // 5. เนเธเนเธเน€เธ•เธทเธญเธ
         await conn.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt) VALUES (?, ?, ?, 'game_gacha', ?, ?, NOW())`,
-            ["NOTIF" + uuidv4(), lineUserId, `ได้รับการ์ด ${card.rarity}: "${card.cardName}" พร้อมเหรียญโบนัส ${bonusCoins} เหรียญ!`, card.cardId, lineUserId]
+            ["NOTIF" + uuidv4(), lineUserId, `เนเธ”เนเธฃเธฑเธเธเธฒเธฃเนเธ” ${card.rarity}: "${card.cardName}" เธเธฃเนเธญเธกเน€เธซเธฃเธตเธขเธเนเธเธเธฑเธช ${bonusCoins} เน€เธซเธฃเธตเธขเธ!`, card.cardId, lineUserId]
         );
 
-        // ดึงยอดเงินล่าสุด
+        // เธ”เธถเธเธขเธญเธ”เน€เธเธดเธเธฅเนเธฒเธชเธธเธ”
         const [[updatedUser]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
 
         await conn.commit();
         
-        // ส่งข้อมูลกลับ (เพิ่ม bonusCoins ไปบอกหน้าบ้าน)
+        // เธชเนเธเธเนเธญเธกเธนเธฅเธเธฅเธฑเธ (เน€เธเธดเนเธก bonusCoins เนเธเธเธญเธเธซเธเนเธฒเธเนเธฒเธ)
         res.json({ 
             status: "success", 
             data: { 
                 badge: { ...card, badgeName: card.cardName }, 
                 remainingCoins: updatedUser.coinBalance,
-                bonusCoins: bonusCoins // ส่งค่านี้ไปโชว์
+                bonusCoins: bonusCoins // เธชเนเธเธเนเธฒเธเธตเนเนเธเนเธเธงเน
             } 
         });
 
@@ -2164,7 +2164,7 @@ app.post('/api/game/gacha-pull', async (req, res) => {
     } finally { conn.release(); }
 });
 
-// --- API: ดึงการ์ดสะสมของผู้ใช้ (แยกจาก Badges) ---
+// --- API: เธ”เธถเธเธเธฒเธฃเนเธ”เธชเธฐเธชเธกเธเธญเธเธเธนเนเนเธเน (เนเธขเธเธเธฒเธ Badges) ---
 app.get('/api/user/cards', async (req, res) => {
     const { lineUserId } = req.query;
     try {
@@ -2189,7 +2189,7 @@ app.get('/api/user/cards', async (req, res) => {
 // ======================================================
 // ADMIN: Users list for admin panel
 // ======================================================
-// --- API: ดึงรายชื่อผู้ใช้ (Admin) - รองรับ Search & Sort ---
+// --- API: เธ”เธถเธเธฃเธฒเธขเธเธทเนเธญเธเธนเนเนเธเน (Admin) - เธฃเธญเธเธฃเธฑเธ Search & Sort ---
 app.get('/api/admin/users', isAdmin, async (req, res) => {
     const { search, sortBy } = req.query;
 
@@ -2247,13 +2247,13 @@ app.get('/api/admin/user-details', isAdmin, async (req, res) => {
         [lineUserId]
     );
 
-    // ดึง streak
+    // เธ”เธถเธ streak
     const [[streakRow]] = await db.query(
         `SELECT currentStreak, lastPlayedDate, recoverableStreak FROM user_streaks WHERE lineUserId = ?`,
         [lineUserId]
     );
 
-    // ดึง card collection
+    // เธ”เธถเธ card collection
     const [cards] = await db.query(
         `SELECT uc.cardId, sc.cardName, sc.imageUrl, sc.rarity, COUNT(*) AS qty
          FROM user_cards uc
@@ -2266,22 +2266,22 @@ app.get('/api/admin/user-details', isAdmin, async (req, res) => {
     res.json({ status: "success", data: { user, badges, streak: streakRow || null, cards } });
 });
 
-// B-1: ปรับ Coins โดยตรง
+// B-1: เธเธฃเธฑเธ Coins เนเธ”เธขเธ•เธฃเธ
 app.post('/api/admin/user/update-coins', isAdmin, async (req, res) => {
     const { lineUserId, deltaCoins, requesterId } = req.body;
     if (!lineUserId || deltaCoins === undefined) {
-        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+        return res.status(400).json({ status: "error", message: "เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ" });
     }
     try {
         const [[user]] = await db.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
-        if (!user) return res.status(404).json({ status: "error", message: "ไม่พบผู้ใช้" });
+        if (!user) return res.status(404).json({ status: "error", message: "เนเธกเนเธเธเธเธนเนเนเธเน" });
         const newBalance = Math.max(0, user.coinBalance + Number(deltaCoins));
         await db.query("UPDATE users SET coinBalance = ? WHERE lineUserId = ?", [newBalance, lineUserId]);
         logAdminAction(requesterId, Number(deltaCoins) >= 0 ? 'ADD_COINS' : 'DEDUCT_COINS', 'user', lineUserId, lineUserId, { deltaCoins, newBalance });
         const delta = Number(deltaCoins);
         const msg = delta >= 0
-            ? `แอดมินเพิ่ม ${delta} เหรียญให้คุณ (คงเหลือ: ${newBalance} เหรียญ)`
-            : `แอดมินหัก ${Math.abs(delta)} เหรียญจากบัญชีคุณ (คงเหลือ: ${newBalance} เหรียญ)`;
+            ? `เนเธญเธ”เธกเธดเธเน€เธเธดเนเธก ${delta} เน€เธซเธฃเธตเธขเธเนเธซเนเธเธธเธ“ (เธเธเน€เธซเธฅเธทเธญ: ${newBalance} เน€เธซเธฃเธตเธขเธ)`
+            : `เนเธญเธ”เธกเธดเธเธซเธฑเธ ${Math.abs(delta)} เน€เธซเธฃเธตเธขเธเธเธฒเธเธเธฑเธเธเธตเธเธธเธ“ (เธเธเน€เธซเธฅเธทเธญ: ${newBalance} เน€เธซเธฃเธตเธขเธ)`;
         db.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
              VALUES (?, ?, ?, 'system_alert', ?, ?, NOW())`,
@@ -2293,14 +2293,14 @@ app.post('/api/admin/user/update-coins', isAdmin, async (req, res) => {
     }
 });
 
-// B-4: ประวัติ KYT ของ user
+// B-4: เธเธฃเธฐเธงเธฑเธ•เธด KYT เธเธญเธ user
 app.get('/api/admin/user/kyt-history', isAdmin, async (req, res) => {
     const { lineUserId } = req.query;
     try {
         const [rows] = await db.query(
             `SELECT h.historyId, h.playedAt, h.isCorrect, h.earnedPoints,
                     h.selectedAnswer AS selectedOption,
-                    COALESCE(q.questionText, 'คำถามถูกลบไปแล้ว') AS questionText,
+                    COALESCE(q.questionText, 'เธเธณเธ–เธฒเธกเธ–เธนเธเธฅเธเนเธเนเธฅเนเธง') AS questionText,
                     COALESCE(q.correctOption, '') AS correctOption
              FROM user_game_history h
              LEFT JOIN kyt_questions q ON h.questionId = q.questionId
@@ -2315,7 +2315,7 @@ app.get('/api/admin/user/kyt-history', isAdmin, async (req, res) => {
     }
 });
 
-// B-5: ประวัติ Hunter ของ user
+// B-5: เธเธฃเธฐเธงเธฑเธ•เธด Hunter เธเธญเธ user
 app.get('/api/admin/user/hunter-history', isAdmin, async (req, res) => {
     const { lineUserId } = req.query;
     try {
@@ -2333,7 +2333,7 @@ app.get('/api/admin/user/hunter-history', isAdmin, async (req, res) => {
     }
 });
 
-// B-6: ประวัติ Submissions ของ user
+// B-6: เธเธฃเธฐเธงเธฑเธ•เธด Submissions เธเธญเธ user
 app.get('/api/admin/user/submissions', isAdmin, async (req, res) => {
     const { lineUserId } = req.query;
     try {
@@ -2352,11 +2352,11 @@ app.get('/api/admin/user/submissions', isAdmin, async (req, res) => {
     }
 });
 
-// B-7: Reset / แก้ไข Streak
+// B-7: Reset / เนเธเนเนเธ Streak
 app.post('/api/admin/user/update-streak', isAdmin, async (req, res) => {
     const { lineUserId, newStreak, requesterId } = req.body;
     if (!lineUserId || newStreak === undefined) {
-        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+        return res.status(400).json({ status: "error", message: "เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ" });
     }
     try {
         const streak = Math.max(0, Number(newStreak));
@@ -2376,7 +2376,7 @@ app.post('/api/admin/user/update-streak', isAdmin, async (req, res) => {
         db.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
              VALUES (?, ?, ?, 'system_alert', ?, ?, NOW())`,
-            ["NOTIF" + uuidv4(), lineUserId, `แอดมินปรับ Streak ของคุณเป็น ${streak} วัน 🔥`, null, requesterId]
+            ["NOTIF" + uuidv4(), lineUserId, `เนเธญเธ”เธกเธดเธเธเธฃเธฑเธ Streak เธเธญเธเธเธธเธ“เน€เธเนเธ ${streak} เธงเธฑเธ ๐”ฅ`, null, requesterId]
         ).catch(() => {});
         res.json({ status: "success", data: { newStreak: streak } });
     } catch (e) {
@@ -2384,11 +2384,11 @@ app.post('/api/admin/user/update-streak', isAdmin, async (req, res) => {
     }
 });
 
-// B-8: มอบการ์ดให้ user โดยตรง
+// B-8: เธกเธญเธเธเธฒเธฃเนเธ”เนเธซเน user เนเธ”เธขเธ•เธฃเธ
 app.post('/api/admin/award-card', isAdmin, async (req, res) => {
     const { lineUserId, cardId, requesterId } = req.body;
     if (!lineUserId || !cardId) {
-        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+        return res.status(400).json({ status: "error", message: "เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ" });
     }
     try {
         const [[card]] = await db.query("SELECT cardName FROM safety_cards WHERE cardId = ?", [cardId]);
@@ -2398,19 +2398,19 @@ app.post('/api/admin/award-card', isAdmin, async (req, res) => {
         db.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
              VALUES (?, ?, ?, 'game_gacha', ?, ?, NOW())`,
-            ["NOTIF" + uuidv4(), lineUserId, `แอดมินมอบการ์ด "${cardName}" ให้คุณ 🎁`, cardId, requesterId]
+            ["NOTIF" + uuidv4(), lineUserId, `เนเธญเธ”เธกเธดเธเธกเธญเธเธเธฒเธฃเนเธ” "${cardName}" เนเธซเนเธเธธเธ“ ๐`, cardId, requesterId]
         ).catch(() => {});
-        res.json({ status: "success", data: { message: "มอบการ์ดสำเร็จ" } });
+        res.json({ status: "success", data: { message: "เธกเธญเธเธเธฒเธฃเนเธ”เธชเธณเน€เธฃเนเธ" } });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
     }
 });
 
-// B-9: แก้ไข Profile user (ชื่อ, รหัสพนักงาน)
+// B-9: เนเธเนเนเธ Profile user (เธเธทเนเธญ, เธฃเธซเธฑเธชเธเธเธฑเธเธเธฒเธ)
 app.post('/api/admin/user/update-profile', isAdmin, async (req, res) => {
     const { lineUserId, fullName, employeeId, department, requesterId } = req.body;
     if (!lineUserId || !fullName) {
-        return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+        return res.status(400).json({ status: "error", message: "เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ" });
     }
     try {
         await db.query(
@@ -2418,17 +2418,17 @@ app.post('/api/admin/user/update-profile', isAdmin, async (req, res) => {
             [fullName, employeeId || '', department || '', lineUserId]
         );
         logAdminAction(requesterId, 'UPDATE_PROFILE', 'user', lineUserId, fullName, { fullName, employeeId, department });
-        res.json({ status: "success", message: "แก้ไขข้อมูลเรียบร้อย" });
+        res.json({ status: "success", message: "เนเธเนเนเธเธเนเธญเธกเธนเธฅเน€เธฃเธตเธขเธเธฃเนเธญเธข" });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
     }
 });
 
 // ==========================================
-// 🛠️ ADMIN EDIT APIs (แก้ได้ทุกตาราง)
+// ๐ ๏ธ ADMIN EDIT APIs (เนเธเนเนเธ”เนเธ—เธธเธเธ•เธฒเธฃเธฒเธ)
 // ==========================================
 
-// 1. แก้ไขคำถาม (Quiz)
+// 1. เนเธเนเนเธเธเธณเธ–เธฒเธก (Quiz)
 app.put('/api/admin/questions', isAdmin, async (req, res) => {
     const { questionId, questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, scoreReward, imageUrl } = req.body;
     try {
@@ -2437,11 +2437,11 @@ app.put('/api/admin/questions', isAdmin, async (req, res) => {
             SET questionText=?, optionA=?, optionB=?, optionC=?, optionD=?, optionE=?, optionF=?, optionG=?, optionH=?, correctOption=?, scoreReward=?, imageUrl=?
             WHERE questionId=?
         `, [questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, scoreReward, imageUrl, questionId]);
-        res.json({ status: "success", message: "แก้ไขคำถามเรียบร้อย" });
+        res.json({ status: "success", message: "เนเธเนเนเธเธเธณเธ–เธฒเธกเน€เธฃเธตเธขเธเธฃเนเธญเธข" });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// 2. แก้ไขการ์ด (Cards)
+// 2. เนเธเนเนเธเธเธฒเธฃเนเธ” (Cards)
 app.put('/api/admin/cards', isAdmin, async (req, res) => {
     const { cardId, cardName, description, rarity, imageUrl } = req.body;
     try {
@@ -2450,11 +2450,11 @@ app.put('/api/admin/cards', isAdmin, async (req, res) => {
             SET cardName=?, description=?, rarity=?, imageUrl=?
             WHERE cardId=?
         `, [cardName, description, rarity, imageUrl, cardId]);
-        res.json({ status: "success", message: "แก้ไขการ์ดเรียบร้อย" });
+        res.json({ status: "success", message: "เนเธเนเนเธเธเธฒเธฃเนเธ”เน€เธฃเธตเธขเธเธฃเนเธญเธข" });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// 3. แก้ไขกิจกรรม (Activities)
+// 3. เนเธเนเนเธเธเธดเธเธเธฃเธฃเธก (Activities)
 app.put('/api/admin/activities', isAdmin, async (req, res) => {
     const { activityId, title, description, imageUrl } = req.body;
     try {
@@ -2463,11 +2463,11 @@ app.put('/api/admin/activities', isAdmin, async (req, res) => {
             SET title=?, description=?, imageUrl=?
             WHERE activityId=?
         `, [title, description, imageUrl, activityId]);
-        res.json({ status: "success", message: "แก้ไขกิจกรรมเรียบร้อย" });
+        res.json({ status: "success", message: "เนเธเนเนเธเธเธดเธเธเธฃเธฃเธกเน€เธฃเธตเธขเธเธฃเนเธญเธข" });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// 4. แก้ไขป้ายรางวัล (Badges)
+// 4. เนเธเนเนเธเธเนเธฒเธขเธฃเธฒเธเธงเธฑเธฅ (Badges)
 app.put('/api/admin/badges/:id', isAdmin, async (req, res) => {
     const { id } = req.params;
     const { badgeName, description, imageUrl } = req.body;
@@ -2477,29 +2477,29 @@ app.put('/api/admin/badges/:id', isAdmin, async (req, res) => {
             SET badgeName=?, description=?, imageUrl=?
             WHERE badgeId=?
         `, [badgeName, description, imageUrl, id]);
-        res.json({ status: "success", message: "แก้ไขป้ายรางวัลเรียบร้อย" });
+        res.json({ status: "success", message: "เนเธเนเนเธเธเนเธฒเธขเธฃเธฒเธเธงเธฑเธฅเน€เธฃเธตเธขเธเธฃเนเธญเธข" });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// 5. แก้ไขด่าน Hunter (อันนี้เดิมใช้ POST path update อยู่แล้ว แต่ใส่เผื่อไว้)
+// 5. เนเธเนเนเธเธ”เนเธฒเธ Hunter (เธญเธฑเธเธเธตเนเน€เธ”เธดเธกเนเธเน POST path update เธญเธขเธนเนเนเธฅเนเธง เนเธ•เนเนเธชเนเน€เธเธทเนเธญเนเธงเน)
 app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     const { levelId, title, imageUrl, hazards } = req.body;
     const conn = await db.getClient();
     try {
         await conn.beginTransaction();
-        // อัปเดตข้อมูลด่าน
+        // เธญเธฑเธเน€เธ”เธ•เธเนเธญเธกเธนเธฅเธ”เนเธฒเธ
         await conn.query('UPDATE hunter_levels SET title=?, imageUrl=? WHERE levelId=?', [title, imageUrl, levelId]);
         
-        // ลบจุดเดิมทิ้ง แล้วลงใหม่ (ง่ายกว่าไล่เช็คทีละจุด)
+        // เธฅเธเธเธธเธ”เน€เธ”เธดเธกเธ—เธดเนเธ เนเธฅเนเธงเธฅเธเนเธซเธกเน (เธเนเธฒเธขเธเธงเนเธฒเนเธฅเนเน€เธเนเธเธ—เธตเธฅเธฐเธเธธเธ”)
         await conn.query('DELETE FROM hunter_hazards WHERE levelId=?', [levelId]);
         
-        // ลงจุดใหม่
+        // เธฅเธเธเธธเธ”เนเธซเธกเน
         for (const h of hazards) {
             await conn.query('INSERT INTO hunter_hazards (levelId, x, y, description, knowledge) VALUES (?, ?, ?, ?, ?)', 
                 [levelId, h.x, h.y, h.description, h.knowledge]);
         }
         await conn.commit();
-        res.json({ status: "success", message: "แก้ไขด่านเรียบร้อย" });
+        res.json({ status: "success", message: "เนเธเนเนเธเธ”เนเธฒเธเน€เธฃเธตเธขเธเธฃเนเธญเธข" });
     } catch (e) {
         await conn.rollback();
         res.status(500).json({ message: e.message });
@@ -2508,32 +2508,32 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: แก้ไขประวัติ KYT (Final Fix: ใช้ชื่อคอลัมน์ recipientUserId ตามภาพ) ---
+// --- API: เนเธเนเนเธเธเธฃเธฐเธงเธฑเธ•เธด KYT (Final Fix: เนเธเนเธเธทเนเธญเธเธญเธฅเธฑเธกเธเน recipientUserId เธ•เธฒเธกเธ เธฒเธ) ---
 app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
-    console.log("🚀 Admin Update KYT Start:", req.body);
+    console.log("๐€ Admin Update KYT Start:", req.body);
 
     const { historyId, lineUserId, isCorrect, newScore, requesterId } = req.body;
     
     if (!historyId || !lineUserId) {
-        return res.status(400).json({ message: "ข้อมูลไม่ครบ (Missing historyId or lineUserId)" });
+        return res.status(400).json({ message: "เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ (Missing historyId or lineUserId)" });
     }
 
     try {
-        // 1. ดึงข้อมูลเก่า
+        // 1. เธ”เธถเธเธเนเธญเธกเธนเธฅเน€เธเนเธฒ
         const [oldData] = await db.query('SELECT earnedPoints FROM user_game_history WHERE historyId = ?', [historyId]);
-        if (oldData.length === 0) throw new Error("ไม่พบประวัติการเล่น");
+        if (oldData.length === 0) throw new Error("เนเธกเนเธเธเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเน€เธฅเนเธ");
         
         const oldScore = oldData[0].earnedPoints || 0;
         const diff = parseInt(newScore) - oldScore; 
         
-        // 2. อัปเดตประวัติ
+        // 2. เธญเธฑเธเน€เธ”เธ•เธเธฃเธฐเธงเธฑเธ•เธด
         await db.query(`
             UPDATE user_game_history 
             SET isCorrect = ?, earnedPoints = ? 
             WHERE historyId = ?
         `, [isCorrect, newScore, historyId]);
 
-        // 3. อัปเดตคะแนนรวม
+        // 3. เธญเธฑเธเน€เธ”เธ•เธเธฐเนเธเธเธฃเธงเธก
         if (diff !== 0) {
             await db.query(`
                 UPDATE users 
@@ -2542,15 +2542,15 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
             `, [diff, diff, lineUserId]);
         }
 
-        // 4. สร้างการแจ้งเตือน (⭐⭐ แก้ชื่อคอลัมน์ตามภาพ image_bd7dee.png ⭐⭐)
+        // 4. เธชเธฃเนเธฒเธเธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธ (โญโญ เนเธเนเธเธทเนเธญเธเธญเธฅเธฑเธกเธเนเธ•เธฒเธกเธ เธฒเธ image_bd7dee.png โญโญ)
         try {
-            const msg = `แอดมินแก้ไขผล KYT: ${isCorrect ? 'ถูกต้อง✅' : 'ผิด❌'} (${diff >= 0 ? '+' : ''}${diff} เหรียญ)`;
+            const msg = `เนเธญเธ”เธกเธดเธเนเธเนเนเธเธเธฅ KYT: ${isCorrect ? 'เธ–เธนเธเธ•เนเธญเธโ…' : 'เธเธดเธ”โ'} (${diff >= 0 ? '+' : ''}${diff} เน€เธซเธฃเธตเธขเธ)`;
             const notifId = 'NOTIF-' + Date.now();
             
-            // ID ผู้ทำรายการ (Admin)
+            // ID เธเธนเนเธ—เธณเธฃเธฒเธขเธเธฒเธฃ (Admin)
             const triggerUser = requesterId || lineUserId; 
 
-            // ใช้ recipientUserId (ผู้รับ) และ triggeringUserId (ผู้ทำ)
+            // เนเธเน recipientUserId (เธเธนเนเธฃเธฑเธ) เนเธฅเธฐ triggeringUserId (เธเธนเนเธ—เธณ)
             await db.query(`
                 INSERT INTO notifications 
                 (notificationId, recipientUserId, message, type, isRead, createdAt, triggeringUserId, relatedItemId)
@@ -2563,17 +2563,17 @@ app.post('/api/admin/kyt/update-answer', isAdmin, async (req, res) => {
                 historyId.toString()  // relatedItemId
             ]);
             
-            console.log("✅ Notification Saved to DB:", notifId);
+            console.log("โ… Notification Saved to DB:", notifId);
             
         } catch (notifyError) {
-            console.error("❌ แจ้งเตือนลง DB ล้มเหลว:", notifyError.message);
+            console.error("โ เนเธเนเธเน€เธ•เธทเธญเธเธฅเธ DB เธฅเนเธกเน€เธซเธฅเธง:", notifyError.message);
         }
 
-        console.log("✅ Update Successfully");
-        res.json({ status: "success", message: "แก้ไขและคืนเหรียญเรียบร้อย" });
+        console.log("โ… Update Successfully");
+        res.json({ status: "success", message: "เนเธเนเนเธเนเธฅเธฐเธเธทเธเน€เธซเธฃเธตเธขเธเน€เธฃเธตเธขเธเธฃเนเธญเธข" });
 
     } catch (e) {
-        console.error("❌ Critical Error Update KYT:", e);
+        console.error("โ Critical Error Update KYT:", e);
         res.status(500).json({ message: "Update Failed: " + e.message });
     }
 });
@@ -2620,30 +2620,30 @@ app.post('/api/notifications/mark-read', async (req, res) => {
     }
 });
 
-// --- API: แลกเหรียญเป็นคะแนน (Exchange Coins to Score) ---
+// --- API: เนเธฅเธเน€เธซเธฃเธตเธขเธเน€เธเนเธเธเธฐเนเธเธ (Exchange Coins to Score) ---
 app.post('/api/game/exchange-coins', async (req, res) => {
     const { lineUserId } = req.body;
-    const COIN_COST = 10;  // จ่าย 10 เหรียญ
-    const POINT_GAIN = 2;  // ได้ 2 คะแนน
+    const COIN_COST = 10;  // เธเนเธฒเธข 10 เน€เธซเธฃเธตเธขเธ
+    const POINT_GAIN = 2;  // เนเธ”เน 2 เธเธฐเนเธเธ
     
     const conn = await db.getClient();
 
     try {
         await conn.beginTransaction();
 
-        // 1. เช็คยอดเงินปัจจุบัน
+        // 1. เน€เธเนเธเธขเธญเธ”เน€เธเธดเธเธเธฑเธเธเธธเธเธฑเธ
         const [[user]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
         if (!user || user.coinBalance < COIN_COST) {
-            throw new Error(`เหรียญไม่พอครับ (มี ${user.coinBalance || 0} เหรียญ, ต้องการ ${COIN_COST} เหรียญ)`);
+            throw new Error(`เน€เธซเธฃเธตเธขเธเนเธกเนเธเธญเธเธฃเธฑเธ (เธกเธต ${user.coinBalance || 0} เน€เธซเธฃเธตเธขเธ, เธ•เนเธญเธเธเธฒเธฃ ${COIN_COST} เน€เธซเธฃเธตเธขเธ)`);
         }
 
-        // 2. หักเหรียญ และ เพิ่มคะแนน
+        // 2. เธซเธฑเธเน€เธซเธฃเธตเธขเธ เนเธฅเธฐ เน€เธเธดเนเธกเธเธฐเนเธเธ
         await conn.query(
             "UPDATE users SET coinBalance = coinBalance - ?, totalScore = totalScore + ? WHERE lineUserId = ?", 
             [COIN_COST, POINT_GAIN, lineUserId]
         );
 
-        // 3. แจ้งเตือน (Notification)
+        // 3. เนเธเนเธเน€เธ•เธทเธญเธ (Notification)
         await conn.query(
             `INSERT INTO notifications 
             (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
@@ -2651,18 +2651,18 @@ app.post('/api/game/exchange-coins', async (req, res) => {
             [
                 "NOTIF" + uuidv4(),
                 lineUserId,
-                `แลกเปลี่ยนสำเร็จ! คุณใช้ ${COIN_COST} เหรียญ แลกรับ ${POINT_GAIN} คะแนนเรียบร้อยแล้ว`,
-                "exchange", // type ใหม่
+                `เนเธฅเธเน€เธเธฅเธตเนเธขเธเธชเธณเน€เธฃเนเธ! เธเธธเธ“เนเธเน ${COIN_COST} เน€เธซเธฃเธตเธขเธ เนเธฅเธเธฃเธฑเธ ${POINT_GAIN} เธเธฐเนเธเธเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง`,
+                "exchange", // type เนเธซเธกเน
                 null,
                 lineUserId
             ]
         );
 
-        // 4. เช็ค Badge อัตโนมัติ (เผื่อคะแนนถึงเกณฑ์แล้วได้โล่)
-        // (ฟังก์ชัน autoAwardBadgesForUser ต้องมีอยู่แล้วใน server.js ตามโค้ดเก่า)
+        // 4. เน€เธเนเธ Badge เธญเธฑเธ•เนเธเธกเธฑเธ•เธด (เน€เธเธทเนเธญเธเธฐเนเธเธเธ–เธถเธเน€เธเธ“เธ‘เนเนเธฅเนเธงเนเธ”เนเนเธฅเน)
+        // (เธเธฑเธเธเนเธเธฑเธ autoAwardBadgesForUser เธ•เนเธญเธเธกเธตเธญเธขเธนเนเนเธฅเนเธงเนเธ server.js เธ•เธฒเธกเนเธเนเธ”เน€เธเนเธฒ)
         // await autoAwardBadgesForUser(lineUserId, conn); 
 
-        // 5. ดึงค่าล่าสุดส่งกลับ
+        // 5. เธ”เธถเธเธเนเธฒเธฅเนเธฒเธชเธธเธ”เธชเนเธเธเธฅเธฑเธ
         const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
 
         await conn.commit();
@@ -2681,22 +2681,22 @@ app.post('/api/game/exchange-coins', async (req, res) => {
     } finally { conn.release(); }
 });
 
-// --- API: แลกคะแนน → เหรียญ ---
+// --- API: เนเธฅเธเธเธฐเนเธเธ โ’ เน€เธซเธฃเธตเธขเธ ---
 app.post('/api/game/exchange-score', async (req, res) => {
     const { lineUserId } = req.body;
-    const SCORE_COST = 2;   // จ่าย 2 คะแนน
-    const COIN_GAIN = 10;   // ได้ 10 เหรียญ
+    const SCORE_COST = 2;   // เธเนเธฒเธข 2 เธเธฐเนเธเธ
+    const COIN_GAIN = 10;   // เนเธ”เน 10 เน€เธซเธฃเธตเธขเธ
 
-    if (!lineUserId) return res.status(400).json({ status: "error", message: "ข้อมูลไม่ครบ" });
+    if (!lineUserId) return res.status(400).json({ status: "error", message: "เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ" });
 
     const conn = await db.getClient();
     try {
         await conn.beginTransaction();
 
         const [[user]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
-        if (!user) throw new Error("ไม่พบผู้ใช้");
+        if (!user) throw new Error("เนเธกเนเธเธเธเธนเนเนเธเน");
         if (user.totalScore < SCORE_COST) {
-            throw new Error(`คะแนนไม่พอครับ (มี ${user.totalScore} คะแนน, ต้องการ ${SCORE_COST} คะแนน)`);
+            throw new Error(`เธเธฐเนเธเธเนเธกเนเธเธญเธเธฃเธฑเธ (เธกเธต ${user.totalScore} เธเธฐเนเธเธ, เธ•เนเธญเธเธเธฒเธฃ ${SCORE_COST} เธเธฐเนเธเธ)`);
         }
 
         await conn.query(
@@ -2710,7 +2710,7 @@ app.post('/api/game/exchange-score', async (req, res) => {
             [
                 "NOTIF" + uuidv4(),
                 lineUserId,
-                `แลกเปลี่ยนสำเร็จ! คุณใช้ ${SCORE_COST} คะแนน แลกรับ ${COIN_GAIN} เหรียญเรียบร้อยแล้ว`,
+                `เนเธฅเธเน€เธเธฅเธตเนเธขเธเธชเธณเน€เธฃเนเธ! เธเธธเธ“เนเธเน ${SCORE_COST} เธเธฐเนเธเธ เนเธฅเธเธฃเธฑเธ ${COIN_GAIN} เน€เธซเธฃเธตเธขเธเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง`,
                 "exchange",
                 null,
                 lineUserId
@@ -2729,59 +2729,59 @@ app.post('/api/game/exchange-score', async (req, res) => {
         });
     } catch (e) {
         await conn.rollback();
-        res.status(e.message.includes("ไม่พอ") || e.message.includes("ไม่พบ") ? 400 : 500).json({ status: "error", message: e.message });
+        res.status(e.message.includes("เนเธกเนเธเธญ") || e.message.includes("เนเธกเนเธเธ") ? 400 : 500).json({ status: "error", message: e.message });
     } finally { conn.release(); }
 });
 
-// --- API: ย่อยการ์ด (Recycle Cards) ---
+// --- API: เธขเนเธญเธขเธเธฒเธฃเนเธ” (Recycle Cards) ---
 app.post('/api/game/recycle-cards', async (req, res) => {
     const { lineUserId, cardsToRecycle } = req.body; 
-    // cardsToRecycle = [{ cardId: 'CARD_001', count: 2 }, { cardId: 'CARD_002', count: 3 }] รวมกันต้องได้ 5 ใบ
+    // cardsToRecycle = [{ cardId: 'CARD_001', count: 2 }, { cardId: 'CARD_002', count: 3 }] เธฃเธงเธกเธเธฑเธเธ•เนเธญเธเนเธ”เน 5 เนเธ
     
     const conn = await db.getClient();
 
     try {
         await conn.beginTransaction();
 
-        // 1. ตรวจสอบจำนวนการ์ดรวม (ต้องครบ 5 ใบ)
+        // 1. เธ•เธฃเธงเธเธชเธญเธเธเธณเธเธงเธเธเธฒเธฃเนเธ”เธฃเธงเธก (เธ•เนเธญเธเธเธฃเธ 5 เนเธ)
         const totalCount = cardsToRecycle.reduce((sum, item) => sum + item.count, 0);
-        if (totalCount !== 5) throw new Error("ต้องเลือกการ์ดมาย่อยให้ครบ 5 ใบพอดีครับ");
+        if (totalCount !== 5) throw new Error("เธ•เนเธญเธเน€เธฅเธทเธญเธเธเธฒเธฃเนเธ”เธกเธฒเธขเนเธญเธขเนเธซเนเธเธฃเธ 5 เนเธเธเธญเธ”เธตเธเธฃเธฑเธ");
 
-        // 2. ลบการ์ดออกจากตาราง (วนลูปย่อยทีละชนิด)
+        // 2. เธฅเธเธเธฒเธฃเนเธ”เธญเธญเธเธเธฒเธเธ•เธฒเธฃเธฒเธ (เธงเธเธฅเธนเธเธขเนเธญเธขเธ—เธตเธฅเธฐเธเธเธดเธ”)
         for (const item of cardsToRecycle) {
-            // เช็คก่อนว่ามีพอให้ลบไหม
+            // เน€เธเนเธเธเนเธญเธเธงเนเธฒเธกเธตเธเธญเนเธซเนเธฅเธเนเธซเธก
             const [rows] = await conn.query(
                 "SELECT count(*) as total FROM user_cards WHERE lineUserId = ? AND cardId = ?", 
                 [lineUserId, item.cardId]
             );
             if (rows[0].total < item.count) {
-                throw new Error(`การ์ด ${item.cardId} มีไม่พอสำหรับย่อย (มี ${rows[0].total} ใบ, ต้องการ ${item.count} ใบ)`);
+                throw new Error(`เธเธฒเธฃเนเธ” ${item.cardId} เธกเธตเนเธกเนเธเธญเธชเธณเธซเธฃเธฑเธเธขเนเธญเธข (เธกเธต ${rows[0].total} เนเธ, เธ•เนเธญเธเธเธฒเธฃ ${item.count} เนเธ)`);
             }
 
-            // คำสั่งลบแบบจำกัดจำนวน (LIMIT)
+            // เธเธณเธชเธฑเนเธเธฅเธเนเธเธเธเธณเธเธฑเธ”เธเธณเธเธงเธ (LIMIT)
             await conn.query(
                 "DELETE FROM user_cards WHERE lineUserId = ? AND cardId = ? LIMIT ?",
                 [lineUserId, item.cardId, item.count]
             );
         }
 
-        // 3. สุ่มรางวัล (Lucky Coin Box: 100 - 300 Coins)
+        // 3. เธชเธธเนเธกเธฃเธฒเธเธงเธฑเธฅ (Lucky Coin Box: 100 - 300 Coins)
         const rewardCoins = Math.floor(Math.random() * (300 - 100 + 1)) + 100;
 
-        // 4. ให้รางวัล
+        // 4. เนเธซเนเธฃเธฒเธเธงเธฑเธฅ
         await conn.query(
             "UPDATE users SET coinBalance = coinBalance + ? WHERE lineUserId = ?",
             [rewardCoins, lineUserId]
         );
 
-        // 5. แจ้งเตือน
+        // 5. เนเธเนเธเน€เธ•เธทเธญเธ
         await conn.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
              VALUES (?, ?, ?, 'recycle', ?, ?, NOW())`,
-            ["NOTIF" + uuidv4(), lineUserId, `รีไซเคิลสำเร็จ! คุณได้รับ ${rewardCoins} เหรียญ`, "recycle", lineUserId]
+            ["NOTIF" + uuidv4(), lineUserId, `เธฃเธตเนเธเน€เธเธดเธฅเธชเธณเน€เธฃเนเธ! เธเธธเธ“เนเธ”เนเธฃเธฑเธ ${rewardCoins} เน€เธซเธฃเธตเธขเธ`, "recycle", lineUserId]
         );
 
-        // 6. ส่งค่ากลับ
+        // 6. เธชเนเธเธเนเธฒเธเธฅเธฑเธ
         const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
 
         await conn.commit();
@@ -2794,10 +2794,10 @@ app.post('/api/game/recycle-cards', async (req, res) => {
 });
 
 // ======================================================
-// PART 5 — SAFETY HUNTER API (MySQL/TiDB Compatible)
+// PART 5 โ€” SAFETY HUNTER API (MySQL/TiDB Compatible)
 // ======================================================
 
-// 1. ADMIN: สร้างด่านใหม่ + บันทึกจุดเสี่ยง
+// 1. ADMIN: เธชเธฃเนเธฒเธเธ”เนเธฒเธเนเธซเธกเน + เธเธฑเธเธ—เธถเธเธเธธเธ”เน€เธชเธตเนเธขเธ
 app.post('/api/admin/hunter/level', isAdmin, async (req, res) => {
     const { title, imageUrl, hazards } = req.body; 
     const levelId = "LVL_" + Date.now();
@@ -2806,13 +2806,13 @@ app.post('/api/admin/hunter/level', isAdmin, async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // 1. สร้าง Level
+        // 1. เธชเธฃเนเธฒเธ Level
         await conn.query(
             "INSERT INTO hunter_levels (levelId, title, imageUrl, totalHazards) VALUES (?, ?, ?, ?)",
             [levelId, title, imageUrl, hazards.length]
         );
 
-        // 2. บันทึกจุดเสี่ยง (วนลูป Insert ทีละแถว เพื่อความชัวร์ใน MySQL)
+        // 2. เธเธฑเธเธ—เธถเธเธเธธเธ”เน€เธชเธตเนเธขเธ (เธงเธเธฅเธนเธ Insert เธ—เธตเธฅเธฐเนเธ–เธง เน€เธเธทเนเธญเธเธงเธฒเธกเธเธฑเธงเธฃเนเนเธ MySQL)
         if (Array.isArray(hazards) && hazards.length > 0) {
             for (const h of hazards) {
                 await conn.query(
@@ -2820,7 +2820,7 @@ app.post('/api/admin/hunter/level', isAdmin, async (req, res) => {
                     [
                         "HZD_" + uuidv4(), 
                         levelId, 
-                        h.description || 'จุดเสี่ยง', 
+                        h.description || 'เธเธธเธ”เน€เธชเธตเนเธขเธ', 
                         h.x, 
                         h.y, 
                         5.0
@@ -2839,7 +2839,7 @@ app.post('/api/admin/hunter/level', isAdmin, async (req, res) => {
     }
 });
 
-// 2. USER: ดึงรายชื่อด่านทั้งหมด (พร้อมดาว + จำนวนครั้งที่เล่น)
+// 2. USER: เธ”เธถเธเธฃเธฒเธขเธเธทเนเธญเธ”เนเธฒเธเธ—เธฑเนเธเธซเธกเธ” (เธเธฃเนเธญเธกเธ”เธฒเธง + เธเธณเธเธงเธเธเธฃเธฑเนเธเธ—เธตเนเน€เธฅเนเธ)
 app.get('/api/game/hunter/levels', async (req, res) => {
     const { lineUserId } = req.query;
     try {
@@ -2878,7 +2878,7 @@ app.get('/api/game/hunter/levels', async (req, res) => {
     }
 });
 
-// 3. USER: ตรวจสอบพิกัด (Check Hit)
+// 3. USER: เธ•เธฃเธงเธเธชเธญเธเธเธดเธเธฑเธ” (Check Hit)
 app.post('/api/game/hunter/check', async (req, res) => {
     const { levelId, x, y } = req.body; 
 
@@ -2886,7 +2886,7 @@ app.post('/api/game/hunter/check', async (req, res) => {
     
     let hit = null;
     for (const h of hazards) {
-        // คำนวณระยะห่าง
+        // เธเธณเธเธงเธ“เธฃเธฐเธขเธฐเธซเนเธฒเธ
         const dx = parseFloat(x) - parseFloat(h.x);
         const dy = parseFloat(y) - parseFloat(h.y);
         const dist = Math.sqrt(dx*dx + dy*dy);
@@ -2904,16 +2904,16 @@ app.post('/api/game/hunter/check', async (req, res) => {
     }
 });
 
-// 4. USER: จบเกม (รับรางวัล + บันทึกดาว)
+// 4. USER: เธเธเน€เธเธก (เธฃเธฑเธเธฃเธฒเธเธงเธฑเธฅ + เธเธฑเธเธ—เธถเธเธ”เธฒเธง)
 app.post('/api/game/hunter/complete', async (req, res) => {
-    const { lineUserId, levelId, stars } = req.body; // ⭐ รับ stars เพิ่ม
+    const { lineUserId, levelId, stars } = req.body; // โญ เธฃเธฑเธ stars เน€เธเธดเนเธก
     const REWARD = 150; 
     const conn = await db.getClient();
 
     try {
         await conn.beginTransaction();
 
-        // เช็คว่าเคยผ่านด่านนี้หรือยัง (เพื่อแจกเหรียญแค่ครั้งแรก)
+        // เน€เธเนเธเธงเนเธฒเน€เธเธขเธเนเธฒเธเธ”เนเธฒเธเธเธตเนเธซเธฃเธทเธญเธขเธฑเธ (เน€เธเธทเนเธญเนเธเธเน€เธซเธฃเธตเธขเธเนเธเนเธเธฃเธฑเนเธเนเธฃเธ)
         const [hist] = await conn.query("SELECT * FROM user_hunter_history WHERE lineUserId = ? AND levelId = ?", [lineUserId, levelId]);
         
         let earnedCoins = 0;
@@ -2921,15 +2921,15 @@ app.post('/api/game/hunter/complete', async (req, res) => {
             earnedCoins = REWARD;
             await conn.query("UPDATE users SET coinBalance = coinBalance + ? WHERE lineUserId = ?", [earnedCoins, lineUserId]);
             
-            // แจ้งเตือนเหรียญ (เฉพาะครั้งแรก)
+            // เนเธเนเธเน€เธ•เธทเธญเธเน€เธซเธฃเธตเธขเธ (เน€เธเธเธฒเธฐเธเธฃเธฑเนเธเนเธฃเธ)
             await conn.query(
                 "INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt) VALUES (?, ?, ?, ?, ?, ?, NOW())",
-                ["NOTIF" + uuidv4(), lineUserId, `สุดยอด! คุณค้นหาจุดเสี่ยงครบ รับ ${earnedCoins} เหรียญ`, 'game_hunter', levelId, lineUserId]
+                ["NOTIF" + uuidv4(), lineUserId, `เธชเธธเธ”เธขเธญเธ”! เธเธธเธ“เธเนเธเธซเธฒเธเธธเธ”เน€เธชเธตเนเธขเธเธเธฃเธ เธฃเธฑเธ ${earnedCoins} เน€เธซเธฃเธตเธขเธ`, 'game_hunter', levelId, lineUserId]
             );
         }
 
-        // ⭐ แก้ไข: ใช้ ON DUPLICATE KEY UPDATE รองรับการเล่นซ้ำ
-        // (ถ้ามีข้อมูลแล้ว จะอัปเดตดาวให้เฉพาะเมื่อได้ดาวมากกว่าเดิม)
+        // โญ เนเธเนเนเธ: เนเธเน ON DUPLICATE KEY UPDATE เธฃเธญเธเธฃเธฑเธเธเธฒเธฃเน€เธฅเนเธเธเนเธณ
+        // (เธ–เนเธฒเธกเธตเธเนเธญเธกเธนเธฅเนเธฅเนเธง เธเธฐเธญเธฑเธเน€เธ”เธ•เธ”เธฒเธงเนเธซเนเน€เธเธเธฒเธฐเน€เธกเธทเนเธญเนเธ”เนเธ”เธฒเธงเธกเธฒเธเธเธงเนเธฒเน€เธ”เธดเธก)
         await conn.query(
             `INSERT INTO user_hunter_history (lineUserId, levelId, stars, clearedAt) 
              VALUES (?, ?, ?, NOW())
@@ -2952,7 +2952,7 @@ app.post('/api/game/hunter/complete', async (req, res) => {
     }
 });
 
-// --- API: เริ่มเล่นด่าน (นับจำนวนครั้ง) ---
+// --- API: เน€เธฃเธดเนเธกเน€เธฅเนเธเธ”เนเธฒเธ (เธเธฑเธเธเธณเธเธงเธเธเธฃเธฑเนเธ) ---
 app.post('/api/game/hunter/start-level', async (req, res) => {
     const { lineUserId, levelId } = req.body;
     const MAX_PLAYS = 3;
@@ -2961,7 +2961,7 @@ app.post('/api/game/hunter/start-level', async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // 1. เช็คจำนวนครั้งปัจจุบัน
+        // 1. เน€เธเนเธเธเธณเธเธงเธเธเธฃเธฑเนเธเธเธฑเธเธเธธเธเธฑเธ
         const [rows] = await conn.query(
             "SELECT attempt_count FROM hunter_attempts WHERE lineUserId = ? AND levelId = ?",
             [lineUserId, levelId]
@@ -2972,12 +2972,12 @@ app.post('/api/game/hunter/start-level', async (req, res) => {
             current = rows[0].attempt_count;
         }
 
-        // 2. ถ้าครบ 3 ครั้งแล้ว -> ห้ามเล่น
+        // 2. เธ–เนเธฒเธเธฃเธ 3 เธเธฃเธฑเนเธเนเธฅเนเธง -> เธซเนเธฒเธกเน€เธฅเนเธ
         if (current >= MAX_PLAYS) {
-            throw new Error(`คุณใช้สิทธิ์เล่นด่านนี้ครบ ${MAX_PLAYS} ครั้งแล้ว`);
+            throw new Error(`เธเธธเธ“เนเธเนเธชเธดเธ—เธเธดเนเน€เธฅเนเธเธ”เนเธฒเธเธเธตเนเธเธฃเธ ${MAX_PLAYS} เธเธฃเธฑเนเธเนเธฅเนเธง`);
         }
 
-        // 3. บวกเพิ่ม 1 ครั้ง
+        // 3. เธเธงเธเน€เธเธดเนเธก 1 เธเธฃเธฑเนเธ
         if (rows.length === 0) {
             await conn.query(
                 "INSERT INTO hunter_attempts (lineUserId, levelId, attempt_count) VALUES (?, ?, 1)",
@@ -3001,12 +3001,12 @@ app.post('/api/game/hunter/start-level', async (req, res) => {
     }
 });
 
-// --- API: ดึงรายละเอียดด่าน (รวมจุดเสี่ยง) เพื่อมาแก้ไข ---
+// --- API: เธ”เธถเธเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธ”เนเธฒเธ (เธฃเธงเธกเธเธธเธ”เน€เธชเธตเนเธขเธ) เน€เธเธทเนเธญเธกเธฒเนเธเนเนเธ ---
 app.get('/api/admin/hunter/level/:id', isAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         const [levels] = await db.query("SELECT * FROM hunter_levels WHERE levelId = ?", [id]);
-        if (levels.length === 0) throw new Error("ไม่พบด่าน");
+        if (levels.length === 0) throw new Error("เนเธกเนเธเธเธ”เนเธฒเธ");
 
         const [hazards] = await db.query("SELECT * FROM hunter_hazards WHERE levelId = ?", [id]);
         
@@ -3016,24 +3016,24 @@ app.get('/api/admin/hunter/level/:id', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: อัปเดตด่าน (แก้ชื่อ + แก้จุดเสี่ยง) ---
+// --- API: เธญเธฑเธเน€เธ”เธ•เธ”เนเธฒเธ (เนเธเนเธเธทเนเธญ + เนเธเนเธเธธเธ”เน€เธชเธตเนเธขเธ) ---
 app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
-    const { levelId, title, hazards } = req.body; // เราจะไม่แก้รูปภาพเพื่อความง่าย (ถ้าจะแก้รูป ลบสร้างใหม่ง่ายกว่า)
+    const { levelId, title, hazards } = req.body; // เน€เธฃเธฒเธเธฐเนเธกเนเนเธเนเธฃเธนเธเธ เธฒเธเน€เธเธทเนเธญเธเธงเธฒเธกเธเนเธฒเธข (เธ–เนเธฒเธเธฐเนเธเนเธฃเธนเธ เธฅเธเธชเธฃเนเธฒเธเนเธซเธกเนเธเนเธฒเธขเธเธงเนเธฒ)
     
     const conn = await db.getClient();
     try {
         await conn.beginTransaction();
 
-        // 1. อัปเดตชื่อและจำนวนจุด
+        // 1. เธญเธฑเธเน€เธ”เธ•เธเธทเนเธญเนเธฅเธฐเธเธณเธเธงเธเธเธธเธ”
         await conn.query(
             "UPDATE hunter_levels SET title = ?, totalHazards = ? WHERE levelId = ?",
             [title, hazards.length, levelId]
         );
 
-        // 2. ลบจุดเสี่ยงเก่าทิ้งทั้งหมด (แล้วใส่ใหม่ ง่ายกว่ามาเช็คทีละจุด)
+        // 2. เธฅเธเธเธธเธ”เน€เธชเธตเนเธขเธเน€เธเนเธฒเธ—เธดเนเธเธ—เธฑเนเธเธซเธกเธ” (เนเธฅเนเธงเนเธชเนเนเธซเธกเน เธเนเธฒเธขเธเธงเนเธฒเธกเธฒเน€เธเนเธเธ—เธตเธฅเธฐเธเธธเธ”)
         await conn.query("DELETE FROM hunter_hazards WHERE levelId = ?", [levelId]);
 
-        // 3. ใส่จุดเสี่ยงใหม่
+        // 3. เนเธชเนเธเธธเธ”เน€เธชเธตเนเธขเธเนเธซเธกเน
         for (const h of hazards) {
             await conn.query(
                 "INSERT INTO hunter_hazards (hazardId, levelId, description, knowledge, x, y, radius) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -3058,10 +3058,10 @@ app.post('/api/admin/hunter/level/update', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: ลบด่าน ---
+// --- API: เธฅเธเธ”เนเธฒเธ ---
 app.delete('/api/admin/hunter/level/:id', isAdmin, async (req, res) => {
     try {
-        // Cascade จะลบ hazards และ attempts ให้อัตโนมัติ (ตามที่เราแก้ DB ไป)
+        // Cascade เธเธฐเธฅเธ hazards เนเธฅเธฐ attempts เนเธซเนเธญเธฑเธ•เนเธเธกเธฑเธ•เธด (เธ•เธฒเธกเธ—เธตเนเน€เธฃเธฒเนเธเน DB เนเธ)
         await db.query("DELETE FROM hunter_levels WHERE levelId = ?", [req.params.id]);
         res.json({ status: "success", data: { deleted: true } });
     } catch (e) {
@@ -3069,35 +3069,35 @@ app.delete('/api/admin/hunter/level/:id', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: จบเกมแบบไม่ผ่าน (รับรางวัลปลอบใจ) ---
+// --- API: เธเธเน€เธเธกเนเธเธเนเธกเนเธเนเธฒเธ (เธฃเธฑเธเธฃเธฒเธเธงเธฑเธฅเธเธฅเธญเธเนเธ) ---
 app.post('/api/game/hunter/fail', async (req, res) => {
     const { lineUserId, levelId } = req.body;
-    const CONSOLATION_PRIZE = 10; // ⭐ กำหนดจำนวนเหรียญปลอบใจตรงนี้
+    const CONSOLATION_PRIZE = 10; // โญ เธเธณเธซเธเธ”เธเธณเธเธงเธเน€เธซเธฃเธตเธขเธเธเธฅเธญเธเนเธเธ•เธฃเธเธเธตเน
 
     const conn = await db.getClient();
     try {
         await conn.beginTransaction();
 
-        // 1. เพิ่มเหรียญให้ User
+        // 1. เน€เธเธดเนเธกเน€เธซเธฃเธตเธขเธเนเธซเน User
         await conn.query(
             "UPDATE users SET coinBalance = coinBalance + ? WHERE lineUserId = ?",
             [CONSOLATION_PRIZE, lineUserId]
         );
 
-        // 2. บันทึกแจ้งเตือน (Optional)
+        // 2. เธเธฑเธเธ—เธถเธเนเธเนเธเน€เธ•เธทเธญเธ (Optional)
         await conn.query(
             "INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt) VALUES (?, ?, ?, ?, ?, ?, NOW())",
             [
                 "NOTIF" + uuidv4(), 
                 lineUserId, 
-                `พยายามได้ดี! รับรางวัลปลอบใจ ${CONSOLATION_PRIZE} เหรียญ จากภารกิจล่าจุดเสี่ยง`, 
+                `เธเธขเธฒเธขเธฒเธกเนเธ”เนเธ”เธต! เธฃเธฑเธเธฃเธฒเธเธงเธฑเธฅเธเธฅเธญเธเนเธ ${CONSOLATION_PRIZE} เน€เธซเธฃเธตเธขเธ เธเธฒเธเธ เธฒเธฃเธเธดเธเธฅเนเธฒเธเธธเธ”เน€เธชเธตเนเธขเธ`, 
                 'game_hunter_fail', 
                 levelId, 
                 lineUserId
             ]
         );
 
-        // 3. ดึงยอดล่าสุดส่งกลับ
+        // 3. เธ”เธถเธเธขเธญเธ”เธฅเนเธฒเธชเธธเธ”เธชเนเธเธเธฅเธฑเธ
         const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
 
         await conn.commit();
@@ -3111,15 +3111,15 @@ app.post('/api/game/hunter/fail', async (req, res) => {
     }
 });
 
-const axios = require('axios'); // ต้องมีบรรทัดนี้ด้านบนสุด ถ้าไม่มีให้ npm install axios
+const axios = require('axios'); // เธ•เนเธญเธเธกเธตเธเธฃเธฃเธ—เธฑเธ”เธเธตเนเธ”เนเธฒเธเธเธเธชเธธเธ” เธ–เนเธฒเนเธกเนเธกเธตเนเธซเน npm install axios
 
-// --- API: Admin กดปุ่มแจ้งเตือนเอง (Manual) ---
+// --- API: Admin เธเธ”เธเธธเนเธกเนเธเนเธเน€เธ•เธทเธญเธเน€เธญเธ (Manual) ---
 app.post('/api/admin/remind-streaks', isAdmin, async (req, res) => {
-    // เรียกใช้ฟังก์ชันเดียวกับ Auto เลย
+    // เน€เธฃเธตเธขเธเนเธเนเธเธฑเธเธเนเธเธฑเธเน€เธ”เธตเธขเธงเธเธฑเธ Auto เน€เธฅเธข
     const result = await broadcastStreakReminders();
     
     if (result.success) {
-        // ⭐⭐⭐ แก้ตรงนี้: ต้องห่อ message ไว้ใน data เพื่อให้ callApi รับค่าได้ถูกต้อง ⭐⭐⭐
+        // โญโญโญ เนเธเนเธ•เธฃเธเธเธตเน: เธ•เนเธญเธเธซเนเธญ message เนเธงเนเนเธ data เน€เธเธทเนเธญเนเธซเน callApi เธฃเธฑเธเธเนเธฒเนเธ”เนเธ–เธนเธเธ•เนเธญเธ โญโญโญ
         res.json({ 
             status: "success", 
             data: { message: result.message } 
@@ -3129,28 +3129,28 @@ app.post('/api/admin/remind-streaks', isAdmin, async (req, res) => {
     }
 });
 
-// --- API: ทดสอบส่งแจ้งเตือนหาตัวเอง (Admin Only) ---
+// --- API: เธ—เธ”เธชเธญเธเธชเนเธเนเธเนเธเน€เธ•เธทเธญเธเธซเธฒเธ•เธฑเธงเน€เธญเธ (Admin Only) ---
 app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
     const { requesterId } = req.body; 
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
     try {
-        if (!token) throw new Error("ไม่พบ LINE Channel Access Token");
+        if (!token) throw new Error("เนเธกเนเธเธ LINE Channel Access Token");
 
         const message = {
             to: requesterId,
             messages: [{
                 type: "flex",
-                altText: "[TEST] 🔥 ระวังไฟดับ! เข้ามาเติมด่วน",
+                altText: "[TEST] ๐”ฅ เธฃเธฐเธงเธฑเธเนเธเธ”เธฑเธ! เน€เธเนเธฒเธกเธฒเน€เธ•เธดเธกเธ”เนเธงเธ",
                 contents: {
                     type: "bubble",
                     body: {
                         type: "box",
                         layout: "vertical",
                         contents: [
-                            { type: "text", text: "🔥 [TEST] ระวังไฟดับ!", weight: "bold", size: "xl", color: "#ff5500" },
-                            { type: "text", text: `คุณรักษาสถิติมา 5 วันแล้ว (ตัวอย่าง)`, size: "md", color: "#555555", margin: "md" },
-                            { type: "text", text: "รีบเล่น Daily Quiz ก่อนเที่ยงคืนเพื่อรักษาสถิติ!", size: "sm", color: "#aaaaaa", wrap: true, margin: "sm" }
+                            { type: "text", text: "๐”ฅ [TEST] เธฃเธฐเธงเธฑเธเนเธเธ”เธฑเธ!", weight: "bold", size: "xl", color: "#ff5500" },
+                            { type: "text", text: `เธเธธเธ“เธฃเธฑเธเธฉเธฒเธชเธ–เธดเธ•เธดเธกเธฒ 5 เธงเธฑเธเนเธฅเนเธง (เธ•เธฑเธงเธญเธขเนเธฒเธ)`, size: "md", color: "#555555", margin: "md" },
+                            { type: "text", text: "เธฃเธตเธเน€เธฅเนเธ Daily Quiz เธเนเธญเธเน€เธ—เธตเนเธขเธเธเธทเธเน€เธเธทเนเธญเธฃเธฑเธเธฉเธฒเธชเธ–เธดเธ•เธด!", size: "sm", color: "#aaaaaa", wrap: true, margin: "sm" }
                         ]
                     },
                     footer: {
@@ -3159,8 +3159,8 @@ app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
                         contents: [
                             {
                                 type: "button",
-                                // ⭐ แก้ตรงนี้: ใช้ process.env.LIFF_ID
-                                action: { type: "uri", label: "เข้าเกมทันที 🎮", uri: "https://liff.line.me/" + process.env.LIFF_ID },
+                                // โญ เนเธเนเธ•เธฃเธเธเธตเน: เนเธเน process.env.LIFF_ID
+                                action: { type: "uri", label: "เน€เธเนเธฒเน€เธเธกเธ—เธฑเธเธ—เธต ๐ฎ", uri: "https://liff.line.me/" + process.env.LIFF_ID },
                                 style: "primary",
                                 color: "#06C755"
                             }
@@ -3174,7 +3174,7 @@ app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
         });
 
-        res.json({ status: "success", data: { message: "ส่งข้อความทดสอบสำเร็จ! เช็คไลน์ของคุณได้เลย" } });
+        res.json({ status: "success", data: { message: "เธชเนเธเธเนเธญเธเธงเธฒเธกเธ—เธ”เธชเธญเธเธชเธณเน€เธฃเนเธ! เน€เธเนเธเนเธฅเธเนเธเธญเธเธเธธเธ“เนเธ”เนเน€เธฅเธข" } });
 
     } catch (e) {
         console.error(e);
@@ -3183,18 +3183,18 @@ app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
 });
 
 // ==========================================
-// 🕹️ GAME MONITOR API (Fixed & Updated)
+// ๐•น๏ธ GAME MONITOR API (Fixed & Updated)
 // ==========================================
 
-// 1. ดึงคนเล่น KYT วันนี้ (แก้: ลบ h.id ออก + ใช้เวลาไทย)
-// --- API: ดึงข้อมูล Monitor KYT (ฉบับแก้ไข: ตรงกับตาราง kyt_questions ของคุณ) ---
+// 1. เธ”เธถเธเธเธเน€เธฅเนเธ KYT เธงเธฑเธเธเธตเน (เนเธเน: เธฅเธ h.id เธญเธญเธ + เนเธเนเน€เธงเธฅเธฒเนเธ—เธข)
+// --- API: เธ”เธถเธเธเนเธญเธกเธนเธฅ Monitor KYT (เธเธเธฑเธเนเธเนเนเธ: เธ•เธฃเธเธเธฑเธเธ•เธฒเธฃเธฒเธ kyt_questions เธเธญเธเธเธธเธ“) ---
 app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
     try {
         const now = new Date();
         const thaiDate = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
         const todayStr = thaiDate.toISOString().split('T')[0];
 
-        // ดึง questionText, selectedOption และ correctOption เพื่อแสดงใน Monitor
+        // เธ”เธถเธ questionText, selectedOption เนเธฅเธฐ correctOption เน€เธเธทเนเธญเนเธชเธ”เธเนเธ Monitor
         const [rows] = await db.query(`
             SELECT
                 h.historyId AS id,
@@ -3206,7 +3206,7 @@ app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
                 h.earnedPoints,
                 h.playedAt,
                 h.selectedAnswer AS selectedOption,
-                COALESCE(q.questionText, 'คำถามถูกลบไปแล้ว') AS questionText,
+                COALESCE(q.questionText, 'เธเธณเธ–เธฒเธกเธ–เธนเธเธฅเธเนเธเนเธฅเนเธง') AS questionText,
                 COALESCE(q.correctOption, '') AS correctOption
             FROM user_game_history h
             JOIN users u ON h.lineUserId = u.lineUserId
@@ -3219,7 +3219,7 @@ app.get('/api/admin/monitor/kyt', isAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// 2. ดึงประวัติ Hunter (เหมือนเดิม)
+// 2. เธ”เธถเธเธเธฃเธฐเธงเธฑเธ•เธด Hunter (เน€เธซเธกเธทเธญเธเน€เธ”เธดเธก)
 app.get('/api/admin/monitor/hunter', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -3233,7 +3233,7 @@ app.get('/api/admin/monitor/hunter', isAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// 3. ดู Streak (เหมือนเดิม)
+// 3. เธ”เธน Streak (เน€เธซเธกเธทเธญเธเน€เธ”เธดเธก)
 app.get('/api/admin/monitor/streaks', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -3246,7 +3246,7 @@ app.get('/api/admin/monitor/streaks', isAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// ⭐ 4. (ใหม่) กระเป๋าเหรียญ (Coin Wallet)
+// โญ 4. (เนเธซเธกเน) เธเธฃเธฐเน€เธเนเธฒเน€เธซเธฃเธตเธขเธ (Coin Wallet)
 app.get('/api/admin/monitor/coins', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -3258,23 +3258,23 @@ app.get('/api/admin/monitor/coins', isAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// --- ฟังก์ชันกลาง: ส่งแจ้งเตือน Streak (แยก 2 กลุ่ม: เตือน / ดับ) ---
+// --- เธเธฑเธเธเนเธเธฑเธเธเธฅเธฒเธ: เธชเนเธเนเธเนเธเน€เธ•เธทเธญเธ Streak (เนเธขเธ 2 เธเธฅเธธเนเธก: เน€เธ•เธทเธญเธ / เธ”เธฑเธ) ---
 async function broadcastStreakReminders() {
     const conn = await db.getClient();
-    console.log(`[${new Date().toLocaleString()}] เริ่มกระบวนการแจ้งเตือน Streak แบบแยกกลุ่ม...`);
+    console.log(`[${new Date().toLocaleString()}] เน€เธฃเธดเนเธกเธเธฃเธฐเธเธงเธเธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธ Streak เนเธเธเนเธขเธเธเธฅเธธเนเธก...`);
 
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!token) return { success: false, message: "No Token" };
 
     try {
-        // กลุ่ม 1: Warning (หายไป 1 วัน)
+        // เธเธฅเธธเนเธก 1: Warning (เธซเธฒเธขเนเธ 1 เธงเธฑเธ)
         const [warningUsers] = await conn.query(`
             SELECT lineUserId, currentStreak FROM user_streaks 
             WHERE currentStreak > 0 AND DATEDIFF(CURDATE(), lastPlayedDate) = 1
         `);
 
 
-        // Helper function ยิงไลน์
+        // Helper function เธขเธดเธเนเธฅเธเน
         const sendPush = async (users, title, text, color, btnText) => {
             let count = 0;
             for (const u of users) {
@@ -3296,7 +3296,7 @@ async function broadcastStreakReminders() {
                                     type: "box", layout: "vertical",
                                     contents: [{
                                         type: "button", style: "primary", color: color,
-                                        // ⭐ แก้ตรงนี้: ใช้ process.env.LIFF_ID
+                                        // โญ เนเธเนเธ•เธฃเธเธเธตเน: เนเธเน process.env.LIFF_ID
                                         action: { type: "uri", label: btnText, uri: "https://liff.line.me/" + process.env.LIFF_ID }
                                     }]
                                 }
@@ -3309,7 +3309,7 @@ async function broadcastStreakReminders() {
             return count;
         };
 
-        const sentWarning = await sendPush(warningUsers, "⚠️ เตือนภัย! ไฟจะดับ", "คุณรักษาสถิติมา {streak} วันแล้ว รีบเข้ามาเล่นก่อนเที่ยงคืน!", "#ffaa00", "เข้าเติมไฟ 🔥");
+        const sentWarning = await sendPush(warningUsers, "โ ๏ธ เน€เธ•เธทเธญเธเธ เธฑเธข! เนเธเธเธฐเธ”เธฑเธ", "เธเธธเธ“เธฃเธฑเธเธฉเธฒเธชเธ–เธดเธ•เธดเธกเธฒ {streak} เธงเธฑเธเนเธฅเนเธง เธฃเธตเธเน€เธเนเธฒเธกเธฒเน€เธฅเนเธเธเนเธญเธเน€เธ—เธตเนเธขเธเธเธทเธ!", "#ffaa00", "เน€เธเนเธฒเน€เธ•เธดเธกเนเธ ๐”ฅ");
 
         return { success: true, message: `Warning: ${sentWarning}` };
 
@@ -3318,18 +3318,18 @@ async function broadcastStreakReminders() {
     } finally { conn.release(); }
 }
 
-// --- ตั้งเวลา Auto (Cron Job) ---
-// '0 12 * * *' แปลว่า: นาทีที่ 0 ของชั่วโมงที่ 12 (เที่ยงตรง)
+// --- เธ•เธฑเนเธเน€เธงเธฅเธฒ Auto (Cron Job) ---
+// '0 12 * * *' เนเธเธฅเธงเนเธฒ: เธเธฒเธ—เธตเธ—เธตเน 0 เธเธญเธเธเธฑเนเธงเนเธกเธเธ—เธตเน 12 (เน€เธ—เธตเนเธขเธเธ•เธฃเธ)
 cron.schedule('0 12 * * *', async () => {
-    console.log(`[${new Date().toLocaleString()}] ⏰ ถึงเวลาแจ้งเตือนอัตโนมัติ (รอบ 12:00)...`);
+    console.log(`[${new Date().toLocaleString()}] โฐ เธ–เธถเธเน€เธงเธฅเธฒเนเธเนเธเน€เธ•เธทเธญเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธด (เธฃเธญเธ 12:00)...`);
     
-    // เรียกฟังก์ชันแจ้งเตือน
+    // เน€เธฃเธตเธขเธเธเธฑเธเธเนเธเธฑเธเนเธเนเธเน€เธ•เธทเธญเธ
     const result = await broadcastStreakReminders();
-    console.log(`ผลการทำงาน: ${result.message}`);
+    console.log(`เธเธฅเธเธฒเธฃเธ—เธณเธเธฒเธ: ${result.message}`);
     
 }, {
     scheduled: true,
-    timezone: "Asia/Bangkok" // สำคัญมาก! ต้องระบุเพื่อให้ตรงกับเวลาไทย
+    timezone: "Asia/Bangkok" // เธชเธณเธเธฑเธเธกเธฒเธ! เธ•เนเธญเธเธฃเธฐเธเธธเน€เธเธทเนเธญเนเธซเนเธ•เธฃเธเธเธฑเธเน€เธงเธฅเธฒเนเธ—เธข
 });
 
 // ======================================================
@@ -3386,7 +3386,7 @@ app.get('/api/admin/department-scores', isAdmin, async (_req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT
-                COALESCE(NULLIF(u.department,''), 'ไม่ระบุแผนก') AS department,
+                COALESCE(NULLIF(u.department,''), 'เนเธกเนเธฃเธฐเธเธธเนเธเธเธ') AS department,
                 COUNT(DISTINCT u.lineUserId) AS memberCount,
                 ROUND(AVG(u.totalScore), 1) AS avgScore,
                 COUNT(s.submissionId) AS totalSubmissions
@@ -3428,7 +3428,7 @@ app.get('/api/admin/export/submissions', isAdmin, async (req, res) => {
             ORDER BY s.createdAt DESC`, params);
 
         const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-        const header = ['ID','ชื่อ','รหัสพนักงาน','แผนก','กิจกรรม','คำอธิบาย','สถานะ','คะแนน','วันที่ส่ง','วันที่ตรวจ'];
+        const header = ['ID','เธเธทเนเธญ','เธฃเธซเธฑเธชเธเธเธฑเธเธเธฒเธ','เนเธเธเธ','เธเธดเธเธเธฃเธฃเธก','เธเธณเธญเธเธดเธเธฒเธข','เธชเธ–เธฒเธเธฐ','เธเธฐเนเธเธ','เธงเธฑเธเธ—เธตเนเธชเนเธ','เธงเธฑเธเธ—เธตเนเธ•เธฃเธงเธ'];
         const csvLines = [
             '\uFEFF' + header.join(','),
             ...rows.map(r => [
@@ -3446,7 +3446,7 @@ app.get('/api/admin/export/submissions', isAdmin, async (req, res) => {
 });
 
 // ======================================================
-// ADMIN: Export Submissions — Print/PDF view
+// ADMIN: Export Submissions โ€” Print/PDF view
 // ======================================================
 app.get('/api/admin/export/submissions/print', isAdmin, async (req, res) => {
     const { status, from, to } = req.query;
@@ -3466,7 +3466,7 @@ app.get('/api/admin/export/submissions/print', isAdmin, async (req, res) => {
             WHERE ${whereClause}
             ORDER BY s.createdAt DESC`, params);
 
-        const statusLabel = { approved:'อนุมัติ', pending:'รอตรวจ', rejected:'ปฏิเสธ' };
+        const statusLabel = { approved:'เธญเธเธธเธกเธฑเธ•เธด', pending:'เธฃเธญเธ•เธฃเธงเธ', rejected:'เธเธเธดเน€เธชเธ' };
         const rowsHtml = rows.map((r, i) => `
             <tr>
                 <td>${i+1}</td>
@@ -3484,12 +3484,12 @@ app.get('/api/admin/export/submissions/print', isAdmin, async (req, res) => {
             <style>@media print{.no-print{display:none}body{font-size:0.85rem}}th{background:#1a1a2e!important;color:#fff!important}</style>
         </head><body class="p-3">
             <div class="d-flex justify-content-between align-items-center mb-3 no-print">
-                <h5>Safety Spot — รายงาน Export (${rows.length} รายการ)</h5>
+                <h5>Safety Spot โ€” เธฃเธฒเธขเธเธฒเธ Export (${rows.length} เธฃเธฒเธขเธเธฒเธฃ)</h5>
                 <button onclick="window.print()" class="btn btn-danger btn-sm">Print / Save PDF</button>
             </div>
-            <h6 class="text-muted mb-3">สร้างเมื่อ: ${new Date().toLocaleString('th-TH')}</h6>
+            <h6 class="text-muted mb-3">เธชเธฃเนเธฒเธเน€เธกเธทเนเธญ: ${new Date().toLocaleString('th-TH')}</h6>
             <table class="table table-bordered table-sm">
-                <thead><tr><th>#</th><th>ผู้ส่ง</th><th>กิจกรรม</th><th>คำอธิบาย</th><th>สถานะ</th><th>คะแนน</th><th>วันที่</th></tr></thead>
+                <thead><tr><th>#</th><th>เธเธนเนเธชเนเธ</th><th>เธเธดเธเธเธฃเธฃเธก</th><th>เธเธณเธญเธเธดเธเธฒเธข</th><th>เธชเธ–เธฒเธเธฐ</th><th>เธเธฐเนเธเธ</th><th>เธงเธฑเธเธ—เธตเน</th></tr></thead>
                 <tbody>${rowsHtml}</tbody>
             </table>
         </body></html>`);
@@ -3523,6 +3523,898 @@ app.get('/api/admin/audit-logs', isAdmin, async (req, res) => {
         res.json({ status: "success", data: { rows, total, page: Number(page), limit: Number(limit) } });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
+// ======================================================
+// STARTUP MIGRATIONS โ€” LOTTERY TABLES
+// ======================================================
+db.query("ALTER TABLE users ADD COLUMN lotteryWinCount INT DEFAULT 0").catch(() => {});
+db.query("ALTER TABLE users ADD COLUMN lotteryTotalWinnings INT DEFAULT 0").catch(() => {});
+db.query("ALTER TABLE lottery_quiz_answers ADD COLUMN usedForTicketId INT DEFAULT NULL").catch(() => {});
+db.query("ALTER TABLE lottery_quiz_answers ADD INDEX idx_quiz_answers_used (usedForTicketId)").catch(() => {});
+
+db.query(`CREATE TABLE IF NOT EXISTS lottery_rounds (
+  roundId       VARCHAR(50) PRIMARY KEY,
+  drawDate      DATE NOT NULL,
+  last2         VARCHAR(2)  DEFAULT NULL,
+  last3_front   VARCHAR(3)  DEFAULT NULL,
+  last3_back    VARCHAR(3)  DEFAULT NULL,
+  status        VARCHAR(20) DEFAULT 'open',
+  source        VARCHAR(20) DEFAULT 'manual',
+  confirmedBy   VARCHAR(50) DEFAULT NULL,
+  createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_lottery_rounds_status (status),
+  INDEX idx_lottery_rounds_date (drawDate)
+)`).catch(() => {});
+
+db.query(`CREATE TABLE IF NOT EXISTS lottery_tickets (
+  ticketId      INT AUTO_INCREMENT PRIMARY KEY,
+  lineUserId    VARCHAR(50) NOT NULL,
+  roundId       VARCHAR(50) NOT NULL,
+  ticketType    VARCHAR(10) NOT NULL,
+  number        VARCHAR(3)  NOT NULL,
+  price         INT         NOT NULL DEFAULT 0,
+  isGoldTicket  BOOLEAN     DEFAULT FALSE,
+  isWinner      BOOLEAN     DEFAULT FALSE,
+  prizeAmount   INT         DEFAULT 0,
+  isPrizeClaimed BOOLEAN    DEFAULT FALSE,
+  purchasedAt   TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (lineUserId) REFERENCES users(lineUserId),
+  FOREIGN KEY (roundId)    REFERENCES lottery_rounds(roundId),
+  INDEX idx_tickets_user_round (lineUserId, roundId),
+  INDEX idx_tickets_round_type (roundId, ticketType, number),
+  INDEX idx_tickets_winner     (isWinner, isPrizeClaimed)
+)`).catch(() => {});
+
+db.query(`CREATE TABLE IF NOT EXISTS lottery_daily_purchases (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  lineUserId    VARCHAR(50) NOT NULL,
+  purchaseDate  DATE        NOT NULL,
+  count         INT         DEFAULT 0,
+  FOREIGN KEY (lineUserId) REFERENCES users(lineUserId),
+  UNIQUE KEY uq_daily_purchase (lineUserId, purchaseDate)
+)`).catch(() => {});
+
+db.query(`CREATE TABLE IF NOT EXISTS lottery_gold_ticket_claims (
+  claimId       INT AUTO_INCREMENT PRIMARY KEY,
+  lineUserId    VARCHAR(50) NOT NULL,
+  roundId       VARCHAR(50) NOT NULL,
+  ticketId      INT         DEFAULT NULL,
+  department    VARCHAR(100) NOT NULL DEFAULT '',
+  incidentFreeSince DATE    NOT NULL,
+  claimedAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (lineUserId) REFERENCES users(lineUserId),
+  FOREIGN KEY (roundId) REFERENCES lottery_rounds(roundId),
+  FOREIGN KEY (ticketId) REFERENCES lottery_tickets(ticketId),
+  UNIQUE KEY uq_gold_claim_user_round (lineUserId, roundId),
+  INDEX idx_gold_claim_round (roundId)
+)`).catch(() => {});
+
+db.query(`CREATE TABLE IF NOT EXISTS lottery_quiz_questions (
+  questionId    INT AUTO_INCREMENT PRIMARY KEY,
+  questionText  TEXT        NOT NULL,
+  optionA       TEXT        NOT NULL,
+  optionB       TEXT        NOT NULL,
+  optionC       TEXT        NOT NULL,
+  optionD       TEXT        NOT NULL,
+  correctOption VARCHAR(1)  NOT NULL,
+  category      VARCHAR(50) DEFAULT 'เธ—เธฑเนเธงเนเธ',
+  isActive      BOOLEAN     DEFAULT TRUE,
+  generatedBy   VARCHAR(20) DEFAULT 'manual',
+  createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_quiz_active_category (isActive, category)
+)`).catch(() => {});
+
+db.query(`CREATE TABLE IF NOT EXISTS lottery_quiz_answers (
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  lineUserId     VARCHAR(50) NOT NULL,
+  questionId     INT         NOT NULL,
+  selectedOption VARCHAR(1)  NOT NULL,
+  isCorrect      BOOLEAN     NOT NULL,
+  usedForTicketId INT        DEFAULT NULL,
+  answeredAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (lineUserId) REFERENCES users(lineUserId),
+  FOREIGN KEY (questionId) REFERENCES lottery_quiz_questions(questionId) ON DELETE CASCADE,
+  INDEX idx_quiz_answers_used     (usedForTicketId),
+  INDEX idx_quiz_answers_user     (lineUserId, answeredAt),
+  INDEX idx_quiz_answers_question (questionId, isCorrect)
+)`).catch(() => {});
+
+db.query(`CREATE TABLE IF NOT EXISTS lottery_results_history (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  roundId          VARCHAR(50) NOT NULL,
+  totalTicketsSold INT         DEFAULT 0,
+  totalWinners     INT         DEFAULT 0,
+  totalPrizesPaid  INT         DEFAULT 0,
+  createdAt        TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (roundId) REFERENCES lottery_rounds(roundId),
+  UNIQUE KEY uq_results_round (roundId)
+)`).catch(() => {});
+
+// ======================================================
+// LOTTERY HELPER โ€” LINE Push Flex Message
+// ======================================================
+async function sendLotteryWinNotification(lineUserId, ticketData) {
+    const flexMessage = {
+        type: 'flex',
+        altText: '๐ เธขเธดเธเธ”เธตเธ”เนเธงเธข! เธเธธเธ“เธ–เธนเธ Safety Lottery!',
+        contents: {
+            type: 'bubble', size: 'mega',
+            header: {
+                type: 'box', layout: 'vertical', backgroundColor: '#06C755', paddingAll: '20px',
+                contents: [
+                    { type: 'text', text: '๐ เธขเธดเธเธ”เธตเธ”เนเธงเธข!', color: '#FFFFFF', size: 'xl', weight: 'bold', align: 'center' },
+                    { type: 'text', text: 'เธเธธเธ“เธ–เธนเธ Safety Lottery!', color: '#FFFFFF', size: 'md', align: 'center', margin: 'sm' }
+                ]
+            },
+            body: {
+                type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '20px',
+                contents: [
+                    { type: 'box', layout: 'horizontal', contents: [
+                        { type: 'text', text: 'เธเธงเธ”เธงเธฑเธเธ—เธตเน', size: 'sm', color: '#888888', flex: 1 },
+                        { type: 'text', text: ticketData.drawDate, size: 'sm', weight: 'bold', flex: 2, align: 'end' }
+                    ]},
+                    { type: 'box', layout: 'horizontal', contents: [
+                        { type: 'text', text: 'เธเธฃเธฐเน€เธ เธ—', size: 'sm', color: '#888888', flex: 1 },
+                        { type: 'text', text: ticketData.ticketType === 'two' ? '๐ข 2 เธ•เธฑเธงเธ—เนเธฒเธข' : '๐”ด 3 เธ•เธฑเธงเธ—เนเธฒเธข', size: 'sm', weight: 'bold', flex: 2, align: 'end' }
+                    ]},
+                    { type: 'box', layout: 'horizontal', contents: [
+                        { type: 'text', text: 'เน€เธฅเธเธเธญเธเธเธธเธ“', size: 'sm', color: '#888888', flex: 1 },
+                        { type: 'text', text: ticketData.number, size: 'xl', weight: 'bold', color: '#06C755', flex: 2, align: 'end' }
+                    ]},
+                    { type: 'separator', margin: 'lg' },
+                    { type: 'box', layout: 'horizontal', margin: 'lg', contents: [
+                        { type: 'text', text: '๐ เธฃเธฒเธเธงเธฑเธฅ', size: 'md', weight: 'bold', flex: 1 },
+                        { type: 'text', text: `+${ticketData.prizeAmount.toLocaleString()} Points`, size: 'lg', weight: 'bold', color: '#FFB800', flex: 2, align: 'end' }
+                    ]}
+                ]
+            },
+            footer: {
+                type: 'box', layout: 'vertical', paddingAll: '15px',
+                contents: [{
+                    type: 'button',
+                    action: { type: 'uri', label: '๐ฐ เธ”เธนเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”', uri: `https://liff.line.me/${process.env.LIFF_ID}` },
+                    style: 'primary', color: '#06C755', height: 'sm'
+                }]
+            }
+        }
+    };
+    try {
+        await axios.post('https://api.line.me/v2/bot/message/push',
+            { to: lineUserId, messages: [flexMessage] },
+            { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` } }
+        );
+    } catch (err) {
+        console.error(`โ Lottery LINE Push failed for ${lineUserId}:`, err.response?.data || err.message);
+    }
+}
+
+// ======================================================
+// LOTTERY CRON โ€” เธ”เธถเธเธเธฅเธซเธงเธขเธญเธฑเธ•เนเธเธกเธฑเธ•เธด 16:00 เนเธ—เธข (09:00 UTC) เธงเธฑเธเธ—เธตเน 1 & 16
+// ======================================================
+async function fetchAndSaveLotteryResults(retryCount = 0) {
+    const dateStr = getBangkokDateString();
+    console.log(`๐ฐ fetchLotteryResults: ${dateStr} (retry ${retryCount})`);
+
+    try {
+        const [[round]] = await db.query(
+            "SELECT * FROM lottery_rounds WHERE roundId = ? AND status IN ('open','closed')", [dateStr]);
+        if (!round) { console.log('โ ๏ธ No open round for today'); return; }
+
+        const htmlRes = await axios.get('https://www.glo.or.th/check/getLotteryResult', {
+            timeout: 15000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+
+        const geminiPayload = {
+            contents: [{ parts: [{ text:
+                `เธเธฒเธเธเนเธญเธกเธนเธฅ HTML เธเธฅเธซเธงเธขเนเธ—เธขเธเธตเน เธ”เธถเธเน€เธเธเธฒเธฐเธเธฅเธฃเธฒเธเธงเธฑเธฅเน€เธฅเธเธ—เนเธฒเธข 2 เธ•เธฑเธง เนเธฅเธฐเน€เธฅเธเธ—เนเธฒเธข 3 เธ•เธฑเธง เธญเธญเธเธกเธฒเน€เธเนเธ JSON\n` +
+                `เธ•เธญเธเน€เธเนเธ JSON เน€เธ—เนเธฒเธเธฑเนเธ เธซเนเธฒเธกเธกเธตเธเนเธญเธเธงเธฒเธกเธญเธทเนเธ:\n{"last2":"XX","last3_back":"XXX","last3_front":"XXX"}\n\nHTML:\n${String(htmlRes.data).slice(0, 8000)}`
+            }]}]
+        };
+
+        const geminiRes = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            geminiPayload, { timeout: 20000 }
+        );
+
+        let rawText = geminiRes.data.candidates[0].content.parts[0].text;
+        rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const parsed = JSON.parse(rawText);
+
+        if (!parsed.last2 || !/^\d{2}$/.test(parsed.last2)) throw new Error('Invalid last2: ' + parsed.last2);
+        if (!parsed.last3_back || !/^\d{3}$/.test(parsed.last3_back)) throw new Error('Invalid last3_back: ' + parsed.last3_back);
+
+        await db.query(
+            `UPDATE lottery_rounds SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source='auto_gemini' WHERE roundId=?`,
+            [parsed.last2, parsed.last3_front || null, parsed.last3_back, dateStr]
+        );
+        console.log(`โ… Lottery result fetched: 2เธ•เธฑเธง=${parsed.last2} 3เธ•เธฑเธงเธ—เนเธฒเธข=${parsed.last3_back}`);
+    } catch (err) {
+        console.error(`โ fetchLotteryResults failed (retry ${retryCount}):`, err.message);
+        if (retryCount < 3) {
+            const delays = [30, 60, 90]; // เธเธฒเธ—เธต
+            setTimeout(() => fetchAndSaveLotteryResults(retryCount + 1), delays[retryCount] * 60 * 1000);
+        } else {
+            await db.query("UPDATE lottery_rounds SET status='pending_manual' WHERE roundId=?", [dateStr]).catch(() => {});
+            console.log('โ ๏ธ Lottery auto-fetch failed 3 times โ€” set to pending_manual');
+        }
+    }
+}
+
+// เธ—เธธเธเธงเธฑเธเธ—เธตเน 1 & 16 เน€เธงเธฅเธฒ 16:00 เนเธ—เธข = 09:00 UTC
+cron.schedule('0 9 1,16 * *', () => fetchAndSaveLotteryResults(0), { timezone: 'UTC' });
+
+function getBangkokDateString(date = new Date()) {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(date);
+}
+
+function toLotteryDateString(value) {
+    if (value instanceof Date) return getBangkokDateString(value);
+    const text = String(value || '');
+    if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+    return text;
+}
+
+function getLotteryCloseAt(drawDate) {
+    const drawStart = new Date(`${toLotteryDateString(drawDate)}T00:00:00+07:00`);
+    return new Date(drawStart.getTime() - 60 * 1000);
+}
+
+function isLotteryRoundClosed(round) {
+    return !round || round.status !== 'open' || new Date() >= getLotteryCloseAt(round.drawDate);
+}
+
+const LOTTERY_INCIDENT_KEYWORDS = [
+    'incident', 'accident', 'near miss',
+    'เธญเธธเธเธฑเธ•เธดเน€เธซเธ•เธธ', 'เธเธฒเธ”เน€เธเนเธ', 'เน€เธเนเธ', 'เน€เธเธทเธญเธเน€เธเธดเธ”เธญเธธเธเธฑเธ•เธดเน€เธซเธ•เธธ'
+];
+
+function getLotteryIncidentWhere(aliasPrefix = '') {
+    const activity = `${aliasPrefix}a`;
+    const submission = `${aliasPrefix}s`;
+    const textExpr = `LOWER(CONCAT(COALESCE(${activity}.title,''),' ',COALESCE(${activity}.description,''),' ',COALESCE(${submission}.description,'')))`;
+    const where = LOTTERY_INCIDENT_KEYWORDS.map(() => `${textExpr} LIKE ?`).join(' OR ');
+    const params = LOTTERY_INCIDENT_KEYWORDS.map(k => `%${k.toLowerCase()}%`);
+    return { where: `(${where})`, params };
+}
+
+async function getLotteryGoldEligibility(lineUserId, conn = db) {
+    const [[round]] = await conn.query(
+        `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, status
+         FROM lottery_rounds
+         WHERE status IN ('open','closed','pending_confirm','pending_manual')
+         ORDER BY drawDate ASC LIMIT 1`
+    );
+    if (!round) return { eligible: false, reason: 'เนเธกเนเธกเธตเธเธงเธ”เธ—เธตเนเน€เธเธดเธ”เธญเธขเธนเน', currentRound: null };
+    if (isLotteryRoundClosed(round)) return { eligible: false, reason: 'เธเธงเธ”เธเธตเนเธเธดเธ”เธฃเธฑเธเนเธฅเนเธง', currentRound: round };
+
+    const [[user]] = await conn.query(
+        'SELECT department FROM users WHERE lineUserId=?',
+        [lineUserId]);
+    const department = (user?.department || '').trim();
+    if (!department) return { eligible: false, reason: 'เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเนเธเธเธเธเนเธญเธ', currentRound: round };
+
+    const [[claimed]] = await conn.query(
+        'SELECT ticketId FROM lottery_gold_ticket_claims WHERE lineUserId=? AND roundId=?',
+        [lineUserId, round.roundId]);
+    if (claimed) {
+        return { eligible: false, reason: 'เธฃเธฑเธเธ•เธฑเนเธงเธ—เธญเธเธชเธณเธซเธฃเธฑเธเธเธงเธ”เธเธตเนเนเธฅเนเธง', alreadyClaimed: true, ticketId: claimed.ticketId, currentRound: round, department };
+    }
+
+    const { where, params } = getLotteryIncidentWhere();
+    const [[incidentStats]] = await conn.query(
+        `SELECT COUNT(*) AS incidentCount, MAX(s.createdAt) AS lastIncidentAt
+         FROM submissions s
+         JOIN users u ON s.lineUserId = u.lineUserId
+         JOIN activities a ON s.activityId = a.activityId
+         WHERE u.department = ?
+           AND s.status IN ('pending','approved')
+           AND s.createdAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+           AND ${where}`,
+        [department, ...params]);
+
+    const incidentsLast30 = Number(incidentStats?.incidentCount || 0);
+    if (incidentsLast30 > 0) {
+        return {
+            eligible: false,
+            reason: 'เนเธเธเธเธกเธต Incident เนเธเธเนเธงเธ 30 เธงเธฑเธเธ—เธตเนเธเนเธฒเธเธกเธฒ',
+            currentRound: round,
+            department,
+            incidentsLast30,
+            lastIncidentAt: incidentStats.lastIncidentAt
+        };
+    }
+
+    const since = getBangkokDateString(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+    return { eligible: true, reason: 'เนเธเธเธเนเธกเนเธกเธต Incident เธเธฃเธ 30 เธงเธฑเธ', currentRound: round, department, incidentsLast30, incidentFreeSince: since };
+}
+
+// ======================================================
+// LOTTERY USER APIs
+// ======================================================
+
+// GET /api/lottery/current-round โ€” เธเธงเธ”เธเธฑเธเธเธธเธเธฑเธ + countdown
+app.get('/api/lottery/current-round', async (req, res) => {
+    try {
+        const [[round]] = await db.query(
+            `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, last2, last3_front, last3_back,
+                    status, source, confirmedBy, createdAt
+             FROM lottery_rounds WHERE status IN ('open','closed','pending_confirm','pending_manual')
+             ORDER BY drawDate ASC LIMIT 1`
+        );
+        if (!round) return res.json({ status: 'success', data: null });
+
+        const closeAt = getLotteryCloseAt(round.drawDate);
+        const msLeft = Math.max(0, closeAt - new Date());
+        const hoursLeft = Math.floor(msLeft / 3600000);
+        const minutesLeft = Math.floor((msLeft % 3600000) / 60000);
+
+        res.json({ status: 'success', data: { ...round, closeAt, hoursLeft, minutesLeft, isClosed: isLotteryRoundClosed(round) } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/lottery/quiz-question โ€” เธชเธธเนเธกเธเธณเธ–เธฒเธก Safety 1 เธเนเธญ
+app.get('/api/lottery/quiz-question', async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT questionId, questionText, optionA, optionB, optionC, optionD, category
+             FROM lottery_quiz_questions WHERE isActive = TRUE
+             ORDER BY RAND() LIMIT 1`
+        );
+        if (!rows.length) return res.status(404).json({ status: 'error', message: 'เนเธกเนเธเธเธเธณเธ–เธฒเธก' });
+        res.json({ status: 'success', data: rows[0] });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/lottery/answer-quiz โ€” เธ•เธญเธเธเธณเธ–เธฒเธก (เธ–เธนเธ = +2 coins)
+app.post('/api/lottery/answer-quiz', async (req, res) => {
+    const { lineUserId, questionId, selectedOption } = req.body;
+    if (!lineUserId || !questionId || !selectedOption)
+        return res.status(400).json({ status: 'error', message: 'เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ' });
+    try {
+        const [[q]] = await db.query(
+            'SELECT correctOption FROM lottery_quiz_questions WHERE questionId = ? AND isActive = TRUE', [questionId]);
+        if (!q) return res.status(404).json({ status: 'error', message: 'เนเธกเนเธเธเธเธณเธ–เธฒเธก' });
+
+        const isCorrect = selectedOption.toUpperCase() === q.correctOption.toUpperCase();
+
+        const [answerResult] = await db.query(
+            'INSERT INTO lottery_quiz_answers (lineUserId, questionId, selectedOption, isCorrect) VALUES (?,?,?,?)',
+            [lineUserId, questionId, selectedOption.toUpperCase(), isCorrect]
+        );
+
+        res.json({
+            status: 'success',
+            data: {
+                isCorrect,
+                correctOption: q.correctOption,
+                newCoinBalance: null,
+                pendingBonusCoins: isCorrect ? 2 : 0,
+                quizAnswerId: answerResult.insertId
+            }
+        });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/lottery/buy-ticket โ€” เธเธทเนเธญเธ•เธฑเนเธง (transaction)
+app.post('/api/lottery/buy-ticket', async (req, res) => {
+    const { lineUserId, roundId, ticketType, number, quizAnswerId } = req.body;
+    if (!lineUserId || !roundId || !ticketType || number == null || !quizAnswerId)
+        return res.status(400).json({ status: 'error', message: 'เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ' });
+
+    if (!['two', 'three'].includes(ticketType))
+        return res.status(400).json({ status: 'error', message: 'เธเธฃเธฐเน€เธ เธ—เธ•เธฑเนเธงเนเธกเนเธ–เธนเธเธ•เนเธญเธ' });
+
+    const numberText = String(number);
+    const requiredDigits = ticketType === 'two' ? 2 : 3;
+    if (!new RegExp(`^\\d{${requiredDigits}}$`).test(numberText))
+        return res.status(400).json({ status: 'error', message: `เน€เธฅเธเธ•เนเธญเธเน€เธเนเธเธ•เธฑเธงเน€เธฅเธ ${requiredDigits} เธซเธฅเธฑเธ` });
+
+    const price = ticketType === 'two' ? 10 : 30;
+    const quizBonus = 2;
+    const todayTH = getBangkokDateString();
+
+    const conn = await db.getClient();
+    try {
+        await conn.beginTransaction();
+
+        const [[user]] = await conn.query('SELECT coinBalance FROM users WHERE lineUserId = ? FOR UPDATE', [lineUserId]);
+        if (!user || Number(user.coinBalance) + quizBonus < price)
+            throw new Error(`เน€เธซเธฃเธตเธขเธเนเธกเนเธเธญ (เธ•เนเธญเธเธเธฒเธฃ ${price} เน€เธซเธฃเธตเธขเธ)`);
+
+        const [[round]] = await conn.query(
+            "SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, status FROM lottery_rounds WHERE roundId = ?",
+            [roundId]);
+        if (isLotteryRoundClosed(round))
+            throw new Error('เธเธงเธ”เธเธตเนเธเธดเธ”เธฃเธฑเธเนเธฅเนเธง');
+
+        const [[quizPass]] = await conn.query(
+            `SELECT id FROM lottery_quiz_answers
+             WHERE id=? AND lineUserId=? AND isCorrect=TRUE AND usedForTicketId IS NULL
+               AND answeredAt >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+             FOR UPDATE`,
+            [quizAnswerId, lineUserId]);
+        if (!quizPass)
+            throw new Error('เธเธฃเธธเธ“เธฒเธ•เธญเธเธเธณเธ–เธฒเธก Safety เนเธซเนเธ–เธนเธเธเนเธญเธเธเธทเนเธญเธ•เธฑเนเธง');
+
+        await conn.query(
+            `INSERT INTO lottery_daily_purchases (lineUserId, purchaseDate, count) VALUES (?,?,0)
+             ON DUPLICATE KEY UPDATE count = count`,
+            [lineUserId, todayTH]);
+        const [[dp]] = await conn.query(
+            'SELECT count FROM lottery_daily_purchases WHERE lineUserId=? AND purchaseDate=? FOR UPDATE',
+            [lineUserId, todayTH]);
+        if (dp && Number(dp.count) >= 5)
+            throw new Error('เธเธทเนเธญเธเธฃเธ 5 เนเธเธ•เนเธญเธงเธฑเธเนเธฅเนเธง');
+
+        await conn.query('UPDATE users SET coinBalance = coinBalance - ? + ? WHERE lineUserId = ?', [price, quizBonus, lineUserId]);
+        const [ticketResult] = await conn.query(
+            'INSERT INTO lottery_tickets (lineUserId, roundId, ticketType, number, price) VALUES (?,?,?,?,?)',
+            [lineUserId, roundId, ticketType, numberText, price]);
+        await conn.query(
+            'UPDATE lottery_quiz_answers SET usedForTicketId=? WHERE id=?',
+            [ticketResult.insertId, quizAnswerId]);
+        await conn.query(
+            'UPDATE lottery_daily_purchases SET count = count + 1 WHERE lineUserId=? AND purchaseDate=?',
+            [lineUserId, todayTH]);
+
+        await conn.commit();
+
+        const [[u]] = await db.query('SELECT coinBalance FROM users WHERE lineUserId = ?', [lineUserId]);
+        res.json({ status: 'success', data: { newCoinBalance: u.coinBalance, message: 'เธเธทเนเธญเธ•เธฑเนเธงเธชเธณเน€เธฃเนเธ' } });
+    } catch (err) {
+        await conn.rollback();
+        res.status(400).json({ status: 'error', message: err.message });
+    } finally {
+        conn.release();
+    }
+});
+
+// GET /api/lottery/my-tickets โ€” เธ•เธฑเนเธงเธเธญเธ user เนเธขเธเธ•เธฒเธกเธเธงเธ”
+app.get('/api/lottery/my-tickets', async (req, res) => {
+    const { lineUserId } = req.query;
+    if (!lineUserId) return res.status(400).json({ status: 'error', message: 'เธ•เนเธญเธเธฃเธฐเธเธธ lineUserId' });
+    try {
+        const [tickets] = await db.query(
+            `SELECT t.*, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.status AS roundStatus, r.last2, r.last3_back
+             FROM lottery_tickets t
+             JOIN lottery_rounds r ON t.roundId = r.roundId
+             WHERE t.lineUserId = ?
+             ORDER BY t.purchasedAt DESC`,
+            [lineUserId]);
+
+        const todayTH = getBangkokDateString();
+        const [[dp]] = await db.query(
+            'SELECT count FROM lottery_daily_purchases WHERE lineUserId=? AND purchaseDate=?',
+            [lineUserId, todayTH]);
+
+        res.json({ status: 'success', data: { tickets, todayCount: dp ? dp.count : 0 } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/lottery/results โ€” เธเธฅเธฃเธฒเธเธงเธฑเธฅเธขเนเธญเธเธซเธฅเธฑเธ
+app.get('/api/lottery/results', async (req, res) => {
+    try {
+        const [rounds] = await db.query(
+            `SELECT r.roundId, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.last2, r.last3_front,
+                    r.last3_back, r.status, r.source, r.confirmedBy, r.createdAt,
+                    h.totalTicketsSold, h.totalWinners, h.totalPrizesPaid
+             FROM lottery_rounds r
+             LEFT JOIN lottery_results_history h ON r.roundId = h.roundId
+             WHERE r.status = 'completed'
+             ORDER BY r.drawDate DESC LIMIT 20`
+        );
+        res.json({ status: 'success', data: rounds });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/lottery/stats โ€” เธชเธ–เธดเธ•เธด
+app.get('/api/lottery/stats', async (req, res) => {
+    const { lineUserId } = req.query;
+    try {
+        const [[totals]] = await db.query(
+            `SELECT COUNT(*) AS totalRounds,
+                    SUM(h.totalTicketsSold) AS allTickets,
+                    SUM(h.totalWinners) AS allWinners,
+                    SUM(h.totalPrizesPaid) AS allPrizes
+             FROM lottery_results_history h`);
+
+        let userStats = null;
+        if (lineUserId) {
+            const [[u]] = await db.query(
+                'SELECT lotteryWinCount, lotteryTotalWinnings FROM users WHERE lineUserId=?', [lineUserId]);
+            const [[uc]] = await db.query(
+                'SELECT COUNT(*) AS myTickets FROM lottery_tickets WHERE lineUserId=?', [lineUserId]);
+            userStats = { ...u, myTickets: uc.myTickets };
+        }
+        res.json({ status: 'success', data: { totals, userStats } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/lottery/gold-eligibility โ€” เน€เธเนเธเธชเธดเธ—เธเธดเนเธ•เธฑเนเธงเธ—เธญเธเธเธฃเธต
+app.get('/api/lottery/gold-eligibility', async (req, res) => {
+    const { lineUserId } = req.query;
+    if (!lineUserId) return res.status(400).json({ status: 'error', message: 'เธ•เนเธญเธเธฃเธฐเธเธธ lineUserId' });
+    try {
+        const eligibility = await getLotteryGoldEligibility(lineUserId);
+        res.json({ status: 'success', data: eligibility });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/lottery/claim-gold-ticket โ€” เธฃเธฑเธเธ•เธฑเนเธงเธ—เธญเธเธเธฃเธต 3 เธ•เธฑเธงเธ—เนเธฒเธข
+app.post('/api/lottery/claim-gold-ticket', async (req, res) => {
+    const { lineUserId } = req.body;
+    if (!lineUserId) return res.status(400).json({ status: 'error', message: 'เธ•เนเธญเธเธฃเธฐเธเธธ lineUserId' });
+
+    const conn = await db.getClient();
+    try {
+        await conn.beginTransaction();
+        const eligibility = await getLotteryGoldEligibility(lineUserId, conn);
+        if (!eligibility.eligible) throw new Error(eligibility.reason || 'เธขเธฑเธเนเธกเนเธกเธตเธชเธดเธ—เธเธดเนเธฃเธฑเธเธ•เธฑเนเธงเธ—เธญเธ');
+
+        const number = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+        const [ticketResult] = await conn.query(
+            `INSERT INTO lottery_tickets (lineUserId, roundId, ticketType, number, price, isGoldTicket)
+             VALUES (?, ?, 'three', ?, 0, TRUE)`,
+            [lineUserId, eligibility.currentRound.roundId, number]);
+
+        await conn.query(
+            `INSERT INTO lottery_gold_ticket_claims
+             (lineUserId, roundId, ticketId, department, incidentFreeSince)
+             VALUES (?, ?, ?, ?, ?)`,
+            [lineUserId, eligibility.currentRound.roundId, ticketResult.insertId, eligibility.department, eligibility.incidentFreeSince]);
+
+        await conn.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'lottery_gold', ?, ?, NOW())`,
+            [
+                'NOTIF' + uuidv4(),
+                lineUserId,
+                `เธเธธเธ“เนเธ”เนเธฃเธฑเธ Gold Ticket เธเธฃเธต เธเธงเธ” ${eligibility.currentRound.drawDate} เน€เธฅเธ ${number}`,
+                eligibility.currentRound.roundId,
+                lineUserId
+            ]);
+
+        await conn.commit();
+        res.json({
+            status: 'success',
+            data: {
+                ticketId: ticketResult.insertId,
+                roundId: eligibility.currentRound.roundId,
+                drawDate: eligibility.currentRound.drawDate,
+                ticketType: 'three',
+                number,
+                isGoldTicket: true,
+                message: 'เธฃเธฑเธ Gold Ticket เธชเธณเน€เธฃเนเธ'
+            }
+        });
+    } catch (e) {
+        await conn.rollback();
+        res.status(400).json({ status: 'error', message: e.message });
+    } finally {
+        conn.release();
+    }
+});
+
+// ======================================================
+// LOTTERY ADMIN APIs
+// ======================================================
+
+// POST /api/admin/lottery/set-result โ€” เธเธฃเธญเธเธเธฅเธฃเธฒเธเธงเธฑเธฅ manual
+app.post('/api/admin/lottery/set-result', async (req, res) => {
+    const { requesterId, roundId, last2, last3_front, last3_back } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'เนเธกเนเธกเธตเธชเธดเธ—เธเธดเน' });
+
+        if (!roundId || !last2 || !last3_back)
+            return res.status(400).json({ status: 'error', message: 'เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ' });
+        if (!/^\d{2}$/.test(last2)) return res.status(400).json({ status: 'error', message: 'เธฃเธนเธเนเธเธ 2 เธ•เธฑเธงเธ—เนเธฒเธขเนเธกเนเธ–เธนเธเธ•เนเธญเธ' });
+        if (!/^\d{3}$/.test(last3_back)) return res.status(400).json({ status: 'error', message: 'เธฃเธนเธเนเธเธ 3 เธ•เธฑเธงเธ—เนเธฒเธขเนเธกเนเธ–เธนเธเธ•เนเธญเธ' });
+
+        await db.query(
+            `UPDATE lottery_rounds SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source='manual', confirmedBy=? WHERE roundId=?`,
+            [last2, last3_front || null, last3_back, requesterId, roundId]
+        );
+        await logAdminAction(requesterId, 'LOTTERY_SET_RESULT', 'round', roundId, roundId, { last2, last3_back });
+        res.json({ status: 'success', data: { message: 'เธเธฑเธเธ—เธถเธเธเธฅเธฃเธฒเธเธงเธฑเธฅเนเธฅเนเธง เธฃเธญเธขเธทเธเธขเธฑเธ' } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/admin/lottery/confirm-result โ€” เธขเธทเธเธขเธฑเธเธเธฅเธเนเธญเธเธเนเธฒเธขเธฃเธฒเธเธงเธฑเธฅ
+app.post('/api/admin/lottery/confirm-result', async (req, res) => {
+    const { requesterId, roundId } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'เนเธกเนเธกเธตเธชเธดเธ—เธเธดเน' });
+
+        const [[round]] = await db.query('SELECT * FROM lottery_rounds WHERE roundId=?', [roundId]);
+        if (!round) throw new Error('Lottery round not found');
+        if (!round.last2 || !round.last3_back)
+            throw new Error('Lottery result is incomplete');
+
+        await db.query(
+            "UPDATE lottery_rounds SET status='confirmed', confirmedBy=? WHERE roundId=?",
+            [requesterId, roundId]
+        );
+        await logAdminAction(requesterId, 'LOTTERY_CONFIRM_RESULT', 'round', roundId, roundId, { last2: round.last2, last3_back: round.last3_back });
+        res.json({ status: 'success', data: { message: 'เธขเธทเธเธขเธฑเธเธเธฅเน€เธฃเธตเธขเธเธฃเนเธญเธข เธเธฃเนเธญเธกเธเธฃเธฐเธกเธงเธฅเธฃเธฒเธเธงเธฑเธฅ' } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/admin/lottery/process-prizes โ€” เธเธฃเธฐเธกเธงเธฅเธเธฅเธฃเธฒเธเธงเธฑเธฅ + เธเนเธฒเธข points + LINE Push
+app.post('/api/admin/lottery/process-prizes', async (req, res) => {
+    const { requesterId, roundId } = req.body;
+    let conn;
+    const pendingPushes = [];
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'เนเธกเนเธกเธตเธชเธดเธ—เธเธดเน' });
+
+        conn = await db.getClient();
+        await conn.beginTransaction();
+
+        const [[round]] = await conn.query('SELECT * FROM lottery_rounds WHERE roundId=? FOR UPDATE', [roundId]);
+        if (!round) throw new Error('Lottery round not found');
+        if (round.status === 'completed')
+            throw new Error('This lottery round has already been processed');
+        if (round.status !== 'confirmed')
+            throw new Error('Lottery result must be confirmed before processing prizes');
+        if (!round.last2 || !round.last3_back)
+            throw new Error('Lottery result is incomplete');
+
+        // เธซเธฒเธเธนเนเธ–เธนเธเธฃเธฒเธเธงเธฑเธฅ 2 เธ•เธฑเธงเธ—เนเธฒเธข
+        const [win2] = await conn.query(
+            `SELECT * FROM lottery_tickets WHERE roundId=? AND ticketType='two' AND number=? AND isPrizeClaimed=FALSE FOR UPDATE`,
+            [roundId, round.last2]);
+
+        // เธซเธฒเธเธนเนเธ–เธนเธเธฃเธฒเธเธงเธฑเธฅ 3 เธ•เธฑเธงเธ—เนเธฒเธข
+        const [win3] = await conn.query(
+            `SELECT * FROM lottery_tickets WHERE roundId=? AND ticketType='three' AND number=? AND isPrizeClaimed=FALSE FOR UPDATE`,
+            [roundId, round.last3_back]);
+
+        const allWinners = [...win2, ...win3];
+        let totalPrizes = 0;
+        let paidWinners = 0;
+
+        for (const ticket of allWinners) {
+            const prize = ticket.ticketType === 'two' ? 500 : 3000;
+            const [ticketUpdate] = await conn.query(
+                `UPDATE lottery_tickets SET isWinner=TRUE, prizeAmount=?, isPrizeClaimed=TRUE WHERE ticketId=? AND isPrizeClaimed=FALSE`,
+                [prize, ticket.ticketId]);
+            if (ticketUpdate.affectedRows !== 1) continue;
+
+            totalPrizes += prize;
+            paidWinners += 1;
+            await conn.query(
+                `UPDATE users SET totalScore=totalScore+?, lotteryWinCount=lotteryWinCount+1,
+                 lotteryTotalWinnings=lotteryTotalWinnings+? WHERE lineUserId=?`,
+                [prize, prize, ticket.lineUserId]);
+
+            const notifId = 'NOTIF' + uuidv4();
+            await conn.query(
+                `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId)
+                 VALUES (?,?,?,?,?)`,
+                [notifId, ticket.lineUserId,
+                 `๐ เธเธธเธ“เธ–เธนเธ Safety Lottery เธเธงเธ” ${toLotteryDateString(round.drawDate)}! เนเธ”เนเธฃเธฑเธ ${prize.toLocaleString()} เธเธฐเนเธเธ`,
+                 'lottery_win', roundId]
+            );
+
+            pendingPushes.push({ lineUserId: ticket.lineUserId, ticketData: {
+                drawDate: toLotteryDateString(round.drawDate),
+                ticketType: ticket.ticketType,
+                number: ticket.number,
+                prizeAmount: prize
+            }});
+        }
+
+        // mark tickets เธ—เธตเนเนเธกเนเธ–เธนเธเธฃเธฒเธเธงเธฑเธฅ
+        await conn.query(
+            `UPDATE lottery_tickets SET isWinner=FALSE, isPrizeClaimed=TRUE
+             WHERE roundId=? AND isPrizeClaimed=FALSE`,
+            [roundId]);
+
+        const [[sold]] = await conn.query(
+            'SELECT COUNT(*) AS cnt FROM lottery_tickets WHERE roundId=?', [roundId]);
+        await conn.query(
+            `INSERT INTO lottery_results_history (roundId, totalTicketsSold, totalWinners, totalPrizesPaid)
+             VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE totalTicketsSold=?, totalWinners=?, totalPrizesPaid=?`,
+            [roundId, sold.cnt, paidWinners, totalPrizes, sold.cnt, paidWinners, totalPrizes]);
+
+        await conn.query("UPDATE lottery_rounds SET status='completed' WHERE roundId=?", [roundId]);
+        await conn.commit();
+
+        await logAdminAction(requesterId, 'LOTTERY_PROCESS_PRIZES', 'round', roundId, roundId,
+            { winners: paidWinners, totalPrizes });
+
+        for (const push of pendingPushes) {
+            sendLotteryWinNotification(push.lineUserId, push.ticketData).catch(() => {});
+        }
+
+        res.json({ status: 'success', data: { winners: paidWinners, totalPrizes, message: 'เธเธฃเธฐเธกเธงเธฅเธเธฅเธฃเธฒเธเธงเธฑเธฅเน€เธฃเธตเธขเธเธฃเนเธญเธข' } });
+    } catch (e) {
+        if (conn) {
+            try { await conn.rollback(); } catch (_) {}
+        }
+        res.status(500).json({ status: 'error', message: e.message });
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
+// GET /api/admin/lottery/dashboard โ€” Dashboard เธชเธฃเธธเธ
+app.get('/api/admin/lottery/dashboard', async (req, res) => {
+    const { requesterId } = req.query;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'เนเธกเนเธกเธตเธชเธดเธ—เธเธดเน' });
+
+        const [rounds] = await db.query(
+            `SELECT r.roundId, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.last2, r.last3_front,
+                    r.last3_back, r.status, r.source, r.confirmedBy, r.createdAt,
+                    h.totalTicketsSold, h.totalWinners, h.totalPrizesPaid
+             FROM lottery_rounds r
+             LEFT JOIN lottery_results_history h ON r.roundId=h.roundId
+             ORDER BY r.drawDate DESC LIMIT 10`);
+
+        const [[totals]] = await db.query(
+            `SELECT COUNT(*) AS totalTickets,
+                    SUM(CASE WHEN isWinner=TRUE THEN 1 ELSE 0 END) AS totalWinners,
+                    SUM(prizeAmount) AS totalPrizesPaid
+             FROM lottery_tickets`);
+
+        const [[qCount]] = await db.query('SELECT COUNT(*) AS cnt FROM lottery_quiz_questions WHERE isActive=TRUE');
+
+        res.json({ status: 'success', data: { rounds, totals, activeQuestions: qCount.cnt } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/admin/lottery/questions โ€” เธ”เธถเธเธเธณเธ–เธฒเธกเธ—เธฑเนเธเธซเธกเธ”
+app.get('/api/admin/lottery/questions', async (req, res) => {
+    const { requesterId, category } = req.query;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'เนเธกเนเธกเธตเธชเธดเธ—เธเธดเน' });
+
+        let sql = 'SELECT * FROM lottery_quiz_questions WHERE 1=1';
+        const params = [];
+        if (category) { sql += ' AND category=?'; params.push(category); }
+        sql += ' ORDER BY createdAt DESC';
+
+        const [rows] = await db.query(sql, params);
+        res.json({ status: 'success', data: rows });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/admin/lottery/questions โ€” เน€เธเธดเนเธกเธเธณเธ–เธฒเธก manual
+app.post('/api/admin/lottery/questions', async (req, res) => {
+    const { requesterId, questionText, optionA, optionB, optionC, optionD, correctOption, category } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'เนเธกเนเธกเธตเธชเธดเธ—เธเธดเน' });
+        if (!questionText || !optionA || !optionB || !optionC || !optionD || !correctOption)
+            return res.status(400).json({ status: 'error', message: 'เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ' });
+
+        const [result] = await db.query(
+            `INSERT INTO lottery_quiz_questions (questionText,optionA,optionB,optionC,optionD,correctOption,category,generatedBy)
+             VALUES (?,?,?,?,?,?,?,?)`,
+            [questionText, optionA, optionB, optionC, optionD, correctOption.toUpperCase(), category || 'เธ—เธฑเนเธงเนเธ', 'manual']);
+
+        await logAdminAction(requesterId, 'LOTTERY_ADD_QUESTION', 'question', String(result.insertId), questionText.slice(0, 50), {});
+        res.json({ status: 'success', data: { questionId: result.insertId } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// PUT /api/admin/lottery/questions โ€” เนเธเนเนเธเธเธณเธ–เธฒเธก
+app.put('/api/admin/lottery/questions', async (req, res) => {
+    const { requesterId, questionId, questionText, optionA, optionB, optionC, optionD, correctOption, category, isActive } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'เนเธกเนเธกเธตเธชเธดเธ—เธเธดเน' });
+        if (!questionId) return res.status(400).json({ status: 'error', message: 'เธ•เนเธญเธเธฃเธฐเธเธธ questionId' });
+
+        await db.query(
+            `UPDATE lottery_quiz_questions SET questionText=?,optionA=?,optionB=?,optionC=?,optionD=?,
+             correctOption=?,category=?,isActive=? WHERE questionId=?`,
+            [questionText, optionA, optionB, optionC, optionD, correctOption.toUpperCase(),
+             category || 'เธ—เธฑเนเธงเนเธ', isActive !== false, questionId]);
+
+        await logAdminAction(requesterId, 'LOTTERY_EDIT_QUESTION', 'question', String(questionId), questionText.slice(0, 50), {});
+        res.json({ status: 'success', data: { message: 'เนเธเนเนเธเนเธฅเนเธง' } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// DELETE /api/admin/lottery/questions/:id โ€” เธฅเธเธเธณเธ–เธฒเธก
+app.delete('/api/admin/lottery/questions/:id', async (req, res) => {
+    const requesterId = req.body?.requesterId || req.query?.requesterId;
+    const { id } = req.params;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'เนเธกเนเธกเธตเธชเธดเธ—เธเธดเน' });
+
+        const [[q]] = await db.query('SELECT questionText FROM lottery_quiz_questions WHERE questionId=?', [id]);
+        await db.query('DELETE FROM lottery_quiz_questions WHERE questionId=?', [id]);
+        await logAdminAction(requesterId, 'LOTTERY_DELETE_QUESTION', 'question', id, q ? q.questionText.slice(0, 50) : '', {});
+        res.json({ status: 'success', data: { message: 'เธฅเธเนเธฅเนเธง' } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/admin/lottery/generate-questions โ€” AI เธชเธฃเนเธฒเธเธเธณเธ–เธฒเธก 10 เธเนเธญ
+app.post('/api/admin/lottery/generate-questions', async (req, res) => {
+    const { requesterId, category } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'เนเธกเนเธกเธตเธชเธดเธ—เธเธดเน' });
+
+        const prompt = `เธเธธเธ“เธเธทเธญเธเธนเนเน€เธเธตเนเธขเธงเธเธฒเธเธ”เนเธฒเธเธเธงเธฒเธกเธเธฅเธญเธ”เธ เธฑเธข เธญเธฒเธเธตเธงเธญเธเธฒเธกเธฑเธข เนเธฅเธฐเธชเธดเนเธเนเธงเธ”เธฅเนเธญเธก (เธเธ.เธงเธดเธเธฒเธเธตเธ) เนเธเนเธฃเธเธเธฒเธเธญเธธเธ•เธชเธฒเธซเธเธฃเธฃเธกเธเธฃเธฐเน€เธ—เธจเนเธ—เธข
+
+เธชเธฃเนเธฒเธเธเธณเธ–เธฒเธกเนเธเธเธเธฃเธเธฑเธข 4 เธ•เธฑเธงเน€เธฅเธทเธญเธ เธเธณเธเธงเธ 10 เธเนเธญ เธซเธกเธงเธ”เธซเธกเธนเน: ${category || 'เธ—เธฑเนเธงเนเธ'}
+
+เธเธเน€เธซเธฅเนเธ:
+- เธเธณเธ–เธฒเธกเธ•เนเธญเธเน€เธเธตเนเธขเธงเธเธฑเธเธเธงเธฒเธกเธเธฅเธญเธ”เธ เธฑเธขเนเธเธเธฒเธฃเธ—เธณเธเธฒเธ เธญเธฒเธเธตเธงเธญเธเธฒเธกเธฑเธข เธซเธฃเธทเธญเธชเธดเนเธเนเธงเธ”เธฅเนเธญเธกเนเธเนเธฃเธเธเธฒเธ
+- เธ เธฒเธฉเธฒเนเธ—เธข เน€เธเนเธฒเนเธเธเนเธฒเธข เน€เธซเธกเธฒเธฐเธเธฑเธเธเธเธฑเธเธเธฒเธเนเธฃเธเธเธฒเธเธ—เธธเธเธฃเธฐเธ”เธฑเธ
+- เธ•เธฑเธงเน€เธฅเธทเธญเธเธ•เนเธญเธเธชเธกเธเธฃเธดเธ เนเธกเนเธ•เธฅเธ เนเธกเนเน€เธซเนเธเธเธฑเธ”เธงเนเธฒเธเนเธญเนเธซเธเธ–เธนเธ
+- เธซเนเธฒเธกเธกเธตเธเธณเธ–เธฒเธกเธเนเธณเธเธฑเธ
+- เธญเนเธฒเธเธญเธดเธเธเธเธซเธกเธฒเธขเนเธ—เธข เธกเธฒเธ•เธฃเธเธฒเธเธชเธฒเธเธฅ (ISO, OSHA) เธซเธฃเธทเธญเนเธเธงเธเธเธดเธเธฑเธ•เธดเธ—เธตเนเธ”เธตเนเธ”เน
+
+เธ•เธญเธเน€เธเนเธ JSON array เน€เธ—เนเธฒเธเธฑเนเธ เธซเนเธฒเธกเธกเธตเธเนเธญเธเธงเธฒเธกเธญเธทเนเธเธเธญเธ JSON เธซเนเธฒเธกเธกเธต markdown backticks:
+[{"questionText":"เธเธณเธ–เธฒเธก","optionA":"A","optionB":"B","optionC":"C","optionD":"D","correctOption":"A","category":"เธซเธกเธงเธ”"}]`;
+
+        const geminiRes = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            { contents: [{ parts: [{ text: prompt }] }] },
+            { timeout: 30000 }
+        );
+
+        let rawText = geminiRes.data.candidates[0].content.parts[0].text;
+        rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const questions = JSON.parse(rawText);
+
+        if (!Array.isArray(questions) || questions.length === 0)
+            throw new Error('Gemini เธชเนเธ JSON เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
+
+        const inserted = [];
+        for (const q of questions) {
+            if (!q.questionText || !q.optionA || !q.optionB || !q.optionC || !q.optionD || !q.correctOption) continue;
+            const [r] = await db.query(
+                `INSERT INTO lottery_quiz_questions (questionText,optionA,optionB,optionC,optionD,correctOption,category,generatedBy)
+                 VALUES (?,?,?,?,?,?,?,?)`,
+                [q.questionText, q.optionA, q.optionB, q.optionC, q.optionD,
+                 q.correctOption.toUpperCase(), q.category || category || 'เธ—เธฑเนเธงเนเธ', 'ai_gemini']);
+            inserted.push({ questionId: r.insertId, questionText: q.questionText });
+        }
+
+        await logAdminAction(requesterId, 'LOTTERY_AI_GENERATE_QUESTIONS', 'question', 'batch', category || 'เธ—เธฑเนเธงเนเธ',
+            { count: inserted.length });
+
+        res.json({ status: 'success', data: { inserted: inserted.length, preview: inserted.slice(0, 3) } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/admin/lottery/rounds โ€” เธชเธฃเนเธฒเธเธเธงเธ”เนเธซเธกเน
+app.post('/api/admin/lottery/rounds', async (req, res) => {
+    const { requesterId, drawDate } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'เนเธกเนเธกเธตเธชเธดเธ—เธเธดเน' });
+        if (!drawDate || !/^\d{4}-\d{2}-\d{2}$/.test(drawDate))
+            return res.status(400).json({ status: 'error', message: 'เธงเธฑเธเธ—เธตเนเนเธกเนเธ–เธนเธเธ•เนเธญเธ' });
+
+        await db.query(
+            'INSERT INTO lottery_rounds (roundId, drawDate) VALUES (?,?)',
+            [drawDate, drawDate]);
+        await logAdminAction(requesterId, 'LOTTERY_CREATE_ROUND', 'round', drawDate, drawDate, {});
+        res.json({ status: 'success', data: { roundId: drawDate, message: 'เธชเธฃเนเธฒเธเธเธงเธ”เนเธฅเนเธง' } });
+    } catch (e) {
+        if (e.code === 'ER_DUP_ENTRY') return res.status(400).json({ status: 'error', message: 'เธกเธตเธเธงเธ”เธเธตเนเนเธฅเนเธง' });
+        res.status(500).json({ status: 'error', message: e.message });
     }
 });
 
