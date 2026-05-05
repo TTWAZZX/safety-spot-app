@@ -333,7 +333,7 @@
                         <div class="bento-card theme-lottery span-2 safety-lottery-entry" onclick="openLotteryModal()">
                             <div class="lottery-entry-copy">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <span class="badge lottery-badge-green fw-semibold">Lottery</span>
+                                    <span class="badge lottery-badge-green fw-semibold" id="lottery-entry-status-badge">Lottery</span>
                                     <i class="fas fa-ticket text-success fs-4 opacity-60"></i>
                                 </div>
                                 <div>
@@ -1827,6 +1827,27 @@
                         <!-- Tab: ซื้อตั๋ว -->
                         <div class="tab-pane fade show active" id="tab-buy">
                             <div id="lottery-buy-section">
+                                <div class="lottery-flow-steps mb-3">
+                                    <div class="lottery-flow-step active" id="lottery-step-number"><span>1</span><small>เลือกเลข</small></div>
+                                    <div class="lottery-flow-step" id="lottery-step-quiz"><span>2</span><small>Quiz</small></div>
+                                    <div class="lottery-flow-step" id="lottery-step-done"><span>3</span><small>สำเร็จ</small></div>
+                                </div>
+
+                                <div class="lottery-purchase-summary mb-3">
+                                    <div>
+                                        <small>Coins</small>
+                                        <strong id="lottery-summary-coins">0</strong>
+                                    </div>
+                                    <div>
+                                        <small>Quota</small>
+                                        <strong id="lottery-summary-quota">0/5</strong>
+                                    </div>
+                                    <div>
+                                        <small>Price</small>
+                                        <strong id="lottery-summary-price">10</strong>
+                                    </div>
+                                </div>
+
                                 <!-- Daily quota info -->
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <small class="text-muted">
@@ -1887,9 +1908,11 @@
                                     </div>
                                 </div>
 
-                                <button class="btn btn-success w-100 fw-bold py-3 lottery-buy-btn" id="btn-lottery-buy" onclick="startLotteryQuiz()">
-                                    <i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety แล้วซื้อ
-                                </button>
+                                <div class="lottery-sticky-action">
+                                    <button class="btn btn-success w-100 fw-bold py-3 lottery-buy-btn" id="btn-lottery-buy" onclick="startLotteryQuiz()">
+                                        <i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety แล้วซื้อ
+                                    </button>
+                                </div>
                             </div>
                         </div>
 

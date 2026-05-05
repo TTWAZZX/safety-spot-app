@@ -3855,6 +3855,8 @@ async function loadGameDashboard() {
     const user = AppState.currentUser;
     if (!user) return; // guard: ยังไม่ login
 
+    refreshLotteryEntryStatusBadge();
+
     // 1. อัปเดตเหรียญ + Streak
     syncCoins(user.coinBalance || 0);
     $('#streak-display').text((user.currentStreak || 0) + " วัน");
@@ -5611,6 +5613,52 @@ let _lotterySelectedType = 'two'; // 'two' | 'three'
 let _lotteryCurrentQuestion = null;
 let _lotteryLastQuizAnswerId = null;
 
+function updateLotteryPurchaseSummary(todayCount = null) {
+    const coins = Number(AppState.currentUser?.coinBalance || 0);
+    const price = _lotterySelectedType === 'two' ? 10 : 30;
+    $('#lottery-summary-coins').text(coins.toLocaleString());
+    $('#lottery-summary-price').text(price.toLocaleString());
+    if (todayCount !== null) {
+        $('#lottery-summary-quota').text(`${todayCount}/5`);
+    }
+}
+
+function setLotteryFlowStep(step) {
+    $('#lottery-step-number, #lottery-step-quiz, #lottery-step-done').removeClass('active complete');
+    if (step === 'number') {
+        $('#lottery-step-number').addClass('active');
+    } else if (step === 'quiz') {
+        $('#lottery-step-number').addClass('complete');
+        $('#lottery-step-quiz').addClass('active');
+    } else if (step === 'done') {
+        $('#lottery-step-number, #lottery-step-quiz').addClass('complete');
+        $('#lottery-step-done').addClass('active');
+    }
+}
+
+async function refreshLotteryEntryStatusBadge() {
+    const $badge = $('#lottery-entry-status-badge');
+    if (!$badge.length) return;
+    try {
+        const res = await callApi('/api/lottery/current-round', {
+            lineUserId: AppState.lineProfile?.userId || ''
+        });
+        if (res && res.featureEnabled === false) {
+            $badge.removeClass('lottery-badge-green').addClass('lottery-badge-muted').text('Developing');
+        } else if (res && res.status === 'open' && !res.isClosed) {
+            $badge.removeClass('lottery-badge-muted').addClass('lottery-badge-green').text('Open');
+        } else {
+            $badge.removeClass('lottery-badge-green').addClass('lottery-badge-muted').text('Waiting');
+        }
+    } catch (_) {
+        $badge.removeClass('lottery-badge-green').addClass('lottery-badge-muted').text('Lottery');
+    }
+}
+
+if (typeof window !== 'undefined') {
+    window.refreshLotteryEntryStatusBadge = refreshLotteryEntryStatusBadge;
+}
+
 // -----------------------------------------------
 // openLotteryModal — เปิด modal หลัก
 // -----------------------------------------------
@@ -5619,7 +5667,10 @@ async function openLotteryModal() {
     const modal = new bootstrap.Modal(document.getElementById('lottery-modal'));
     AppState.allModals['lottery'] = modal;
     modal.show();
+    setLotteryFlowStep('number');
+    updateLotteryPurchaseSummary();
     await loadLotteryCurrentRound();
+    refreshLotteryEntryStatusBadge();
 }
 
 // -----------------------------------------------
@@ -5684,6 +5735,7 @@ async function loadLotteryCurrentRound() {
         // load daily quota
         const ticketsRes = await callApi('/api/lottery/my-tickets', { lineUserId: AppState.lineProfile.userId });
         $('#lottery-daily-quota-badge').text(`${ticketsRes.todayCount}/5 ใบวันนี้`);
+        updateLotteryPurchaseSummary(ticketsRes.todayCount || 0);
         if (ticketsRes.todayCount >= 5) {
             $('#btn-lottery-buy').prop('disabled', true)
                 .html('<i class="fas fa-ban me-2"></i>ซื้อครบ 5 ใบแล้ววันนี้');
@@ -5784,6 +5836,7 @@ function selectLotteryType(type) {
     _lotterySelectedType = type;
     $('#type-two-card, #type-three-card').removeClass('active');
     $(`#type-${type}-card`).addClass('active');
+    updateLotteryPurchaseSummary();
 
     const input = $('#lottery-number-input');
     if (type === 'two') {
@@ -5826,6 +5879,7 @@ async function startLotteryQuiz() {
     }
 
     // โหลดคำถาม
+    setLotteryFlowStep('quiz');
     const quizModal = new bootstrap.Modal(document.getElementById('lottery-quiz-modal'));
     AppState.allModals['lottery-quiz'] = quizModal;
     quizModal.show();
@@ -5966,6 +6020,7 @@ async function executeBuyTicket() {
         _lotteryLastQuizAnswerId = null;
         await loadLotteryCurrentRound();
         $('#lottery-number-input').val('');
+        setLotteryFlowStep('done');
         // เปิด tab ตั๋วของฉัน
         $('[data-bs-target="#tab-my-tickets"]').trigger('click');
     } catch (e) {
@@ -5998,15 +6053,27 @@ async function loadMyLotteryTickets() {
         let html = '';
         for (const [roundId, g] of Object.entries(grouped)) {
             const drawDateStr = new Date(g.drawDate + 'T00:00:00+07:00').toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+            const total = g.tickets.length;
+            const wins = g.tickets.filter(t => t.isWinner).length;
+            const gold = g.tickets.filter(t => t.isGoldTicket).length;
+            const prizeTotal = g.tickets.reduce((sum, t) => sum + Number(t.prizeAmount || 0), 0);
             const statusBadge = g.roundStatus === 'completed'
                 ? '<span class="badge bg-success">ออกรางวัลแล้ว</span>'
                 : g.roundStatus === 'open'
                 ? '<span class="badge bg-primary">กำลังรับซื้อ</span>'
                 : '<span class="badge bg-warning text-dark">รอผล</span>';
 
-            html += `<div class="mb-3">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <small class="fw-bold text-muted">งวด ${sanitizeHTML(drawDateStr)}</small>
+            html += `<div class="lottery-ticket-group mb-3">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <small class="fw-bold text-muted">งวด ${sanitizeHTML(drawDateStr)}</small>
+                        <div class="lottery-ticket-group-summary">
+                            <span>${total} ใบ</span>
+                            <span>${wins} ถูก</span>
+                            <span>${gold} Gold</span>
+                            <span>${prizeTotal.toLocaleString()} pts</span>
+                        </div>
+                    </div>
                     ${statusBadge}
                 </div>`;
 
@@ -6019,9 +6086,13 @@ async function loadMyLotteryTickets() {
                 html += `<div class="lottery-ticket-card ${ticketClass} ${isWin ? 'ticket-winner' : ''}">
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="ticket-type-sm">${typeIcon} ${typeLabel}</span>
-                        ${isWin ? '<span class="badge bg-warning text-dark">🏆 ถูกรางวัล</span>' : ''}
+                        ${isWin ? '<span class="badge bg-warning text-dark">ถูกรางวัล</span>' : '<span class="badge bg-light text-muted border">รอ/ไม่ถูกรางวัล</span>'}
                     </div>
                     <div class="ticket-number-large">${sanitizeHTML(t.number)}</div>
+                    <div class="ticket-meta-row">
+                        <span>${t.ticketType === 'two' ? 'Prize 500 pts' : 'Prize 3,000 pts'}</span>
+                        <span>${t.isPrizeClaimed ? 'จ่ายแล้ว' : (isWin ? 'รอจ่าย' : 'Active')}</span>
+                    </div>
                     ${isWin ? `<div class="ticket-prize-badge">+${Number(t.prizeAmount).toLocaleString()} Points</div>` : ''}
                 </div>`;
             });

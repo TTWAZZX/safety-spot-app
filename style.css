@@ -2702,6 +2702,11 @@ body {
     color: #06C755;
     border: 1px solid rgba(6,199,85,0.3);
 }
+.lottery-badge-muted {
+    background: rgba(100,116,139,0.14);
+    color: #475569;
+    border: 1px solid rgba(100,116,139,0.25);
+}
 
 /* Main Modal header */
 .lottery-modal-content { border-radius: 20px; overflow: hidden; }
@@ -2762,6 +2767,78 @@ body {
 }
 .lottery-tab-btn:focus { outline: none; box-shadow: none; }
 
+.lottery-flow-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+.lottery-flow-step {
+    min-height: 52px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #fff;
+    color: #64748b;
+    font-weight: 800;
+}
+.lottery-flow-step span {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #e5e7eb;
+    color: #475569;
+    font-size: 0.78rem;
+}
+.lottery-flow-step small {
+    font-size: 0.74rem;
+    font-weight: 800;
+}
+.lottery-flow-step.active {
+    border-color: #06C755;
+    background: #ecfdf5;
+    color: #047857;
+}
+.lottery-flow-step.active span,
+.lottery-flow-step.complete span {
+    background: #06C755;
+    color: #fff;
+}
+.lottery-flow-step.complete {
+    border-color: #bbf7d0;
+    color: #047857;
+}
+
+.lottery-purchase-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+.lottery-purchase-summary div {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 10px;
+    min-width: 0;
+}
+.lottery-purchase-summary small {
+    display: block;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+.lottery-purchase-summary strong {
+    display: block;
+    color: #0f172a;
+    font-size: 1.05rem;
+    line-height: 1.1;
+}
+
 /* Ticket type cards */
 .lottery-type-card {
     border: 2px solid #e9ecef;
@@ -2806,6 +2883,14 @@ body {
 }
 .lottery-buy-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(6,199,85,0.4); }
 .lottery-buy-btn:disabled { background: #adb5bd; cursor: not-allowed; }
+.lottery-sticky-action {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    padding-top: 8px;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(255,255,255,0), #fff 34%);
+}
 
 /* Gold ticket claim */
 .lottery-gold-claim {
@@ -2904,6 +2989,37 @@ body {
     font-weight: 700;
     color: #f59e0b;
     font-size: 1rem;
+}
+.lottery-ticket-group {
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 12px;
+    background: #fff;
+}
+.lottery-ticket-group-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+.lottery-ticket-group-summary span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    border-radius: 999px;
+    padding: 2px 8px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+.ticket-meta-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 700;
 }
 
 /* Ticket preview in Swal */
@@ -3030,6 +3146,28 @@ body {
     .lottery-number-input {
         font-size: 1.75rem !important;
         letter-spacing: 4px;
+    }
+    .lottery-flow-step {
+        flex-direction: column;
+        gap: 3px;
+        min-height: 58px;
+    }
+    .lottery-purchase-summary div {
+        padding: 9px 8px;
+    }
+    .lottery-purchase-summary strong {
+        font-size: 0.95rem;
+    }
+    .lottery-sticky-action {
+        margin-left: -12px;
+        margin-right: -12px;
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+    .ticket-meta-row {
+        flex-direction: column;
+        gap: 2px;
+        text-align: center;
     }
     .ticket-number-large,
     .ticket-number-display,
