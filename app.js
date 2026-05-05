@@ -5632,6 +5632,29 @@ async function loadLotteryCurrentRound() {
         });
         _lotteryCurrentRound = res;
 
+        if (res && res.featureEnabled === false) {
+            _lotteryCurrentRound = null;
+            $('#lottery-round-label').text('Safety Lottery ยังไม่เปิดให้ผู้ใช้เข้าเล่น');
+            $('#lottery-countdown-bar').html(`<i class="fas fa-tools me-1"></i>${sanitizeHTML(res.message || 'Admin is preparing this feature.')}`);
+            $('#lottery-buy-section').addClass('lottery-feature-disabled').html(`
+                <div class="lottery-disabled-state">
+                    <div class="lottery-disabled-icon"><i class="fas fa-lock"></i></div>
+                    <h6 class="fw-bold mb-2">ยังไม่เปิดให้เข้าเล่น</h6>
+                    <p class="text-muted small mb-3">${sanitizeHTML(res.message || 'Admin is preparing this feature.')}</p>
+                    <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+                        <i class="fas fa-arrow-left me-1"></i>กลับหน้าหลัก
+                    </button>
+                </div>
+            `);
+            return;
+        }
+
+        if ($('#lottery-buy-section').hasClass('lottery-feature-disabled')) {
+            $('#lottery-buy-section').removeClass('lottery-feature-disabled');
+            location.reload();
+            return;
+        }
+
         if (!res) {
             $('#lottery-round-label').text('ไม่มีงวดที่เปิดอยู่');
             $('#lottery-countdown-bar').text('ยังไม่มีงวด — Admin กำลังสร้างงวดใหม่');
@@ -5728,6 +5751,29 @@ async function claimLotteryGoldTicket() {
     } catch (e) {
         Swal.fire({ icon: 'error', title: 'รับตั๋วทองไม่สำเร็จ', text: e.message, confirmButtonColor: '#06C755' });
         await loadLotteryGoldEligibility();
+    }
+}
+
+async function adminToggleLotteryUserAccess() {
+    const $toggle = $('#admin-lottery-user-enabled');
+    const userEnabled = $toggle.is(':checked');
+    const disabledMessage = $('#admin-lottery-disabled-message').val()?.trim()
+        || 'Safety Lottery is being prepared by the admin team.';
+
+    $toggle.prop('disabled', true);
+    try {
+        await callApi('/api/admin/lottery/settings', {
+            requesterId: AppState.lineProfile.userId,
+            userEnabled,
+            disabledMessage
+        }, 'POST');
+        showToast(userEnabled ? 'เปิด Safety Lottery ให้ผู้ใช้แล้ว' : 'ปิด Safety Lottery สำหรับผู้ใช้แล้ว', 'success');
+        await loadAdminLotteryDashboard();
+    } catch (e) {
+        $toggle.prop('checked', !userEnabled);
+        Swal.fire('Error', e.message, 'error');
+    } finally {
+        $toggle.prop('disabled', false);
     }
 }
 
@@ -6062,7 +6108,8 @@ async function loadAdminLotteryDashboard() {
         const res = await callApi('/api/admin/lottery/dashboard', {
             requesterId: AppState.lineProfile.userId
         });
-        const { rounds, totals, activeQuestions } = res;
+        const { rounds, totals, activeQuestions, settings = {} } = res;
+        const userEnabled = !!settings.userEnabled;
 
         let roundsHtml = '';
         (rounds || []).forEach(r => {
@@ -6085,6 +6132,22 @@ async function loadAdminLotteryDashboard() {
         });
 
         $el.html(`
+            <div class="lottery-admin-control mb-3">
+                <div>
+                    <div class="fw-bold">${userEnabled ? 'เปิดให้ผู้ใช้เข้าเล่นแล้ว' : 'ปิดการเข้าเล่นของผู้ใช้'}</div>
+                    <small class="text-muted">Admin ยังจัดการคำถาม งวด ผลรางวัล และ Monitor ได้ตามปกติ</small>
+                </div>
+                <div class="lottery-admin-control-actions">
+                    <input class="form-control form-control-sm" id="admin-lottery-disabled-message"
+                           value="${sanitizeHTML(settings.disabledMessage || 'Safety Lottery is being prepared by the admin team.')}"
+                           placeholder="ข้อความที่จะแสดงเมื่อปิดฟีเจอร์">
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="admin-lottery-user-enabled"
+                               ${userEnabled ? 'checked' : ''} onchange="adminToggleLotteryUserAccess()">
+                        <label class="form-check-label small fw-semibold" for="admin-lottery-user-enabled">${userEnabled ? 'Enabled' : 'Disabled'}</label>
+                    </div>
+                </div>
+            </div>
             <div class="row g-3 mb-4">
                 <div class="col-4 text-center">
                     <div class="fw-bold fs-4 text-success">${Number(totals.totalTickets || 0).toLocaleString()}</div>
@@ -6380,9 +6443,11 @@ async function loadAdminLotteryQuestions() {
             const activeBadge = q.isActive
                 ? '<span class="badge bg-success-subtle text-success">Active</span>'
                 : '<span class="badge bg-secondary-subtle text-secondary">Inactive</span>';
-            const aiBadge = q.generatedBy === 'ai_gemini'
-                ? '<span class="badge bg-dark-subtle text-dark ms-1"><i class="fas fa-robot me-1"></i>AI</span>'
-                : '';
+            const aiBadge = (q.generatedBy || '').startsWith('gemini-')
+                ? `<span class="badge bg-dark-subtle text-dark ms-1"><i class="fas fa-robot me-1"></i>${sanitizeHTML(q.generatedBy)}</span>`
+                : (q.generatedBy === 'system_fallback'
+                    ? '<span class="badge bg-warning-subtle text-warning ms-1">Fallback</span>'
+                    : '');
             html += `<div class="card mb-2 border-0 shadow-sm">
                 <div class="card-body py-2 px-3">
                     <div class="d-flex justify-content-between align-items-start mb-1">

@@ -2719,6 +2719,27 @@ body {
     padding: 8px 16px;
     border-bottom: 1px solid #fde68a;
 }
+.lottery-disabled-state {
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px 12px;
+}
+.lottery-disabled-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #eef2f7;
+    color: #475569;
+    font-size: 1.4rem;
+    margin-bottom: 14px;
+}
 
 /* Tab navigation */
 .lottery-tabs { border-bottom: 2px solid #e9ecef; background: #f8f9fa; }
@@ -2977,6 +2998,22 @@ body {
     white-space: nowrap;
     font-weight: 800;
 }
+.lottery-admin-control {
+    display: grid;
+    grid-template-columns: 1fr minmax(260px, 420px);
+    gap: 14px;
+    align-items: center;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    background: #f8fafc;
+}
+.lottery-admin-control-actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+}
 
 @media (max-width: 430px) {
     .theme-lottery {
@@ -3004,6 +3041,10 @@ body {
     }
     #admin-lottery-modal .tab-content {
         padding: 12px !important;
+    }
+    .lottery-admin-control,
+    .lottery-admin-control-actions {
+        grid-template-columns: 1fr;
     }
     #admin-lottery-modal table {
         font-size: 0.78rem;

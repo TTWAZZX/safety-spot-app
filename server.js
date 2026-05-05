@@ -3541,7 +3541,7 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_rounds (
   last3_front   VARCHAR(3)  DEFAULT NULL,
   last3_back    VARCHAR(3)  DEFAULT NULL,
   status        VARCHAR(20) DEFAULT 'open',
-  source        VARCHAR(20) DEFAULT 'manual',
+  source        VARCHAR(50) DEFAULT 'manual',
   confirmedBy   VARCHAR(50) DEFAULT NULL,
   createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_lottery_rounds_status (status),
@@ -3576,6 +3576,8 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_daily_purchases (
   UNIQUE KEY uq_daily_purchase (lineUserId, purchaseDate)
 )`).catch(() => {});
 
+db.query(`ALTER TABLE lottery_rounds MODIFY source VARCHAR(50) DEFAULT 'manual'`).catch(() => {});
+
 db.query(`CREATE TABLE IF NOT EXISTS lottery_gold_ticket_claims (
   claimId       INT AUTO_INCREMENT PRIMARY KEY,
   lineUserId    VARCHAR(50) NOT NULL,
@@ -3601,10 +3603,23 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_quiz_questions (
   correctOption VARCHAR(1)  NOT NULL,
   category      VARCHAR(50) DEFAULT 'เธ—เธฑเนเธงเนเธ',
   isActive      BOOLEAN     DEFAULT TRUE,
-  generatedBy   VARCHAR(20) DEFAULT 'manual',
+  generatedBy   VARCHAR(50) DEFAULT 'manual',
   createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_quiz_active_category (isActive, category)
 )`).catch(() => {});
+
+db.query(`ALTER TABLE lottery_quiz_questions MODIFY generatedBy VARCHAR(50) DEFAULT 'manual'`).catch(() => {});
+
+db.query(`CREATE TABLE IF NOT EXISTS lottery_settings (
+  settingKey   VARCHAR(50) PRIMARY KEY,
+  settingValue VARCHAR(255) NOT NULL,
+  updatedBy    VARCHAR(50) DEFAULT NULL,
+  updatedAt    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)`).catch(() => {});
+
+db.query(`INSERT IGNORE INTO lottery_settings (settingKey, settingValue) VALUES
+  ('user_enabled', 'false'),
+  ('disabled_message', 'Safety Lottery is being prepared by the admin team.')`).catch(() => {});
 
 db.query(`CREATE TABLE IF NOT EXISTS lottery_quiz_answers (
   id             INT AUTO_INCREMENT PRIMARY KEY,
@@ -3635,6 +3650,37 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_results_history (
 // ======================================================
 // LOTTERY HELPER โ€” LINE Push Flex Message
 // ======================================================
+const LOTTERY_GEMINI_MODELS = [
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-3.1-flash-lite'
+];
+
+const DEFAULT_LOTTERY_DISABLED_MESSAGE = 'Safety Lottery is being prepared by the admin team.';
+
+async function getLotterySettings(conn = db) {
+    const [rows] = await conn.query(
+        `SELECT settingKey, settingValue FROM lottery_settings
+         WHERE settingKey IN ('user_enabled', 'disabled_message')`
+    );
+    const map = Object.fromEntries(rows.map(r => [r.settingKey, r.settingValue]));
+    return {
+        userEnabled: map.user_enabled === 'true',
+        disabledMessage: map.disabled_message || DEFAULT_LOTTERY_DISABLED_MESSAGE
+    };
+}
+
+async function ensureLotteryUserEnabled(conn = db) {
+    const settings = await getLotterySettings(conn);
+    if (!settings.userEnabled) {
+        const err = new Error(settings.disabledMessage || DEFAULT_LOTTERY_DISABLED_MESSAGE);
+        err.statusCode = 403;
+        err.code = 'LOTTERY_DISABLED';
+        throw err;
+    }
+    return settings;
+}
+
 async function sendLotteryWinNotification(lineUserId, ticketData) {
     const flexMessage = {
         type: 'flex',
@@ -3714,21 +3760,34 @@ async function fetchAndSaveLotteryResults(retryCount = 0) {
             }]}]
         };
 
-        const geminiRes = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-            geminiPayload, { timeout: 20000 }
-        );
+        let parsed = null;
+        let sourceModel = null;
+        let lastGeminiError = null;
+        for (const model of LOTTERY_GEMINI_MODELS) {
+            try {
+                const geminiRes = await axios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+                    geminiPayload, { timeout: 20000 }
+                );
 
-        let rawText = geminiRes.data.candidates[0].content.parts[0].text;
-        rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        const parsed = JSON.parse(rawText);
+                let rawText = geminiRes.data.candidates[0].content.parts[0].text;
+                rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                parsed = JSON.parse(rawText);
+                sourceModel = model;
+                break;
+            } catch (geminiErr) {
+                lastGeminiError = geminiErr;
+                console.warn(`Lottery result Gemini model failed: ${model}`, geminiErr.response?.status || geminiErr.message);
+            }
+        }
+        if (!parsed) throw lastGeminiError || new Error('Unable to parse lottery result with Gemini');
 
         if (!parsed.last2 || !/^\d{2}$/.test(parsed.last2)) throw new Error('Invalid last2: ' + parsed.last2);
         if (!parsed.last3_back || !/^\d{3}$/.test(parsed.last3_back)) throw new Error('Invalid last3_back: ' + parsed.last3_back);
 
         await db.query(
-            `UPDATE lottery_rounds SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source='auto_gemini' WHERE roundId=?`,
-            [parsed.last2, parsed.last3_front || null, parsed.last3_back, dateStr]
+            `UPDATE lottery_rounds SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source=? WHERE roundId=?`,
+            [parsed.last2, parsed.last3_front || null, parsed.last3_back, sourceModel || 'auto_gemini', dateStr]
         );
         console.log(`โ… Lottery result fetched: 2เธ•เธฑเธง=${parsed.last2} 3เธ•เธฑเธงเธ—เนเธฒเธข=${parsed.last3_back}`);
     } catch (err) {
@@ -3843,6 +3902,18 @@ async function getLotteryGoldEligibility(lineUserId, conn = db) {
 // GET /api/lottery/current-round โ€” เธเธงเธ”เธเธฑเธเธเธธเธเธฑเธ + countdown
 app.get('/api/lottery/current-round', async (req, res) => {
     try {
+        const settings = await getLotterySettings();
+        if (!settings.userEnabled) {
+            return res.json({
+                status: 'success',
+                data: {
+                    featureEnabled: false,
+                    disabled: true,
+                    message: settings.disabledMessage
+                }
+            });
+        }
+
         const [[round]] = await db.query(
             `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, last2, last3_front, last3_back,
                     status, source, confirmedBy, createdAt
@@ -3856,13 +3927,14 @@ app.get('/api/lottery/current-round', async (req, res) => {
         const hoursLeft = Math.floor(msLeft / 3600000);
         const minutesLeft = Math.floor((msLeft % 3600000) / 60000);
 
-        res.json({ status: 'success', data: { ...round, closeAt, hoursLeft, minutesLeft, isClosed: isLotteryRoundClosed(round) } });
+        res.json({ status: 'success', data: { ...round, featureEnabled: true, closeAt, hoursLeft, minutesLeft, isClosed: isLotteryRoundClosed(round) } });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
 // GET /api/lottery/quiz-question โ€” เธชเธธเนเธกเธเธณเธ–เธฒเธก Safety 1 เธเนเธญ
 app.get('/api/lottery/quiz-question', async (req, res) => {
     try {
+        await ensureLotteryUserEnabled();
         const [rows] = await db.query(
             `SELECT questionId, questionText, optionA, optionB, optionC, optionD, category
              FROM lottery_quiz_questions WHERE isActive = TRUE
@@ -3879,6 +3951,7 @@ app.post('/api/lottery/answer-quiz', async (req, res) => {
     if (!lineUserId || !questionId || !selectedOption)
         return res.status(400).json({ status: 'error', message: 'เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธ' });
     try {
+        await ensureLotteryUserEnabled();
         const [[q]] = await db.query(
             'SELECT correctOption FROM lottery_quiz_questions WHERE questionId = ? AND isActive = TRUE', [questionId]);
         if (!q) return res.status(404).json({ status: 'error', message: 'เนเธกเนเธเธเธเธณเธ–เธฒเธก' });
@@ -3924,6 +3997,7 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
     const conn = await db.getClient();
     try {
         await conn.beginTransaction();
+        await ensureLotteryUserEnabled(conn);
 
         const [[user]] = await conn.query('SELECT coinBalance FROM users WHERE lineUserId = ? FOR UPDATE', [lineUserId]);
         if (!user || Number(user.coinBalance) + quizBonus < price)
@@ -3971,7 +4045,7 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
         res.json({ status: 'success', data: { newCoinBalance: u.coinBalance, message: 'เธเธทเนเธญเธ•เธฑเนเธงเธชเธณเน€เธฃเนเธ' } });
     } catch (err) {
         await conn.rollback();
-        res.status(400).json({ status: 'error', message: err.message });
+        res.status(err.statusCode || 400).json({ status: 'error', message: err.message, code: err.code });
     } finally {
         conn.release();
     }
@@ -4035,7 +4109,7 @@ app.get('/api/lottery/stats', async (req, res) => {
             userStats = { ...u, myTickets: uc.myTickets };
         }
         res.json({ status: 'success', data: { totals, userStats } });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+    } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
 });
 
 // GET /api/lottery/gold-eligibility โ€” เน€เธเนเธเธชเธดเธ—เธเธดเนเธ•เธฑเนเธงเธ—เธญเธเธเธฃเธต
@@ -4043,9 +4117,10 @@ app.get('/api/lottery/gold-eligibility', async (req, res) => {
     const { lineUserId } = req.query;
     if (!lineUserId) return res.status(400).json({ status: 'error', message: 'เธ•เนเธญเธเธฃเธฐเธเธธ lineUserId' });
     try {
+        await ensureLotteryUserEnabled();
         const eligibility = await getLotteryGoldEligibility(lineUserId);
         res.json({ status: 'success', data: eligibility });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+    } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
 });
 
 // POST /api/lottery/claim-gold-ticket โ€” เธฃเธฑเธเธ•เธฑเนเธงเธ—เธญเธเธเธฃเธต 3 เธ•เธฑเธงเธ—เนเธฒเธข
@@ -4056,6 +4131,7 @@ app.post('/api/lottery/claim-gold-ticket', async (req, res) => {
     const conn = await db.getClient();
     try {
         await conn.beginTransaction();
+        await ensureLotteryUserEnabled(conn);
         const eligibility = await getLotteryGoldEligibility(lineUserId, conn);
         if (!eligibility.eligible) throw new Error(eligibility.reason || 'เธขเธฑเธเนเธกเนเธกเธตเธชเธดเธ—เธเธดเนเธฃเธฑเธเธ•เธฑเนเธงเธ—เธญเธ');
 
@@ -4097,7 +4173,7 @@ app.post('/api/lottery/claim-gold-ticket', async (req, res) => {
         });
     } catch (e) {
         await conn.rollback();
-        res.status(400).json({ status: 'error', message: e.message });
+        res.status(e.statusCode || 400).json({ status: 'error', message: e.message, code: e.code });
     } finally {
         conn.release();
     }
@@ -4271,8 +4347,41 @@ app.get('/api/admin/lottery/dashboard', async (req, res) => {
              FROM lottery_tickets`);
 
         const [[qCount]] = await db.query('SELECT COUNT(*) AS cnt FROM lottery_quiz_questions WHERE isActive=TRUE');
+        const settings = await getLotterySettings();
 
-        res.json({ status: 'success', data: { rounds, totals, activeQuestions: qCount.cnt } });
+        res.json({ status: 'success', data: { rounds, totals, activeQuestions: qCount.cnt, settings } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/admin/lottery/settings — Feature access settings
+app.get('/api/admin/lottery/settings', async (req, res) => {
+    const { requesterId } = req.query;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+        res.json({ status: 'success', data: await getLotterySettings() });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/admin/lottery/settings — Enable/disable user entry while admins develop
+app.post('/api/admin/lottery/settings', async (req, res) => {
+    const { requesterId, userEnabled, disabledMessage } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+
+        const enabledValue = userEnabled ? 'true' : 'false';
+        const message = String(disabledMessage || DEFAULT_LOTTERY_DISABLED_MESSAGE).slice(0, 255);
+
+        await db.query(
+            `INSERT INTO lottery_settings (settingKey, settingValue, updatedBy) VALUES
+             ('user_enabled', ?, ?),
+             ('disabled_message', ?, ?)
+             ON DUPLICATE KEY UPDATE settingValue=VALUES(settingValue), updatedBy=VALUES(updatedBy)`,
+            [enabledValue, requesterId, message, requesterId]
+        );
+        await logAdminAction(requesterId, 'LOTTERY_UPDATE_SETTINGS', 'settings', 'lottery', enabledValue, { disabledMessage: message });
+        res.json({ status: 'success', data: await getLotterySettings() });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
@@ -4485,26 +4594,35 @@ app.post('/api/admin/lottery/generate-questions', async (req, res) => {
 [{"questionText":"เธเธณเธ–เธฒเธก","optionA":"A","optionB":"B","optionC":"C","optionD":"D","correctOption":"A","category":"เธซเธกเธงเธ”"}]`;
 
         let questions;
-        let source = 'ai_gemini';
+        let source = 'system_fallback';
         let warning = null;
-        try {
-            const geminiRes = await axios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-                { contents: [{ parts: [{ text: prompt }] }] },
-                { timeout: 30000 }
-            );
+        let lastAiError = null;
 
-            let rawText = geminiRes.data.candidates[0].content.parts[0].text;
-            rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-            questions = JSON.parse(rawText);
-        } catch (aiErr) {
-            if (aiErr.response?.status === 429) {
-                questions = buildFallbackLotteryQuestions(category || 'ทั่วไป');
-                source = 'system_fallback';
-                warning = 'Gemini rate limit reached. Created standard fallback questions instead.';
-            } else {
-                throw aiErr;
+        for (const model of LOTTERY_GEMINI_MODELS) {
+            try {
+                const geminiRes = await axios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+                    { contents: [{ parts: [{ text: prompt }] }] },
+                    { timeout: 30000 }
+                );
+
+                let rawText = geminiRes.data.candidates[0].content.parts[0].text;
+                rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                questions = JSON.parse(rawText);
+                source = model;
+                break;
+            } catch (aiErr) {
+                lastAiError = aiErr;
+                console.warn(`Lottery Gemini model failed: ${model}`, aiErr.response?.status || aiErr.message);
             }
+        }
+
+        if (!questions) {
+            questions = buildFallbackLotteryQuestions(category || 'ทั่วไป');
+            const status = lastAiError?.response?.status;
+            warning = status === 429
+                ? 'All Gemini models were rate limited. Created standard fallback questions instead.'
+                : 'Gemini generation failed. Created standard fallback questions instead.';
         }
 
         if (!Array.isArray(questions) || questions.length === 0)

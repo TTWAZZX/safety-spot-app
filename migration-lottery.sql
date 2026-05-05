@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS lottery_rounds (
   last3_front   VARCHAR(3)  DEFAULT NULL,
   last3_back    VARCHAR(3)  DEFAULT NULL,
   status        VARCHAR(20) DEFAULT 'open',
-  source        VARCHAR(20) DEFAULT 'manual',
+  source        VARCHAR(50) DEFAULT 'manual',
   confirmedBy   VARCHAR(50) DEFAULT NULL,
   createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_lottery_rounds_status (status),
@@ -75,10 +75,21 @@ CREATE TABLE IF NOT EXISTS lottery_quiz_questions (
   correctOption VARCHAR(1)  NOT NULL,
   category      VARCHAR(50) DEFAULT 'ทั่วไป',
   isActive      BOOLEAN     DEFAULT TRUE,
-  generatedBy   VARCHAR(20) DEFAULT 'manual',
+  generatedBy   VARCHAR(50) DEFAULT 'manual',
   createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_quiz_active_category (isActive, category)
 );
+
+CREATE TABLE IF NOT EXISTS lottery_settings (
+  settingKey   VARCHAR(50) PRIMARY KEY,
+  settingValue VARCHAR(255) NOT NULL,
+  updatedBy    VARCHAR(50) DEFAULT NULL,
+  updatedAt    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT IGNORE INTO lottery_settings (settingKey, settingValue) VALUES
+  ('user_enabled', 'false'),
+  ('disabled_message', 'Safety Lottery is being prepared by the admin team.');
 
 -- 5. lottery_quiz_answers — สถิติตอบคำถาม
 CREATE TABLE IF NOT EXISTS lottery_quiz_answers (
