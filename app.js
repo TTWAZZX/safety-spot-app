@@ -475,6 +475,10 @@ function checkStreakMilestone(streak) {
     const icons  = { 7: '🔥', 30: '⭐', 60: '🏆', 100: '👑' };
     setTimeout(() => {
         fireConfetti('streak');
+        const fallbackNote = false
+            ? '<div class="alert alert-warning small mt-2 mb-0">Gemini ถูกจำกัดการใช้งานชั่วคราว ระบบจึงสร้างคำถามมาตรฐานสำรองให้แทน</div>'
+            : '';
+
         Swal.fire({
             title: `${icons[hit]} Streak ${labels[hit]}!`,
             html: `<p class="mb-0">คุณ Login ต่อเนื่องมาถึง <strong>${hit} วัน</strong> แล้ว!<br>ยอดเยี่ยมมาก ขอบคุณที่ใส่ใจความปลอดภัย</p>`,
@@ -6045,6 +6049,7 @@ async function openAdminLotteryModal() {
     modal.show();
     await loadAdminLotteryDashboard();
     await loadAdminLotteryRoundSelect();
+    await loadAdminLotteryMonitor(true);
 }
 
 // -----------------------------------------------
@@ -6119,6 +6124,98 @@ async function loadAdminLotteryRoundSelect() {
             $sel.append(`<option value="${sanitizeHTML(r.roundId)}">${sanitizeHTML(r.drawDate)} — ${r.status}</option>`);
         });
     } catch (e) { console.error('loadAdminLotteryRoundSelect:', e); }
+}
+
+async function loadAdminLotteryMonitor(keepSelection = false) {
+    const $wrap = $('#admin-lottery-monitor');
+    const $sel = $('#admin-monitor-round-select');
+    if (!$wrap.length) return;
+
+    const selected = keepSelection ? $sel.val() : $sel.val();
+    $wrap.html('<div class="text-center py-4"><div class="spinner-border text-success"></div></div>');
+    try {
+        const params = { requesterId: AppState.lineProfile.userId };
+        if (selected) params.roundId = selected;
+        const res = await callApi('/api/admin/lottery/monitor', params);
+        const summary = res.summary || {};
+        const rounds = res.rounds || [];
+        const tickets = res.tickets || [];
+        const winners = res.winners || [];
+        const departments = res.departments || [];
+
+        const currentSelect = selected || res.selectedRoundId || '';
+        $sel.empty().append('<option value="">ทุกงวด</option>');
+        rounds.forEach(r => {
+            const label = `${r.drawDate} · ${r.status}`;
+            $sel.append(`<option value="${sanitizeHTML(r.roundId)}">${sanitizeHTML(label)}</option>`);
+        });
+        $sel.val(currentSelect);
+
+        const winnerRows = winners.length ? winners.map(w => `
+            <tr>
+                <td><strong>${sanitizeHTML(w.fullName || '-')}</strong><br><small class="text-muted">${sanitizeHTML(w.department || '-')}</small></td>
+                <td><span class="badge bg-${w.ticketType === 'two' ? 'success' : 'danger'}">${w.ticketType === 'two' ? '2D' : '3D'}</span> ${w.isGoldTicket ? '<span class="badge bg-warning text-dark">Gold</span>' : ''}</td>
+                <td class="fw-bold">${sanitizeHTML(w.number)}</td>
+                <td class="text-end fw-bold text-success">${Number(w.prizeAmount || 0).toLocaleString()}</td>
+            </tr>`).join('') : '<tr><td colspan="4" class="text-center text-muted py-3">ยังไม่มีผู้ถูกรางวัล</td></tr>';
+
+        const ticketRows = tickets.length ? tickets.slice(0, 30).map(t => `
+            <tr>
+                <td><strong>${sanitizeHTML(t.fullName || '-')}</strong><br><small class="text-muted">${sanitizeHTML(t.employeeId || '')}</small></td>
+                <td>${sanitizeHTML(t.roundId)}</td>
+                <td>${t.ticketType === 'two' ? '2D' : '3D'} ${t.isGoldTicket ? '<span class="badge bg-warning text-dark">Gold</span>' : ''}</td>
+                <td class="fw-bold">${sanitizeHTML(t.number)}</td>
+                <td>${t.isWinner ? '<span class="badge bg-success">Win</span>' : (t.isPrizeClaimed ? '<span class="badge bg-secondary">Closed</span>' : '<span class="badge bg-primary">Active</span>')}</td>
+            </tr>`).join('') : '<tr><td colspan="5" class="text-center text-muted py-3">ยังไม่มีตั๋วในงวดนี้</td></tr>';
+
+        const deptRows = departments.length ? departments.map(d => `
+            <tr>
+                <td>${sanitizeHTML(d.department || 'ไม่ระบุ')}</td>
+                <td class="text-end">${Number(d.players || 0).toLocaleString()}</td>
+                <td class="text-end">${Number(d.tickets || 0).toLocaleString()}</td>
+                <td class="text-end">${Number(d.winners || 0).toLocaleString()}</td>
+            </tr>`).join('') : '<tr><td colspan="4" class="text-center text-muted py-3">ยังไม่มีข้อมูลแผนก</td></tr>';
+
+        $wrap.html(`
+            <div class="lottery-admin-metrics mb-3">
+                <div><span>${Number(summary.tickets || 0).toLocaleString()}</span><small>Tickets</small></div>
+                <div><span>${Number(summary.players || 0).toLocaleString()}</span><small>Players</small></div>
+                <div><span>${Number(summary.winners || 0).toLocaleString()}</span><small>Winners</small></div>
+                <div><span>${Number(summary.goldTickets || 0).toLocaleString()}</span><small>Gold</small></div>
+            </div>
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <div class="lottery-admin-panel">
+                        <div class="lottery-admin-panel-title">Prize Winners</div>
+                        <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>User</th><th>Type</th><th>No.</th><th class="text-end">Points</th></tr></thead>
+                            <tbody>${winnerRows}</tbody>
+                        </table></div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="lottery-admin-panel">
+                        <div class="lottery-admin-panel-title">Recent Tickets</div>
+                        <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>User</th><th>Round</th><th>Type</th><th>No.</th><th>Status</th></tr></thead>
+                            <tbody>${ticketRows}</tbody>
+                        </table></div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="lottery-admin-panel">
+                        <div class="lottery-admin-panel-title">Department Monitor</div>
+                        <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>Department</th><th class="text-end">Players</th><th class="text-end">Tickets</th><th class="text-end">Winners</th></tr></thead>
+                            <tbody>${deptRows}</tbody>
+                        </table></div>
+                    </div>
+                </div>
+            </div>
+        `);
+    } catch (e) {
+        $wrap.html(`<div class="alert alert-danger">${sanitizeHTML(e.message)}</div>`);
+    }
 }
 
 // -----------------------------------------------
@@ -6230,6 +6327,39 @@ async function adminCreateLotteryRound() {
 // -----------------------------------------------
 // loadAdminLotteryQuestions — โหลดคำถามทั้งหมด
 // -----------------------------------------------
+async function adminAutoCreateLotteryRounds() {
+    const confirm = await Swal.fire({
+        icon: 'question',
+        title: 'สร้างงวดถัดไปอัตโนมัติ?',
+        text: 'ระบบจะสร้างงวดวันที่ 1 และ 16 ที่ยังไม่มีอยู่ในฐานข้อมูล',
+        showCancelButton: true,
+        confirmButtonColor: '#06C755',
+        confirmButtonText: 'สร้างงวด',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!confirm.isConfirmed) return;
+
+    try {
+        const res = await callApi('/api/admin/lottery/auto-rounds', {
+            requesterId: AppState.lineProfile.userId,
+            count: 4
+        }, 'POST');
+        const created = res.created || [];
+        const skipped = res.skipped || [];
+        await Swal.fire({
+            icon: 'success',
+            title: 'จัดการงวดเรียบร้อย',
+            html: `สร้างใหม่: <strong>${created.length}</strong> งวด<br>มีอยู่แล้ว: <strong>${skipped.length}</strong> งวด`,
+            confirmButtonColor: '#06C755'
+        });
+        await loadAdminLotteryDashboard();
+        await loadAdminLotteryRoundSelect();
+        await loadAdminLotteryMonitor(true);
+    } catch (e) {
+        Swal.fire('Error', e.message, 'error');
+    }
+}
+
 async function loadAdminLotteryQuestions() {
     const $list = $('#admin-lottery-questions-list');
     $list.html('<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div></div>');
@@ -6416,13 +6546,16 @@ async function aiGenerateLotteryQuestions() {
             `<div class="text-start small mb-2 p-2 bg-light rounded">
                 <strong>${i + 1}.</strong> ${sanitizeHTML(q.questionText.slice(0, 80))}...
              </div>`).join('');
+        const fallbackNote = res.source === 'system_fallback'
+            ? '<div class="alert alert-warning small mt-2 mb-0">Gemini ถูกจำกัดการใช้งานชั่วคราว ระบบจึงสร้างคำถามมาตรฐานสำรองให้แทน</div>'
+            : '';
 
         Swal.fire({
             icon: 'success',
             title: `สร้างสำเร็จ! ${res.inserted} ข้อ`,
             html: `<p>หมวด: <strong>${sanitizeHTML(category)}</strong></p>
                    <p class="text-muted small">ตัวอย่าง 3 ข้อแรก:</p>
-                   ${previewHtml}`,
+                   ${previewHtml}${fallbackNote}`,
             confirmButtonColor: '#06C755'
         });
         await loadAdminLotteryQuestions();

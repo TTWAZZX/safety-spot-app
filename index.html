@@ -330,14 +330,17 @@
                         </div>
 
                         <!-- SAFETY LOTTERY -->
-                        <div class="bento-card theme-lottery" onclick="openLotteryModal()">
-                            <div class="d-flex flex-column justify-content-between h-100">
+                        <div class="bento-card theme-lottery span-2 safety-lottery-entry" onclick="openLotteryModal()">
+                            <div class="lottery-entry-copy">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <span class="badge lottery-badge-green fw-semibold">Lottery</span>
                                     <i class="fas fa-ticket text-success fs-4 opacity-60"></i>
                                 </div>
                                 <div>
                                     <div class="bento-title text-success">Safety Lottery</div>
+                                    <div class="lottery-entry-metrics d-sm-none">
+                                        <span>2D</span><span>3D</span><i class="fas fa-ticket-alt"></i>
+                                    </div>
                                     <div class="bento-sub text-success">ซื้อตั๋วด้วย Coins ลุ้นรางวัล</div>
                                 </div>
                             </div>
@@ -1964,6 +1967,12 @@
                             </button>
                         </li>
                         <li class="nav-item">
+                            <button class="nav-link small" data-bs-toggle="tab" data-bs-target="#al-tab-monitor"
+                                    onclick="loadAdminLotteryMonitor()">
+                                <i class="fas fa-eye me-1"></i>Monitor
+                            </button>
+                        </li>
+                        <li class="nav-item">
                             <button class="nav-link small" data-bs-toggle="tab" data-bs-target="#al-tab-questions"
                                     onclick="loadAdminLotteryQuestions()">
                                 <i class="fas fa-question-circle me-1"></i>คำถาม
@@ -1981,6 +1990,25 @@
                         </div>
 
                         <!-- กรอกผล Tab -->
+                        <div class="tab-pane fade" id="al-tab-monitor">
+                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-between align-items-sm-center mb-3">
+                                <div>
+                                    <h6 class="fw-bold mb-1">Lottery Monitor</h6>
+                                    <small class="text-muted">ตรวจตั๋ว ผู้เล่น ผู้ถูกรางวัล และภาพรวมรายแผนก</small>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <select class="form-select form-select-sm" id="admin-monitor-round-select"
+                                            onchange="loadAdminLotteryMonitor()"></select>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="loadAdminLotteryMonitor()" title="Refresh">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="admin-lottery-monitor">
+                                <div class="text-center py-4"><div class="spinner-border text-success"></div></div>
+                            </div>
+                        </div>
+
                         <div class="tab-pane fade" id="al-tab-result">
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">เลือกงวด</label>
@@ -2023,6 +2051,9 @@
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
+                                <button class="btn btn-success w-100 mt-2 fw-semibold" onclick="adminAutoCreateLotteryRounds()">
+                                    <i class="fas fa-calendar-plus me-1"></i>สร้างงวดถัดไปอัตโนมัติ
+                                </button>
                             </div>
                         </div>
 

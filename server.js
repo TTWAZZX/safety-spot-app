@@ -4276,6 +4276,99 @@ app.get('/api/admin/lottery/dashboard', async (req, res) => {
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
+function getNextLotteryDrawDates(count = 2, fromDate = new Date()) {
+    const result = [];
+    const cursor = new Date(fromDate);
+    cursor.setHours(0, 0, 0, 0);
+
+    while (result.length < count) {
+        const y = cursor.getFullYear();
+        const m = cursor.getMonth();
+        for (const day of [1, 16]) {
+            const d = new Date(y, m, day);
+            d.setHours(0, 0, 0, 0);
+            if (d >= cursor) result.push(getBangkokDateString(d));
+            if (result.length >= count) break;
+        }
+        cursor.setMonth(cursor.getMonth() + 1, 1);
+    }
+    return result;
+}
+
+// GET /api/admin/lottery/monitor — Full monitoring surface for Safety Lottery
+app.get('/api/admin/lottery/monitor', async (req, res) => {
+    const { requesterId, roundId } = req.query;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+
+        const [[currentRound]] = await db.query(
+            `SELECT roundId FROM lottery_rounds
+             WHERE status IN ('open','closed','pending_confirm','pending_manual','confirmed')
+             ORDER BY drawDate ASC LIMIT 1`
+        );
+        const selectedRoundId = roundId || currentRound?.roundId || null;
+
+        const [rounds] = await db.query(
+            `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, status, last2, last3_back
+             FROM lottery_rounds ORDER BY drawDate DESC LIMIT 20`
+        );
+
+        const params = selectedRoundId ? [selectedRoundId] : [];
+        const roundWhere = selectedRoundId ? 'WHERE t.roundId=?' : '';
+
+        const [[summary]] = await db.query(
+            `SELECT COUNT(*) AS tickets,
+                    COUNT(DISTINCT t.lineUserId) AS players,
+                    SUM(CASE WHEN t.isWinner=TRUE THEN 1 ELSE 0 END) AS winners,
+                    SUM(CASE WHEN t.isGoldTicket=TRUE THEN 1 ELSE 0 END) AS goldTickets,
+                    COALESCE(SUM(t.prizeAmount),0) AS prizesPaid
+             FROM lottery_tickets t ${roundWhere}`,
+            params
+        );
+
+        const [tickets] = await db.query(
+            `SELECT t.ticketId, t.roundId, t.ticketType, t.number, t.price, t.isGoldTicket,
+                    t.isWinner, t.prizeAmount, t.isPrizeClaimed, t.purchasedAt,
+                    u.fullName, u.employeeId, u.department
+             FROM lottery_tickets t
+             JOIN users u ON u.lineUserId=t.lineUserId
+             ${roundWhere}
+             ORDER BY t.purchasedAt DESC LIMIT 80`,
+            params
+        );
+
+        const [winners] = await db.query(
+            `SELECT t.ticketId, t.roundId, t.ticketType, t.number, t.prizeAmount, t.isGoldTicket,
+                    u.fullName, u.employeeId, u.department
+             FROM lottery_tickets t
+             JOIN users u ON u.lineUserId=t.lineUserId
+             WHERE t.isWinner=TRUE ${selectedRoundId ? 'AND t.roundId=?' : ''}
+             ORDER BY t.prizeAmount DESC, t.ticketId DESC LIMIT 80`,
+            params
+        );
+
+        const [departments] = await db.query(
+            `SELECT u.department,
+                    COUNT(*) AS tickets,
+                    COUNT(DISTINCT t.lineUserId) AS players,
+                    SUM(CASE WHEN t.isWinner=TRUE THEN 1 ELSE 0 END) AS winners,
+                    COALESCE(SUM(t.prizeAmount),0) AS prizesPaid
+             FROM lottery_tickets t
+             JOIN users u ON u.lineUserId=t.lineUserId
+             ${roundWhere}
+             GROUP BY u.department
+             ORDER BY tickets DESC LIMIT 20`,
+            params
+        );
+
+        res.json({
+            status: 'success',
+            data: { selectedRoundId, rounds, summary, tickets, winners, departments }
+        });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
 // GET /api/admin/lottery/questions โ€” เธ”เธถเธเธเธณเธ–เธฒเธกเธ—เธฑเนเธเธซเธกเธ”
 app.get('/api/admin/lottery/questions', async (req, res) => {
     const { requesterId, category } = req.query;
@@ -4346,6 +4439,30 @@ app.delete('/api/admin/lottery/questions/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
+function buildFallbackLotteryQuestions(category = 'ทั่วไป') {
+    const cat = category || 'ทั่วไป';
+    return [
+        ['ก่อนเริ่มงานที่มีความเสี่ยงสูง ควรทำสิ่งใดก่อนเสมอ?', 'เริ่มงานทันทีถ้ามีประสบการณ์', 'ประเมินความเสี่ยงและทบทวนวิธีทำงานที่ปลอดภัย', 'รอให้หัวหน้ามาตรวจหลังทำเสร็จ', 'ทำเฉพาะเมื่อมีอุบัติเหตุเกิดขึ้น', 'B'],
+        ['เมื่อพบ Near Miss ในพื้นที่ทำงาน ควรทำอย่างไร?', 'ปล่อยผ่านถ้าไม่มีใครบาดเจ็บ', 'รายงานและแก้ไขสภาพอันตรายก่อนเกิดเหตุจริง', 'ลบหลักฐานเพื่อไม่ให้เสียเวลา', 'รอประชุมประจำเดือนก่อนแจ้ง', 'B'],
+        ['ข้อใดเป็นหลักการใช้ PPE ที่เหมาะสมที่สุด?', 'เลือกใช้ตามความสะดวก', 'ตรวจสภาพและเลือก PPE ให้ตรงกับความเสี่ยงของงาน', 'ใช้ร่วมกันได้ทุกคนถ้าประหยัด', 'ใส่เฉพาะตอนมีผู้ตรวจ', 'B'],
+        ['หากพื้นเปียกลื่นในทางเดิน ควรทำสิ่งใดทันที?', 'เดินเลี่ยงแล้วไม่ต้องแจ้งใคร', 'ตั้งป้ายเตือนและประสานให้ทำความสะอาด', 'ถ่ายรูปเก็บไว้เท่านั้น', 'รอให้แห้งเอง', 'B'],
+        ['ก่อนซ่อมบำรุงเครื่องจักร ควรควบคุมพลังงานอย่างไร?', 'ปิดสวิตช์เฉพาะหน้าเครื่อง', 'ทำ Lockout/Tagout ตามขั้นตอน', 'บอกเพื่อนร่วมงานด้วยวาจา', 'ซ่อมตอนเครื่องเดินช้า', 'B'],
+        ['ถังดับเพลิงควรถูกดูแลอย่างไร?', 'ตรวจเมื่อจะใช้งานเท่านั้น', 'ตรวจสภาพตามรอบและให้เข้าถึงได้ง่าย', 'เก็บในห้องล็อกเพื่อกันหาย', 'วางหลังสิ่งของเพื่อประหยัดพื้นที่', 'B'],
+        ['สารเคมีหกรั่วไหล ควรทำสิ่งใดก่อน?', 'รีบเช็ดด้วยผ้าทั่วไป', 'กั้นพื้นที่และปฏิบัติตาม SDS/แผนฉุกเฉิน', 'ใช้น้ำล้างทุกกรณี', 'เปิดพัดลมเป่าให้แห้ง', 'B'],
+        ['การทำงานบนที่สูงต้องให้ความสำคัญกับอะไร?', 'ความเร็วในการทำงาน', 'อุปกรณ์กันตก จุดยึด และการตรวจพื้นที่ก่อนเริ่ม', 'จำนวนคนดูงาน', 'ทำเฉพาะวันที่อากาศดี', 'B'],
+        ['การยกของหนักที่ถูกต้องควรทำอย่างไร?', 'ก้มหลังแล้วยกเร็ว', 'ให้หลังตรง ใช้แรงขา และขอความช่วยเหลือเมื่อจำเป็น', 'บิดตัวขณะยกเพื่อประหยัดเวลา', 'ยกคนเดียวเสมอ', 'B'],
+        ['ทำไมต้องสื่อสารอันตรายก่อนเริ่มงาน?', 'เพื่อให้เอกสารครบเท่านั้น', 'เพื่อให้ทุกคนเข้าใจความเสี่ยงและมาตรการควบคุมเดียวกัน', 'เพื่อเพิ่มเวลาทำงาน', 'เพื่อใช้แทนการควบคุมจริง', 'B']
+    ].map((q) => ({
+        questionText: q[0],
+        optionA: q[1],
+        optionB: q[2],
+        optionC: q[3],
+        optionD: q[4],
+        correctOption: q[5],
+        category: cat
+    }));
+}
+
 // POST /api/admin/lottery/generate-questions โ€” AI เธชเธฃเนเธฒเธเธเธณเธ–เธฒเธก 10 เธเนเธญ
 app.post('/api/admin/lottery/generate-questions', async (req, res) => {
     const { requesterId, category } = req.body;
@@ -4367,15 +4484,28 @@ app.post('/api/admin/lottery/generate-questions', async (req, res) => {
 เธ•เธญเธเน€เธเนเธ JSON array เน€เธ—เนเธฒเธเธฑเนเธ เธซเนเธฒเธกเธกเธตเธเนเธญเธเธงเธฒเธกเธญเธทเนเธเธเธญเธ JSON เธซเนเธฒเธกเธกเธต markdown backticks:
 [{"questionText":"เธเธณเธ–เธฒเธก","optionA":"A","optionB":"B","optionC":"C","optionD":"D","correctOption":"A","category":"เธซเธกเธงเธ”"}]`;
 
-        const geminiRes = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-            { contents: [{ parts: [{ text: prompt }] }] },
-            { timeout: 30000 }
-        );
+        let questions;
+        let source = 'ai_gemini';
+        let warning = null;
+        try {
+            const geminiRes = await axios.post(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+                { contents: [{ parts: [{ text: prompt }] }] },
+                { timeout: 30000 }
+            );
 
-        let rawText = geminiRes.data.candidates[0].content.parts[0].text;
-        rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        const questions = JSON.parse(rawText);
+            let rawText = geminiRes.data.candidates[0].content.parts[0].text;
+            rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            questions = JSON.parse(rawText);
+        } catch (aiErr) {
+            if (aiErr.response?.status === 429) {
+                questions = buildFallbackLotteryQuestions(category || 'ทั่วไป');
+                source = 'system_fallback';
+                warning = 'Gemini rate limit reached. Created standard fallback questions instead.';
+            } else {
+                throw aiErr;
+            }
+        }
 
         if (!Array.isArray(questions) || questions.length === 0)
             throw new Error('Gemini เธชเนเธ JSON เนเธกเนเธ–เธนเธเธ•เนเธญเธ');
@@ -4387,14 +4517,14 @@ app.post('/api/admin/lottery/generate-questions', async (req, res) => {
                 `INSERT INTO lottery_quiz_questions (questionText,optionA,optionB,optionC,optionD,correctOption,category,generatedBy)
                  VALUES (?,?,?,?,?,?,?,?)`,
                 [q.questionText, q.optionA, q.optionB, q.optionC, q.optionD,
-                 q.correctOption.toUpperCase(), q.category || category || 'เธ—เธฑเนเธงเนเธ', 'ai_gemini']);
+                 q.correctOption.toUpperCase(), q.category || category || 'เธ—เธฑเนเธงเนเธ', source]);
             inserted.push({ questionId: r.insertId, questionText: q.questionText });
         }
 
         await logAdminAction(requesterId, 'LOTTERY_AI_GENERATE_QUESTIONS', 'question', 'batch', category || 'เธ—เธฑเนเธงเนเธ',
             { count: inserted.length });
 
-        res.json({ status: 'success', data: { inserted: inserted.length, preview: inserted.slice(0, 3) } });
+        res.json({ status: 'success', data: { inserted: inserted.length, preview: inserted.slice(0, 3), source, warning } });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
@@ -4416,6 +4546,35 @@ app.post('/api/admin/lottery/rounds', async (req, res) => {
         if (e.code === 'ER_DUP_ENTRY') return res.status(400).json({ status: 'error', message: 'เธกเธตเธเธงเธ”เธเธตเนเนเธฅเนเธง' });
         res.status(500).json({ status: 'error', message: e.message });
     }
+});
+
+// POST /api/admin/lottery/auto-rounds — Create upcoming 1st/16th draw rounds automatically
+app.post('/api/admin/lottery/auto-rounds', async (req, res) => {
+    const { requesterId, count = 2 } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+
+        const dates = getNextLotteryDrawDates(Math.min(Math.max(Number(count) || 2, 1), 6));
+        const created = [];
+        const skipped = [];
+        for (const drawDate of dates) {
+            try {
+                await db.query(
+                    'INSERT INTO lottery_rounds (roundId, drawDate, status) VALUES (?, ?, "open")',
+                    [drawDate, drawDate]
+                );
+                created.push(drawDate);
+            } catch (e) {
+                if (e.code === 'ER_DUP_ENTRY') skipped.push(drawDate);
+                else throw e;
+            }
+        }
+
+        await logAdminAction(requesterId, 'LOTTERY_AUTO_CREATE_ROUNDS', 'round', 'batch', created.join(',') || 'none',
+            { created, skipped });
+        res.json({ status: 'success', data: { created, skipped } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
 // ======================================================
