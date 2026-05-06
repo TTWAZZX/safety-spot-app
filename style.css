@@ -135,6 +135,75 @@ body {
     flex-shrink: 0;
 }
 
+.home-lottery-card {
+    background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 58%, #ecfeff 100%);
+    border: 1px solid #bbf7d0;
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 4px 14px rgba(6, 199, 85, 0.12);
+    cursor: pointer;
+}
+
+.home-lottery-card:active {
+    transform: scale(0.99);
+}
+
+.home-lottery-muted {
+    background: #fff;
+    border-color: #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    cursor: default;
+}
+
+.home-lottery-kicker {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #047857;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.home-lottery-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #064e3b;
+    margin-top: 2px;
+}
+
+.home-lottery-sub {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+.home-lottery-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.home-lottery-grid div {
+    background: rgba(255,255,255,0.76);
+    border: 1px solid rgba(187,247,208,0.85);
+    border-radius: 10px;
+    padding: 8px 6px;
+    text-align: center;
+}
+
+.home-lottery-grid strong {
+    display: block;
+    color: #065f46;
+    font-size: 0.95rem;
+    line-height: 1.1;
+}
+
+.home-lottery-grid span {
+    display: block;
+    color: #64748b;
+    font-size: 0.68rem;
+    margin-top: 2px;
+}
+
 .activity-card .card-title {
     font-weight: 600; /* Semi-bold */
     color: var(--text-black);

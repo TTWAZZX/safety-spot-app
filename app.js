@@ -497,26 +497,116 @@ function checkStreakMilestone(streak) {
 async function loadSocialFeed() {
     const container = $('#home-social-feed');
     try {
-        const items = await callApi('/api/social-feed');
+        const items = await callApi('/api/home/activity-feed', { limit: 20 });
         if (!items || !items.length) {
-            container.html('<div class="empty-state-small"><i class="fas fa-rss"></i><p>ยังไม่มีความเคลื่อนไหว</p></div>');
+            container.html('<div class="empty-state-small"><i class="fas fa-rss"></i><p>ยังไม่มี Safety Pulse</p></div>');
             return;
         }
         container.html(items.map(item => {
             const timeAgo = formatTimeAgo(item.createdAt);
-            const pic = item.pictureUrl || 'https://placehold.co/36x36';
+            const pic = item.actorPictureUrl || item.pictureUrl || 'https://placehold.co/36x36';
+            const meta = getPulseMeta(item.eventType);
             return `<div class="feed-item">
                 <img src="${pic}" class="feed-avatar" onerror="this.onerror=null;this.src='https://placehold.co/36x36'">
                 <div class="feed-body">
-                    <span class="feed-name">${sanitizeHTML(item.fullName || '')}</span>
-                    <span class="feed-action"> ร่วมกิจกรรม </span>
-                    <span class="feed-act">${sanitizeHTML(item.activityTitle || '')}</span>
+                    <div class="d-flex align-items-center gap-1 flex-wrap">
+                        <span class="badge ${meta.badgeClass}"><i class="fas ${meta.icon} me-1"></i>${meta.label}</span>
+                        <span class="feed-name">${sanitizeHTML(item.actorName || item.fullName || '')}</span>
+                    </div>
+                    <div>
+                        <span class="feed-action">${sanitizeHTML(item.title || '')}</span>
+                        <span class="feed-act">${sanitizeHTML(item.message || item.activityTitle || '')}</span>
+                    </div>
                     <div class="feed-time">${timeAgo}</div>
                 </div>
             </div>`;
         }).join(''));
     } catch (e) {
         container.html('<div class="empty-state-small"><i class="fas fa-wifi-slash"></i><p>โหลดไม่ได้</p></div>');
+    }
+}
+
+function getPulseMeta(eventType) {
+    const map = {
+        submission_created: { label: 'Report', icon: 'fa-paper-plane', badgeClass: 'bg-primary-subtle text-primary' },
+        submission_approved: { label: 'Approved', icon: 'fa-check-circle', badgeClass: 'bg-success-subtle text-success' },
+        kyt_played: { label: 'KYT', icon: 'fa-helmet-safety', badgeClass: 'bg-info-subtle text-info' },
+        hunter_cleared: { label: 'Hunter', icon: 'fa-crosshairs', badgeClass: 'bg-danger-subtle text-danger' },
+        card_pulled: { label: 'Card', icon: 'fa-layer-group', badgeClass: 'bg-warning-subtle text-warning' },
+        badge_awarded: { label: 'Badge', icon: 'fa-award', badgeClass: 'bg-warning-subtle text-warning' },
+        lottery_ticket_bought: { label: 'Lottery', icon: 'fa-ticket-alt', badgeClass: 'bg-success-subtle text-success' },
+        lottery_gold_claimed: { label: 'Gold', icon: 'fa-crown', badgeClass: 'bg-warning text-dark' },
+        lottery_won: { label: 'Winner', icon: 'fa-trophy', badgeClass: 'bg-warning text-dark' }
+    };
+    return map[eventType] || { label: 'Pulse', icon: 'fa-bolt', badgeClass: 'bg-secondary-subtle text-secondary' };
+}
+
+async function loadHomeLotterySummary() {
+    const container = $('#home-lottery-summary');
+    if (!container.length) return;
+    container.html('<div class="home-lottery-card"><div class="spinner-border spinner-border-sm text-success me-2"></div>กำลังโหลด Safety Lottery...</div>');
+    try {
+        const res = await callApi('/api/home/lottery-summary', {
+            lineUserId: AppState.lineProfile?.userId || ''
+        });
+        if (!res.enabled) {
+            container.html(`
+                <div class="home-lottery-card home-lottery-muted">
+                    <div class="d-flex align-items-center justify-content-between gap-3">
+                        <div>
+                            <div class="home-lottery-kicker"><i class="fas fa-ticket-alt me-1"></i>Safety Lottery</div>
+                            <div class="home-lottery-title">กำลังเตรียมเปิดใช้งาน</div>
+                            <div class="home-lottery-sub">${sanitizeHTML(res.message || 'Admin is preparing this feature.')}</div>
+                        </div>
+                        <i class="fas fa-tools fs-3 text-muted"></i>
+                    </div>
+                </div>`);
+            return;
+        }
+
+        const round = res.currentRound;
+        const user = res.user || {};
+        const latest = res.latestResult;
+        const statusText = !round ? 'ยังไม่มีงวด' : round.isClosed ? 'ปิดรับแล้ว' : 'เปิดรับอยู่';
+        const statusClass = !round ? 'bg-secondary' : round.isClosed ? 'bg-warning text-dark' : 'bg-success';
+        const drawDate = round ? new Date(round.drawDate).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' }) : '-';
+        const ticketsSold = Number(round?.stats?.ticketsSold || 0).toLocaleString();
+        const myTickets = Number(user.myRoundTickets || 0);
+        const todayCount = Number(user.todayCount || 0);
+        const coinBalance = Number(user.coinBalance || 0).toLocaleString();
+        const goldReady = user.goldEligibility && user.goldEligibility.eligible;
+        const latestText = latest
+            ? `ผลล่าสุด ${sanitizeHTML(latest.last2 || '--')} / ${sanitizeHTML(latest.last3_back || '---')}`
+            : 'ยังไม่มีผลย้อนหลัง';
+
+        container.html(`
+            <div class="home-lottery-card" onclick="openLotteryModal()">
+                <div class="d-flex justify-content-between align-items-start gap-3">
+                    <div>
+                        <div class="home-lottery-kicker"><i class="fas fa-ticket-alt me-1"></i>Safety Lottery</div>
+                        <div class="home-lottery-title">งวด ${sanitizeHTML(drawDate)}</div>
+                        <div class="home-lottery-sub">${sanitizeHTML(latestText)}</div>
+                    </div>
+                    <span class="badge ${statusClass}">${statusText}</span>
+                </div>
+                <div class="home-lottery-grid mt-3">
+                    <div><strong>${myTickets}</strong><span>ตั๋วของฉัน</span></div>
+                    <div><strong>${todayCount}/5</strong><span>โควตาวันนี้</span></div>
+                    <div><strong>${coinBalance}</strong><span>เหรียญ</span></div>
+                    <div><strong>${ticketsSold}</strong><span>ตั๋วในงวด</span></div>
+                </div>
+                <div class="d-flex align-items-center justify-content-between mt-3">
+                    <span class="small ${goldReady ? 'text-warning fw-bold' : 'text-muted'}">
+                        <i class="fas ${goldReady ? 'fa-crown' : 'fa-shield-alt'} me-1"></i>
+                        ${goldReady ? 'มีสิทธิ์ Gold Ticket' : '2D 10 เหรียญ • 3D 30 เหรียญ'}
+                    </span>
+                    <button type="button" class="btn btn-sm btn-success fw-bold" onclick="event.stopPropagation();openLotteryModal();">
+                        เข้า Lottery
+                    </button>
+                </div>
+            </div>`);
+    } catch (e) {
+        container.html('<div class="home-lottery-card home-lottery-muted"><i class="fas fa-wifi-slash me-2"></i>โหลด Lottery Pulse ไม่ได้</div>');
     }
 }
 
@@ -590,7 +680,8 @@ async function loadHomeDashboard(activities) {
         actList.html(`<div class="empty-state-small"><i class="fas fa-clipboard-list"></i><p>ยังไม่มีกิจกรรม</p></div>`);
     }
 
-    // Load social feed
+    // Load Lottery Pulse and Safety Pulse
+    loadHomeLotterySummary();
     loadSocialFeed();
 
     // Show safety tip
@@ -1269,6 +1360,7 @@ function bindAdminEventListeners() {
     $('#manage-reports-btn').on('click', handleManageReports);
     $('#manage-activities-btn').on('click', handleManageActivities);
     $('#manage-badges-btn').on('click', handleManageBadges);
+    $('#btn-refresh-line-profiles').off('click').on('click', handleRefreshLineProfiles);
     $('#create-activity-btn').on('click', handleCreateActivity);
     // เพิ่มต่อจากรายการเดิม
     $('#manage-questions-btn').on('click', handleManageQuestions);
@@ -2184,6 +2276,46 @@ function handleManageBadges() {
     $('#manageBadgesTab').show().siblings('.admin-tab-content').hide();
     loadBadgesForAdmin();
 }
+
+async function handleRefreshLineProfiles(e) {
+    e.preventDefault();
+    const confirmed = await Swal.fire({
+        icon: 'question',
+        title: 'รีเฟรชรูปโปรไฟล์ LINE?',
+        html: 'ระบบจะดึง display name และรูปโปรไฟล์ล่าสุดจาก LINE สำหรับผู้ใช้ทั้งหมดที่ bot เข้าถึงได้',
+        showCancelButton: true,
+        confirmButtonText: 'เริ่มรีเฟรช',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#06C755'
+    });
+    if (!confirmed.isConfirmed) return;
+
+    const $btn = $('#btn-refresh-line-profiles');
+    const originalHtml = $btn.html();
+    $btn.addClass('disabled').html('<i class="fas fa-spinner fa-spin me-2 text-success"></i>กำลังรีเฟรชรูปโปรไฟล์...');
+    showLoading('กำลังรีเฟรชรูปโปรไฟล์ LINE...');
+    try {
+        const res = await callApi('/api/admin/refresh-line-profiles', {}, 'POST');
+        Swal.close();
+        await Swal.fire({
+            icon: 'success',
+            title: 'รีเฟรชเสร็จแล้ว',
+            html: `
+                อัปเดตสำเร็จ <b>${res.updated || 0}</b> คน<br>
+                ข้าม <b>${res.skipped || 0}</b> คน<br>
+                ไม่สำเร็จ <b>${res.failed || 0}</b> คน
+            `,
+            confirmButtonColor: '#06C755'
+        });
+        await loadAdminDashboard();
+    } catch (err) {
+        Swal.close();
+        await Swal.fire('รีเฟรชไม่สำเร็จ', err.message, 'error');
+    } finally {
+        $btn.removeClass('disabled').html(originalHtml);
+    }
+}
+
 function handleAddBadge() {
     $('#badge-form-title').text('เพิ่มป้ายรางวัลใหม่');
     $('#badge-form')[0].reset();

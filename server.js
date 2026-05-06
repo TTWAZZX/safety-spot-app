@@ -120,6 +120,27 @@ db.query(`
   )
 `).catch(() => {});
 
+db.query(`
+  CREATE TABLE IF NOT EXISTS activity_events (
+    eventId              VARCHAR(100) PRIMARY KEY,
+    eventType            VARCHAR(80) NOT NULL,
+    actorUserId          VARCHAR(100) DEFAULT '',
+    actorNameSnapshot    VARCHAR(200) DEFAULT '',
+    actorPictureSnapshot TEXT,
+    departmentSnapshot   VARCHAR(100) DEFAULT '',
+    entityType           VARCHAR(50) DEFAULT '',
+    entityId             VARCHAR(100) DEFAULT '',
+    title                VARCHAR(255) NOT NULL,
+    message              TEXT,
+    metadata             JSON,
+    visibility           VARCHAR(20) DEFAULT 'public',
+    createdAt            DATETIME DEFAULT NOW(),
+    INDEX idx_activity_events_feed (visibility, createdAt),
+    INDEX idx_activity_events_actor (actorUserId, createdAt),
+    INDEX idx_activity_events_type (eventType, createdAt)
+  )
+`).catch(() => {});
+
 // -------------------------
 //   Admin Audit Log Helper
 // -------------------------
@@ -133,6 +154,48 @@ async function logAdminAction(adminId, action, targetType, targetId, targetName,
             [adminId, adminName, action, targetType || '', targetId || '', targetName || '', JSON.stringify(detail || {})]
         );
     } catch (_) { /* never block main flow */ }
+}
+
+async function emitActivityEvent({ eventType, actorUserId, entityType, entityId, title, message, metadata, visibility = 'public' }) {
+    try {
+        let actorName = '';
+        let actorPicture = '';
+        let department = '';
+        if (actorUserId) {
+            const [[user]] = await db.query(
+                "SELECT fullName, pictureUrl, department FROM users WHERE lineUserId = ?",
+                [actorUserId]
+            );
+            if (user) {
+                actorName = user.fullName || '';
+                actorPicture = user.pictureUrl || '';
+                department = user.department || '';
+            }
+        }
+
+        await db.query(
+            `INSERT INTO activity_events
+             (eventId, eventType, actorUserId, actorNameSnapshot, actorPictureSnapshot, departmentSnapshot,
+              entityType, entityId, title, message, metadata, visibility, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            [
+                "EVT" + uuidv4(),
+                eventType,
+                actorUserId || '',
+                actorName,
+                actorPicture,
+                department,
+                entityType || '',
+                entityId || '',
+                title,
+                message || '',
+                JSON.stringify(metadata || {}),
+                visibility
+            ]
+        );
+    } catch (err) {
+        console.warn("activity event skipped:", err.message);
+    }
 }
 
 // -----------------------------
@@ -452,6 +515,276 @@ app.get('/api/social-feed', async (_req, res) => {
     }
 });
 
+// Public: Home Lottery Summary — compact enterprise card for the home screen
+app.get('/api/home/lottery-summary', async (req, res) => {
+    const { lineUserId } = req.query;
+    try {
+        const settings = await getLotterySettings();
+        if (!settings.userEnabled) {
+            return res.json({
+                status: "success",
+                data: {
+                    enabled: false,
+                    message: settings.disabledMessage || DEFAULT_LOTTERY_DISABLED_MESSAGE,
+                    currentRound: null,
+                    latestResult: null,
+                    user: null
+                }
+            });
+        }
+
+        const todayTH = getBangkokDateString();
+        const [[round]] = await db.query(
+            `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, status, last2, last3_front, last3_back
+             FROM lottery_rounds
+             WHERE status IN ('open','closed','pending_confirm','pending_manual')
+             ORDER BY drawDate ASC
+             LIMIT 1`
+        );
+
+        const [[latestResult]] = await db.query(
+            `SELECT r.roundId, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.last2, r.last3_front, r.last3_back,
+                    h.totalTicketsSold, h.totalWinners, h.totalPrizesPaid
+             FROM lottery_rounds r
+             LEFT JOIN lottery_results_history h ON r.roundId = h.roundId
+             WHERE r.status = 'completed'
+             ORDER BY r.drawDate DESC
+             LIMIT 1`
+        );
+
+        let roundStats = { ticketsSold: 0, participantCount: 0 };
+        if (round) {
+            const [[stats]] = await db.query(
+                `SELECT COUNT(*) AS ticketsSold, COUNT(DISTINCT lineUserId) AS participantCount
+                 FROM lottery_tickets
+                 WHERE roundId = ?`,
+                [round.roundId]
+            );
+            roundStats = stats || roundStats;
+        }
+
+        let user = null;
+        if (lineUserId) {
+            const [[u]] = await db.query(
+                'SELECT coinBalance, lotteryWinCount, lotteryTotalWinnings FROM users WHERE lineUserId=?',
+                [lineUserId]
+            );
+            const [[dp]] = await db.query(
+                'SELECT count FROM lottery_daily_purchases WHERE lineUserId=? AND purchaseDate=?',
+                [lineUserId, todayTH]
+            );
+            const [[myRoundTickets]] = round
+                ? await db.query(
+                    'SELECT COUNT(*) AS count FROM lottery_tickets WHERE lineUserId=? AND roundId=?',
+                    [lineUserId, round.roundId]
+                )
+                : [[{ count: 0 }]];
+            let goldEligibility = null;
+            try {
+                goldEligibility = round ? await getLotteryGoldEligibility(lineUserId) : null;
+            } catch (_) {
+                goldEligibility = null;
+            }
+            user = {
+                coinBalance: u ? Number(u.coinBalance || 0) : 0,
+                lotteryWinCount: u ? Number(u.lotteryWinCount || 0) : 0,
+                lotteryTotalWinnings: u ? Number(u.lotteryTotalWinnings || 0) : 0,
+                todayCount: dp ? Number(dp.count || 0) : 0,
+                myRoundTickets: myRoundTickets ? Number(myRoundTickets.count || 0) : 0,
+                goldEligibility
+            };
+        }
+
+        res.json({
+            status: "success",
+            data: {
+                enabled: true,
+                currentRound: round ? { ...round, isClosed: isLotteryRoundClosed(round), stats: roundStats } : null,
+                latestResult: latestResult || null,
+                user,
+                prices: { two: 10, three: 30 },
+                dailyQuota: 5
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
+// Public: Safety Pulse — cross-system activity feed for the home screen
+app.get('/api/home/activity-feed', async (req, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
+    try {
+        const perSourceLimit = Math.max(limit, 10);
+        const sources = [];
+
+        const [eventRows] = await db.query(
+            `SELECT eventType, actorUserId, actorNameSnapshot AS actorName, actorPictureSnapshot AS actorPictureUrl,
+                    departmentSnapshot AS department, entityType, entityId, title, message, createdAt
+             FROM activity_events
+             WHERE visibility = 'public'
+               AND eventType IN ('submission_created','lottery_won','streak_milestone','coins_exchanged')
+             ORDER BY createdAt DESC
+             LIMIT ?`,
+            [perSourceLimit]
+        );
+        sources.push(...eventRows);
+
+        const [submissions] = await db.query(
+            `SELECT s.lineUserId AS actorUserId, u.fullName AS actorName, u.pictureUrl AS actorPictureUrl,
+                    u.department, s.submissionId AS entityId, a.title AS activityTitle,
+                    COALESCE(s.reviewedAt, s.createdAt) AS createdAt
+             FROM submissions s
+             JOIN users u ON s.lineUserId = u.lineUserId
+             JOIN activities a ON s.activityId = a.activityId
+             WHERE s.status = 'approved'
+             ORDER BY COALESCE(s.reviewedAt, s.createdAt) DESC
+             LIMIT ?`,
+            [perSourceLimit]
+        );
+        sources.push(...submissions.map(r => ({
+            eventType: 'submission_approved',
+            actorUserId: r.actorUserId,
+            actorName: r.actorName,
+            actorPictureUrl: r.actorPictureUrl,
+            department: r.department,
+            entityType: 'submission',
+            entityId: r.entityId,
+            title: 'ส่งรายงานกิจกรรม',
+            message: `ร่วมกิจกรรม ${r.activityTitle || ''}`.trim(),
+            createdAt: r.createdAt
+        })));
+
+        const [kytRows] = await db.query(
+            `SELECT h.historyId, h.lineUserId AS actorUserId, h.isCorrect, h.earnedPoints, h.playedAt,
+                    u.fullName AS actorName, u.pictureUrl AS actorPictureUrl, u.department
+             FROM user_game_history h
+             JOIN users u ON h.lineUserId = u.lineUserId
+             ORDER BY h.playedAt DESC, h.historyId DESC
+             LIMIT ?`,
+            [perSourceLimit]
+        );
+        sources.push(...kytRows.map(r => ({
+            eventType: 'kyt_played',
+            actorUserId: r.actorUserId,
+            actorName: r.actorName,
+            actorPictureUrl: r.actorPictureUrl,
+            department: r.department,
+            entityType: 'kyt',
+            entityId: String(r.historyId),
+            title: r.isCorrect ? 'ตอบ KYT ถูกต้อง' : 'เล่น KYT ประจำวัน',
+            message: `รับ ${Number(r.earnedPoints || 0).toLocaleString()} เหรียญจากภารกิจความปลอดภัย`,
+            createdAt: r.playedAt
+        })));
+
+        const [hunterRows] = await db.query(
+            `SELECT hh.lineUserId AS actorUserId, hh.levelId, hh.stars, hh.clearedAt,
+                    u.fullName AS actorName, u.pictureUrl AS actorPictureUrl, u.department, l.title AS levelTitle
+             FROM user_hunter_history hh
+             JOIN users u ON hh.lineUserId = u.lineUserId
+             JOIN hunter_levels l ON hh.levelId = l.levelId
+             ORDER BY hh.clearedAt DESC
+             LIMIT ?`,
+            [perSourceLimit]
+        );
+        sources.push(...hunterRows.map(r => ({
+            eventType: 'hunter_cleared',
+            actorUserId: r.actorUserId,
+            actorName: r.actorName,
+            actorPictureUrl: r.actorPictureUrl,
+            department: r.department,
+            entityType: 'hunter',
+            entityId: r.levelId,
+            title: 'ผ่านด่าน Safety Hunter',
+            message: `${r.levelTitle || 'Safety Hunter'} ได้ ${r.stars || 1} ดาว`,
+            createdAt: r.clearedAt
+        })));
+
+        const [notificationRows] = await db.query(
+            `SELECT n.notificationId, n.recipientUserId AS actorUserId, n.type, n.relatedItemId, n.message, n.createdAt,
+                    u.fullName AS actorName, u.pictureUrl AS actorPictureUrl, u.department,
+                    c.cardName, c.rarity
+             FROM notifications n
+             JOIN users u ON n.recipientUserId = u.lineUserId
+             LEFT JOIN safety_cards c ON n.relatedItemId = c.cardId
+             WHERE n.type IN ('game_gacha','exchange')
+             ORDER BY n.createdAt DESC
+             LIMIT ?`,
+            [perSourceLimit]
+        );
+        sources.push(...notificationRows.map(r => ({
+            eventType: r.type === 'exchange' ? 'coins_exchanged' : 'card_pulled',
+            actorUserId: r.actorUserId,
+            actorName: r.actorName,
+            actorPictureUrl: r.actorPictureUrl,
+            department: r.department,
+            entityType: r.type === 'exchange' ? 'exchange' : 'card',
+            entityId: r.relatedItemId || r.notificationId,
+            title: r.type === 'exchange' ? 'แลกเหรียญ/คะแนน' : 'ได้รับ Safety Card',
+            message: r.type === 'exchange'
+                ? r.message
+                : (r.cardName ? `${r.cardName} ระดับ ${r.rarity || '-'}` : r.message),
+            createdAt: r.createdAt
+        })));
+
+        const [badgeRows] = await db.query(
+            `SELECT ub.lineUserId AS actorUserId, ub.badgeId, ub.earnedAt,
+                    u.fullName AS actorName, u.pictureUrl AS actorPictureUrl, u.department, b.badgeName
+             FROM user_badges ub
+             JOIN users u ON ub.lineUserId = u.lineUserId
+             JOIN badges b ON ub.badgeId = b.badgeId
+             ORDER BY ub.earnedAt DESC
+             LIMIT ?`,
+            [perSourceLimit]
+        );
+        sources.push(...badgeRows.map(r => ({
+            eventType: 'badge_awarded',
+            actorUserId: r.actorUserId,
+            actorName: r.actorName,
+            actorPictureUrl: r.actorPictureUrl,
+            department: r.department,
+            entityType: 'badge',
+            entityId: r.badgeId,
+            title: 'ได้รับป้ายรางวัล',
+            message: r.badgeName,
+            createdAt: r.earnedAt
+        })));
+
+        const [lotteryRows] = await db.query(
+            `SELECT t.ticketId, t.lineUserId AS actorUserId, t.ticketType, t.isGoldTicket, t.purchasedAt,
+                    u.fullName AS actorName, u.pictureUrl AS actorPictureUrl, u.department,
+                    DATE_FORMAT(r.drawDate, '%d/%m/%Y') AS drawDateText
+             FROM lottery_tickets t
+             JOIN users u ON t.lineUserId = u.lineUserId
+             JOIN lottery_rounds r ON t.roundId = r.roundId
+             ORDER BY t.purchasedAt DESC
+             LIMIT ?`,
+            [perSourceLimit]
+        );
+        sources.push(...lotteryRows.map(r => ({
+            eventType: r.isGoldTicket ? 'lottery_gold_claimed' : 'lottery_ticket_bought',
+            actorUserId: r.actorUserId,
+            actorName: r.actorName,
+            actorPictureUrl: r.actorPictureUrl,
+            department: r.department,
+            entityType: 'lottery_ticket',
+            entityId: String(r.ticketId),
+            title: r.isGoldTicket ? 'รับตั๋วทอง Safety Lottery' : 'ซื้อ Safety Lottery',
+            message: `งวด ${r.drawDateText || '-'} • ${r.ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย'}`,
+            createdAt: r.purchasedAt
+        })));
+
+        const rows = sources
+            .filter(item => item.createdAt)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, limit);
+
+        res.json({ status: "success", data: rows });
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
 // Public: Department Leaderboard (top 10 by avg score)
 app.get('/api/department-leaderboard', async (_req, res) => {
     try {
@@ -712,11 +1045,12 @@ app.post('/api/submissions', async (req, res) => {
         const [[activity]] = await db.query("SELECT title FROM activities WHERE activityId = ?", [activityId]);
         const activityTitle = activity ? activity.title : 'กิจกรรม';
 
+        const submissionId = "SUB" + uuidv4();
         await db.query(
             `INSERT INTO submissions
              (submissionId, activityId, lineUserId, description, imageUrl, status, createdAt)
              VALUES (?, ?, ?, ?, ?, 'pending', NOW())`,
-            ["SUB" + uuidv4(), activityId, lineUserId, normalized, imageUrl]
+            [submissionId, activityId, lineUserId, normalized, imageUrl]
         );
 
         // แจ้งเตือนตัวเอง — รายงานรออนุมัติ
@@ -725,6 +1059,16 @@ app.post('/api/submissions', async (req, res) => {
              VALUES (?, ?, ?, 'submission', ?, ?, NOW())`,
             ["NOTIF" + uuidv4(), lineUserId, `รายงาน "${activityTitle}" ของคุณอยู่ระหว่างรอการพิจารณาจากแอดมิน`, activityId, lineUserId]
         ).catch(() => {});
+
+        emitActivityEvent({
+            eventType: 'submission_created',
+            actorUserId: lineUserId,
+            entityType: 'submission',
+            entityId: submissionId,
+            title: 'ส่งรายงานใหม่',
+            message: `รออนุมัติกิจกรรม ${activityTitle}`,
+            visibility: 'public'
+        });
 
         res.json({ status: "success", data: { message: "Submission created." } });
     } catch (err) {
@@ -1363,7 +1707,10 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
 
         // หาว่ารายงานนี้เป็นของใคร + เช็คสถานะ (idempotency)
         const [sub] = await conn.query(
-            "SELECT lineUserId, status FROM submissions WHERE submissionId = ?",
+            `SELECT s.lineUserId, s.status, a.title AS activityTitle
+             FROM submissions s
+             LEFT JOIN activities a ON s.activityId = a.activityId
+             WHERE s.submissionId = ?`,
             [submissionId]
         );
         if (sub.length === 0) throw new Error("Submission not found");
@@ -1401,6 +1748,16 @@ app.post('/api/admin/submissions/approve', isAdmin, async (req, res) => {
 
         await conn.commit();
         logAdminAction(requesterId, 'APPROVE_SUBMISSION', 'submission', String(submissionId), `Submission #${submissionId}`, { score, ownerId });
+        emitActivityEvent({
+            eventType: 'submission_approved',
+            actorUserId: ownerId,
+            entityType: 'submission',
+            entityId: String(submissionId),
+            title: 'รายงานได้รับอนุมัติ',
+            message: `กิจกรรม ${sub[0].activityTitle || 'Safety Activity'} +${score} คะแนน`,
+            metadata: { score },
+            visibility: 'public'
+        });
         res.json({ status: "success", data: { message: "Approved." } });
     } catch (err) {
         await conn.rollback();
@@ -1724,6 +2081,16 @@ app.post('/api/admin/award-badge', isAdmin, async (req, res) => {
     );
 
     logAdminAction(requesterId, 'AWARD_BADGE', 'user', lineUserId, lineUserId, { badgeId, badgeName: badge ? badge.badgeName : '' });
+    emitActivityEvent({
+        eventType: 'badge_awarded',
+        actorUserId: lineUserId,
+        entityType: 'badge',
+        entityId: badgeId,
+        title: 'ได้รับป้ายรางวัล',
+        message: badge ? badge.badgeName : 'ป้ายรางวัลใหม่',
+        metadata: { badgeId, source: 'admin' },
+        visibility: 'public'
+    });
     res.json({ status: "success", data: { awarded: true } });
 });
 
@@ -1783,6 +2150,16 @@ app.post('/api/admin/recalculate-badges', isAdmin, async (req, res) => {
         }
 
         await conn.commit();
+        emitActivityEvent({
+            eventType: 'lottery_gold_claimed',
+            actorUserId: lineUserId,
+            entityType: 'lottery_ticket',
+            entityId: String(ticketResult.insertId),
+            title: 'รับตั๋วทอง Safety Lottery',
+            message: `งวด ${toLotteryDateString(eligibility.currentRound.drawDate)} • 3 ตัวท้าย`,
+            metadata: { roundId: eligibility.currentRound.roundId, ticketType: 'three', isGoldTicket: true, isNumberMasked: true },
+            visibility: 'public'
+        });
         res.json({
             status: "success",
             data: { recalculated: true, userCount: users.length }
@@ -2007,6 +2384,16 @@ app.post('/api/game/submit-answer-v2', async (req, res) => {
 
         const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
         await conn.commit();
+        emitActivityEvent({
+            eventType: 'kyt_played',
+            actorUserId: lineUserId,
+            entityType: 'kyt',
+            entityId: String(questionId),
+            title: isCorrect ? 'ตอบ KYT ถูกต้อง' : 'เล่น KYT ประจำวัน',
+            message: `รับ ${earnedCoins} เหรียญ และ +${earnedScore} คะแนน`,
+            metadata: { isCorrect, earnedCoins, earnedScore, currentStreak },
+            visibility: 'public'
+        });
         
         res.json({
             status: "success",
@@ -2147,6 +2534,16 @@ app.post('/api/game/gacha-pull', async (req, res) => {
         const [[updatedUser]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
 
         await conn.commit();
+        emitActivityEvent({
+            eventType: 'card_pulled',
+            actorUserId: lineUserId,
+            entityType: 'card',
+            entityId: card.cardId,
+            title: 'ได้รับ Safety Card',
+            message: `${card.cardName} ระดับ ${card.rarity}`,
+            metadata: { cardId: card.cardId, rarity: card.rarity, bonusCoins },
+            visibility: 'public'
+        });
         
         // ส่งข้อมูลกลับ (เพิ่ม bonusCoins ไปบอกหน้าบ้าน)
         res.json({ 
@@ -2400,6 +2797,16 @@ app.post('/api/admin/award-card', isAdmin, async (req, res) => {
              VALUES (?, ?, ?, 'game_gacha', ?, ?, NOW())`,
             ["NOTIF" + uuidv4(), lineUserId, `แอดมินมอบการ์ด "${cardName}" ให้คุณ 🎁`, cardId, requesterId]
         ).catch(() => {});
+        emitActivityEvent({
+            eventType: 'card_pulled',
+            actorUserId: lineUserId,
+            entityType: 'card',
+            entityId: cardId,
+            title: 'ได้รับ Safety Card',
+            message: cardName,
+            metadata: { cardId, source: 'admin' },
+            visibility: 'public'
+        });
         res.json({ status: "success", data: { message: "มอบการ์ดสำเร็จ" } });
     } catch (e) {
         res.status(500).json({ status: "error", message: e.message });
@@ -2666,6 +3073,16 @@ app.post('/api/game/exchange-coins', async (req, res) => {
         const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
 
         await conn.commit();
+        emitActivityEvent({
+            eventType: 'coins_exchanged',
+            actorUserId: lineUserId,
+            entityType: 'exchange',
+            entityId: 'coins-to-score',
+            title: 'แลกเหรียญเป็นคะแนน',
+            message: `ใช้ ${COIN_COST} เหรียญ แลกรับ ${POINT_GAIN} คะแนน`,
+            metadata: { coinCost: COIN_COST, pointGain: POINT_GAIN },
+            visibility: 'public'
+        });
         
         res.json({ 
             status: "success", 
@@ -2719,6 +3136,16 @@ app.post('/api/game/exchange-score', async (req, res) => {
 
         const [[updatedUser]] = await conn.query("SELECT coinBalance, totalScore FROM users WHERE lineUserId = ?", [lineUserId]);
         await conn.commit();
+        emitActivityEvent({
+            eventType: 'coins_exchanged',
+            actorUserId: lineUserId,
+            entityType: 'exchange',
+            entityId: 'score-to-coins',
+            title: 'แลกคะแนนเป็นเหรียญ',
+            message: `ใช้ ${SCORE_COST} คะแนน แลกรับ ${COIN_GAIN} เหรียญ`,
+            metadata: { scoreCost: SCORE_COST, coinGain: COIN_GAIN },
+            visibility: 'public'
+        });
 
         res.json({
             status: "success",
@@ -2941,6 +3368,17 @@ app.post('/api/game/hunter/complete', async (req, res) => {
 
         const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
         await conn.commit();
+        const [[level]] = await db.query("SELECT title FROM hunter_levels WHERE levelId = ?", [levelId]);
+        emitActivityEvent({
+            eventType: 'hunter_cleared',
+            actorUserId: lineUserId,
+            entityType: 'hunter',
+            entityId: levelId,
+            title: 'ผ่านด่าน Safety Hunter',
+            message: `${level ? level.title : 'Safety Hunter'} ได้ ${stars || 1} ดาว`,
+            metadata: { stars: stars || 1, earnedCoins },
+            visibility: 'public'
+        });
 
         res.json({ status: "success", data: { earnedCoins, newCoinBalance: user.coinBalance } });
 
@@ -3179,6 +3617,78 @@ app.post('/api/admin/test-remind-self', isAdmin, async (req, res) => {
     } catch (e) {
         console.error(e);
         res.status(500).json({ status: "error", message: e.message });
+    }
+});
+
+// --- API: Admin refresh LINE displayName / pictureUrl for all users ---
+app.post('/api/admin/refresh-line-profiles', isAdmin, async (req, res) => {
+    const { requesterId } = req.body;
+    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!token) {
+        return res.status(500).json({ status: 'error', message: 'ไม่พบ LINE Channel Access Token' });
+    }
+
+    try {
+        const [users] = await db.query(`
+            SELECT lineUserId, displayName, pictureUrl
+            FROM users
+            WHERE lineUserId IS NOT NULL AND lineUserId != ''
+            ORDER BY createdAt DESC
+        `);
+
+        let updated = 0;
+        let skipped = 0;
+        let failed = 0;
+        const failedUsers = [];
+
+        for (const user of users) {
+            try {
+                const lineRes = await axios.get(
+                    `https://api.line.me/v2/bot/profile/${encodeURIComponent(user.lineUserId)}`,
+                    { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 }
+                );
+                const profile = lineRes.data || {};
+                const nextDisplayName = profile.displayName || user.displayName || '';
+                const nextPictureUrl = profile.pictureUrl || '';
+
+                if (nextDisplayName === (user.displayName || '') && nextPictureUrl === (user.pictureUrl || '')) {
+                    skipped++;
+                } else {
+                    await db.query(
+                        "UPDATE users SET displayName = ?, pictureUrl = ? WHERE lineUserId = ?",
+                        [nextDisplayName, nextPictureUrl, user.lineUserId]
+                    );
+                    updated++;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 80));
+            } catch (err) {
+                failed++;
+                if (failedUsers.length < 10) {
+                    failedUsers.push({
+                        lineUserId: user.lineUserId,
+                        status: err.response?.status || null,
+                        message: err.response?.data?.message || err.message
+                    });
+                }
+            }
+        }
+
+        await logAdminAction(
+            requesterId,
+            'REFRESH_LINE_PROFILES',
+            'user',
+            'batch',
+            'LINE profiles',
+            { total: users.length, updated, skipped, failed }
+        );
+
+        res.json({
+            status: 'success',
+            data: { total: users.length, updated, skipped, failed, failedUsers }
+        });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
     }
 });
 
@@ -4040,6 +4550,16 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
             [lineUserId, todayTH]);
 
         await conn.commit();
+        emitActivityEvent({
+            eventType: 'lottery_ticket_bought',
+            actorUserId: lineUserId,
+            entityType: 'lottery_ticket',
+            entityId: String(ticketResult.insertId),
+            title: 'ซื้อ Safety Lottery',
+            message: `งวด ${toLotteryDateString(round.drawDate)} • ${ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย'}`,
+            metadata: { roundId, ticketType, isNumberMasked: true },
+            visibility: 'public'
+        });
 
         const [[u]] = await db.query('SELECT coinBalance FROM users WHERE lineUserId = ?', [lineUserId]);
         res.json({ status: 'success', data: { newCoinBalance: u.coinBalance, message: 'ซื้อตั๋วสำเร็จ' } });
@@ -4311,6 +4831,16 @@ app.post('/api/admin/lottery/process-prizes', async (req, res) => {
             { winners: paidWinners, totalPrizes });
 
         for (const push of pendingPushes) {
+            emitActivityEvent({
+                eventType: 'lottery_won',
+                actorUserId: push.lineUserId,
+                entityType: 'lottery_round',
+                entityId: roundId,
+                title: 'ถูกรางวัล Safety Lottery',
+                message: `งวด ${push.ticketData.drawDate} ได้รับ ${push.ticketData.prizeAmount.toLocaleString()} คะแนน`,
+                metadata: { roundId, ticketType: push.ticketData.ticketType, prizeAmount: push.ticketData.prizeAmount },
+                visibility: 'public'
+            });
             sendLotteryWinNotification(push.lineUserId, push.ticketData).catch(() => {});
         }
 
