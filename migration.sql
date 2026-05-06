@@ -20,7 +20,7 @@ FROM user_badges ub1
 INNER JOIN user_badges ub2
   ON  ub1.lineUserId = ub2.lineUserId
   AND ub1.badgeId    = ub2.badgeId
-  AND ub1.userBadgeId > ub2.userBadgeId;
+  AND ub1.earnedAt > ub2.earnedAt;
 
 -- ตรวจสอบหลังลบ (ควรได้ 0 rows)
 -- SELECT lineUserId, badgeId, COUNT(*) AS cnt
@@ -29,52 +29,84 @@ INNER JOIN user_badges ub2
 -- HAVING cnt > 1;
 
 -- ============================================================
--- STEP 3: เพิ่ม UNIQUE constraints
--- ใช้ CREATE UNIQUE INDEX IF NOT EXISTS (MySQL 8.0+)
+-- STEP 3 & 4: เพิ่ม INDEX / UNIQUE — ตรวจก่อนสร้าง (idempotent)
+-- MySQL ไม่รองรับ CREATE INDEX IF NOT EXISTS
+-- ใช้ INFORMATION_SCHEMA + PREPARE/EXECUTE แทน
 -- ============================================================
 
--- user_badges: ป้องกัน badge ซ้ำในระดับ DB
-CREATE UNIQUE INDEX IF NOT EXISTS uq_user_badges
-  ON user_badges (lineUserId, badgeId);
+-- helper macro: สร้าง index เฉพาะกรณีที่ยังไม่มี
+-- (ทำซ้ำสำหรับแต่ละ index เพราะ MySQL ไม่มี loop ใน plain SQL)
 
--- likes: ป้องกัน like ซ้ำในระดับ DB (ไม่มี duplicate อยู่แล้ว)
-CREATE UNIQUE INDEX IF NOT EXISTS uq_likes
-  ON likes (submissionId, lineUserId);
+-- uq_user_badges
+SET @x := (SELECT COUNT(*) FROM information_schema.statistics
+           WHERE table_schema=DATABASE() AND table_name='user_badges' AND index_name='uq_user_badges');
+SET @sql := IF(@x=0, 'CREATE UNIQUE INDEX uq_user_badges ON user_badges (lineUserId, badgeId)', 'SELECT "uq_user_badges exists"');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
--- users: ป้องกัน employeeId ซ้ำ (ไม่มี duplicate อยู่แล้ว)
-CREATE UNIQUE INDEX IF NOT EXISTS uq_users_employeeId
-  ON users (employeeId);
+-- uq_likes
+SET @x := (SELECT COUNT(*) FROM information_schema.statistics
+           WHERE table_schema=DATABASE() AND table_name='likes' AND index_name='uq_likes');
+SET @sql := IF(@x=0, 'CREATE UNIQUE INDEX uq_likes ON likes (submissionId, lineUserId)', 'SELECT "uq_likes exists"');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- uq_users_employeeId
+SET @x := (SELECT COUNT(*) FROM information_schema.statistics
+           WHERE table_schema=DATABASE() AND table_name='users' AND index_name='uq_users_employeeId');
+SET @sql := IF(@x=0, 'CREATE UNIQUE INDEX uq_users_employeeId ON users (employeeId)', 'SELECT "uq_users_employeeId exists"');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- idx_submissions_activity_user
+SET @x := (SELECT COUNT(*) FROM information_schema.statistics
+           WHERE table_schema=DATABASE() AND table_name='submissions' AND index_name='idx_submissions_activity_user');
+SET @sql := IF(@x=0, 'CREATE INDEX idx_submissions_activity_user ON submissions (activityId, lineUserId, status)', 'SELECT "idx_submissions_activity_user exists"');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- idx_submissions_status
+SET @x := (SELECT COUNT(*) FROM information_schema.statistics
+           WHERE table_schema=DATABASE() AND table_name='submissions' AND index_name='idx_submissions_status');
+SET @sql := IF(@x=0, 'CREATE INDEX idx_submissions_status ON submissions (status)', 'SELECT "idx_submissions_status exists"');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- idx_likes_userId
+SET @x := (SELECT COUNT(*) FROM information_schema.statistics
+           WHERE table_schema=DATABASE() AND table_name='likes' AND index_name='idx_likes_userId');
+SET @sql := IF(@x=0, 'CREATE INDEX idx_likes_userId ON likes (lineUserId)', 'SELECT "idx_likes_userId exists"');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- idx_comments_submission
+SET @x := (SELECT COUNT(*) FROM information_schema.statistics
+           WHERE table_schema=DATABASE() AND table_name='comments' AND index_name='idx_comments_submission');
+SET @sql := IF(@x=0, 'CREATE INDEX idx_comments_submission ON comments (submissionId)', 'SELECT "idx_comments_submission exists"');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- idx_notifications_recipient
+SET @x := (SELECT COUNT(*) FROM information_schema.statistics
+           WHERE table_schema=DATABASE() AND table_name='notifications' AND index_name='idx_notifications_recipient');
+SET @sql := IF(@x=0, 'CREATE INDEX idx_notifications_recipient ON notifications (recipientUserId, isRead)', 'SELECT "idx_notifications_recipient exists"');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- idx_game_history_user_date
+SET @x := (SELECT COUNT(*) FROM information_schema.statistics
+           WHERE table_schema=DATABASE() AND table_name='user_game_history' AND index_name='idx_game_history_user_date');
+SET @sql := IF(@x=0, 'CREATE INDEX idx_game_history_user_date ON user_game_history (lineUserId, playedAt)', 'SELECT "idx_game_history_user_date exists"');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- uq_game_history_daily (สร้างใน DBeaver ไปแล้ว — uncomment ถ้ายังไม่มี)
+-- SET @x := (SELECT COUNT(*) FROM information_schema.statistics
+--            WHERE table_schema=DATABASE() AND table_name='user_game_history' AND index_name='uq_game_history_daily');
+-- SET @sql := IF(@x=0, 'CREATE UNIQUE INDEX uq_game_history_daily ON user_game_history (lineUserId, playedAt)', 'SELECT "uq_game_history_daily exists"');
+-- PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- ============================================================
--- STEP 4: เพิ่ม Index เพื่อประสิทธิภาพ
+-- Lottery Settings: seed configurable prize/price/daily_limit values
 -- ============================================================
-
--- submissions: ใช้บ่อยใน duplicate check และ pending query
-CREATE INDEX IF NOT EXISTS idx_submissions_activity_user
-  ON submissions (activityId, lineUserId, status);
-
-CREATE INDEX IF NOT EXISTS idx_submissions_status
-  ON submissions (status);
-
--- likes: ใช้ตอนโหลด submissions (เช็คว่า user กด like ไหน)
-CREATE INDEX IF NOT EXISTS idx_likes_userId
-  ON likes (lineUserId);
-
--- comments: ใช้ตอนโหลด submissions
-CREATE INDEX IF NOT EXISTS idx_comments_submission
-  ON comments (submissionId);
-
--- notifications: ใช้หนักที่สุด (query ทุกครั้งที่เปิด app)
-CREATE INDEX IF NOT EXISTS idx_notifications_recipient
-  ON notifications (recipientUserId, isRead);
-
--- user_game_history: ใช้ตรวจ daily quiz ทุกครั้งที่เล่น
-CREATE INDEX IF NOT EXISTS idx_game_history_user_date
-  ON user_game_history (lineUserId, playedAt);
-
--- user_game_history: ป้องกัน race condition (เล่นซ้ำวันเดิม)
--- *** สร้างแล้วใน DBeaver โดยตรง — รันเฉพาะถ้ายังไม่มี ***
--- CREATE UNIQUE INDEX uq_game_history_daily ON user_game_history (lineUserId, playedAt);
+INSERT INTO lottery_settings (settingKey, settingValue) VALUES
+  ('prize_two',   '500'),
+  ('prize_three', '3000'),
+  ('price_two',   '10'),
+  ('price_three', '30'),
+  ('daily_limit', '5')
+ON DUPLICATE KEY UPDATE settingKey=settingKey;
 
 -- ============================================================
 -- เสร็จสิ้น — รันแค่ครั้งเดียว ปลอดภัย 100%

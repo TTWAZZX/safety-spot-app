@@ -598,7 +598,7 @@ async function loadHomeLotterySummary() {
                 <div class="d-flex align-items-center justify-content-between mt-3">
                     <span class="small ${goldReady ? 'text-warning fw-bold' : 'text-muted'}">
                         <i class="fas ${goldReady ? 'fa-crown' : 'fa-shield-alt'} me-1"></i>
-                        ${goldReady ? 'มีสิทธิ์ Gold Ticket' : '2D 10 เหรียญ • 3D 30 เหรียญ'}
+                        ${goldReady ? 'มีสิทธิ์ Gold Ticket' : `2D ${Number(res.prices?.two || 10)} เหรียญ • 3D ${Number(res.prices?.three || 30)} เหรียญ`}
                     </span>
                     <button type="button" class="btn btn-sm btn-success fw-bold" onclick="event.stopPropagation();openLotteryModal();">
                         เข้า Lottery
@@ -5785,6 +5785,16 @@ let _lotteryCurrentRound = null;
 let _lotterySelectedType = 'two'; // 'two' | 'three'
 let _lotteryCurrentQuestion = null;
 let _lotteryLastQuizAnswerId = null;
+let _lotteryCountdownInterval = null;
+
+const LOTTERY_STATUS_TH = {
+    open: 'เปิดรับตั๋ว',
+    closed: 'ปิดรับตั๋ว',
+    pending_manual: 'รอกรอกผล',
+    pending_confirm: 'รอยืนยันผล',
+    confirmed: 'ยืนยันผลแล้ว',
+    completed: 'จ่ายรางวัลแล้ว'
+};
 
 function updateLotteryPurchaseSummary(todayCount = null) {
     const coins = Number(AppState.currentUser?.coinBalance || 0);
@@ -5837,9 +5847,55 @@ if (typeof window !== 'undefined') {
 // -----------------------------------------------
 async function openLotteryModal() {
     triggerHaptic('light');
+
+    // แสดง T&C ครั้งแรก
+    if (!localStorage.getItem('lottery_tnc_v1_accepted')) {
+        const result = await Swal.fire({
+            title: '<i class="fas fa-ticket-alt text-success me-2"></i>กติกา Safety Lottery',
+            html: `<div class="text-start small">
+                <p class="mb-2 fw-semibold">วิธีเล่น:</p>
+                <ol class="mb-3 ps-3">
+                    <li>เลือกประเภทตั๋ว: 2 ตัวท้าย (10 เหรียญ) หรือ 3 ตัวท้าย (30 เหรียญ)</li>
+                    <li>กรอกเลขที่ต้องการ หรือกด 🎲 สุ่ม</li>
+                    <li>ตอบคำถาม Safety ให้ถูกต้อง เพื่อยืนยันการซื้อ (+2 เหรียญ bonus)</li>
+                    <li>ตรวจผลรางวัลในงวดวันที่ 1 และ 16 ของทุกเดือน</li>
+                </ol>
+                <p class="mb-2 fw-semibold">รางวัล:</p>
+                <ul class="mb-3 ps-3">
+                    <li>2 ตัวท้ายถูก = 500 คะแนน</li>
+                    <li>3 ตัวท้ายถูก = 3,000 คะแนน</li>
+                </ul>
+                <p class="mb-2 fw-semibold">Gold Ticket ฟรี:</p>
+                <ul class="mb-3 ps-3">
+                    <li>แผนกไม่มีรายงานอุบัติเหตุในช่วง 30 วันที่ผ่านมา</li>
+                    <li>รับได้ 1 ตั๋วต่อ 1 งวด</li>
+                </ul>
+                <p class="mb-0 fw-semibold">ข้อกำหนด:</p>
+                <ul class="mb-0 ps-3">
+                    <li>ซื้อได้ไม่เกิน 5 ใบ/วัน</li>
+                    <li>คะแนนรางวัลจะเข้าบัญชีทันทีหลังประมวลผล</li>
+                    <li>การตัดสินใจของทีมบริหารถือเป็นที่สิ้นสุด</li>
+                </ul>
+            </div>`,
+            confirmButtonColor: '#06C755',
+            confirmButtonText: 'รับทราบและดำเนินการต่อ',
+            showCancelButton: true,
+            cancelButtonText: 'ยกเลิก',
+            width: '480px'
+        });
+        if (!result.isConfirmed) return;
+        localStorage.setItem('lottery_tnc_v1_accepted', '1');
+    }
+
     const modal = new bootstrap.Modal(document.getElementById('lottery-modal'));
     AppState.allModals['lottery'] = modal;
     modal.show();
+
+    document.getElementById('lottery-modal').addEventListener('hidden.bs.modal', () => {
+        clearInterval(_lotteryCountdownInterval);
+        _lotteryCountdownInterval = null;
+    }, { once: true });
+
     setLotteryFlowStep('number');
     updateLotteryPurchaseSummary();
     await loadLotteryCurrentRound();
@@ -5898,9 +5954,25 @@ async function loadLotteryCurrentRound() {
             $('#btn-lottery-buy').prop('disabled', true)
                 .html('<i class="fas fa-lock me-2"></i>ปิดรับแล้ว');
         } else {
-            const h = res.hoursLeft, m = res.minutesLeft;
-            $('#lottery-countdown-bar').html(`<i class="fas fa-clock me-1"></i>ปิดรับใน ${h} ชม. ${m} นาที`);
-            // reset ปุ่มให้กลับ state เดิมก่อนเสมอ (กรณีเปิด modal ครั้งที่ 2)
+            const closeAt = new Date(res.drawDate + 'T00:00:00+07:00').getTime() - 60 * 1000;
+            function updateLotteryCountdown() {
+                const now = Date.now();
+                const diff = closeAt - now;
+                if (diff <= 0) {
+                    $('#lottery-countdown-bar').html('<i class="fas fa-lock me-1"></i>ปิดรับแล้ว — รอผลรางวัล');
+                    $('#btn-lottery-buy').prop('disabled', true).html('<i class="fas fa-lock me-2"></i>ปิดรับแล้ว');
+                    clearInterval(_lotteryCountdownInterval);
+                    return;
+                }
+                const totalSec = Math.floor(diff / 1000);
+                const h = Math.floor(totalSec / 3600);
+                const m = Math.floor((totalSec % 3600) / 60);
+                const s = totalSec % 60;
+                $('#lottery-countdown-bar').html(`<i class="fas fa-clock me-1"></i>ปิดรับใน ${h} ชม. ${m} นาที ${s} วินาที`);
+            }
+            clearInterval(_lotteryCountdownInterval);
+            updateLotteryCountdown();
+            _lotteryCountdownInterval = setInterval(updateLotteryCountdown, 1000);
             $('#btn-lottery-buy').prop('disabled', false)
                 .html('<i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety แล้วซื้อ');
         }
@@ -5932,14 +6004,23 @@ async function loadLotteryGoldEligibility() {
     try {
         const res = await callApi('/api/lottery/gold-eligibility', { lineUserId: AppState.lineProfile.userId });
         if (res.eligible) {
-            $status.text(`${res.department} ไม่มี Incident ครบ 30 วัน รับตั๋ว 3 ตัวท้ายฟรี`);
+            const since = res.incidentFreeSince
+                ? new Date(res.incidentFreeSince).toLocaleDateString('th-TH', { month: 'short', day: 'numeric', year: 'numeric' })
+                : null;
+            const sinceText = since ? ` (ปลอดภัยตั้งแต่ ${since})` : '';
+            $status.html(`<span class="badge bg-warning text-dark me-1"><i class="fas fa-shield-check me-1"></i>แผนกปลอดภัย ✓</span>${sanitizeHTML(res.department || '')}${sinceText}<br><small class="text-muted">รับตั๋ว 3 ตัวท้ายฟรี 1 ใบ</small>`);
             $btn.prop('disabled', false).text('รับฟรี');
             return;
         }
 
         $box.addClass(res.alreadyClaimed ? 'claimed' : 'locked');
-        $status.text(res.reason || 'ยังไม่มีสิทธิ์รับตั๋วทอง');
+        const reason = res.reason || 'ยังไม่มีสิทธิ์รับตั๋วทอง';
+        const infoIcon = `<i class="fas fa-info-circle text-muted ms-1" title="Gold Ticket ฟรี = แผนกไม่มีรายงานอุบัติเหตุใน 30 วันที่ผ่านมา" data-bs-toggle="tooltip"></i>`;
+        $status.html(`${sanitizeHTML(reason)}${infoIcon}`);
         $btn.prop('disabled', true).text(res.alreadyClaimed ? 'รับแล้ว' : 'ล็อก');
+        // init tooltip
+        const tip = $status.find('[data-bs-toggle="tooltip"]')[0];
+        if (tip) new bootstrap.Tooltip(tip);
     } catch (e) {
         $box.addClass('locked');
         $status.text('ตรวจสอบสิทธิ์ตั๋วทองไม่สำเร็จ');
@@ -5979,6 +6060,28 @@ async function claimLotteryGoldTicket() {
     }
 }
 
+async function adminSaveLotteryPrizeConfig() {
+    const prizeTwo = Number($('#cfg-prize-two').val());
+    const prizeThree = Number($('#cfg-prize-three').val());
+    const priceTwo = Number($('#cfg-price-two').val());
+    const priceThree = Number($('#cfg-price-three').val());
+    const dailyLimit = Number($('#cfg-daily-limit').val());
+    if (!prizeTwo || !prizeThree || !priceTwo || !priceThree || !dailyLimit)
+        return Swal.fire('ข้อมูลไม่ถูกต้อง', 'กรุณากรอกตัวเลขที่มากกว่า 0 ทุกช่อง', 'warning');
+    try {
+        const userEnabled = $('#admin-lottery-user-enabled').is(':checked');
+        const disabledMessage = $('#admin-lottery-disabled-message').val()?.trim() || '';
+        await callApi('/api/admin/lottery/settings', {
+            requesterId: AppState.lineProfile.userId,
+            userEnabled, disabledMessage, prizeTwo, prizeThree, priceTwo, priceThree, dailyLimit
+        }, 'POST');
+        showToast('บันทึกการตั้งค่าราคาและรางวัลแล้ว', 'success');
+        await loadAdminLotteryDashboard();
+    } catch (e) {
+        Swal.fire('Error', e.message, 'error');
+    }
+}
+
 async function adminToggleLotteryUserAccess() {
     const $toggle = $('#admin-lottery-user-enabled');
     const userEnabled = $toggle.is(':checked');
@@ -6012,14 +6115,36 @@ function selectLotteryType(type) {
     updateLotteryPurchaseSummary();
 
     const input = $('#lottery-number-input');
+    const digits = type === 'two' ? 2 : 3;
+    const example = type === 'two' ? 'เช่น 47' : 'เช่น 283';
     if (type === 'two') {
-        input.attr('maxlength', 2).attr('placeholder', '00');
+        input.attr('maxlength', 2).attr('placeholder', example);
         $('#lottery-digit-hint').text('(00-99)');
     } else {
-        input.attr('maxlength', 3).attr('placeholder', '000');
+        input.attr('maxlength', 3).attr('placeholder', example);
         $('#lottery-digit-hint').text('(000-999)');
     }
     input.val('');
+    updateLotteryCharCounter();
+
+    input.off('input.counter').on('input.counter', () => {
+        input.val(input.val().replace(/\D/g, '').slice(0, digits));
+        updateLotteryCharCounter();
+    });
+}
+
+function updateLotteryCharCounter() {
+    const digits = _lotterySelectedType === 'two' ? 2 : 3;
+    const current = String($('#lottery-number-input').val()).length;
+    let $counter = $('#lottery-char-counter');
+    if (!$counter.length) {
+        $('#lottery-number-input').closest('.lottery-number-input-area').append(
+            '<div id="lottery-char-counter" class="text-end small mt-1 text-muted"></div>'
+        );
+        $counter = $('#lottery-char-counter');
+    }
+    const color = current === digits ? 'text-success fw-semibold' : 'text-muted';
+    $counter.attr('class', `text-end small mt-1 ${color}`).text(`${current}/${digits} หลัก`);
 }
 
 // -----------------------------------------------
@@ -6216,6 +6341,24 @@ async function loadMyLotteryTickets() {
             return;
         }
 
+        // ตรวจ winner celebration (เฉพาะงวดที่ completed + isWinner ที่ยังไม่ celebrate)
+        const newWins = tickets.filter(t => t.isWinner && t.roundStatus === 'completed');
+        if (newWins.length) {
+            const celebKey = `lottery_win_celebrated_${newWins.map(t => t.ticketId).sort().join('_')}`;
+            if (!localStorage.getItem(celebKey)) {
+                localStorage.setItem(celebKey, '1');
+                fireConfetti('big');
+                const totalWon = newWins.reduce((s, t) => s + Number(t.prizeAmount || 0), 0);
+                await Swal.fire({
+                    icon: 'success',
+                    title: '🎉 คุณถูกรางวัล!',
+                    html: `<p>ถูกรางวัล <strong>${newWins.length} ใบ</strong><br>รวม <strong class="text-success">${totalWon.toLocaleString()} คะแนน</strong></p>`,
+                    confirmButtonColor: '#06C755',
+                    confirmButtonText: 'ดูตั๋วที่ถูก'
+                });
+            }
+        }
+
         // จัดกลุ่มตามงวด
         const grouped = {};
         tickets.forEach(t => {
@@ -6223,7 +6366,14 @@ async function loadMyLotteryTickets() {
             grouped[t.roundId].tickets.push(t);
         });
 
-        let html = '';
+        const recentWins = tickets.filter(t => t.isWinner && t.roundStatus === 'completed');
+        const winBanner = recentWins.length
+            ? `<div class="lottery-win-banner mb-3">
+                <i class="fas fa-trophy me-2"></i>
+                คุณถูกรางวัล <strong>${recentWins.length} ใบ</strong> รวม <strong>${recentWins.reduce((s,t) => s+Number(t.prizeAmount||0), 0).toLocaleString()} pts</strong>!
+               </div>` : '';
+
+        let html = winBanner;
         for (const [roundId, g] of Object.entries(grouped)) {
             const drawDateStr = new Date(g.drawDate + 'T00:00:00+07:00').toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
             const total = g.tickets.length;
@@ -6292,31 +6442,32 @@ async function loadLotteryResults() {
             return;
         }
         let html = '';
-        rounds.forEach(r => {
-            const d = new Date(r.drawDate + 'T00:00:00+07:00').toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
-            html += `<div class="lottery-result-card mb-3">
+        rounds.forEach((r, idx) => {
+            const d = new Date(r.drawDate + 'T00:00:00+07:00').toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+            const isFirst = idx === 0;
+            html += `<div class="lottery-result-card mb-3 ${isFirst ? 'lottery-result-latest' : ''}">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="fw-bold">งวด ${sanitizeHTML(d)}</span>
+                    <span class="fw-bold">${isFirst ? '🏆 ' : ''}งวด ${sanitizeHTML(d)}</span>
                     <span class="badge bg-success">ออกรางวัลแล้ว</span>
                 </div>
-                <div class="d-flex gap-3 justify-content-center">
-                    <div class="text-center">
+                <div class="lottery-result-numbers-row">
+                    <div class="lottery-result-num-block">
                         <div class="lottery-result-label">2 ตัวท้าย 🟢</div>
-                        <div class="lottery-result-number">${sanitizeHTML(r.last2 || '--')}</div>
+                        <div class="lottery-result-number-large ${isFirst ? 'slot-reveal' : ''}">${sanitizeHTML(r.last2 || '--')}</div>
                     </div>
-                    <div class="text-center">
+                    <div class="lottery-result-num-block">
                         <div class="lottery-result-label">3 ตัวท้าย 🔴</div>
-                        <div class="lottery-result-number">${sanitizeHTML(r.last3_back || '---')}</div>
+                        <div class="lottery-result-number-large ${isFirst ? 'slot-reveal' : ''}">${sanitizeHTML(r.last3_back || '---')}</div>
                     </div>
-                    ${r.last3_front ? `<div class="text-center">
+                    ${r.last3_front ? `<div class="lottery-result-num-block">
                         <div class="lottery-result-label">3 ตัวหน้า</div>
-                        <div class="lottery-result-number">${sanitizeHTML(r.last3_front)}</div>
+                        <div class="lottery-result-number-large ${isFirst ? 'slot-reveal' : ''}">${sanitizeHTML(r.last3_front)}</div>
                     </div>` : ''}
                 </div>
-                <div class="d-flex justify-content-around mt-2 pt-2 border-top">
-                    <small class="text-muted"><i class="fas fa-ticket me-1"></i>${Number(r.totalTicketsSold || 0).toLocaleString()} ใบ</small>
-                    <small class="text-success"><i class="fas fa-trophy me-1"></i>${r.totalWinners || 0} รางวัล</small>
-                    <small class="text-warning"><i class="fas fa-coins me-1"></i>${Number(r.totalPrizesPaid || 0).toLocaleString()} pts</small>
+                <div class="lottery-result-stats mt-2 pt-2 border-top">
+                    <span><i class="fas fa-ticket me-1 text-muted"></i>${Number(r.totalTicketsSold || 0).toLocaleString()} ใบ</span>
+                    <span class="text-success fw-semibold"><i class="fas fa-trophy me-1"></i>${r.totalWinners || 0} รางวัล</span>
+                    <span class="text-warning fw-semibold"><i class="fas fa-coins me-1"></i>${Number(r.totalPrizesPaid || 0).toLocaleString()} pts</span>
                 </div>
             </div>`;
         });
@@ -6355,18 +6506,15 @@ async function loadAdminLotteryDashboard() {
         const { rounds, totals, activeQuestions, settings = {} } = res;
         const userEnabled = !!settings.userEnabled;
 
+        const statusColorMap = {
+            open: 'primary', closed: 'secondary', pending_confirm: 'warning',
+            pending_manual: 'danger', confirmed: 'info', completed: 'success'
+        };
         let roundsHtml = '';
         (rounds || []).forEach(r => {
             const d = new Date(r.drawDate + 'T00:00:00+07:00').toLocaleDateString('th-TH', { month: 'short', day: 'numeric' });
-            const statusMap = {
-                open: ['primary', 'เปิดรับ'],
-                closed: ['secondary', 'ปิดรับ'],
-                pending_confirm: ['warning', 'รอยืนยัน'],
-                pending_manual: ['danger', 'รอกรอกผล'],
-                confirmed: ['info', 'ยืนยันแล้ว'],
-                completed: ['success', 'เสร็จสิ้น']
-            };
-            const [color, label] = statusMap[r.status] || ['secondary', r.status];
+            const color = statusColorMap[r.status] || 'secondary';
+            const label = LOTTERY_STATUS_TH[r.status] || r.status;
             roundsHtml += `<tr>
                 <td>${sanitizeHTML(d)}</td>
                 <td>${r.last2 ? sanitizeHTML(r.last2) : '-'} / ${r.last3_back ? sanitizeHTML(r.last3_back) : '-'}</td>
@@ -6375,6 +6523,7 @@ async function loadAdminLotteryDashboard() {
             </tr>`;
         });
 
+        const defaultMsg = 'ขณะนี้ Safety Lottery กำลังอยู่ในการปรับปรุง โปรดติดตามประกาศจากทีมบริหาร';
         $el.html(`
             <div class="lottery-admin-control mb-3">
                 <div>
@@ -6383,7 +6532,7 @@ async function loadAdminLotteryDashboard() {
                 </div>
                 <div class="lottery-admin-control-actions">
                     <input class="form-control form-control-sm" id="admin-lottery-disabled-message"
-                           value="${sanitizeHTML(settings.disabledMessage || 'Safety Lottery is being prepared by the admin team.')}"
+                           value="${sanitizeHTML(settings.disabledMessage || defaultMsg)}"
                            placeholder="ข้อความที่จะแสดงเมื่อปิดฟีเจอร์">
                     <div class="form-check form-switch m-0">
                         <input class="form-check-input" type="checkbox" role="switch" id="admin-lottery-user-enabled"
@@ -6392,6 +6541,40 @@ async function loadAdminLotteryDashboard() {
                     </div>
                 </div>
             </div>
+
+            <div class="card mb-3 border-0 bg-light">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0 fw-bold small"><i class="fas fa-cog me-1 text-secondary"></i>ตั้งค่าราคาและรางวัล</h6>
+                        <button class="btn btn-sm btn-success" onclick="adminSaveLotteryPrizeConfig()">
+                            <i class="fas fa-save me-1"></i>บันทึก
+                        </button>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6 col-md-4">
+                            <label class="form-label form-label-sm mb-1">ราคา 2D (เหรียญ)</label>
+                            <input type="number" class="form-control form-control-sm" id="cfg-price-two" value="${settings.priceTwo || 10}" min="1">
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label form-label-sm mb-1">ราคา 3D (เหรียญ)</label>
+                            <input type="number" class="form-control form-control-sm" id="cfg-price-three" value="${settings.priceThree || 30}" min="1">
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label form-label-sm mb-1">จำกัด/วัน</label>
+                            <input type="number" class="form-control form-control-sm" id="cfg-daily-limit" value="${settings.dailyLimit || 5}" min="1" max="100">
+                        </div>
+                        <div class="col-6 col-md-6">
+                            <label class="form-label form-label-sm mb-1">รางวัล 2D (pts)</label>
+                            <input type="number" class="form-control form-control-sm" id="cfg-prize-two" value="${settings.prizeTwo || 500}" min="1">
+                        </div>
+                        <div class="col-6 col-md-6">
+                            <label class="form-label form-label-sm mb-1">รางวัล 3D (pts)</label>
+                            <input type="number" class="form-control form-control-sm" id="cfg-prize-three" value="${settings.prizeThree || 3000}" min="1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-3 mb-4">
                 <div class="col-4 text-center">
                     <div class="fw-bold fs-4 text-success">${Number(totals.totalTickets || 0).toLocaleString()}</div>
@@ -6453,7 +6636,7 @@ async function loadAdminLotteryMonitor(keepSelection = false) {
         const currentSelect = selected || res.selectedRoundId || '';
         $sel.empty().append('<option value="">ทุกงวด</option>');
         rounds.forEach(r => {
-            const label = `${r.drawDate} · ${r.status}`;
+            const label = `${r.drawDate} · ${LOTTERY_STATUS_TH[r.status] || r.status}`;
             $sel.append(`<option value="${sanitizeHTML(r.roundId)}">${sanitizeHTML(label)}</option>`);
         });
         $sel.val(currentSelect);
@@ -6466,7 +6649,9 @@ async function loadAdminLotteryMonitor(keepSelection = false) {
                 <td class="text-end fw-bold text-success">${Number(w.prizeAmount || 0).toLocaleString()}</td>
             </tr>`).join('') : '<tr><td colspan="4" class="text-center text-muted py-3">ยังไม่มีผู้ถูกรางวัล</td></tr>';
 
-        const ticketRows = tickets.length ? tickets.slice(0, 30).map(t => `
+        const currentOffset = Number(res.ticketOffset || 0);
+        const hasMore = tickets.length >= 80;
+        const ticketRows = tickets.length ? tickets.map(t => `
             <tr>
                 <td><strong>${sanitizeHTML(t.fullName || '-')}</strong><br><small class="text-muted">${sanitizeHTML(t.employeeId || '')}</small></td>
                 <td>${sanitizeHTML(t.roundId)}</td>
@@ -6474,6 +6659,16 @@ async function loadAdminLotteryMonitor(keepSelection = false) {
                 <td class="fw-bold">${sanitizeHTML(t.number)}</td>
                 <td>${t.isWinner ? '<span class="badge bg-success">Win</span>' : (t.isPrizeClaimed ? '<span class="badge bg-secondary">Closed</span>' : '<span class="badge bg-primary">Active</span>')}</td>
             </tr>`).join('') : '<tr><td colspan="5" class="text-center text-muted py-3">ยังไม่มีตั๋วในงวดนี้</td></tr>';
+        const loadMoreHtml = hasMore
+            ? `<tr><td colspan="5" class="text-center py-2">
+                 <button class="btn btn-outline-secondary btn-sm" onclick="loadAdminLotteryMonitorMore(${currentOffset + 80})">
+                   <i class="fas fa-chevron-down me-1"></i>โหลดเพิ่มเติม
+                 </button>
+               </td></tr>`
+            : '';
+        const exportBtn = `<a class="btn btn-outline-success btn-sm" href="/api/admin/lottery/export?requesterId=${encodeURIComponent(AppState.lineProfile.userId)}${currentSelect ? '&roundId=' + encodeURIComponent(currentSelect) : ''}" target="_blank">
+            <i class="fas fa-file-csv me-1"></i>Export CSV
+        </a>`;
 
         const deptRows = departments.length ? departments.map(d => `
             <tr>
@@ -6502,10 +6697,13 @@ async function loadAdminLotteryMonitor(keepSelection = false) {
                 </div>
                 <div class="col-lg-6">
                     <div class="lottery-admin-panel">
-                        <div class="lottery-admin-panel-title">Recent Tickets</div>
-                        <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="lottery-admin-panel-title mb-0">Recent Tickets</div>
+                            ${exportBtn}
+                        </div>
+                        <div class="table-responsive mt-2"><table class="table table-sm align-middle mb-0" id="admin-tickets-table">
                             <thead><tr><th>User</th><th>Round</th><th>Type</th><th>No.</th><th>Status</th></tr></thead>
-                            <tbody>${ticketRows}</tbody>
+                            <tbody>${ticketRows}${loadMoreHtml}</tbody>
                         </table></div>
                     </div>
                 </div>
@@ -6522,6 +6720,33 @@ async function loadAdminLotteryMonitor(keepSelection = false) {
         `);
     } catch (e) {
         $wrap.html(`<div class="alert alert-danger">${sanitizeHTML(e.message)}</div>`);
+    }
+}
+
+async function loadAdminLotteryMonitorMore(offset) {
+    const roundId = $('#admin-monitor-round-select').val();
+    try {
+        const params = { requesterId: AppState.lineProfile.userId, offset };
+        if (roundId) params.roundId = roundId;
+        const res = await callApi('/api/admin/lottery/monitor', params);
+        const tickets = res.tickets || [];
+        const hasMore = tickets.length >= 80;
+        const currentOffset = Number(res.ticketOffset || 0);
+        const newRows = tickets.map(t => `
+            <tr>
+                <td><strong>${sanitizeHTML(t.fullName || '-')}</strong><br><small class="text-muted">${sanitizeHTML(t.employeeId || '')}</small></td>
+                <td>${sanitizeHTML(t.roundId)}</td>
+                <td>${t.ticketType === 'two' ? '2D' : '3D'} ${t.isGoldTicket ? '<span class="badge bg-warning text-dark">Gold</span>' : ''}</td>
+                <td class="fw-bold">${sanitizeHTML(t.number)}</td>
+                <td>${t.isWinner ? '<span class="badge bg-success">Win</span>' : (t.isPrizeClaimed ? '<span class="badge bg-secondary">Closed</span>' : '<span class="badge bg-primary">Active</span>')}</td>
+            </tr>`).join('');
+        const loadMoreHtml = hasMore
+            ? `<tr><td colspan="5" class="text-center py-2"><button class="btn btn-outline-secondary btn-sm" onclick="loadAdminLotteryMonitorMore(${currentOffset + 80})"><i class="fas fa-chevron-down me-1"></i>โหลดเพิ่มเติม</button></td></tr>`
+            : '';
+        $('#admin-tickets-table tbody tr:last-child').remove();
+        $('#admin-tickets-table tbody').append(newRows + loadMoreHtml);
+    } catch (e) {
+        showToast('โหลดเพิ่มเติมไม่สำเร็จ: ' + e.message, 'danger');
     }
 }
 
@@ -6557,20 +6782,53 @@ async function adminConfirmLotteryResult() {
     const roundId = $('#admin-lottery-round-select').val();
     if (!roundId) return Swal.fire('เลือกงวดก่อน', '', 'warning');
 
-    const confirm = await Swal.fire({
-        icon: 'question', title: 'ยืนยันผลรางวัล?',
-        text: `งวด ${roundId} — หลังยืนยันแล้วพร้อมประมวลผลรางวัล`,
+    Swal.fire({ title: 'กำลังตรวจรายชื่อผู้ถูกรางวัล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+    let preview;
+    try {
+        preview = await callApi('/api/admin/lottery/preview-winners', {
+            requesterId: AppState.lineProfile.userId, roundId
+        });
+    } catch (e) {
+        return Swal.fire('Error', e.message, 'error');
+    }
+
+    const { round, winners, totalPrizesToPay, totalTickets, totalPlayers } = preview;
+    const winnerRows = winners.length
+        ? winners.map(w => `<tr>
+            <td>${sanitizeHTML(w.fullName || '-')}</td>
+            <td>${sanitizeHTML(w.department || '-')}</td>
+            <td>${w.ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย'}${w.isGoldTicket ? ' 🏆' : ''}</td>
+            <td class="fw-bold">${sanitizeHTML(w.number)}</td>
+            <td class="text-success fw-bold">${Number(w.prize).toLocaleString()} pts</td>
+          </tr>`).join('')
+        : '<tr><td colspan="5" class="text-center text-muted">ไม่มีผู้ถูกรางวัลในงวดนี้</td></tr>';
+
+    const confirmResult = await Swal.fire({
+        icon: 'info',
+        title: `ตรวจผลงวด ${sanitizeHTML(round.drawDate)}`,
+        html: `
+            <p class="mb-2">ผล: <strong>${sanitizeHTML(round.last2)}</strong> (2D) / <strong>${sanitizeHTML(round.last3_back)}</strong> (3D)</p>
+            <p class="mb-2">ตั๋วทั้งหมด: <strong>${Number(totalTickets).toLocaleString()}</strong> ใบ จาก <strong>${Number(totalPlayers).toLocaleString()}</strong> คน</p>
+            <p class="mb-3 text-success fw-bold">ผู้ถูกรางวัล: ${winners.length} คน | รวมรางวัล: ${Number(totalPrizesToPay).toLocaleString()} pts</p>
+            <div class="table-responsive" style="max-height:200px;overflow-y:auto">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead class="table-light"><tr><th>ชื่อ</th><th>แผนก</th><th>ประเภท</th><th>เลข</th><th>รางวัล</th></tr></thead>
+                    <tbody>${winnerRows}</tbody>
+                </table>
+            </div>`,
         showCancelButton: true,
-        confirmButtonColor: '#06C755', confirmButtonText: 'ยืนยัน',
-        cancelButtonText: 'ยกเลิก'
+        confirmButtonColor: '#06C755',
+        confirmButtonText: 'ยืนยันผล (ขั้นตอน 2/3)',
+        cancelButtonText: 'ยกเลิก',
+        width: '600px'
     });
-    if (!confirm.isConfirmed) return;
+    if (!confirmResult.isConfirmed) return;
 
     try {
         await callApi('/api/admin/lottery/confirm-result', {
             requesterId: AppState.lineProfile.userId, roundId
         }, 'POST');
-        showToast('ยืนยันผลเรียบร้อย', 'success');
+        showToast('ยืนยันผลเรียบร้อย — พร้อมประมวลผลรางวัล', 'success');
         await loadAdminLotteryDashboard();
     } catch (e) {
         Swal.fire('Error', e.message, 'error');
@@ -6584,13 +6842,25 @@ async function adminProcessLotteryPrizes() {
     const roundId = $('#admin-lottery-round-select').val();
     if (!roundId) return Swal.fire('เลือกงวดก่อน', '', 'warning');
 
+    Swal.fire({ title: 'กำลังโหลดรายชื่อผู้ถูกรางวัล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+    let preview;
+    try {
+        preview = await callApi('/api/admin/lottery/preview-winners', {
+            requesterId: AppState.lineProfile.userId, roundId
+        });
+    } catch (e) {
+        return Swal.fire('Error', e.message, 'error');
+    }
+
+    const { winners, totalPrizesToPay } = preview;
     const confirm = await Swal.fire({
-        icon: 'warning', title: 'ประมวลผลรางวัล?',
+        icon: 'warning', title: 'ประมวลผลและจ่ายรางวัล?',
         html: `<p>งวด <strong>${sanitizeHTML(roundId)}</strong></p>
-               <p class="text-danger">⚠️ การดำเนินการนี้ไม่สามารถย้อนกลับได้!</p>
-               <p>ระบบจะจ่าย Points และส่ง LINE ให้ผู้ถูกรางวัลทุกคน</p>`,
+               <p>ผู้ถูกรางวัล: <strong class="text-success">${winners.length} คน</strong> | รวมรางวัล: <strong class="text-success">${Number(totalPrizesToPay).toLocaleString()} pts</strong></p>
+               <p class="text-danger small">⚠️ การดำเนินการนี้ไม่สามารถย้อนกลับได้!</p>
+               <p class="small">ระบบจะจ่าย Points และส่ง LINE ให้ผู้ถูกรางวัลทุกคน</p>`,
         showCancelButton: true,
-        confirmButtonColor: '#d33', confirmButtonText: 'ยืนยัน ดำเนินการ',
+        confirmButtonColor: '#d33', confirmButtonText: 'ยืนยัน จ่ายรางวัล (ขั้นตอน 3/3)',
         cancelButtonText: 'ยกเลิก'
     });
     if (!confirm.isConfirmed) return;
@@ -6635,10 +6905,24 @@ async function adminCreateLotteryRound() {
 // loadAdminLotteryQuestions — โหลดคำถามทั้งหมด
 // -----------------------------------------------
 async function adminAutoCreateLotteryRounds() {
+    let previewDates = [];
+    try {
+        const prev = await callApi('/api/admin/lottery/preview-auto-rounds', {
+            requesterId: AppState.lineProfile.userId, count: 4
+        });
+        previewDates = prev.preview || [];
+    } catch (_) {}
+
+    const previewHtml = previewDates.length
+        ? `<ul class="text-start ps-3 mt-2">
+            ${previewDates.map(p => `<li>${sanitizeHTML(p.drawDate)} ${p.exists ? '<span class="badge bg-secondary">มีอยู่แล้ว</span>' : '<span class="badge bg-success">สร้างใหม่</span>'}</li>`).join('')}
+           </ul>`
+        : '<p class="text-muted small">ไม่สามารถโหลด preview ได้</p>';
+
     const confirm = await Swal.fire({
         icon: 'question',
         title: 'สร้างงวดถัดไปอัตโนมัติ?',
-        text: 'ระบบจะสร้างงวดวันที่ 1 และ 16 ที่ยังไม่มีอยู่ในฐานข้อมูล',
+        html: `<p class="mb-2">งวดที่จะสร้าง (วันที่ 1 และ 16):</p>${previewHtml}`,
         showCancelButton: true,
         confirmButtonColor: '#06C755',
         confirmButtonText: 'สร้างงวด',

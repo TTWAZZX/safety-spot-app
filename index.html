@@ -2046,6 +2046,23 @@
                         </div>
 
                         <div class="tab-pane fade" id="al-tab-result">
+                            <!-- Step Indicator -->
+                            <div class="admin-result-steps mb-3">
+                                <div class="admin-result-step">
+                                    <div class="step-num">1</div>
+                                    <div class="step-label">บันทึกผล</div>
+                                </div>
+                                <div class="admin-result-step-arrow">→</div>
+                                <div class="admin-result-step">
+                                    <div class="step-num">2</div>
+                                    <div class="step-label">ยืนยันผล</div>
+                                </div>
+                                <div class="admin-result-step-arrow">→</div>
+                                <div class="admin-result-step">
+                                    <div class="step-num">3</div>
+                                    <div class="step-label">จ่ายรางวัล</div>
+                                </div>
+                            </div>
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">เลือกงวด</label>
                                 <select class="form-select" id="admin-lottery-round-select"></select>
@@ -2068,14 +2085,14 @@
                                 </div>
                             </div>
                             <div class="d-grid gap-2">
-                                <button class="btn btn-warning fw-bold" onclick="adminSaveLotteryResult()">
-                                    <i class="fas fa-save me-1"></i>บันทึกผลรางวัล
+                                <button class="btn btn-primary fw-bold" onclick="adminSaveLotteryResult()">
+                                    <i class="fas fa-save me-1"></i>① บันทึกผลรางวัล
                                 </button>
-                                <button class="btn btn-success fw-bold" onclick="adminConfirmLotteryResult()">
-                                    <i class="fas fa-check-circle me-1"></i>ยืนยันผล
+                                <button class="btn btn-warning fw-bold" onclick="adminConfirmLotteryResult()">
+                                    <i class="fas fa-search me-1"></i>② ตรวจผล & ยืนยัน
                                 </button>
                                 <button class="btn btn-danger fw-bold" onclick="adminProcessLotteryPrizes()">
-                                    <i class="fas fa-coins me-1"></i>ประมวลผลและจ่ายรางวัล
+                                    <i class="fas fa-coins me-1"></i>③ ประมวลผลและจ่ายรางวัล
                                 </button>
                             </div>
                             <hr>

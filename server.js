@@ -602,8 +602,9 @@ app.get('/api/home/lottery-summary', async (req, res) => {
                 currentRound: round ? { ...round, isClosed: isLotteryRoundClosed(round), stats: roundStats } : null,
                 latestResult: latestResult || null,
                 user,
-                prices: { two: 10, three: 30 },
-                dailyQuota: 5
+                prices: { two: settings.priceTwo, three: settings.priceThree },
+                prizes: { two: settings.prizeTwo, three: settings.prizeThree },
+                dailyQuota: settings.dailyLimit
             }
         });
     } catch (e) {
@@ -4166,17 +4167,22 @@ const LOTTERY_GEMINI_MODELS = [
     'gemini-3.1-flash-lite'
 ];
 
-const DEFAULT_LOTTERY_DISABLED_MESSAGE = 'Safety Lottery is being prepared by the admin team.';
+const DEFAULT_LOTTERY_DISABLED_MESSAGE = 'ขณะนี้ Safety Lottery กำลังอยู่ในการปรับปรุง โปรดติดตามประกาศจากทีมบริหาร';
 
 async function getLotterySettings(conn = db) {
     const [rows] = await conn.query(
         `SELECT settingKey, settingValue FROM lottery_settings
-         WHERE settingKey IN ('user_enabled', 'disabled_message')`
+         WHERE settingKey IN ('user_enabled','disabled_message','prize_two','prize_three','price_two','price_three','daily_limit')`
     );
     const map = Object.fromEntries(rows.map(r => [r.settingKey, r.settingValue]));
     return {
         userEnabled: map.user_enabled === 'true',
-        disabledMessage: map.disabled_message || DEFAULT_LOTTERY_DISABLED_MESSAGE
+        disabledMessage: map.disabled_message || DEFAULT_LOTTERY_DISABLED_MESSAGE,
+        prizeTwo: Number(map.prize_two) || 500,
+        prizeThree: Number(map.prize_three) || 3000,
+        priceTwo: Number(map.price_two) || 10,
+        priceThree: Number(map.price_three) || 30,
+        dailyLimit: Number(map.daily_limit) || 5
     };
 }
 
@@ -4500,7 +4506,6 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
     if (!new RegExp(`^\\d{${requiredDigits}}$`).test(numberText))
         return res.status(400).json({ status: 'error', message: `เลขต้องเป็นตัวเลข ${requiredDigits} หลัก` });
 
-    const price = ticketType === 'two' ? 10 : 30;
     const quizBonus = 2;
     const todayTH = getBangkokDateString();
 
@@ -4508,6 +4513,10 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
     try {
         await conn.beginTransaction();
         await ensureLotteryUserEnabled(conn);
+
+        const settings = await getLotterySettings(conn);
+        const price = ticketType === 'two' ? settings.priceTwo : settings.priceThree;
+        const dailyLimit = settings.dailyLimit;
 
         const [[user]] = await conn.query('SELECT coinBalance FROM users WHERE lineUserId = ? FOR UPDATE', [lineUserId]);
         if (!user || Number(user.coinBalance) + quizBonus < price)
@@ -4535,8 +4544,8 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
         const [[dp]] = await conn.query(
             'SELECT count FROM lottery_daily_purchases WHERE lineUserId=? AND purchaseDate=? FOR UPDATE',
             [lineUserId, todayTH]);
-        if (dp && Number(dp.count) >= 5)
-            throw new Error('ซื้อครบ 5 ใบต่อวันแล้ว');
+        if (dp && Number(dp.count) >= dailyLimit)
+            throw new Error(`ซื้อครบ ${dailyLimit} ใบต่อวันแล้ว`);
 
         await conn.query('UPDATE users SET coinBalance = coinBalance - ? + ? WHERE lineUserId = ?', [price, quizBonus, lineUserId]);
         const [ticketResult] = await conn.query(
@@ -4745,6 +4754,56 @@ app.post('/api/admin/lottery/confirm-result', async (req, res) => {
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
+// GET /api/admin/lottery/preview-winners — ดูรายชื่อผู้ถูกรางวัลก่อน process (dry-run)
+app.get('/api/admin/lottery/preview-winners', async (req, res) => {
+    const { requesterId, roundId } = req.query;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+        if (!roundId) return res.status(400).json({ status: 'error', message: 'ต้องระบุ roundId' });
+
+        const [[round]] = await db.query('SELECT * FROM lottery_rounds WHERE roundId=?', [roundId]);
+        if (!round) return res.status(404).json({ status: 'error', message: 'ไม่พบงวดนี้' });
+        if (!round.last2 || !round.last3_back)
+            return res.status(400).json({ status: 'error', message: 'ยังไม่ได้กรอกผลรางวัล' });
+
+        const settings = await getLotterySettings();
+
+        const [win2] = await db.query(
+            `SELECT t.ticketId, t.ticketType, t.number, t.isGoldTicket,
+                    u.fullName, u.employeeId, u.department
+             FROM lottery_tickets t
+             JOIN users u ON u.lineUserId=t.lineUserId
+             WHERE t.roundId=? AND t.ticketType='two' AND t.number=? AND t.isPrizeClaimed=FALSE`,
+            [roundId, round.last2]);
+
+        const [win3] = await db.query(
+            `SELECT t.ticketId, t.ticketType, t.number, t.isGoldTicket,
+                    u.fullName, u.employeeId, u.department
+             FROM lottery_tickets t
+             JOIN users u ON u.lineUserId=t.lineUserId
+             WHERE t.roundId=? AND t.ticketType='three' AND t.number=? AND t.isPrizeClaimed=FALSE`,
+            [roundId, round.last3_back]);
+
+        const [[totals]] = await db.query(
+            'SELECT COUNT(*) AS totalTickets, COUNT(DISTINCT lineUserId) AS totalPlayers FROM lottery_tickets WHERE roundId=?',
+            [roundId]);
+
+        const winners = [
+            ...win2.map(w => ({ ...w, prize: settings.prizeTwo })),
+            ...win3.map(w => ({ ...w, prize: settings.prizeThree }))
+        ];
+        const totalPrizesToPay = winners.reduce((s, w) => s + w.prize, 0);
+
+        res.json({ status: 'success', data: {
+            round: { roundId: round.roundId, drawDate: toLotteryDateString(round.drawDate), last2: round.last2, last3_back: round.last3_back, status: round.status },
+            winners, totalPrizesToPay,
+            totalTickets: Number(totals?.totalTickets || 0),
+            totalPlayers: Number(totals?.totalPlayers || 0)
+        }});
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
 // POST /api/admin/lottery/process-prizes — ประมวลผลรางวัล + จ่าย points + LINE Push
 app.post('/api/admin/lottery/process-prizes', async (req, res) => {
     const { requesterId, roundId } = req.body;
@@ -4780,8 +4839,9 @@ app.post('/api/admin/lottery/process-prizes', async (req, res) => {
         let totalPrizes = 0;
         let paidWinners = 0;
 
+        const prizeSettings = await getLotterySettings(conn);
         for (const ticket of allWinners) {
-            const prize = ticket.ticketType === 'two' ? 500 : 3000;
+            const prize = ticket.ticketType === 'two' ? prizeSettings.prizeTwo : prizeSettings.prizeThree;
             const [ticketUpdate] = await conn.query(
                 `UPDATE lottery_tickets SET isWinner=TRUE, prizeAmount=?, isPrizeClaimed=TRUE WHERE ticketId=? AND isPrizeClaimed=FALSE`,
                 [prize, ticket.ticketId]);
@@ -4893,9 +4953,9 @@ app.get('/api/admin/lottery/settings', async (req, res) => {
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
-// POST /api/admin/lottery/settings — Enable/disable user entry while admins develop
+// POST /api/admin/lottery/settings — Update feature settings (enable/disable, prizes, prices, limits)
 app.post('/api/admin/lottery/settings', async (req, res) => {
-    const { requesterId, userEnabled, disabledMessage } = req.body;
+    const { requesterId, userEnabled, disabledMessage, prizeTwo, prizeThree, priceTwo, priceThree, dailyLimit } = req.body;
     try {
         const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
         if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
@@ -4903,14 +4963,25 @@ app.post('/api/admin/lottery/settings', async (req, res) => {
         const enabledValue = userEnabled ? 'true' : 'false';
         const message = String(disabledMessage || DEFAULT_LOTTERY_DISABLED_MESSAGE).slice(0, 255);
 
-        await db.query(
-            `INSERT INTO lottery_settings (settingKey, settingValue, updatedBy) VALUES
-             ('user_enabled', ?, ?),
-             ('disabled_message', ?, ?)
-             ON DUPLICATE KEY UPDATE settingValue=VALUES(settingValue), updatedBy=VALUES(updatedBy)`,
-            [enabledValue, requesterId, message, requesterId]
-        );
-        await logAdminAction(requesterId, 'LOTTERY_UPDATE_SETTINGS', 'settings', 'lottery', enabledValue, { disabledMessage: message });
+        const pairs = [
+            ['user_enabled', enabledValue, requesterId],
+            ['disabled_message', message, requesterId]
+        ];
+        if (prizeTwo != null && Number(prizeTwo) > 0) pairs.push(['prize_two', String(Number(prizeTwo)), requesterId]);
+        if (prizeThree != null && Number(prizeThree) > 0) pairs.push(['prize_three', String(Number(prizeThree)), requesterId]);
+        if (priceTwo != null && Number(priceTwo) > 0) pairs.push(['price_two', String(Number(priceTwo)), requesterId]);
+        if (priceThree != null && Number(priceThree) > 0) pairs.push(['price_three', String(Number(priceThree)), requesterId]);
+        if (dailyLimit != null && Number(dailyLimit) > 0) pairs.push(['daily_limit', String(Number(dailyLimit)), requesterId]);
+
+        for (const [key, val, by] of pairs) {
+            await db.query(
+                `INSERT INTO lottery_settings (settingKey, settingValue, updatedBy) VALUES (?,?,?)
+                 ON DUPLICATE KEY UPDATE settingValue=VALUES(settingValue), updatedBy=VALUES(updatedBy)`,
+                [key, val, by]
+            );
+        }
+        await logAdminAction(requesterId, 'LOTTERY_UPDATE_SETTINGS', 'settings', 'lottery', enabledValue,
+            { disabledMessage: message, prizeTwo, prizeThree, priceTwo, priceThree, dailyLimit });
         res.json({ status: 'success', data: await getLotterySettings() });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
@@ -4936,7 +5007,7 @@ function getNextLotteryDrawDates(count = 2, fromDate = new Date()) {
 
 // GET /api/admin/lottery/monitor — Full monitoring surface for Safety Lottery
 app.get('/api/admin/lottery/monitor', async (req, res) => {
-    const { requesterId, roundId } = req.query;
+    const { requesterId, roundId, offset = 0 } = req.query;
     try {
         const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
         if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
@@ -4966,6 +5037,8 @@ app.get('/api/admin/lottery/monitor', async (req, res) => {
             params
         );
 
+        const ticketOffset = Math.max(0, Number(offset) || 0);
+        const ticketParams = [...params, ticketOffset];
         const [tickets] = await db.query(
             `SELECT t.ticketId, t.roundId, t.ticketType, t.number, t.price, t.isGoldTicket,
                     t.isWinner, t.prizeAmount, t.isPrizeClaimed, t.purchasedAt,
@@ -4973,8 +5046,8 @@ app.get('/api/admin/lottery/monitor', async (req, res) => {
              FROM lottery_tickets t
              JOIN users u ON u.lineUserId=t.lineUserId
              ${roundWhere}
-             ORDER BY t.purchasedAt DESC LIMIT 80`,
-            params
+             ORDER BY t.purchasedAt DESC LIMIT 80 OFFSET ?`,
+            ticketParams
         );
 
         const [winners] = await db.query(
@@ -5003,8 +5076,52 @@ app.get('/api/admin/lottery/monitor', async (req, res) => {
 
         res.json({
             status: 'success',
-            data: { selectedRoundId, rounds, summary, tickets, winners, departments }
+            data: { selectedRoundId, rounds, summary, tickets, winners, departments, ticketOffset }
         });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/admin/lottery/export — Export tickets CSV (UTF-8 BOM)
+app.get('/api/admin/lottery/export', async (req, res) => {
+    const { requesterId, roundId } = req.query;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+
+        const roundFilter = roundId ? 'AND t.roundId=?' : '';
+        const params = roundId ? [roundId] : [];
+        const [tickets] = await db.query(
+            `SELECT u.fullName, u.employeeId, u.department,
+                    t.ticketType, t.number, t.price, t.isGoldTicket,
+                    t.isWinner, t.prizeAmount, t.isPrizeClaimed,
+                    DATE_FORMAT(r.drawDate,'%Y-%m-%d') AS drawDate, r.status AS roundStatus,
+                    DATE_FORMAT(t.purchasedAt,'%Y-%m-%d %H:%i:%s') AS purchasedAt
+             FROM lottery_tickets t
+             JOIN users u ON u.lineUserId=t.lineUserId
+             JOIN lottery_rounds r ON r.roundId=t.roundId
+             WHERE 1=1 ${roundFilter}
+             ORDER BY t.purchasedAt DESC`,
+            params
+        );
+
+        const headers = ['ชื่อ','รหัสพนักงาน','แผนก','ประเภทตั๋ว','หมายเลข','ราคา(เหรียญ)','Gold Ticket','ถูกรางวัล','รางวัลที่ได้','จ่ายแล้ว','งวดวันที่','สถานะงวด','เวลาซื้อ'];
+        const typeLabel = { two: '2 ตัวท้าย', three: '3 ตัวท้าย' };
+        const rows = tickets.map(t => [
+            t.fullName || '', t.employeeId || '', t.department || '',
+            typeLabel[t.ticketType] || t.ticketType, t.number, t.price,
+            t.isGoldTicket ? 'ใช่' : 'ไม่',
+            t.isWinner ? 'ใช่' : 'ไม่',
+            Number(t.prizeAmount || 0),
+            t.isPrizeClaimed ? 'ใช่' : 'ไม่',
+            t.drawDate || '', t.roundStatus || '', t.purchasedAt || ''
+        ]);
+
+        const BOM = '﻿';
+        const csv = BOM + [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+        const filename = `lottery_export_${roundId || 'all'}_${getBangkokDateString()}.csv`;
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(csv);
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
@@ -5222,6 +5339,24 @@ app.post('/api/admin/lottery/auto-rounds', async (req, res) => {
         await logAdminAction(requesterId, 'LOTTERY_AUTO_CREATE_ROUNDS', 'round', 'batch', created.join(',') || 'none',
             { created, skipped });
         res.json({ status: 'success', data: { created, skipped } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/admin/lottery/preview-auto-rounds — Preview dates before auto-creating rounds
+app.get('/api/admin/lottery/preview-auto-rounds', async (req, res) => {
+    const { requesterId, count = 4 } = req.query;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+
+        const dates = getNextLotteryDrawDates(Math.min(Math.max(Number(count) || 4, 1), 6));
+        const [existing] = await db.query(
+            `SELECT roundId FROM lottery_rounds WHERE roundId IN (${dates.map(() => '?').join(',')})`,
+            dates
+        );
+        const existingSet = new Set(existing.map(r => r.roundId));
+        const preview = dates.map(d => ({ drawDate: d, exists: existingSet.has(d) }));
+        res.json({ status: 'success', data: { preview } });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 

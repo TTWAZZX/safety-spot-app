@@ -3116,7 +3116,31 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     border: 1px solid #e9ecef;
 }
-.lottery-result-label { font-size: 0.75rem; color: #6c757d; font-weight: 600; }
+.lottery-result-latest {
+    border: 2px solid var(--line-green);
+    box-shadow: 0 4px 20px rgba(6,199,85,0.15);
+}
+.lottery-result-label { font-size: 0.75rem; color: #6c757d; font-weight: 600; text-transform: uppercase; }
+.lottery-result-numbers-row {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin: 10px 0;
+}
+.lottery-result-num-block { text-align: center; }
+.lottery-result-number-large {
+    font-size: 2.5rem;
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: #1a1a2e;
+    line-height: 1.1;
+}
+.lottery-result-stats {
+    display: flex;
+    justify-content: space-around;
+    font-size: 0.82rem;
+}
 .lottery-result-number {
     font-size: 1.8rem;
     font-weight: 900;
@@ -3130,7 +3154,52 @@ body {
     60%  { transform: translateY(4px); }
     100% { transform: translateY(0); opacity: 1; }
 }
+.slot-reveal { animation: slotReveal 0.6s ease both; }
 .lottery-result-number { animation: slotReveal 0.5s ease; }
+
+/* Admin Result Entry Step Indicator */
+.admin-result-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 1px solid #e9ecef;
+}
+.admin-result-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+.step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #dee2e6;
+    color: #6c757d;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.step-label { font-size: 0.7rem; color: #6c757d; font-weight: 600; white-space: nowrap; }
+.admin-result-step-arrow { color: #adb5bd; font-size: 1rem; }
+
+/* Winner announcement banner */
+.lottery-win-banner {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 0.95rem;
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(245,158,11,0.35);
+    animation: ticketGlow 2s ease-in-out infinite;
+}
 
 .lottery-admin-metrics {
     display: grid;
