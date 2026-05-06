@@ -100,6 +100,17 @@ ALTER TABLE lottery_quiz_answers
 
 ถ้า duplicate column/index ให้ข้ามได้ เพราะ `server.js` มี startup migration แบบ `.catch(() => {})` อยู่แล้ว
 
+Latest schema additions:
+
+```sql
+-- Fresh installs: included in CREATE TABLE lottery_rounds.
+isTest BOOLEAN DEFAULT FALSE
+
+-- Existing installs: server.js adds this on startup.
+-- Manual SQL should be run only if the column is absent:
+ALTER TABLE lottery_rounds ADD COLUMN isTest BOOLEAN DEFAULT FALSE;
+```
+
 ## Feature Checklist
 
 User flow:
@@ -129,11 +140,29 @@ Admin flow:
 - เปิด Admin > Safety Lottery
 - ดู Dashboard
 - สร้างงวดใหม่
+- สร้างงวดทดสอบได้ด้วย checkbox "สร้างเป็นงวดทดสอบ"
 - กรอกผล 2 ตัวท้าย และ 3 ตัวท้าย
+- หรือกด "ดึงผลด้วย AI" สำหรับงวดจริง แล้วตรวจเลขก่อนยืนยัน
 - ยืนยันผล
 - ประมวลผลรางวัล
 - CRUD คำถาม Safety
 - AI สร้างคำถาม 10 ข้อด้วย Gemini
+
+Admin AI/manual result behavior:
+
+- `POST /api/admin/lottery/fetch-result` lets an admin pull lottery results for a selected real round
+- AI result fetch updates the round to `pending_confirm`
+- Test rounds throw `งวดทดสอบต้องกรอกผลเอง`
+- If scheduled AI fetch fails after retries, the round becomes `pending_manual`
+- Admins receive in-app notification and LINE Push alert to retry AI or enter results manually
+
+Test round behavior:
+
+- `lottery_rounds.isTest=TRUE`
+- Normal users cannot see test rounds from `/api/lottery/current-round`
+- Normal users cannot buy tickets for test rounds
+- Admins may access test rounds for local/live verification
+- Public completed results exclude test rounds
 
 ## Incident Rule For Gold Ticket
 
@@ -172,14 +201,21 @@ Admin:
 
 - `GET /api/admin/lottery/dashboard`
 - `POST /api/admin/lottery/set-result`
+- `POST /api/admin/lottery/fetch-result`
 - `POST /api/admin/lottery/confirm-result`
 - `POST /api/admin/lottery/process-prizes`
+- `GET /api/admin/lottery/preview-winners`
+- `GET /api/admin/lottery/monitor`
+- `GET /api/admin/lottery/export`
+- `GET /api/admin/lottery/settings`
+- `POST /api/admin/lottery/settings`
 - `GET /api/admin/lottery/questions`
 - `POST /api/admin/lottery/questions`
 - `PUT /api/admin/lottery/questions`
 - `DELETE /api/admin/lottery/questions/:id`
 - `POST /api/admin/lottery/generate-questions`
 - `POST /api/admin/lottery/rounds`
+- `POST /api/admin/lottery/auto-rounds`
 
 ## Smoke Test With Browser
 
@@ -192,6 +228,30 @@ Admin:
 7. เช็กแท็บ "ตั๋วของฉัน"
 8. กดรับ Gold Ticket ถ้ามีสิทธิ์
 9. เช็กว่า ticket แสดงเป็นสีทอง
+
+## Admin Test Round E2E
+
+Use this before touching a real production round:
+
+1. Open Admin > Safety Lottery
+2. Create a future round and tick "สร้างเป็นงวดทดสอบ"
+3. As admin, open Safety Lottery and buy a test ticket
+4. Go back to Admin > Safety Lottery > result tab
+5. Enter result manually; do not use AI for test rounds
+6. Preview winners
+7. Confirm result
+8. Process prizes
+9. Verify:
+   - points were paid to winners
+   - notification row was created
+   - LINE Push path did not log an error
+   - test round does not appear in public results
+
+Cleanup for live DB verification:
+
+- Remove temporary test rows if the round was only for QA
+- Restore admin/user coin and score balances when the test must leave no business trace
+- Restore `lottery_settings.user_enabled` to the original value
 
 ## Known Limits
 

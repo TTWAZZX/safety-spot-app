@@ -256,6 +256,16 @@ db.query(`CREATE TABLE IF NOT EXISTS example_table (...)`).catch(() => {});
 - Home dashboard shows profile, streak, score, department ranking, recent feed
 - Admin dashboard shows pending reports, approved today, quiz stats, at-risk users, active activities
 
+Current home UX:
+
+- Quick Actions under the hero: report risk, answer KYT, open games, view leaderboard/rewards
+- Personal status strip: coins, streak, points, KYT today status
+- Today's Safety Tasks appears before lower content and prioritizes KYT, pending activity submissions, open Safety Lottery, and risk reporting
+- Section previews keep the home screen short:
+  - recent activities preview 3 items with a "ดูทั้งหมด" path
+  - department leaderboard preview 5 rows with a "ดูอันดับทั้งหมด" path
+  - Safety Pulse paginates 5 items per page with previous/next controls
+
 ### Daily Quiz
 
 - Safety quiz game with streak behavior
@@ -293,6 +303,11 @@ db.query(`CREATE TABLE IF NOT EXISTS example_table (...)`).catch(() => {});
 - Admin sets/confirms/processes results
 - Cron can fetch Thai lottery results and parse via Gemini
 - Winners receive points, in-app notification, and LINE Push
+- The Lottery modal has rounded clipping, a reusable rules dialog, and a header rules button
+- Admin can manually ask AI to fetch the result for a selected round via `/api/admin/lottery/fetch-result`
+- If automatic AI result fetch fails after retries, the system marks the round `pending_manual` and pushes an admin alert
+- Admin can create test rounds with `isTest`; normal users do not see or buy test rounds
+- Test rounds must be filled manually and are excluded from public results/history
 
 See `SAFETY_LOTTERY_DEV.md` for deep details.
 
@@ -349,6 +364,13 @@ Safety Lottery:
 migration-lottery.sql
 ```
 
+Latest additive Lottery schema note:
+
+- `lottery_rounds.isTest BOOLEAN DEFAULT FALSE`
+- Fresh installs get it from `migration-lottery.sql`
+- Existing installs are covered by the backend startup migration in `server.js`
+- If running SQL manually, add the column only if it is absent
+
 Important:
 
 - Do not run `schema.sql` on production with data unless intentionally rebuilding
@@ -384,6 +406,43 @@ LINE LIFF:
 7. Confirm ticket appears in "ตั๋วของฉัน"
 8. Claim Gold Ticket if eligible
 9. Use Admin Safety Lottery modal to set, confirm, and process results
+
+## Full System Smoke Test Checklist
+
+Run these before release when practical:
+
+1. `node --check app.js`
+2. `node --check server.js`
+3. `node --check db.js`
+4. `git diff --check`
+5. Start backend with `.env`
+6. Serve frontend locally
+7. Open home page and verify:
+   - profile card loads
+   - Quick Actions navigate correctly
+   - Today's Safety Tasks renders
+   - mini status strip updates
+   - Safety Pulse paginates by 5
+8. Verify core read APIs:
+   - `/api/user/profile`
+   - `/api/activities`
+   - `/api/home/activity-feed`
+   - `/api/home/lottery-summary`
+   - `/api/department-leaderboard`
+9. Verify Safety Lottery admin flow on a test round before production use:
+   - create test round
+   - fill result manually
+   - preview winners
+   - confirm result
+   - process prizes
+
+Latest live DB E2E already performed during this work:
+
+- Created a temporary future test round
+- Bought an admin ticket through the live backend
+- Set matching result, confirmed, processed prizes
+- Verified winner notification row and LINE push path from backend logs
+- Cleaned up the temporary round/ticket/notification/activity rows and restored balances/settings
 
 ## Common Problems
 

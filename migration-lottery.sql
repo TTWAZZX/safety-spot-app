@@ -13,10 +13,16 @@ CREATE TABLE IF NOT EXISTS lottery_rounds (
   status        VARCHAR(20) DEFAULT 'open',
   source        VARCHAR(50) DEFAULT 'manual',
   confirmedBy   VARCHAR(50) DEFAULT NULL,
+  isTest        BOOLEAN     DEFAULT FALSE,
   createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_lottery_rounds_status (status),
   INDEX idx_lottery_rounds_date (drawDate)
 );
+
+-- Existing installs that already had lottery_rounds:
+-- server.js has a startup migration for this column.
+-- If you apply SQL manually, run the next line only when the column is absent.
+-- ALTER TABLE lottery_rounds ADD COLUMN isTest BOOLEAN DEFAULT FALSE;
 
 -- 2. lottery_tickets — ตั๋วที่ซื้อ
 CREATE TABLE IF NOT EXISTS lottery_tickets (

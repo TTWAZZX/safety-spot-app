@@ -157,11 +157,13 @@ await callApi('/api/endpoint', { param: value }, 'POST');
 ### Home Dashboard (Personal Dashboard)
 หน้าหลักเป็น Personal Dashboard แยกออกจากหน้ากิจกรรม:
 - **Profile card**: avatar, ชื่อ, รหัสพนักงาน, แผนก, คะแนน, percentile chip
-- **Stats row**: เหรียญ, streak ต่อเนื่อง
-- **Quick actions**: เล่นเกม / ส่งรายงาน
+- **Personal status strip**: เหรียญ, streak ต่อเนื่อง, คะแนน, สถานะ KYT วันนี้
+- **Quick actions**: รายงานจุดเสี่ยง / ตอบ KYT / เล่นเกม / ดูรางวัล
+- **Today's Safety Tasks**: action list ที่ดันงานวันนี้ขึ้นก่อน content อื่น เช่น KYT, activity pending, Safety Lottery, report shortcut
 - **Department Leaderboard**: top 10 avg score, highlight แผนกตัวเอง, rank label
-- **Recent activities**: compact card 3 อันดับแรก, กดเปิด submission modal ได้
-- **Social Feed**: ความเคลื่อนไหวล่าสุด (10 รายการ approved)
+- **Department Leaderboard preview**: แสดง 5 แถวแรกบนหน้าแรกและมีปุ่มไปหน้าอันดับทั้งหมด
+- **Recent activities**: compact card 3 อันดับแรก, กดเปิด submission modal ได้ พร้อมทางไปดูทั้งหมด
+- **Safety Pulse**: ความเคลื่อนไหว cross-system ล่าสุดจาก `/api/home/activity-feed`, แสดงทีละ 5 พร้อม previous/next pager
 
 ### Activities Page (ภารกิจความปลอดภัย)
 - **Filter tabs**: ทั้งหมด / ยังไม่ได้ร่วม / ร่วมแล้ว ✓
@@ -197,9 +199,24 @@ fireConfetti('big')      // 3 bursts
 - แสดง Swal popup + confetti streak
 
 ### Social Feed
-- `GET /api/social-feed` (public) — 10 approved submissions ล่าสุด พร้อม user + activity info
-- `loadSocialFeed()` — render ใน `#home-social-feed` เรียกจาก `loadHomeDashboard`
+- `GET /api/home/activity-feed` (public) — cross-system activity feed เช่น reports, KYT, cards, hunter, lottery
+- `loadSocialFeed()` — cache feed items and render 5 items per page in `#home-social-feed`
+- `changeSocialFeedPage(delta)` — pager สำหรับ Safety Pulse
 - `formatTimeAgo(dateStr)` — Thai time labels (เมื่อกี้ / X นาที / X ชั่วโมง / X วัน)
+
+### Safety Lottery Current Notes
+- User rules modal can be reopened from the Lottery modal header
+- Lottery modal content uses rounded clipping to avoid square white corners on mobile
+- User endpoints validate `requesterId`/`lineUserId` for Lottery user-owned data
+- `/api/lottery/current-round` hides test rounds from normal users
+- `lottery_rounds.isTest` supports admin-only test rounds
+- Admin result tab supports:
+  - manual result entry
+  - `POST /api/admin/lottery/fetch-result` for AI result fetch on real rounds
+  - preview winners
+  - confirm result
+  - process prizes and LINE Push winner notifications
+- If scheduled AI result fetch fails after retries, admins receive in-app notification and LINE Push alert, and the round becomes `pending_manual`
 
 ### Department Leaderboard (Public)
 - `GET /api/department-leaderboard` (public) — top 10 แผนก by avgScore
@@ -302,6 +319,21 @@ AppState = {
 ## Cron Jobs
 - ทุกวัน 12:00 และ 15:00 (Asia/Bangkok) → `broadcastStreakReminders()`
 - แจ้งเตือน LINE push สำหรับ user ที่ streak กำลังจะหมด
+- วันที่ 1 และ 16 ตาม schedule ของ Lottery cron → AI fetch Thai lottery result; on repeated failure notify admins and require manual result handling
+
+## Current Verification Commands
+```bash
+node --check app.js
+node --check server.js
+node --check db.js
+git diff --check
+```
+
+Recommended browser smoke after UI changes:
+- Home loads profile/status strip/Quick Actions/Today's Safety Tasks
+- Safety Pulse pages 5 items at a time
+- Quick Actions navigate to activities, KYT, game, leaderboard
+- Safety Lottery opens, rules button works, rounded modal has no square white corners
 
 ## Running Locally
 ```bash

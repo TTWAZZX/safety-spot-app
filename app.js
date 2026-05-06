@@ -416,6 +416,7 @@ function updateUserInfoUI(user) {
     $('#user-employee-id').text(`รหัส: ${user.employeeId}`);
     $('#profile-page-employee-id').text(`รหัสพนักงาน: ${user.employeeId}`);
     $('#user-score, #profile-page-score').text(user.totalScore);
+    $('#home-score-mini').text(Number(user.totalScore || 0).toLocaleString());
     $('#profile-page-coins').text(user.coinBalance || 0);
     $('#profile-page-streak').text((user.currentStreak || 0) + ' วัน');
     // Home dashboard stats
@@ -494,6 +495,10 @@ function checkStreakMilestone(streak) {
 // ===============================================================
 //  SOCIAL FEED
 // ===============================================================
+let _socialFeedItems = [];
+let _socialFeedPage = 0;
+const SOCIAL_FEED_PAGE_SIZE = 5;
+
 async function loadSocialFeed() {
     const container = $('#home-social-feed');
     try {
@@ -502,28 +507,60 @@ async function loadSocialFeed() {
             container.html('<div class="empty-state-small"><i class="fas fa-rss"></i><p>ยังไม่มี Safety Pulse</p></div>');
             return;
         }
-        container.html(items.map(item => {
-            const timeAgo = formatTimeAgo(item.createdAt);
-            const pic = item.actorPictureUrl || item.pictureUrl || 'https://placehold.co/36x36';
-            const meta = getPulseMeta(item.eventType);
-            return `<div class="feed-item">
-                <img src="${pic}" class="feed-avatar" onerror="this.onerror=null;this.src='https://placehold.co/36x36'">
-                <div class="feed-body">
-                    <div class="d-flex align-items-center gap-1 flex-wrap">
-                        <span class="badge ${meta.badgeClass}"><i class="fas ${meta.icon} me-1"></i>${meta.label}</span>
-                        <span class="feed-name">${sanitizeHTML(item.actorName || item.fullName || '')}</span>
-                    </div>
-                    <div>
-                        <span class="feed-action">${sanitizeHTML(item.title || '')}</span>
-                        <span class="feed-act">${sanitizeHTML(item.message || item.activityTitle || '')}</span>
-                    </div>
-                    <div class="feed-time">${timeAgo}</div>
-                </div>
-            </div>`;
-        }).join(''));
+        _socialFeedItems = items;
+        _socialFeedPage = 0;
+        renderSocialFeedPage();
     } catch (e) {
         container.html('<div class="empty-state-small"><i class="fas fa-wifi-slash"></i><p>โหลดไม่ได้</p></div>');
     }
+}
+
+function renderSocialFeedPage() {
+    const container = $('#home-social-feed');
+    const totalItems = _socialFeedItems.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / SOCIAL_FEED_PAGE_SIZE));
+    _socialFeedPage = Math.min(Math.max(_socialFeedPage, 0), totalPages - 1);
+
+    const start = _socialFeedPage * SOCIAL_FEED_PAGE_SIZE;
+    const pageItems = _socialFeedItems.slice(start, start + SOCIAL_FEED_PAGE_SIZE);
+    const feedHtml = pageItems.map(item => {
+        const timeAgo = formatTimeAgo(item.createdAt);
+        const pic = item.actorPictureUrl || item.pictureUrl || 'https://placehold.co/36x36';
+        const meta = getPulseMeta(item.eventType);
+        return `<div class="feed-item">
+            <img src="${pic}" class="feed-avatar" onerror="this.onerror=null;this.src='https://placehold.co/36x36'">
+            <div class="feed-body">
+                <div class="d-flex align-items-center gap-1 flex-wrap">
+                    <span class="badge ${meta.badgeClass}"><i class="fas ${meta.icon} me-1"></i>${meta.label}</span>
+                    <span class="feed-name">${sanitizeHTML(item.actorName || item.fullName || '')}</span>
+                </div>
+                <div>
+                    <span class="feed-action">${sanitizeHTML(item.title || '')}</span>
+                    <span class="feed-act">${sanitizeHTML(item.message || item.activityTitle || '')}</span>
+                </div>
+                <div class="feed-time">${timeAgo}</div>
+            </div>
+        </div>`;
+    }).join('');
+
+    const controlsHtml = totalItems > SOCIAL_FEED_PAGE_SIZE
+        ? `<div class="feed-pager">
+            <button class="feed-pager-btn" onclick="changeSocialFeedPage(-1)" ${_socialFeedPage === 0 ? 'disabled' : ''}>
+                <i class="fas fa-chevron-left"></i><span>ก่อนหน้า</span>
+            </button>
+            <span class="feed-pager-status">${start + 1}-${Math.min(start + SOCIAL_FEED_PAGE_SIZE, totalItems)} จาก ${totalItems}</span>
+            <button class="feed-pager-btn" onclick="changeSocialFeedPage(1)" ${_socialFeedPage >= totalPages - 1 ? 'disabled' : ''}>
+                <span>ถัดไป</span><i class="fas fa-chevron-right"></i>
+            </button>
+        </div>`
+        : '';
+
+    container.html(feedHtml + controlsHtml);
+}
+
+function changeSocialFeedPage(delta) {
+    _socialFeedPage += delta;
+    renderSocialFeedPage();
 }
 
 function getPulseMeta(eventType) {
@@ -539,6 +576,108 @@ function getPulseMeta(eventType) {
         lottery_won: { label: 'Winner', icon: 'fa-trophy', badgeClass: 'bg-warning text-dark' }
     };
     return map[eventType] || { label: 'Pulse', icon: 'fa-bolt', badgeClass: 'bg-secondary-subtle text-secondary' };
+}
+
+async function loadHomeTodayTasks(activities) {
+    const container = $('#home-today-tasks');
+    if (!container.length) return;
+
+    const tasks = [];
+    const firstPendingActivity = (activities || AppState._lastActivities || []).find(a => !a.userHasSubmitted);
+
+    try {
+        const quizStatus = await callApi('/api/game/daily-question', { lineUserId: AppState.lineProfile.userId });
+        $('#home-kyt-status-mini').text(quizStatus.played ? 'แล้ว' : 'ยัง');
+        tasks.push({
+            icon: quizStatus.played ? 'fa-check-circle' : 'fa-helmet-safety',
+            tone: quizStatus.played ? 'done' : 'primary',
+            title: quizStatus.played ? 'KYT วันนี้เรียบร้อย' : 'ตอบ KYT วันนี้',
+            sub: quizStatus.played ? 'รักษา streak ต่อไป พรุ่งนี้ค่อยกลับมาเล่นใหม่' : 'ตอบคำถามสั้น ๆ เพื่อรักษา streak และรับเหรียญ',
+            actionText: quizStatus.played ? 'เสร็จแล้ว' : 'เล่น KYT',
+            action: quizStatus.played ? '' : 'startDailyQuiz()',
+            done: !!quizStatus.played
+        });
+    } catch (_) {
+        $('#home-kyt-status-mini').text('-');
+        tasks.push({
+            icon: 'fa-helmet-safety',
+            tone: 'muted',
+            title: 'KYT วันนี้',
+            sub: 'เช็กสถานะไม่ได้ชั่วคราว',
+            actionText: 'เปิดเกม',
+            action: "$('[data-page=game-page]').trigger('click')"
+        });
+    }
+
+    if (firstPendingActivity) {
+        tasks.push({
+            icon: 'fa-paper-plane',
+            tone: 'success',
+            title: 'มีกิจกรรมที่ยังไม่ได้ส่ง',
+            sub: firstPendingActivity.title || 'เลือกกิจกรรมแล้วส่งรายงาน',
+            actionText: 'ไปส่ง',
+            action: "$('[data-page=activities-page]').trigger('click')"
+        });
+    } else {
+        tasks.push({
+            icon: 'fa-clipboard-check',
+            tone: 'done',
+            title: 'กิจกรรมล่าสุดครบแล้ว',
+            sub: 'ยังไม่มีงานค้างจากกิจกรรมที่แสดงบนหน้าหลัก',
+            actionText: 'ดูทั้งหมด',
+            action: "$('[data-page=activities-page]').trigger('click')",
+            done: true
+        });
+    }
+
+    try {
+        const round = await callApi('/api/lottery/current-round', { lineUserId: AppState.lineProfile.userId });
+        if (round?.featureEnabled && !round.isClosed) {
+            tasks.push({
+                icon: 'fa-ticket-alt',
+                tone: 'lottery',
+                title: 'Safety Lottery เปิดอยู่',
+                sub: `งวด ${round.drawDate || round.roundId} เหลือประมาณ ${Number(round.hoursLeft || 0)} ชม.`,
+                actionText: 'เข้า Lottery',
+                action: 'openLotteryModal()'
+            });
+        }
+    } catch (_) {}
+
+    tasks.push({
+        icon: 'fa-shield-alt',
+        tone: 'muted',
+        title: 'พบจุดเสี่ยงหรือ Near Miss?',
+        sub: 'ส่งรายงานทันทีเพื่อให้ทีมเห็นและแก้ไขเร็วขึ้น',
+        actionText: 'ส่งรายงาน',
+        action: "$('[data-page=activities-page]').trigger('click')"
+    });
+
+    const openCount = tasks.filter(t => !t.done).length;
+    const visibleTasks = tasks.slice(0, 4);
+    container.html(`
+        <div class="today-tasks-card">
+            <div class="today-tasks-head">
+                <div>
+                    <div class="today-tasks-kicker">Today</div>
+                    <div class="today-tasks-title">สิ่งที่ควรทำวันนี้</div>
+                </div>
+                <span class="today-tasks-count">${openCount} งาน</span>
+            </div>
+            <div class="today-tasks-list">
+                ${visibleTasks.map(task => `
+                    <button type="button" class="today-task-item ${task.done ? 'is-done' : ''}" ${task.action ? `onclick="${task.action}"` : 'disabled'}>
+                        <span class="today-task-icon tone-${task.tone}"><i class="fas ${task.icon}"></i></span>
+                        <span class="today-task-copy">
+                            <strong>${sanitizeHTML(task.title)}</strong>
+                            <small>${sanitizeHTML(task.sub)}</small>
+                        </span>
+                        <span class="today-task-action">${sanitizeHTML(task.actionText)}<i class="fas fa-chevron-right"></i></span>
+                    </button>
+                `).join('')}
+            </div>
+        </div>
+    `);
 }
 
 async function loadHomeLotterySummary() {
@@ -638,14 +777,20 @@ async function loadHomeDashboard(activities) {
                 $('#home-dept-rank-label').text(`แผนกคุณ: อันดับ ${myRank + 1} / ${rows.length}`);
             }
             const medals = ['🥇', '🥈', '🥉'];
-            container.html(rows.map((r, i) => {
+            const previewRows = rows.slice(0, 5);
+            const footerHtml = rows.length > 5
+                ? `<button type="button" class="home-section-more" onclick="$('[data-page=leaderboard-page]').trigger('click')">
+                    ดูอันดับทั้งหมด <i class="fas fa-chevron-right"></i>
+                   </button>`
+                : '';
+            container.html(previewRows.map((r, i) => {
                 const isMe = r.department === myDept;
                 return `<div class="home-dept-row ${isMe ? 'home-dept-row-mine' : ''}">
                     <span class="home-dept-rank">${medals[i] || (i + 1)}</span>
                     <span class="home-dept-name-text flex-grow-1 text-truncate">${sanitizeHTML(r.department)}</span>
                     <span class="home-dept-score">${r.avgScore} <small class="text-muted">เฉลี่ย</small></span>
                 </div>`;
-            }).join(''));
+            }).join('') + footerHtml);
         }
     } catch (e) {
         container.html('<p class="text-muted text-center small py-2">โหลดไม่ได้</p>');
@@ -680,7 +825,8 @@ async function loadHomeDashboard(activities) {
         actList.html(`<div class="empty-state-small"><i class="fas fa-clipboard-list"></i><p>ยังไม่มีกิจกรรม</p></div>`);
     }
 
-    // Load Lottery Pulse and Safety Pulse
+    // Load Today's tasks, Lottery Pulse and Safety Pulse
+    loadHomeTodayTasks(list || []);
     loadHomeLotterySummary();
     loadSocialFeed();
 
@@ -5786,6 +5932,13 @@ let _lotterySelectedType = 'two'; // 'two' | 'three'
 let _lotteryCurrentQuestion = null;
 let _lotteryLastQuizAnswerId = null;
 let _lotteryCountdownInterval = null;
+let _lotterySettings = {
+    priceTwo: 10,
+    priceThree: 30,
+    prizeTwo: 500,
+    prizeThree: 3000,
+    dailyLimit: 5
+};
 
 const LOTTERY_STATUS_TH = {
     open: 'เปิดรับตั๋ว',
@@ -5798,12 +5951,29 @@ const LOTTERY_STATUS_TH = {
 
 function updateLotteryPurchaseSummary(todayCount = null) {
     const coins = Number(AppState.currentUser?.coinBalance || 0);
-    const price = _lotterySelectedType === 'two' ? 10 : 30;
+    const price = _lotterySelectedType === 'two' ? _lotterySettings.priceTwo : _lotterySettings.priceThree;
     $('#lottery-summary-coins').text(coins.toLocaleString());
     $('#lottery-summary-price').text(price.toLocaleString());
     if (todayCount !== null) {
-        $('#lottery-summary-quota').text(`${todayCount}/5`);
+        $('#lottery-summary-quota').text(`${todayCount}/${_lotterySettings.dailyLimit}`);
     }
+}
+
+function applyLotterySettings(settings = {}) {
+    _lotterySettings = {
+        priceTwo: Number(settings.priceTwo) || 10,
+        priceThree: Number(settings.priceThree) || 30,
+        prizeTwo: Number(settings.prizeTwo) || 500,
+        prizeThree: Number(settings.prizeThree) || 3000,
+        dailyLimit: Number(settings.dailyLimit) || 5
+    };
+
+    $('#type-two-card .lottery-type-price').text(`${_lotterySettings.priceTwo.toLocaleString()} เหรียญ`);
+    $('#type-three-card .lottery-type-price').text(`${_lotterySettings.priceThree.toLocaleString()} เหรียญ`);
+    $('#type-two-card .lottery-type-prize').text(`รางวัล ${_lotterySettings.prizeTwo.toLocaleString()} pts`);
+    $('#type-three-card .lottery-type-prize').text(`รางวัล ${_lotterySettings.prizeThree.toLocaleString()} pts`);
+    $('#lottery-daily-limit-text').html(`<i class="fas fa-info-circle me-1 text-primary"></i>ซื้อได้สูงสุด ${_lotterySettings.dailyLimit.toLocaleString()} ใบ/วัน`);
+    updateLotteryPurchaseSummary();
 }
 
 function setLotteryFlowStep(step) {
@@ -5845,44 +6015,61 @@ if (typeof window !== 'undefined') {
 // -----------------------------------------------
 // openLotteryModal — เปิด modal หลัก
 // -----------------------------------------------
+function showLotteryRules(options = {}) {
+    const { firstTime = false } = options;
+    const priceTwo = _lotterySettings.priceTwo.toLocaleString();
+    const priceThree = _lotterySettings.priceThree.toLocaleString();
+    const prizeTwo = _lotterySettings.prizeTwo.toLocaleString();
+    const prizeThree = _lotterySettings.prizeThree.toLocaleString();
+    const dailyLimit = _lotterySettings.dailyLimit.toLocaleString();
+    triggerHaptic('light');
+    return Swal.fire({
+        title: '<i class="fas fa-ticket-alt text-success me-2"></i>กติกา Safety Lottery',
+        html: `<div class="text-start small">
+            <p class="mb-2 fw-semibold">วิธีเล่น:</p>
+            <ol class="mb-3 ps-3">
+                <li>เลือกประเภทตั๋ว: 2 ตัวท้าย (${priceTwo} เหรียญ) หรือ 3 ตัวท้าย (${priceThree} เหรียญ)</li>
+                <li>กรอกเลขที่ต้องการ หรือกด 🎲 สุ่ม</li>
+                <li>ตอบคำถาม Safety ให้ถูกต้อง เพื่อยืนยันการซื้อ (+2 เหรียญ bonus)</li>
+                <li>ตรวจผลรางวัลในงวดวันที่ 1 และ 16 ของทุกเดือน</li>
+            </ol>
+            <p class="mb-2 fw-semibold">รางวัล:</p>
+            <ul class="mb-3 ps-3">
+                <li>2 ตัวท้ายถูก = ${prizeTwo} คะแนน</li>
+                <li>3 ตัวท้ายถูก = ${prizeThree} คะแนน</li>
+            </ul>
+            <p class="mb-2 fw-semibold">Gold Ticket ฟรี:</p>
+            <ul class="mb-3 ps-3">
+                <li>แผนกไม่มีรายงานอุบัติเหตุในช่วง 30 วันที่ผ่านมา</li>
+                <li>รับได้ 1 ตั๋วต่อ 1 งวด</li>
+            </ul>
+            <p class="mb-0 fw-semibold">ข้อกำหนด:</p>
+            <ul class="mb-0 ps-3">
+                <li>ซื้อได้ไม่เกิน ${dailyLimit} ใบ/วัน</li>
+                <li>คะแนนรางวัลจะเข้าบัญชีทันทีหลังประมวลผล</li>
+                <li>การตัดสินใจของทีมบริหารถือเป็นที่สิ้นสุด</li>
+            </ul>
+        </div>`,
+        confirmButtonColor: '#06C755',
+        confirmButtonText: firstTime ? 'รับทราบและดำเนินการต่อ' : 'ปิด',
+        showCancelButton: firstTime,
+        cancelButtonText: 'ยกเลิก',
+        width: '480px'
+    });
+}
+
 async function openLotteryModal() {
     triggerHaptic('light');
 
     // แสดง T&C ครั้งแรก
     if (!localStorage.getItem('lottery_tnc_v1_accepted')) {
-        const result = await Swal.fire({
-            title: '<i class="fas fa-ticket-alt text-success me-2"></i>กติกา Safety Lottery',
-            html: `<div class="text-start small">
-                <p class="mb-2 fw-semibold">วิธีเล่น:</p>
-                <ol class="mb-3 ps-3">
-                    <li>เลือกประเภทตั๋ว: 2 ตัวท้าย (10 เหรียญ) หรือ 3 ตัวท้าย (30 เหรียญ)</li>
-                    <li>กรอกเลขที่ต้องการ หรือกด 🎲 สุ่ม</li>
-                    <li>ตอบคำถาม Safety ให้ถูกต้อง เพื่อยืนยันการซื้อ (+2 เหรียญ bonus)</li>
-                    <li>ตรวจผลรางวัลในงวดวันที่ 1 และ 16 ของทุกเดือน</li>
-                </ol>
-                <p class="mb-2 fw-semibold">รางวัล:</p>
-                <ul class="mb-3 ps-3">
-                    <li>2 ตัวท้ายถูก = 500 คะแนน</li>
-                    <li>3 ตัวท้ายถูก = 3,000 คะแนน</li>
-                </ul>
-                <p class="mb-2 fw-semibold">Gold Ticket ฟรี:</p>
-                <ul class="mb-3 ps-3">
-                    <li>แผนกไม่มีรายงานอุบัติเหตุในช่วง 30 วันที่ผ่านมา</li>
-                    <li>รับได้ 1 ตั๋วต่อ 1 งวด</li>
-                </ul>
-                <p class="mb-0 fw-semibold">ข้อกำหนด:</p>
-                <ul class="mb-0 ps-3">
-                    <li>ซื้อได้ไม่เกิน 5 ใบ/วัน</li>
-                    <li>คะแนนรางวัลจะเข้าบัญชีทันทีหลังประมวลผล</li>
-                    <li>การตัดสินใจของทีมบริหารถือเป็นที่สิ้นสุด</li>
-                </ul>
-            </div>`,
-            confirmButtonColor: '#06C755',
-            confirmButtonText: 'รับทราบและดำเนินการต่อ',
-            showCancelButton: true,
-            cancelButtonText: 'ยกเลิก',
-            width: '480px'
-        });
+        try {
+            const preview = await callApi('/api/lottery/current-round', {
+                lineUserId: AppState.lineProfile.userId
+            });
+            if (preview?.settings) applyLotterySettings(preview.settings);
+        } catch (_) {}
+        const result = await showLotteryRules({ firstTime: true });
         if (!result.isConfirmed) return;
         localStorage.setItem('lottery_tnc_v1_accepted', '1');
     }
@@ -5911,8 +6098,10 @@ async function loadLotteryCurrentRound() {
             lineUserId: AppState.lineProfile.userId
         });
         _lotteryCurrentRound = res;
+        if (res?.settings) applyLotterySettings(res.settings);
 
         if (res && res.featureEnabled === false) {
+            if (res.settings) applyLotterySettings(res.settings);
             _lotteryCurrentRound = null;
             $('#lottery-round-label').text('Safety Lottery ยังไม่เปิดให้ผู้ใช้เข้าเล่น');
             $('#lottery-countdown-bar').html(`<i class="fas fa-tools me-1"></i>${sanitizeHTML(res.message || 'Admin is preparing this feature.')}`);
@@ -5979,11 +6168,11 @@ async function loadLotteryCurrentRound() {
 
         // load daily quota
         const ticketsRes = await callApi('/api/lottery/my-tickets', { lineUserId: AppState.lineProfile.userId });
-        $('#lottery-daily-quota-badge').text(`${ticketsRes.todayCount}/5 ใบวันนี้`);
+        $('#lottery-daily-quota-badge').text(`${ticketsRes.todayCount}/${_lotterySettings.dailyLimit} ใบวันนี้`);
         updateLotteryPurchaseSummary(ticketsRes.todayCount || 0);
-        if (ticketsRes.todayCount >= 5) {
+        if (ticketsRes.todayCount >= _lotterySettings.dailyLimit) {
             $('#btn-lottery-buy').prop('disabled', true)
-                .html('<i class="fas fa-ban me-2"></i>ซื้อครบ 5 ใบแล้ววันนี้');
+                .html(`<i class="fas fa-ban me-2"></i>ซื้อครบ ${_lotterySettings.dailyLimit.toLocaleString()} ใบแล้ววันนี้`);
         }
         await loadLotteryGoldEligibility();
     } catch (e) {
@@ -6413,7 +6602,7 @@ async function loadMyLotteryTickets() {
                     </div>
                     <div class="ticket-number-large">${sanitizeHTML(t.number)}</div>
                     <div class="ticket-meta-row">
-                        <span>${t.ticketType === 'two' ? 'Prize 500 pts' : 'Prize 3,000 pts'}</span>
+                        <span>${t.ticketType === 'two' ? `Prize ${_lotterySettings.prizeTwo.toLocaleString()} pts` : `Prize ${_lotterySettings.prizeThree.toLocaleString()} pts`}</span>
                         <span>${t.isPrizeClaimed ? 'จ่ายแล้ว' : (isWin ? 'รอจ่าย' : 'Active')}</span>
                     </div>
                     ${isWin ? `<div class="ticket-prize-badge">+${Number(t.prizeAmount).toLocaleString()} Points</div>` : ''}
@@ -6515,10 +6704,11 @@ async function loadAdminLotteryDashboard() {
             const d = new Date(r.drawDate + 'T00:00:00+07:00').toLocaleDateString('th-TH', { month: 'short', day: 'numeric' });
             const color = statusColorMap[r.status] || 'secondary';
             const label = LOTTERY_STATUS_TH[r.status] || r.status;
+            const testBadge = r.isTest ? '<span class="badge bg-dark ms-1">Test</span>' : '';
             roundsHtml += `<tr>
                 <td>${sanitizeHTML(d)}</td>
                 <td>${r.last2 ? sanitizeHTML(r.last2) : '-'} / ${r.last3_back ? sanitizeHTML(r.last3_back) : '-'}</td>
-                <td><span class="badge bg-${color}">${label}</span></td>
+                <td><span class="badge bg-${color}">${label}</span>${testBadge}</td>
                 <td>${r.totalWinners || 0}</td>
             </tr>`;
         });
@@ -6611,7 +6801,8 @@ async function loadAdminLotteryRoundSelect() {
         const $sel = $('#admin-lottery-round-select');
         $sel.empty().append('<option value="">— เลือกงวด —</option>');
         (res.rounds || []).forEach(r => {
-            $sel.append(`<option value="${sanitizeHTML(r.roundId)}">${sanitizeHTML(r.drawDate)} — ${r.status}</option>`);
+            const label = `${r.drawDate} — ${LOTTERY_STATUS_TH[r.status] || r.status}${r.isTest ? ' · TEST' : ''}`;
+            $sel.append(`<option value="${sanitizeHTML(r.roundId)}">${sanitizeHTML(label)}</option>`);
         });
     } catch (e) { console.error('loadAdminLotteryRoundSelect:', e); }
 }
@@ -6636,7 +6827,7 @@ async function loadAdminLotteryMonitor(keepSelection = false) {
         const currentSelect = selected || res.selectedRoundId || '';
         $sel.empty().append('<option value="">ทุกงวด</option>');
         rounds.forEach(r => {
-            const label = `${r.drawDate} · ${LOTTERY_STATUS_TH[r.status] || r.status}`;
+            const label = `${r.drawDate} · ${LOTTERY_STATUS_TH[r.status] || r.status}${r.isTest ? ' · TEST' : ''}`;
             $sel.append(`<option value="${sanitizeHTML(r.roundId)}">${sanitizeHTML(label)}</option>`);
         });
         $sel.val(currentSelect);
@@ -6770,14 +6961,46 @@ async function adminSaveLotteryResult() {
         showToast('บันทึกผลรางวัลแล้ว รอการยืนยัน', 'success');
         await loadAdminLotteryDashboard();
         await loadAdminLotteryRoundSelect();
+        await loadAdminLotteryMonitor(true);
     } catch (e) {
         Swal.fire('Error', e.message, 'error');
     }
 }
 
-// -----------------------------------------------
-// adminConfirmLotteryResult — ยืนยันผล
-// -----------------------------------------------
+async function adminFetchLotteryResultWithAI() {
+    const roundId = $('#admin-lottery-round-select').val();
+    if (!roundId) return Swal.fire('เลือกงวดก่อน', '', 'warning');
+
+    const ok = await Swal.fire({
+        icon: 'question',
+        title: 'ให้ AI ดึงผลรางวัล?',
+        html: `<p class="mb-1">งวด <strong>${sanitizeHTML(roundId)}</strong></p><p class="small text-muted mb-0">ระบบจะดึงจากแหล่งผลรางวัลและเติมเลขให้ตรวจสอบก่อนยืนยัน</p>`,
+        showCancelButton: true,
+        confirmButtonColor: '#06C755',
+        confirmButtonText: 'ดึงผลด้วย AI',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!ok.isConfirmed) return;
+
+    Swal.fire({ title: 'AI กำลังดึงผลรางวัล...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+    try {
+        const res = await callApi('/api/admin/lottery/fetch-result', {
+            requesterId: AppState.lineProfile.userId,
+            roundId
+        }, 'POST');
+        $('#admin-lottery-last2').val(res.last2 || '');
+        $('#admin-lottery-last3f').val(res.last3_front || '');
+        $('#admin-lottery-last3b').val(res.last3_back || '');
+        await Swal.fire('ดึงผลสำเร็จ', 'กรุณาตรวจสอบเลขก่อนกดยืนยันผล', 'success');
+        await loadAdminLotteryDashboard();
+        await loadAdminLotteryRoundSelect();
+        await loadAdminLotteryMonitor(true);
+        $('#admin-lottery-round-select').val(roundId);
+    } catch (e) {
+        Swal.fire('AI ดึงผลไม่สำเร็จ', `${sanitizeHTML(e.message)}<br><small class="text-muted">สามารถกรอกผลเองแล้วกดบันทึกผลรางวัลได้</small>`, 'warning');
+    }
+}
+
 async function adminConfirmLotteryResult() {
     const roundId = $('#admin-lottery-round-select').val();
     if (!roundId) return Swal.fire('เลือกงวดก่อน', '', 'warning');
@@ -6793,11 +7016,12 @@ async function adminConfirmLotteryResult() {
     }
 
     const { round, winners, totalPrizesToPay, totalTickets, totalPlayers } = preview;
+    const testWarn = round.isTest ? '<div class="alert alert-warning py-2 mb-2">งวดนี้เป็นงวดทดสอบ ผู้ใช้ทั่วไปจะไม่เห็นงวดนี้</div>' : '';
     const winnerRows = winners.length
         ? winners.map(w => `<tr>
             <td>${sanitizeHTML(w.fullName || '-')}</td>
             <td>${sanitizeHTML(w.department || '-')}</td>
-            <td>${w.ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย'}${w.isGoldTicket ? ' 🏆' : ''}</td>
+            <td>${w.ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย'}${w.isGoldTicket ? ' Gold' : ''}</td>
             <td class="fw-bold">${sanitizeHTML(w.number)}</td>
             <td class="text-success fw-bold">${Number(w.prize).toLocaleString()} pts</td>
           </tr>`).join('')
@@ -6807,6 +7031,7 @@ async function adminConfirmLotteryResult() {
         icon: 'info',
         title: `ตรวจผลงวด ${sanitizeHTML(round.drawDate)}`,
         html: `
+            ${testWarn}
             <p class="mb-2">ผล: <strong>${sanitizeHTML(round.last2)}</strong> (2D) / <strong>${sanitizeHTML(round.last3_back)}</strong> (3D)</p>
             <p class="mb-2">ตั๋วทั้งหมด: <strong>${Number(totalTickets).toLocaleString()}</strong> ใบ จาก <strong>${Number(totalPlayers).toLocaleString()}</strong> คน</p>
             <p class="mb-3 text-success fw-bold">ผู้ถูกรางวัล: ${winners.length} คน | รวมรางวัล: ${Number(totalPrizesToPay).toLocaleString()} pts</p>
@@ -6828,16 +7053,13 @@ async function adminConfirmLotteryResult() {
         await callApi('/api/admin/lottery/confirm-result', {
             requesterId: AppState.lineProfile.userId, roundId
         }, 'POST');
-        showToast('ยืนยันผลเรียบร้อย — พร้อมประมวลผลรางวัล', 'success');
+        showToast('ยืนยันผลเรียบร้อย พร้อมประมวลผลรางวัล', 'success');
         await loadAdminLotteryDashboard();
     } catch (e) {
         Swal.fire('Error', e.message, 'error');
     }
 }
 
-// -----------------------------------------------
-// adminProcessLotteryPrizes — ประมวลผลรางวัล + จ่าย points
-// -----------------------------------------------
 async function adminProcessLotteryPrizes() {
     const roundId = $('#admin-lottery-round-select').val();
     if (!roundId) return Swal.fire('เลือกงวดก่อน', '', 'warning');
@@ -6852,12 +7074,14 @@ async function adminProcessLotteryPrizes() {
         return Swal.fire('Error', e.message, 'error');
     }
 
-    const { winners, totalPrizesToPay } = preview;
+    const { round, winners, totalPrizesToPay } = preview;
+    const testWarn = round?.isTest ? '<p class="text-warning fw-bold small">งวดนี้เป็นงวดทดสอบ</p>' : '';
     const confirm = await Swal.fire({
         icon: 'warning', title: 'ประมวลผลและจ่ายรางวัล?',
         html: `<p>งวด <strong>${sanitizeHTML(roundId)}</strong></p>
+               ${testWarn}
                <p>ผู้ถูกรางวัล: <strong class="text-success">${winners.length} คน</strong> | รวมรางวัล: <strong class="text-success">${Number(totalPrizesToPay).toLocaleString()} pts</strong></p>
-               <p class="text-danger small">⚠️ การดำเนินการนี้ไม่สามารถย้อนกลับได้!</p>
+               <p class="text-danger small">การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
                <p class="small">ระบบจะจ่าย Points และส่ง LINE ให้ผู้ถูกรางวัลทุกคน</p>`,
         showCancelButton: true,
         confirmButtonColor: '#d33', confirmButtonText: 'ยืนยัน จ่ายรางวัล (ขั้นตอน 3/3)',
@@ -6877,25 +7101,26 @@ async function adminProcessLotteryPrizes() {
         });
         triggerHaptic('heavy');
         await loadAdminLotteryDashboard();
+        await loadAdminLotteryMonitor(true);
     } catch (e) {
         Swal.fire('Error', e.message, 'error');
     }
 }
 
-// -----------------------------------------------
-// adminCreateLotteryRound — สร้างงวดใหม่
-// -----------------------------------------------
 async function adminCreateLotteryRound() {
     const date = $('#admin-new-round-date').val();
+    const isTest = $('#admin-new-round-test').is(':checked');
     if (!date) return Swal.fire('ระบุวันที่', '', 'warning');
     try {
         await callApi('/api/admin/lottery/rounds', {
-            requesterId: AppState.lineProfile.userId, drawDate: date
+            requesterId: AppState.lineProfile.userId, drawDate: date, isTest
         }, 'POST');
-        showToast(`สร้างงวด ${date} แล้ว`, 'success');
+        showToast(`สร้างงวด ${date}${isTest ? ' (ทดสอบ)' : ''} แล้ว`, 'success');
         $('#admin-new-round-date').val('');
+        $('#admin-new-round-test').prop('checked', false);
         await loadAdminLotteryDashboard();
         await loadAdminLotteryRoundSelect();
+        await loadAdminLotteryMonitor(true);
     } catch (e) {
         Swal.fire('Error', e.message, 'error');
     }

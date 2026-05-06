@@ -4044,6 +4044,7 @@ db.query("ALTER TABLE users ADD COLUMN lotteryWinCount INT DEFAULT 0").catch(() 
 db.query("ALTER TABLE users ADD COLUMN lotteryTotalWinnings INT DEFAULT 0").catch(() => {});
 db.query("ALTER TABLE lottery_quiz_answers ADD COLUMN usedForTicketId INT DEFAULT NULL").catch(() => {});
 db.query("ALTER TABLE lottery_quiz_answers ADD INDEX idx_quiz_answers_used (usedForTicketId)").catch(() => {});
+db.query("ALTER TABLE lottery_rounds ADD COLUMN isTest BOOLEAN DEFAULT FALSE").catch(() => {});
 
 db.query(`CREATE TABLE IF NOT EXISTS lottery_rounds (
   roundId       VARCHAR(50) PRIMARY KEY,
@@ -4054,6 +4055,7 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_rounds (
   status        VARCHAR(20) DEFAULT 'open',
   source        VARCHAR(50) DEFAULT 'manual',
   confirmedBy   VARCHAR(50) DEFAULT NULL,
+  isTest        BOOLEAN     DEFAULT FALSE,
   createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_lottery_rounds_status (status),
   INDEX idx_lottery_rounds_date (drawDate)
@@ -4197,6 +4199,35 @@ async function ensureLotteryUserEnabled(conn = db) {
     return settings;
 }
 
+function assertLotteryUserRequest(req, lineUserId) {
+    const requesterId = req.body?.requesterId || req.query?.requesterId;
+    if (!lineUserId || !requesterId || requesterId !== lineUserId) {
+        const err = new Error('ไม่มีสิทธิ์ใช้งานข้อมูล Lottery ของผู้ใช้นี้');
+        err.statusCode = 403;
+        err.code = 'LOTTERY_USER_MISMATCH';
+        throw err;
+    }
+}
+
+async function isLotteryAdmin(lineUserId, conn = db) {
+    if (!lineUserId) return false;
+    const [[admin]] = await conn.query('SELECT 1 FROM admins WHERE lineUserId=?', [lineUserId]);
+    return !!admin;
+}
+
+async function pushLineFlexMessage(lineUserId, flexMessage, logLabel = 'LINE Push') {
+    try {
+        await axios.post('https://api.line.me/v2/bot/message/push',
+            { to: lineUserId, messages: [flexMessage] },
+            { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` } }
+        );
+        return true;
+    } catch (err) {
+        console.error(`❌ ${logLabel} failed for ${lineUserId}:`, err.response?.data || err.message);
+        return false;
+    }
+}
+
 async function sendLotteryWinNotification(lineUserId, ticketData) {
     const flexMessage = {
         type: 'flex',
@@ -4242,70 +4273,137 @@ async function sendLotteryWinNotification(lineUserId, ticketData) {
             }
         }
     };
-    try {
-        await axios.post('https://api.line.me/v2/bot/message/push',
-            { to: lineUserId, messages: [flexMessage] },
-            { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` } }
-        );
-    } catch (err) {
-        console.error(`❌ Lottery LINE Push failed for ${lineUserId}:`, err.response?.data || err.message);
+    await pushLineFlexMessage(lineUserId, flexMessage, 'Lottery LINE Push');
+}
+
+async function notifyLotteryAdminsForManualResult(roundId, reason) {
+    const [admins] = await db.query(
+        `SELECT a.lineUserId, u.fullName
+         FROM admins a
+         LEFT JOIN users u ON u.lineUserId = a.lineUserId`
+    );
+    if (!admins.length) return { sent: 0 };
+
+    const title = 'Safety Lottery ต้องกรอกผลเอง';
+    const message = `AI ดึงผลรางวัลงวด ${roundId} ไม่สำเร็จ กรุณาเปิดหน้า Admin เพื่อลองดึงด้วย AI อีกครั้งหรือกรอกผลเอง`;
+    let sent = 0;
+    for (const admin of admins) {
+        const notificationId = 'NOTIF' + uuidv4();
+        await db.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'lottery_admin_alert', ?, ?, NOW())`,
+            [notificationId, admin.lineUserId, message, roundId, admin.lineUserId]
+        ).catch(() => {});
+
+        const flexMessage = {
+            type: 'flex',
+            altText: title,
+            contents: {
+                type: 'bubble',
+                header: {
+                    type: 'box',
+                    layout: 'vertical',
+                    backgroundColor: '#f59e0b',
+                    paddingAll: '18px',
+                    contents: [
+                        { type: 'text', text: 'Safety Lottery', color: '#FFFFFF', weight: 'bold', size: 'lg' },
+                        { type: 'text', text: 'AI ดึงผลไม่สำเร็จ', color: '#FFFFFF', size: 'sm', margin: 'sm' }
+                    ]
+                },
+                body: {
+                    type: 'box',
+                    layout: 'vertical',
+                    spacing: 'md',
+                    contents: [
+                        { type: 'text', text: `งวด ${roundId}`, weight: 'bold', size: 'md', wrap: true },
+                        { type: 'text', text: reason || 'ระบบตั้งสถานะเป็นรอกรอกผลเองแล้ว', size: 'sm', color: '#666666', wrap: true },
+                        { type: 'text', text: 'เข้าไปลองดึงผลด้วย AI อีกครั้ง หรือกรอกผลเองแล้วกดยืนยันผล', size: 'sm', color: '#444444', wrap: true }
+                    ]
+                },
+                footer: {
+                    type: 'box',
+                    layout: 'vertical',
+                    contents: [{
+                        type: 'button',
+                        style: 'primary',
+                        color: '#06C755',
+                        height: 'sm',
+                        action: { type: 'uri', label: 'เปิด Safety Lottery Admin', uri: `https://liff.line.me/${process.env.LIFF_ID}` }
+                    }]
+                }
+            }
+        };
+        if (await pushLineFlexMessage(admin.lineUserId, flexMessage, 'Lottery admin alert push')) sent += 1;
     }
+    return { sent };
 }
 
 // ======================================================
 // LOTTERY CRON — ดึงผลหวยอัตโนมัติ 16:00 ไทย (09:00 UTC) วันที่ 1 & 16
 // ======================================================
+async function fetchLotteryResultWithGemini() {
+    const htmlRes = await axios.get('https://www.glo.or.th/check/getLotteryResult', {
+        timeout: 15000,
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+
+    const geminiPayload = {
+        contents: [{ parts: [{ text:
+            `จากข้อมูล HTML ผลหวยไทยนี้ ดึงเฉพาะผลรางวัลเลขท้าย 2 ตัว และเลขท้าย 3 ตัว ออกมาเป็น JSON\n` +
+            `ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น:\n{"last2":"XX","last3_back":"XXX","last3_front":"XXX"}\n\nHTML:\n${String(htmlRes.data).slice(0, 8000)}`
+        }]}]
+    };
+
+    let parsed = null;
+    let sourceModel = null;
+    let lastGeminiError = null;
+    for (const model of LOTTERY_GEMINI_MODELS) {
+        try {
+            const geminiRes = await axios.post(
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+                geminiPayload, { timeout: 20000 }
+            );
+
+            let rawText = geminiRes.data.candidates[0].content.parts[0].text;
+            rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            parsed = JSON.parse(rawText);
+            sourceModel = model;
+            break;
+        } catch (geminiErr) {
+            lastGeminiError = geminiErr;
+            console.warn(`Lottery result Gemini model failed: ${model}`, geminiErr.response?.status || geminiErr.message);
+        }
+    }
+    if (!parsed) throw lastGeminiError || new Error('Unable to parse lottery result with Gemini');
+    if (!parsed.last2 || !/^\d{2}$/.test(parsed.last2)) throw new Error('Invalid last2: ' + parsed.last2);
+    if (!parsed.last3_back || !/^\d{3}$/.test(parsed.last3_back)) throw new Error('Invalid last3_back: ' + parsed.last3_back);
+    return { parsed, sourceModel };
+}
+
+async function fetchAndSaveLotteryResultsForRound(roundId, { requesterId = null, sourcePrefix = 'auto_gemini' } = {}) {
+    const [[round]] = await db.query(
+        "SELECT * FROM lottery_rounds WHERE roundId = ? AND status IN ('open','closed','pending_manual','pending_confirm')",
+        [roundId]
+    );
+    if (!round) throw new Error('ไม่พบงวดที่พร้อมดึงผล');
+    if (round.isTest) throw new Error('งวดทดสอบต้องกรอกผลเอง');
+
+    const { parsed, sourceModel } = await fetchLotteryResultWithGemini();
+    const source = sourceModel ? `${sourcePrefix}:${sourceModel}` : sourcePrefix;
+    await db.query(
+        `UPDATE lottery_rounds SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source=?, confirmedBy=? WHERE roundId=?`,
+        [parsed.last2, parsed.last3_front || null, parsed.last3_back, source, requesterId, roundId]
+    );
+    return { roundId, last2: parsed.last2, last3_front: parsed.last3_front || null, last3_back: parsed.last3_back, source };
+}
+
 async function fetchAndSaveLotteryResults(retryCount = 0) {
     const dateStr = getBangkokDateString();
     console.log(`🎰 fetchLotteryResults: ${dateStr} (retry ${retryCount})`);
 
     try {
-        const [[round]] = await db.query(
-            "SELECT * FROM lottery_rounds WHERE roundId = ? AND status IN ('open','closed')", [dateStr]);
-        if (!round) { console.log('⚠️ No open round for today'); return; }
-
-        const htmlRes = await axios.get('https://www.glo.or.th/check/getLotteryResult', {
-            timeout: 15000,
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-
-        const geminiPayload = {
-            contents: [{ parts: [{ text:
-                `จากข้อมูล HTML ผลหวยไทยนี้ ดึงเฉพาะผลรางวัลเลขท้าย 2 ตัว และเลขท้าย 3 ตัว ออกมาเป็น JSON\n` +
-                `ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น:\n{"last2":"XX","last3_back":"XXX","last3_front":"XXX"}\n\nHTML:\n${String(htmlRes.data).slice(0, 8000)}`
-            }]}]
-        };
-
-        let parsed = null;
-        let sourceModel = null;
-        let lastGeminiError = null;
-        for (const model of LOTTERY_GEMINI_MODELS) {
-            try {
-                const geminiRes = await axios.post(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-                    geminiPayload, { timeout: 20000 }
-                );
-
-                let rawText = geminiRes.data.candidates[0].content.parts[0].text;
-                rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-                parsed = JSON.parse(rawText);
-                sourceModel = model;
-                break;
-            } catch (geminiErr) {
-                lastGeminiError = geminiErr;
-                console.warn(`Lottery result Gemini model failed: ${model}`, geminiErr.response?.status || geminiErr.message);
-            }
-        }
-        if (!parsed) throw lastGeminiError || new Error('Unable to parse lottery result with Gemini');
-
-        if (!parsed.last2 || !/^\d{2}$/.test(parsed.last2)) throw new Error('Invalid last2: ' + parsed.last2);
-        if (!parsed.last3_back || !/^\d{3}$/.test(parsed.last3_back)) throw new Error('Invalid last3_back: ' + parsed.last3_back);
-
-        await db.query(
-            `UPDATE lottery_rounds SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source=? WHERE roundId=?`,
-            [parsed.last2, parsed.last3_front || null, parsed.last3_back, sourceModel || 'auto_gemini', dateStr]
-        );
-        console.log(`✅ Lottery result fetched: 2ตัว=${parsed.last2} 3ตัวท้าย=${parsed.last3_back}`);
+        const result = await fetchAndSaveLotteryResultsForRound(dateStr);
+        console.log(`✅ Lottery result fetched: 2ตัว=${result.last2} 3ตัวท้าย=${result.last3_back}`);
     } catch (err) {
         console.error(`❌ fetchLotteryResults failed (retry ${retryCount}):`, err.message);
         if (retryCount < 3) {
@@ -4313,7 +4411,10 @@ async function fetchAndSaveLotteryResults(retryCount = 0) {
             setTimeout(() => fetchAndSaveLotteryResults(retryCount + 1), delays[retryCount] * 60 * 1000);
         } else {
             await db.query("UPDATE lottery_rounds SET status='pending_manual' WHERE roundId=?", [dateStr]).catch(() => {});
-            console.log('⚠️ Lottery auto-fetch failed 3 times — set to pending_manual');
+            await notifyLotteryAdminsForManualResult(dateStr, err.message).catch(pushErr => {
+                console.error('❌ notifyLotteryAdminsForManualResult failed:', pushErr.message);
+            });
+            console.log('⚠️ Lottery auto-fetch failed 3 times — set to pending_manual and notified admins');
         }
     }
 }
@@ -4361,12 +4462,13 @@ function getLotteryIncidentWhere(aliasPrefix = '') {
 }
 
 async function getLotteryGoldEligibility(lineUserId, conn = db) {
-    const [[round]] = await conn.query(
+    const [rounds] = await conn.query(
         `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, status
          FROM lottery_rounds
-         WHERE status IN ('open','closed','pending_confirm','pending_manual')
-         ORDER BY drawDate ASC LIMIT 1`
+         WHERE status = 'open' AND COALESCE(isTest, FALSE) = FALSE
+         ORDER BY drawDate ASC LIMIT 20`
     );
+    const round = (rounds || []).find(r => !isLotteryRoundClosed(r)) || null;
     if (!round) return { eligible: false, reason: 'ไม่มีงวดที่เปิดอยู่', currentRound: null };
     if (isLotteryRoundClosed(round)) return { eligible: false, reason: 'งวดนี้ปิดรับแล้ว', currentRound: round };
 
@@ -4419,23 +4521,31 @@ async function getLotteryGoldEligibility(lineUserId, conn = db) {
 app.get('/api/lottery/current-round', async (req, res) => {
     try {
         const settings = await getLotterySettings();
-        if (!settings.userEnabled) {
+        const requesterId = req.query.requesterId || req.query.lineUserId;
+        const includeTestRounds = await isLotteryAdmin(requesterId).catch(() => false);
+        if (!settings.userEnabled && !includeTestRounds) {
             return res.json({
                 status: 'success',
                 data: {
                     featureEnabled: false,
                     disabled: true,
-                    message: settings.disabledMessage
+                    message: settings.disabledMessage,
+                    settings
                 }
             });
         }
 
-        const [[round]] = await db.query(
+        const [rounds] = await db.query(
             `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, last2, last3_front, last3_back,
-                    status, source, confirmedBy, createdAt
-             FROM lottery_rounds WHERE status IN ('open','closed','pending_confirm','pending_manual')
-             ORDER BY drawDate ASC LIMIT 1`
+                    status, source, confirmedBy, isTest, createdAt
+             FROM lottery_rounds WHERE status = 'open'
+             ORDER BY drawDate ASC LIMIT 20`
         );
+        const round = (rounds || []).find(r =>
+            r.status === 'open' &&
+            !isLotteryRoundClosed(r) &&
+            (includeTestRounds || !r.isTest)
+        ) || null;
         if (!round) return res.json({ status: 'success', data: null });
 
         const closeAt = getLotteryCloseAt(round.drawDate);
@@ -4443,14 +4553,19 @@ app.get('/api/lottery/current-round', async (req, res) => {
         const hoursLeft = Math.floor(msLeft / 3600000);
         const minutesLeft = Math.floor((msLeft % 3600000) / 60000);
 
-        res.json({ status: 'success', data: { ...round, featureEnabled: true, closeAt, hoursLeft, minutesLeft, isClosed: isLotteryRoundClosed(round) } });
+        res.json({ status: 'success', data: { ...round, featureEnabled: true, settings, closeAt, hoursLeft, minutesLeft, isClosed: isLotteryRoundClosed(round) } });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
 // GET /api/lottery/quiz-question — สุ่มคำถาม Safety 1 ข้อ
 app.get('/api/lottery/quiz-question', async (req, res) => {
     try {
-        await ensureLotteryUserEnabled();
+        const settings = await getLotterySettings();
+        if (!settings.userEnabled && !(await isLotteryAdmin(req.query.lineUserId))) {
+            const err = new Error(settings.disabledMessage || DEFAULT_LOTTERY_DISABLED_MESSAGE);
+            err.statusCode = 403;
+            throw err;
+        }
         const [rows] = await db.query(
             `SELECT questionId, questionText, optionA, optionB, optionC, optionD, category
              FROM lottery_quiz_questions WHERE isActive = TRUE
@@ -4458,7 +4573,7 @@ app.get('/api/lottery/quiz-question', async (req, res) => {
         );
         if (!rows.length) return res.status(404).json({ status: 'error', message: 'ไม่พบคำถาม' });
         res.json({ status: 'success', data: rows[0] });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+    } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
 });
 
 // POST /api/lottery/answer-quiz — ตอบคำถาม (ถูก = +2 coins)
@@ -4466,8 +4581,16 @@ app.post('/api/lottery/answer-quiz', async (req, res) => {
     const { lineUserId, questionId, selectedOption } = req.body;
     if (!lineUserId || !questionId || !selectedOption)
         return res.status(400).json({ status: 'error', message: 'ข้อมูลไม่ครบ' });
+    if (!['A', 'B', 'C', 'D'].includes(String(selectedOption).toUpperCase()))
+        return res.status(400).json({ status: 'error', message: 'ตัวเลือกไม่ถูกต้อง' });
     try {
-        await ensureLotteryUserEnabled();
+        assertLotteryUserRequest(req, lineUserId);
+        const accessSettings = await getLotterySettings();
+        if (!accessSettings.userEnabled && !(await isLotteryAdmin(lineUserId))) {
+            const err = new Error(accessSettings.disabledMessage || DEFAULT_LOTTERY_DISABLED_MESSAGE);
+            err.statusCode = 403;
+            throw err;
+        }
         const [[q]] = await db.query(
             'SELECT correctOption FROM lottery_quiz_questions WHERE questionId = ? AND isActive = TRUE', [questionId]);
         if (!q) return res.status(404).json({ status: 'error', message: 'ไม่พบคำถาม' });
@@ -4489,7 +4612,7 @@ app.post('/api/lottery/answer-quiz', async (req, res) => {
                 quizAnswerId: answerResult.insertId
             }
         });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+    } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
 });
 
 // POST /api/lottery/buy-ticket — ซื้อตั๋ว (transaction)
@@ -4497,6 +4620,11 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
     const { lineUserId, roundId, ticketType, number, quizAnswerId } = req.body;
     if (!lineUserId || !roundId || !ticketType || number == null || !quizAnswerId)
         return res.status(400).json({ status: 'error', message: 'ข้อมูลไม่ครบ' });
+    try {
+        assertLotteryUserRequest(req, lineUserId);
+    } catch (err) {
+        return res.status(err.statusCode || 403).json({ status: 'error', message: err.message, code: err.code });
+    }
 
     if (!['two', 'three'].includes(ticketType))
         return res.status(400).json({ status: 'error', message: 'ประเภทตั๋วไม่ถูกต้อง' });
@@ -4512,8 +4640,6 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
     const conn = await db.getClient();
     try {
         await conn.beginTransaction();
-        await ensureLotteryUserEnabled(conn);
-
         const settings = await getLotterySettings(conn);
         const price = ticketType === 'two' ? settings.priceTwo : settings.priceThree;
         const dailyLimit = settings.dailyLimit;
@@ -4523,8 +4649,20 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
             throw new Error(`เหรียญไม่พอ (ต้องการ ${price} เหรียญ)`);
 
         const [[round]] = await conn.query(
-            "SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, status FROM lottery_rounds WHERE roundId = ?",
+            "SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, status, isTest FROM lottery_rounds WHERE roundId = ?",
             [roundId]);
+        if (!round) throw new Error('ไม่พบงวดนี้');
+        const requesterIsAdmin = await isLotteryAdmin(lineUserId, conn);
+        if (!settings.userEnabled && !(requesterIsAdmin && round.isTest)) {
+            const err = new Error(settings.disabledMessage || DEFAULT_LOTTERY_DISABLED_MESSAGE);
+            err.statusCode = 403;
+            throw err;
+        }
+        if (round.isTest && !requesterIsAdmin) {
+            const err = new Error('งวดทดสอบสำหรับแอดมินเท่านั้น');
+            err.statusCode = 403;
+            throw err;
+        }
         if (isLotteryRoundClosed(round))
             throw new Error('งวดนี้ปิดรับแล้ว');
 
@@ -4585,6 +4723,7 @@ app.get('/api/lottery/my-tickets', async (req, res) => {
     const { lineUserId } = req.query;
     if (!lineUserId) return res.status(400).json({ status: 'error', message: 'ต้องระบุ lineUserId' });
     try {
+        assertLotteryUserRequest(req, lineUserId);
         const [tickets] = await db.query(
             `SELECT t.*, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.status AS roundStatus, r.last2, r.last3_back
              FROM lottery_tickets t
@@ -4599,7 +4738,7 @@ app.get('/api/lottery/my-tickets', async (req, res) => {
             [lineUserId, todayTH]);
 
         res.json({ status: 'success', data: { tickets, todayCount: dp ? dp.count : 0 } });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+    } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
 });
 
 // GET /api/lottery/results — ผลรางวัลย้อนหลัง
@@ -4607,11 +4746,11 @@ app.get('/api/lottery/results', async (req, res) => {
     try {
         const [rounds] = await db.query(
             `SELECT r.roundId, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.last2, r.last3_front,
-                    r.last3_back, r.status, r.source, r.confirmedBy, r.createdAt,
+                    r.last3_back, r.status, r.source, r.confirmedBy, r.isTest, r.createdAt,
                     h.totalTicketsSold, h.totalWinners, h.totalPrizesPaid
              FROM lottery_rounds r
              LEFT JOIN lottery_results_history h ON r.roundId = h.roundId
-             WHERE r.status = 'completed'
+             WHERE r.status = 'completed' AND COALESCE(r.isTest, FALSE) = FALSE
              ORDER BY r.drawDate DESC LIMIT 20`
         );
         res.json({ status: 'success', data: rounds });
@@ -4622,6 +4761,7 @@ app.get('/api/lottery/results', async (req, res) => {
 app.get('/api/lottery/stats', async (req, res) => {
     const { lineUserId } = req.query;
     try {
+        if (lineUserId) assertLotteryUserRequest(req, lineUserId);
         const [[totals]] = await db.query(
             `SELECT COUNT(*) AS totalRounds,
                     SUM(h.totalTicketsSold) AS allTickets,
@@ -4646,6 +4786,7 @@ app.get('/api/lottery/gold-eligibility', async (req, res) => {
     const { lineUserId } = req.query;
     if (!lineUserId) return res.status(400).json({ status: 'error', message: 'ต้องระบุ lineUserId' });
     try {
+        assertLotteryUserRequest(req, lineUserId);
         await ensureLotteryUserEnabled();
         const eligibility = await getLotteryGoldEligibility(lineUserId);
         res.json({ status: 'success', data: eligibility });
@@ -4656,6 +4797,11 @@ app.get('/api/lottery/gold-eligibility', async (req, res) => {
 app.post('/api/lottery/claim-gold-ticket', async (req, res) => {
     const { lineUserId } = req.body;
     if (!lineUserId) return res.status(400).json({ status: 'error', message: 'ต้องระบุ lineUserId' });
+    try {
+        assertLotteryUserRequest(req, lineUserId);
+    } catch (err) {
+        return res.status(err.statusCode || 403).json({ status: 'error', message: err.message, code: err.code });
+    }
 
     const conn = await db.getClient();
     try {
@@ -4733,6 +4879,37 @@ app.post('/api/admin/lottery/set-result', async (req, res) => {
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
+// POST /api/admin/lottery/fetch-result — ให้แอดมินเรียก AI ดึงผลของงวดที่เลือก
+app.post('/api/admin/lottery/fetch-result', async (req, res) => {
+    const { requesterId, roundId } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+        if (!roundId) return res.status(400).json({ status: 'error', message: 'ต้องระบุงวด' });
+
+        const result = await fetchAndSaveLotteryResultsForRound(roundId, {
+            requesterId,
+            sourcePrefix: 'admin_ai'
+        });
+        await logAdminAction(requesterId, 'LOTTERY_AI_FETCH_RESULT', 'round', roundId, roundId, result);
+        res.json({
+            status: 'success',
+            data: {
+                ...result,
+                message: 'AI ดึงผลรางวัลแล้ว กรุณาตรวจสอบก่อนยืนยัน'
+            }
+        });
+    } catch (e) {
+        if (roundId) {
+            await db.query(
+                "UPDATE lottery_rounds SET status='pending_manual' WHERE roundId=? AND status IN ('open','closed','pending_manual','pending_confirm')",
+                [roundId]
+            ).catch(() => {});
+        }
+        res.status(e.statusCode || 500).json({ status: 'error', message: e.message });
+    }
+});
+
 // POST /api/admin/lottery/confirm-result — ยืนยันผลก่อนจ่ายรางวัล
 app.post('/api/admin/lottery/confirm-result', async (req, res) => {
     const { requesterId, roundId } = req.body;
@@ -4796,7 +4973,7 @@ app.get('/api/admin/lottery/preview-winners', async (req, res) => {
         const totalPrizesToPay = winners.reduce((s, w) => s + w.prize, 0);
 
         res.json({ status: 'success', data: {
-            round: { roundId: round.roundId, drawDate: toLotteryDateString(round.drawDate), last2: round.last2, last3_back: round.last3_back, status: round.status },
+            round: { roundId: round.roundId, drawDate: toLotteryDateString(round.drawDate), last2: round.last2, last3_back: round.last3_back, status: round.status, isTest: !!round.isTest },
             winners, totalPrizesToPay,
             totalTickets: Number(totals?.totalTickets || 0),
             totalPlayers: Number(totals?.totalPlayers || 0)
@@ -4924,7 +5101,7 @@ app.get('/api/admin/lottery/dashboard', async (req, res) => {
 
         const [rounds] = await db.query(
             `SELECT r.roundId, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.last2, r.last3_front,
-                    r.last3_back, r.status, r.source, r.confirmedBy, r.createdAt,
+                    r.last3_back, r.status, r.source, r.confirmedBy, r.isTest, r.createdAt,
                     h.totalTicketsSold, h.totalWinners, h.totalPrizesPaid
              FROM lottery_rounds r
              LEFT JOIN lottery_results_history h ON r.roundId=h.roundId
@@ -5020,7 +5197,7 @@ app.get('/api/admin/lottery/monitor', async (req, res) => {
         const selectedRoundId = roundId || currentRound?.roundId || null;
 
         const [rounds] = await db.query(
-            `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, status, last2, last3_back
+            `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, status, last2, last3_back, isTest
              FROM lottery_rounds ORDER BY drawDate DESC LIMIT 20`
         );
 
@@ -5295,7 +5472,7 @@ app.post('/api/admin/lottery/generate-questions', async (req, res) => {
 
 // POST /api/admin/lottery/rounds — สร้างงวดใหม่
 app.post('/api/admin/lottery/rounds', async (req, res) => {
-    const { requesterId, drawDate } = req.body;
+    const { requesterId, drawDate, isTest = false } = req.body;
     try {
         const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
         if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
@@ -5303,10 +5480,10 @@ app.post('/api/admin/lottery/rounds', async (req, res) => {
             return res.status(400).json({ status: 'error', message: 'วันที่ไม่ถูกต้อง' });
 
         await db.query(
-            'INSERT INTO lottery_rounds (roundId, drawDate) VALUES (?,?)',
-            [drawDate, drawDate]);
-        await logAdminAction(requesterId, 'LOTTERY_CREATE_ROUND', 'round', drawDate, drawDate, {});
-        res.json({ status: 'success', data: { roundId: drawDate, message: 'สร้างงวดแล้ว' } });
+            'INSERT INTO lottery_rounds (roundId, drawDate, source, isTest) VALUES (?,?,?,?)',
+            [drawDate, drawDate, isTest ? 'test_manual' : 'manual', !!isTest]);
+        await logAdminAction(requesterId, 'LOTTERY_CREATE_ROUND', 'round', drawDate, drawDate, { isTest: !!isTest });
+        res.json({ status: 'success', data: { roundId: drawDate, isTest: !!isTest, message: isTest ? 'สร้างงวดทดสอบแล้ว' : 'สร้างงวดแล้ว' } });
     } catch (e) {
         if (e.code === 'ER_DUP_ENTRY') return res.status(400).json({ status: 'error', message: 'มีงวดนี้แล้ว' });
         res.status(500).json({ status: 'error', message: e.message });

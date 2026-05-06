@@ -2086,38 +2086,201 @@ body {
     line-height: 1;
 }
 
-.home-stat-card {
+.home-status-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+.home-status-pill {
+    min-width: 0;
+    min-height: 52px;
     background: #fff;
-    border-radius: 16px;
-    padding: 14px 12px;
-    text-align: center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-}
-
-.home-stat-icon {
-    font-size: 1.2rem;
-    margin-bottom: 4px;
-    display: block;
-}
-
-.home-stat-value {
-    font-size: 1.4rem;
-    font-weight: 800;
-    color: #111827;
-    line-height: 1;
-}
-
-.home-stat-label {
-    font-size: 0.68rem;
-    color: #9ca3af;
-    font-weight: 600;
-    margin-top: 2px;
-}
-
-.home-action-btn {
+    border: 1px solid #edf2f7;
     border-radius: 14px;
-    padding: 10px;
-    font-size: 0.9rem;
+    padding: 8px 9px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.home-status-pill i {
+    font-size: 1rem;
+    flex: 0 0 auto;
+}
+.home-status-pill span {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+}
+.home-status-pill strong {
+    color: #111827;
+    font-size: 0.86rem;
+    font-weight: 900;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.home-status-pill small {
+    color: #9ca3af;
+    font-size: 0.6rem;
+    font-weight: 700;
+    margin-top: 3px;
+}
+
+.home-quick-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+.home-quick-action {
+    min-width: 0;
+    min-height: 62px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #fff;
+    color: #111827;
+    padding: 8px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 3px 12px rgba(15,23,42,0.06);
+}
+.home-quick-action.primary {
+    background: #06C755;
+    border-color: #06C755;
+    color: #fff;
+}
+.home-quick-action i {
+    font-size: 1.02rem;
+}
+.home-quick-action span {
+    max-width: 100%;
+    font-size: 0.68rem;
+    font-weight: 900;
+    line-height: 1.15;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+.home-quick-action:active {
+    transform: scale(0.98);
+}
+@media (max-width: 360px) {
+    .home-status-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .home-quick-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.today-tasks-card {
+    background: #ffffff;
+    border: 1px solid #e8eef2;
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+.today-tasks-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.today-tasks-kicker {
+    color: #06C755;
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0;
+}
+.today-tasks-title {
+    color: #111827;
+    font-size: 0.98rem;
+    font-weight: 900;
+    line-height: 1.2;
+}
+.today-tasks-count {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #b7efd0;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+.today-tasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.today-task-item {
+    width: 100%;
+    min-height: 58px;
+    border: 1px solid #eef2f7;
+    border-radius: 14px;
+    background: #fbfdff;
+    padding: 9px 10px;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    text-align: left;
+}
+.today-task-item:not(:disabled):active {
+    transform: scale(0.99);
+}
+.today-task-item.is-done {
+    background: #f8fafc;
+}
+.today-task-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+.today-task-icon.tone-primary { background: #e0f2fe; color: #0369a1; }
+.today-task-icon.tone-success { background: #dcfce7; color: #15803d; }
+.today-task-icon.tone-lottery { background: #ecfdf5; color: #047857; }
+.today-task-icon.tone-done { background: #f1f5f9; color: #64748b; }
+.today-task-icon.tone-muted { background: #f3f4f6; color: #6b7280; }
+.today-task-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.today-task-copy strong {
+    color: #111827;
+    font-size: 0.84rem;
+    line-height: 1.25;
+}
+.today-task-copy small {
+    color: #6b7280;
+    font-size: 0.74rem;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.today-task-action {
+    color: #06C755;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    font-weight: 900;
+    white-space: nowrap;
+}
+.today-task-item:disabled .today-task-action {
+    color: #9ca3af;
 }
 
 .home-dept-row {
@@ -2154,6 +2317,21 @@ body {
     font-size: 0.85rem;
     color: #374151;
     white-space: nowrap;
+}
+.home-section-more {
+    width: 100%;
+    min-height: 34px;
+    margin-top: 6px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #fff;
+    color: #06C755;
+    font-size: 0.76rem;
+    font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 
 /* ===== NOW PLAYING BAR ===== */
@@ -2520,6 +2698,36 @@ body {
 .feed-action { color: #6c757d; }
 .feed-act { color: var(--line-green, #06C755); font-weight: 500; }
 .feed-time { font-size: 0.75rem; color: #adb5bd; margin-top: 2px; }
+.feed-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 0 2px;
+}
+.feed-pager-btn {
+    min-height: 32px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #fff;
+    color: #374151;
+    font-size: 0.78rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+}
+.feed-pager-btn:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+}
+.feed-pager-status {
+    color: #9ca3af;
+    font-size: 0.74rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
 
 /* ===== EMPTY STATES ===== */
 .empty-state {
@@ -2727,11 +2935,12 @@ body {
     background: linear-gradient(135deg, #ecfdf5 0%, #dff7ed 54%, #f8fff9 100%);
     border: 1.5px solid #9ddfbb;
     cursor: pointer;
-    min-height: 112px;
+    min-height: 132px;
     display: flex;
     align-items: stretch;
     justify-content: space-between;
     gap: 12px;
+    padding: 14px;
 }
 .theme-lottery:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(6,199,85,0.2); }
 .safety-lottery-entry .lottery-entry-copy {
@@ -2740,31 +2949,48 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    gap: 10px;
 }
-.safety-lottery-entry .lottery-entry-copy > .d-flex {
-    margin-bottom: 8px !important;
+.lottery-entry-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+.lottery-entry-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(6,199,85,0.12);
+    color: #047857;
+    border: 1px solid rgba(6,199,85,0.24);
+    flex: 0 0 auto;
+}
+.lottery-entry-main {
+    min-width: 0;
 }
 .lottery-entry-metrics {
-    width: 82px;
-    min-width: 82px;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.72);
-    border: 1px solid rgba(6,199,85,0.2);
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr;
-    place-items: center;
-    color: #047a3a;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    color: #047857;
 }
 .lottery-entry-metrics span {
-    font-size: 0.72rem;
-    font-weight: 900;
+    min-width: 42px;
+    min-height: 24px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 9px;
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(6,199,85,0.22);
+    font-size: 0.68rem;
+    font-weight: 800;
     letter-spacing: 0;
-}
-.lottery-entry-metrics i {
-    grid-column: 1 / span 2;
-    font-size: 1.35rem;
 }
 .lottery-badge-green {
     background: rgba(6,199,85,0.15);
@@ -2778,9 +3004,37 @@ body {
 }
 
 /* Main Modal header */
-.lottery-modal-content { border-radius: 20px; overflow: hidden; }
+.lottery-modal-content {
+    border-radius: 22px;
+    overflow: hidden;
+    clip-path: inset(0 round 22px);
+}
 .lottery-modal-header {
     background: linear-gradient(135deg, #064e3b 0%, #047857 62%, #06C755 100%);
+}
+.lottery-modal-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+.lottery-rules-btn {
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(255,255,255,0.34);
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.14);
+    color: #fff;
+    font-size: 0.9rem;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+.lottery-rules-btn:hover,
+.lottery-rules-btn:focus-visible {
+    background: rgba(255,255,255,0.24);
+    color: #fff;
+    transform: translateY(-1px);
 }
 
 /* Countdown banner */
@@ -3271,15 +3525,20 @@ body {
 
 @media (max-width: 430px) {
     .theme-lottery {
-        min-height: 104px;
-        padding: 12px;
+        min-height: 132px;
+        padding: 13px;
     }
     .lottery-entry-metrics {
-        width: 68px;
-        min-width: 68px;
+        gap: 5px;
+    }
+    .lottery-entry-metrics span {
+        min-width: 40px;
+        min-height: 23px;
+        padding: 3px 8px;
     }
     .lottery-modal-content {
-        border-radius: 0;
+        border-radius: 18px;
+        clip-path: inset(0 round 18px);
     }
     .lottery-number-input {
         font-size: 1.75rem !important;
