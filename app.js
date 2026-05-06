@@ -1397,6 +1397,8 @@ function bindAdminEventListeners() {
     $('button[data-bs-target="#tab-hunter"]').on('shown.bs.tab', loadHunterMonitor);
     $('button[data-bs-target="#tab-streak"]').on('shown.bs.tab', loadStreakMonitor);
     $('button[data-bs-target="#tab-coins"]').on('shown.bs.tab', loadCoinMonitor); // ⭐ เพิ่มแท็บเหรียญ
+    $(document).off('click', '#btn-remind-streaks').on('click', '#btn-remind-streaks', sendStreakReminders);
+    $(document).off('click', '#btn-test-remind-self').on('click', '#btn-test-remind-self', sendTestStreakReminder);
 
     // Function 1: KYT
     async function loadKytMonitor() {
@@ -1505,6 +1507,45 @@ function bindAdminEventListeners() {
                 `);
             });
         } catch (e) { list.html(`<div class="text-danger p-3">${e.message}</div>`); }
+    }
+
+    async function sendStreakReminders() {
+        const confirmed = await Swal.fire({
+            icon: 'warning',
+            title: 'ส่งแจ้งเตือนเติมไฟ?',
+            html: 'ระบบจะส่ง LINE Push Message ให้ผู้ใช้ที่มี Streak และยังไม่ได้เติมไฟตามเงื่อนไขวันนี้',
+            showCancelButton: true,
+            confirmButtonText: 'ส่งแจ้งเตือน',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#f59e0b'
+        });
+        if (!confirmed.isConfirmed) return;
+
+        const $btn = $('#btn-remind-streaks');
+        const originalHtml = $btn.html();
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>กำลังส่ง...');
+        try {
+            const res = await callApi('/api/admin/remind-streaks', {}, 'POST');
+            await Swal.fire('ส่งสำเร็จ', res.message || 'ส่งแจ้งเตือนเรียบร้อยแล้ว', 'success');
+        } catch (e) {
+            await Swal.fire('ส่งไม่สำเร็จ', e.message, 'error');
+        } finally {
+            $btn.prop('disabled', false).html(originalHtml);
+        }
+    }
+
+    async function sendTestStreakReminder() {
+        const $btn = $('#btn-test-remind-self');
+        const originalHtml = $btn.html();
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>ทดสอบ...');
+        try {
+            const res = await callApi('/api/admin/test-remind-self', {}, 'POST');
+            await Swal.fire('ส่งทดสอบแล้ว', res.message || 'เช็ค LINE ของคุณได้เลย', 'success');
+        } catch (e) {
+            await Swal.fire('ส่งทดสอบไม่สำเร็จ', e.message, 'error');
+        } finally {
+            $btn.prop('disabled', false).html(originalHtml);
+        }
     }
 
     // ⭐ Function 4: Coins (ใหม่)
