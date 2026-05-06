@@ -4544,7 +4544,8 @@ app.get('/api/lottery/current-round', async (req, res) => {
         const round = (rounds || []).find(r =>
             r.status === 'open' &&
             !isLotteryRoundClosed(r) &&
-            (includeTestRounds || !r.isTest)
+            (includeTestRounds || !r.isTest) &&
+            (settings.userEnabled || r.isTest)
         ) || null;
         if (!round) return res.json({ status: 'success', data: null });
 
@@ -4787,7 +4788,18 @@ app.get('/api/lottery/gold-eligibility', async (req, res) => {
     if (!lineUserId) return res.status(400).json({ status: 'error', message: 'ต้องระบุ lineUserId' });
     try {
         assertLotteryUserRequest(req, lineUserId);
-        await ensureLotteryUserEnabled();
+        const settings = await getLotterySettings();
+        if (!settings.userEnabled) {
+            return res.json({
+                status: 'success',
+                data: {
+                    eligible: false,
+                    reason: settings.disabledMessage || DEFAULT_LOTTERY_DISABLED_MESSAGE,
+                    featureEnabled: false,
+                    currentRound: null
+                }
+            });
+        }
         const eligibility = await getLotteryGoldEligibility(lineUserId);
         res.json({ status: 'success', data: eligibility });
     } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }

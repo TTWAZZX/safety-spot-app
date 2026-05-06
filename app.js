@@ -694,8 +694,8 @@ async function loadHomeLotterySummary() {
                     <div class="d-flex align-items-center justify-content-between gap-3">
                         <div>
                             <div class="home-lottery-kicker"><i class="fas fa-ticket-alt me-1"></i>Safety Lottery</div>
-                            <div class="home-lottery-title">กำลังเตรียมเปิดใช้งาน</div>
-                            <div class="home-lottery-sub">${sanitizeHTML(res.message || 'Admin is preparing this feature.')}</div>
+                            <div class="home-lottery-title">ปิดใช้งานชั่วคราว</div>
+                            <div class="home-lottery-sub">${sanitizeHTML(res.message || 'Admin has temporarily disabled this feature.')}</div>
                         </div>
                         <i class="fas fa-tools fs-3 text-muted"></i>
                     </div>
@@ -6173,6 +6173,14 @@ async function loadLotteryCurrentRound() {
         if (ticketsRes.todayCount >= _lotterySettings.dailyLimit) {
             $('#btn-lottery-buy').prop('disabled', true)
                 .html(`<i class="fas fa-ban me-2"></i>ซื้อครบ ${_lotterySettings.dailyLimit.toLocaleString()} ใบแล้ววันนี้`);
+        }
+        if (res.isTest || res.settings?.userEnabled === false) {
+            $('#lottery-gold-claim').addClass('locked');
+            $('#lottery-gold-status').text(res.isTest
+                ? 'Gold Ticket ไม่เปิดในงวดทดสอบ'
+                : (res.settings?.disabledMessage || 'Safety Lottery ยังไม่เปิดให้ผู้ใช้เข้าเล่น'));
+            $('#btn-claim-gold-ticket').prop('disabled', true).text('ล็อก');
+            return;
         }
         await loadLotteryGoldEligibility();
     } catch (e) {
