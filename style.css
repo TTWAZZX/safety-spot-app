@@ -3003,11 +3003,41 @@ body {
     border: 1px solid rgba(100,116,139,0.25);
 }
 
-/* Main Modal header */
+/* Quiz Modal — fullscreen */
+.lottery-quiz-modal-content {
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.lottery-quiz-modal-header {
+    background: linear-gradient(135deg, #1a6b3c 0%, #06C755 100%);
+}
+#lottery-quiz-modal .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Main Modal — fullscreen on all devices */
 .lottery-modal-content {
-    border-radius: 22px;
+    border-radius: 0;
     overflow: hidden;
-    clip-path: inset(0 round 22px);
+    clip-path: none;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+#lottery-modal .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    display: flex;
+    flex-direction: column;
+}
+#lottery-modal .tab-content {
+    flex: 1;
 }
 .lottery-modal-header {
     background: linear-gradient(135deg, #064e3b 0%, #047857 62%, #06C755 100%);
@@ -3074,7 +3104,8 @@ body {
 .lottery-tab-btn {
     border: none;
     background: transparent;
-    padding: 10px 8px;
+    padding: 13px 8px;
+    min-height: 44px;
     font-size: 0.82rem;
     font-weight: 600;
     color: #6c757d;
@@ -3237,6 +3268,46 @@ body {
     justify-content: center;
     box-shadow: 0 2px 8px rgba(245,158,11,0.3);
     flex-shrink: 0;
+}
+
+/* Personal stats bar in ตั๋วของฉัน */
+.lottery-personal-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.lottery-personal-stats > div {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 10px 8px;
+    text-align: center;
+}
+.lottery-personal-stats span {
+    display: block;
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1.1;
+}
+.lottery-personal-stats small {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+/* Quiz explanation box (แสดงเมื่อตอบผิด) */
+.lottery-quiz-explanation {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    color: #92400e;
+    line-height: 1.5;
 }
 
 /* Quiz answer buttons */
@@ -3535,10 +3606,6 @@ body {
         min-width: 40px;
         min-height: 23px;
         padding: 3px 8px;
-    }
-    .lottery-modal-content {
-        border-radius: 18px;
-        clip-path: inset(0 round 18px);
     }
     .lottery-number-input {
         font-size: 1.75rem !important;
