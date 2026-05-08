@@ -5782,7 +5782,15 @@ app.post('/api/admin/lottery/broadcast-new-round', async (req, res) => {
 // SAFETY DREAM NUMBERS — ท่านอาจารย์จอห์นนี่
 // ======================================================
 
-// Startup: seed safety_dream_items if empty
+// Startup: ensure safety_dream_items table exists then seed if empty
+db.query(`CREATE TABLE IF NOT EXISTS safety_dream_items (
+  itemId      INT AUTO_INCREMENT PRIMARY KEY,
+  category    VARCHAR(30)  NOT NULL,
+  itemName    VARCHAR(100) NOT NULL,
+  luckyDigit  VARCHAR(3)   NOT NULL,
+  INDEX idx_dream_category (category)
+)`).catch(() => {});
+
 db.query('SELECT COUNT(*) AS cnt FROM safety_dream_items').then(([[{ cnt }]]) => {
     if (cnt > 0) return;
     const items = [
