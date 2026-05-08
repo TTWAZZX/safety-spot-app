@@ -6802,12 +6802,19 @@ async function loadAdminLotteryDashboard() {
                 ? `<button class="btn btn-xs py-0 px-1 btn-outline-secondary" onclick="adminEditLotteryRound('${sanitizeHTML(r.roundId)}','${sanitizeHTML(r.drawDate)}')" title="แก้วันที่"><i class="fas fa-pen"></i></button>`
                 : '';
             const delBtn = `<button class="btn btn-xs py-0 px-1 btn-outline-danger" onclick="adminDeleteLotteryRound('${sanitizeHTML(r.roundId)}',${!!r.isTest},${Number(r.ticketCount||0)})" title="ลบงวด"><i class="fas fa-trash"></i></button>`;
+            const canReset = !['confirmed', 'completed'].includes(r.status);
+            const resetBtn = canReset
+                ? `<button class="btn btn-xs py-0 px-1 btn-outline-warning" onclick="adminResetLotteryRound('${sanitizeHTML(r.roundId)}','${sanitizeHTML(r.drawDate)}',${Number(r.ticketCount||0)})" title="รีเซตตั๋วทั้งหมด"><i class="fas fa-undo"></i></button>`
+                : '';
+            const testBtn = r.isTest
+                ? `<button class="btn btn-xs py-0 px-1 btn-outline-info" onclick="openLotteryModal()" title="ทดสอบซื้อตั๋ว"><i class="fas fa-flask"></i></button>`
+                : '';
             roundsHtml += `<tr>
                 <td>${sanitizeHTML(d)}</td>
                 <td>${r.last2 ? sanitizeHTML(r.last2) : '-'} / ${r.last3_back ? sanitizeHTML(r.last3_back) : '-'}</td>
                 <td><span class="badge bg-${color}">${label}</span>${testBadge}${autoBadge}</td>
                 <td>${r.totalWinners || 0}</td>
-                <td class="text-end" style="white-space:nowrap">${editBtn} ${delBtn}</td>
+                <td class="text-end" style="white-space:nowrap">${testBtn} ${editBtn} ${resetBtn} ${delBtn}</td>
             </tr>`;
         });
 
@@ -7318,6 +7325,43 @@ async function adminDeleteLotteryRound(roundId, isTest, ticketCount) {
         showToast('ลบงวดแล้ว', 'success');
         await loadAdminLotteryDashboard();
         await loadAdminLotteryRoundSelect();
+        await loadAdminLotteryMonitor(true);
+    } catch (e) { Swal.fire('Error', e.message, 'error'); }
+}
+
+async function adminResetLotteryRound(roundId, drawDate, ticketCount) {
+    const { value: typed, isConfirmed } = await Swal.fire({
+        icon: 'warning',
+        title: `รีเซตตั๋วงวด ${sanitizeHTML(drawDate)}`,
+        html: `<p>ตั๋วทั้งหมด <strong class="text-danger">${ticketCount} ใบ</strong> จะถูกลบ<br>
+               ผู้ใช้ทุกคนจะสามารถซื้อใหม่ได้ทันที</p>
+               <p class="text-muted small mb-1">พิมพ์ <strong>RESET</strong> เพื่อยืนยัน</p>
+               <input id="swal-reset-confirm" class="swal2-input" placeholder="RESET" autocomplete="off">`,
+        showCancelButton: true,
+        confirmButtonText: 'รีเซตตั๋ว',
+        confirmButtonColor: '#d97706',
+        cancelButtonText: 'ยกเลิก',
+        preConfirm: () => {
+            const val = document.getElementById('swal-reset-confirm')?.value?.trim();
+            if (val !== 'RESET') {
+                Swal.showValidationMessage('พิมพ์ RESET ให้ถูกต้องก่อน');
+                return false;
+            }
+            return val;
+        }
+    });
+    if (!isConfirmed) return;
+    try {
+        const res = await callApi(`/api/admin/lottery/rounds/${encodeURIComponent(roundId)}/reset-tickets`, {
+            requesterId: AppState.lineProfile.userId
+        }, 'POST');
+        await Swal.fire({
+            icon: 'success',
+            title: 'รีเซตสำเร็จ',
+            html: `ลบแล้ว: ตั๋ว <strong>${res.ticketCount}</strong> ใบ · โควต้ารายวัน <strong>${res.purchaseCount}</strong> รายการ`,
+            confirmButtonColor: '#06C755'
+        });
+        await loadAdminLotteryDashboard();
         await loadAdminLotteryMonitor(true);
     } catch (e) { Swal.fire('Error', e.message, 'error'); }
 }

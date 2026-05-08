@@ -5624,6 +5624,37 @@ app.delete('/api/admin/lottery/rounds/:roundId', async (req, res) => {
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
+// POST /api/admin/lottery/rounds/:roundId/reset-tickets — ลบตั๋วทั้งหมดในงวด ให้ user ซื้อใหม่ได้
+app.post('/api/admin/lottery/rounds/:roundId/reset-tickets', async (req, res) => {
+    const { roundId } = req.params;
+    const { requesterId } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+
+        const [[round]] = await db.query(
+            `SELECT roundId, DATE_FORMAT(drawDate,'%Y-%m-%d') AS drawDate, status, isTest FROM lottery_rounds WHERE roundId=?`,
+            [roundId]
+        );
+        if (!round) return res.status(404).json({ status: 'error', message: 'ไม่พบงวด' });
+        if (['confirmed', 'completed'].includes(round.status))
+            return res.status(400).json({ status: 'error', message: 'งวดนี้ยืนยันผลแล้ว รีเซตไม่ได้' });
+
+        const [[{ ticketCount }]] = await db.query('SELECT COUNT(*) AS ticketCount FROM lottery_tickets WHERE roundId=?', [roundId]);
+        const [[{ purchaseCount }]] = await db.query('SELECT COUNT(*) AS purchaseCount FROM lottery_daily_purchases WHERE roundId=?', [roundId]);
+        const [[{ quizCount }]] = await db.query('SELECT COUNT(*) AS quizCount FROM lottery_quiz_answers WHERE roundId=?', [roundId]);
+
+        await db.query('DELETE FROM lottery_tickets WHERE roundId=?', [roundId]);
+        await db.query('DELETE FROM lottery_daily_purchases WHERE roundId=?', [roundId]);
+        await db.query('DELETE FROM lottery_quiz_answers WHERE roundId=?', [roundId]);
+
+        await logAdminAction(requesterId, 'LOTTERY_RESET_TICKETS', 'round', roundId, round.drawDate,
+            { ticketCount, purchaseCount, quizCount, isTest: !!round.isTest });
+
+        res.json({ status: 'success', data: { ticketCount, purchaseCount, quizCount } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
 // GET /api/admin/lottery/preview-auto-rounds — Preview dates before auto-creating rounds
 app.get('/api/admin/lottery/preview-auto-rounds', async (req, res) => {
     const { requesterId, count = 4 } = req.query;
