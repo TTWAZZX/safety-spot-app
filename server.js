@@ -5927,24 +5927,38 @@ app.post('/api/lottery/dream-interpret', async (req, res) => {
         }
 
         // Build context for AI
-        let itemContext = '';
+        let itemName = null;
+        let luckyDigit = null;
         if (itemId) {
             const [[item]] = await db.query('SELECT itemName, luckyDigit FROM safety_dream_items WHERE itemId=?', [itemId]);
-            if (item) itemContext = `\nสัญลักษณ์ที่เลือก: ${item.itemName} (เลขนำโชค: ${item.luckyDigit})`;
+            if (item) { itemName = item.itemName; luckyDigit = item.luckyDigit; }
         }
-        const userInput = [dreamText ? `ความฝัน/ประสบการณ์: ${dreamText}` : '', itemContext].filter(Boolean).join('\n');
 
-        const prompt = `${userInput}
+        // Focus subject: symbol name, dream text, or both
+        const focusSubject = [itemName, dreamText].filter(Boolean).join(' และ ');
+        const seedHint = luckyDigit
+            ? `เลขนำโชคพื้นฐานของ "${itemName}" คือ ${luckyDigit} — ให้ใช้เลขนี้เป็นแก่นในการคำนวณเลข 2 ตัวและ 3 ตัว`
+            : '';
 
-จงพยากรณ์ตามบุคลิกท่านอาจารย์จอห์นนี่ และตอบเป็น JSON เท่านั้น ห้ามมี markdown backticks:
+        const prompt = `ลูกศิษย์ถามเรื่อง: "${focusSubject}"
+${dreamText ? `รายละเอียด: ${dreamText}` : ''}
+${seedHint}
+
+กฎเหล็ก — ทุก field ในคำตอบต้องคล้องจองและอ้างถึง "${focusSubject}" โดยตรง ห้ามตอบแบบกว้างหรือทั่วไป:
+- interpretation: เล่าเรื่องราวโหราศาสตร์ที่มี "${focusSubject}" เป็นแก่นกลาง 2-3 ประโยค
+- numberReason: อธิบายว่าทำไม "${focusSubject}" ถึงให้เลขนี้ โดยอ้างถึงลักษณะหรือความหมายของสัญลักษณ์นั้นๆ
+- safetyAdvice: คำแนะนำความปลอดภัยเฉพาะเรื่อง "${focusSubject}" เท่านั้น ไม่ใช่เรื่องอื่น
+- safetyFact: ข้อเท็จจริงความปลอดภัยที่เกี่ยวกับ "${focusSubject}" โดยตรง
+
+ตอบเป็น JSON เท่านั้น ห้ามมี markdown backticks:
 {
-  "interpretation": "คำพยากรณ์สไตล์โหราศาสตร์ลึกลับ 2-3 ประโยค",
+  "interpretation": "...",
   "number2d": "เลข 2 ตัว (00-99)",
   "number3d": "เลข 3 ตัว (000-999)",
-  "numberReason": "เหตุผลสั้นๆ ว่าทำไมถึงได้เลขนี้",
-  "safetyAdvice": "คำแนะนำความปลอดภัยที่เชื่อมกับสัญลักษณ์ (1-2 ประโยค)",
-  "safetyFact": "ข้อเท็จจริงด้านความปลอดภัยน่ารู้ 1 ประโยค",
-  "disclaimer": "ข้อความเตือนว่าการทำนายเพื่อความสนุกเท่านั้น ไม่ใช่การรับประกันผลลอตเตอรี่"
+  "numberReason": "...",
+  "safetyAdvice": "...",
+  "safetyFact": "...",
+  "disclaimer": "ข้อความเตือนสั้นๆ ว่าการทำนายเพื่อความสนุกเท่านั้น"
 }`;
 
         let result = null;
@@ -5971,18 +5985,20 @@ app.post('/api/lottery/dream-interpret', async (req, res) => {
             }
         }
 
-        // Fallback: generate static result if AI fails
+        // Fallback: generate static result if AI fails (use luckyDigit as seed when available)
         if (!result) {
-            const digits = String(Math.floor(Math.random() * 100)).padStart(2, '0');
-            const digits3 = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+            const base = luckyDigit ? parseInt(luckyDigit, 10) : Math.floor(Math.random() * 100);
+            const d2 = String(base % 100).padStart(2, '0');
+            const d3 = String((base * 7 + 13) % 1000).padStart(3, '0');
+            const subject = focusSubject || 'สัญลักษณ์ความปลอดภัย';
             result = {
-                interpretation: 'ดวงดาวกำลังเรียงตัว... อาจารย์รับรู้พลังงานของลูกศิษย์ สัญลักษณ์นี้บ่งบอกถึงความระมัดระวัง และโชคดีที่ซ่อนอยู่ในความปลอดภัย',
-                number2d: digits,
-                number3d: digits3,
-                numberReason: 'คำนวณจากพลังงานสัญลักษณ์และตำแหน่งดวงดาวประจำวัน',
-                safetyAdvice: 'จงสวมใส่อุปกรณ์ PPE ทุกครั้งก่อนปฏิบัติงาน เพราะความปลอดภัยคือโชคดีที่แท้จริง',
+                interpretation: `ดวงดาวแห่ง "${subject}" กำลังส่งพลังงานมายังท่าน อาจารย์รับรู้พลังงานนี้ชัดเจน สัญลักษณ์นี้บ่งบอกถึงการระมัดระวังและโชคดีที่ซ่อนอยู่ในความรับผิดชอบ`,
+                number2d: d2,
+                number3d: d3,
+                numberReason: `เลขนี้คำนวณจากพลังงานของ "${subject}" และตำแหน่งดวงดาวประจำวัน`,
+                safetyAdvice: `ให้ระมัดระวังเรื่อง "${subject}" เป็นพิเศษในวันนี้ เพราะความปลอดภัยคือโชคดีที่แท้จริง`,
                 safetyFact: 'อุบัติเหตุในโรงงาน 96% เกิดจากความประมาท ไม่ใช่โชคร้าย',
-                disclaimer: '⚠️ การพยากรณ์นี้เพื่อความสนุกและสร้างจิตสำนึกด้านความปลอดภัยเท่านั้น ไม่ใช่การรับประกันผลลอตเตอรี่ใดๆ',
+                disclaimer: '⚠️ การพยากรณ์นี้เพื่อความสนุกและสร้างจิตสำนึกด้านความปลอดภัยเท่านั้น',
                 fallback: true
             };
         }
