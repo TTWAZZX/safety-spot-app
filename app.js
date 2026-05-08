@@ -6125,21 +6125,21 @@ async function loadLotteryCurrentRound() {
         }
 
         if (!res || res.nextDrawDates) {
-            $('#lottery-round-label').text('ไม่มีงวดที่เปิดอยู่');
+            $('#lottery-round-label').text('ยังไม่มีงวดเปิด');
+            $('#lottery-countdown-bar').attr('class', 'lottery-countdown-bar lottery-countdown-info')
+                .html('<i class="fas fa-clock me-1"></i>รอประกาศงวดถัดไป');
+            // แสดง empty state ซ่อน form
+            $('#lottery-form-content').addClass('d-none');
+            $('#lottery-no-round-msg').removeClass('d-none');
             const nextDates = res?.nextDrawDates || [];
-            let nextHtml = 'ยังไม่มีงวด — Admin กำลังสร้างงวดใหม่';
-            if (nextDates.length) {
-                const fmtDates = nextDates.map(d => {
+            const cardsHtml = nextDates.length
+                ? nextDates.map(d => {
                     const dt = new Date(d + 'T00:00:00+07:00');
-                    return dt.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-                });
-                nextHtml = `<i class="fas fa-calendar-alt me-1"></i>งวดถัดไปคาดว่าจะเปิดรับ: ${fmtDates.join(' หรือ ')}`;
-            }
-            $('#lottery-countdown-bar').html(nextHtml);
-            $('#btn-lottery-buy').prop('disabled', true).text('ไม่มีงวดที่เปิดรับ');
-            $('#lottery-gold-claim').addClass('locked');
-            $('#lottery-gold-status').text('ยังไม่มีงวดให้รับตั๋วทอง');
-            $('#btn-claim-gold-ticket').prop('disabled', true).text('ล็อก');
+                    const label = dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+                    return `<div class="lottery-next-date-card"><i class="fas fa-calendar-day mb-1"></i><div class="fw-bold">${label}</div><small>งวดถัดไป</small></div>`;
+                }).join('')
+                : '<p class="text-muted small">Admin กำลังสร้างงวดใหม่</p>';
+            $('#lottery-next-dates-cards').html(cardsHtml);
             return;
         }
 
@@ -6149,8 +6149,13 @@ async function loadLotteryCurrentRound() {
         $('#lottery-round-banner').removeClass('d-none')
             .html(`<i class="fas fa-calendar-check me-2"></i>กำลังซื้องวดวันที่ <strong>${drawDateStr}</strong>`);
 
+        // แสดง form content ซ่อน empty state (กรณีที่เคย no-round มาก่อน)
+        $('#lottery-form-content').removeClass('d-none');
+        $('#lottery-no-round-msg').addClass('d-none');
+
         if (res.isClosed || res.status !== 'open') {
-            $('#lottery-countdown-bar').html('<i class="fas fa-lock me-1"></i>ปิดรับแล้ว — รอผลรางวัล');
+            $('#lottery-countdown-bar').attr('class', 'lottery-countdown-bar lottery-countdown-closed')
+                .html('<i class="fas fa-lock me-1"></i>ปิดรับแล้ว — รอประกาศผลรางวัล');
             $('#btn-lottery-buy').prop('disabled', true)
                 .html('<i class="fas fa-lock me-2"></i>ปิดรับแล้ว');
         } else {
@@ -6159,7 +6164,8 @@ async function loadLotteryCurrentRound() {
                 const now = Date.now();
                 const diff = closeAt - now;
                 if (diff <= 0) {
-                    $('#lottery-countdown-bar').html('<i class="fas fa-lock me-1"></i>ปิดรับแล้ว — รอผลรางวัล');
+                    $('#lottery-countdown-bar').attr('class', 'lottery-countdown-bar lottery-countdown-closed')
+                        .html('<i class="fas fa-lock me-1"></i>ปิดรับแล้ว — รอประกาศผลรางวัล');
                     $('#btn-lottery-buy').prop('disabled', true).html('<i class="fas fa-lock me-2"></i>ปิดรับแล้ว');
                     clearInterval(_lotteryCountdownInterval);
                     return;
@@ -6168,7 +6174,8 @@ async function loadLotteryCurrentRound() {
                 const h = Math.floor(totalSec / 3600);
                 const m = Math.floor((totalSec % 3600) / 60);
                 const s = totalSec % 60;
-                $('#lottery-countdown-bar').html(`<i class="fas fa-clock me-1"></i>ปิดรับใน ${h} ชม. ${m} นาที ${s} วินาที`);
+                $('#lottery-countdown-bar').attr('class', 'lottery-countdown-bar lottery-countdown-active')
+                    .html(`<i class="fas fa-clock me-1"></i>ปิดรับใน ${h} ชม. ${m} นาที ${s} วินาที`);
             }
             clearInterval(_lotteryCountdownInterval);
             updateLotteryCountdown();

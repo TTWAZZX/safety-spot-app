@@ -3081,13 +3081,63 @@ body {
 
 /* Countdown banner */
 .lottery-countdown-bar {
-    background: #fff8e1;
-    color: #c8830a;
     font-size: 0.85rem;
     font-weight: 600;
     text-align: center;
     padding: 8px 16px;
-    border-bottom: 1px solid #fde68a;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+}
+.lottery-countdown-bar.lottery-countdown-active {
+    background: #f0fdf4;
+    border-bottom-color: #bbf7d0;
+    color: #166534;
+}
+.lottery-countdown-bar.lottery-countdown-closed {
+    background: #f1f5f9;
+    border-bottom-color: #cbd5e1;
+    color: #64748b;
+}
+.lottery-countdown-bar.lottery-countdown-info {
+    background: #eff6ff;
+    border-bottom-color: #bfdbfe;
+    color: #1d4ed8;
+}
+.lottery-no-round-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+}
+.lottery-no-round-state .lottery-no-round-icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    opacity: 0.6;
+}
+.lottery-next-dates-grid {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.lottery-next-date-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 130px;
+    color: #334155;
+}
+.lottery-next-date-card i {
+    color: #06C755;
+    font-size: 1.2rem;
 }
 .lottery-disabled-state {
     min-height: 280px;

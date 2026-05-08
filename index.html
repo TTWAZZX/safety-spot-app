@@ -1862,91 +1862,99 @@
                         <div class="tab-pane fade show active" id="tab-buy">
                             <div id="lottery-buy-section">
                                 <div id="lottery-round-banner" class="lottery-round-banner d-none"></div>
-                                <div class="lottery-flow-steps mb-3">
-                                    <div class="lottery-flow-step active" id="lottery-step-number"><span>1</span><small>เลือกเลข</small></div>
-                                    <div class="lottery-flow-step" id="lottery-step-quiz"><span>2</span><small>Quiz</small></div>
-                                    <div class="lottery-flow-step" id="lottery-step-done"><span>3</span><small>สำเร็จ</small></div>
+
+                                <!-- Empty state — แสดงเมื่อไม่มีงวดเปิด -->
+                                <div id="lottery-no-round-msg" class="d-none lottery-no-round-state">
+                                    <div class="lottery-no-round-icon">🎰</div>
+                                    <h6 class="fw-bold mb-1">ยังไม่มีงวดที่เปิดรับ</h6>
+                                    <p class="text-muted small mb-3">ระบบจะเปิดรับตั๋วก่อนวันออกรางวัล</p>
+                                    <div id="lottery-next-dates-cards" class="lottery-next-dates-grid"></div>
                                 </div>
 
-                                <div class="lottery-purchase-summary mb-3">
-                                    <div>
-                                        <small>Coins</small>
-                                        <strong id="lottery-summary-coins">0</strong>
+                                <!-- Form content — ซ่อนเมื่อไม่มีงวด -->
+                                <div id="lottery-form-content">
+                                    <div class="lottery-flow-steps mb-3">
+                                        <div class="lottery-flow-step active" id="lottery-step-number"><span>1</span><small>เลือกเลข</small></div>
+                                        <div class="lottery-flow-step" id="lottery-step-quiz"><span>2</span><small>Quiz</small></div>
+                                        <div class="lottery-flow-step" id="lottery-step-done"><span>3</span><small>สำเร็จ</small></div>
                                     </div>
-                                    <div>
-                                        <small>Quota</small>
-                                        <strong id="lottery-summary-quota">0/5</strong>
-                                    </div>
-                                    <div>
-                                        <small>Price</small>
-                                        <strong id="lottery-summary-price">10</strong>
-                                    </div>
-                                </div>
 
-                                <!-- Daily quota info -->
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <small class="text-muted" id="lottery-daily-limit-text">
-                                        <i class="fas fa-info-circle me-1 text-primary"></i>
-                                        ซื้อได้สูงสุด 5 ใบ/วัน
-                                    </small>
-                                    <span class="badge bg-light text-dark border" id="lottery-daily-quota-badge">0/5 ใบวันนี้</span>
-                                </div>
-
-                                <!-- Gold Ticket claim -->
-                                <div class="lottery-gold-claim mb-3" id="lottery-gold-claim">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div class="lottery-gold-icon">🏆</div>
-                                        <div class="flex-grow-1">
-                                            <div class="fw-bold small">Gold Ticket</div>
-                                            <div class="small text-muted" id="lottery-gold-status">กำลังตรวจสอบสิทธิ์...</div>
+                                    <div class="lottery-purchase-summary mb-3">
+                                        <div>
+                                            <small>เหรียญ</small>
+                                            <strong id="lottery-summary-coins">0</strong>
                                         </div>
-                                        <button class="btn btn-warning btn-sm fw-bold" id="btn-claim-gold-ticket"
-                                                onclick="claimLotteryGoldTicket()" disabled>
-                                            รับฟรี
+                                        <div>
+                                            <small>จำกัด</small>
+                                            <strong id="lottery-summary-quota">0/5</strong>
+                                        </div>
+                                        <div>
+                                            <small>ราคา</small>
+                                            <strong id="lottery-summary-price">10</strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <small class="text-muted" id="lottery-daily-limit-text">
+                                            <i class="fas fa-info-circle me-1 text-primary"></i>
+                                            ซื้อได้สูงสุด 5 ใบ/วัน
+                                        </small>
+                                        <span class="badge bg-light text-dark border" id="lottery-daily-quota-badge">0/5 ใบวันนี้</span>
+                                    </div>
+
+                                    <div class="lottery-gold-claim mb-3" id="lottery-gold-claim">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="lottery-gold-icon">🏆</div>
+                                            <div class="flex-grow-1">
+                                                <div class="fw-bold small">Gold Ticket</div>
+                                                <div class="small text-muted" id="lottery-gold-status">กำลังตรวจสอบสิทธิ์...</div>
+                                            </div>
+                                            <button class="btn btn-warning btn-sm fw-bold" id="btn-claim-gold-ticket"
+                                                    onclick="claimLotteryGoldTicket()" disabled>
+                                                รับฟรี
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <div class="lottery-type-card active" id="type-two-card" onclick="selectLotteryType('two')">
+                                                <div class="lottery-type-icon">🟢</div>
+                                                <div class="lottery-type-name">2 ตัวท้าย</div>
+                                                <div class="lottery-type-price">10 เหรียญ</div>
+                                                <div class="lottery-type-prize">รางวัล 500 pts</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="lottery-type-card" id="type-three-card" onclick="selectLotteryType('three')">
+                                                <div class="lottery-type-icon">🔴</div>
+                                                <div class="lottery-type-name">3 ตัวท้าย</div>
+                                                <div class="lottery-type-price">30 เหรียญ</div>
+                                                <div class="lottery-type-prize">รางวัล 3,000 pts</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="lottery-number-input-area mb-3">
+                                        <label class="fw-semibold mb-2 d-block">
+                                            <i class="fas fa-ticket-alt me-1 text-success"></i>
+                                            เลือกเลข <span id="lottery-digit-hint" class="text-muted">(00-99)</span>
+                                        </label>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <input type="text" class="form-control form-control-lg lottery-number-input text-center fw-bold"
+                                                   id="lottery-number-input" maxlength="2" placeholder="00"
+                                                   inputmode="numeric" pattern="[0-9]*">
+                                            <button class="btn btn-outline-secondary btn-lg" onclick="randomLotteryNumber()" title="สุ่มเลข">
+                                                <i class="fas fa-dice"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="lottery-sticky-action">
+                                        <button class="btn btn-success w-100 fw-bold py-3 lottery-buy-btn" id="btn-lottery-buy" onclick="startLotteryQuiz()">
+                                            <i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety แล้วซื้อ
                                         </button>
                                     </div>
-                                </div>
-
-                                <!-- Type Selection -->
-                                <div class="row g-2 mb-3">
-                                    <div class="col-6">
-                                        <div class="lottery-type-card active" id="type-two-card" onclick="selectLotteryType('two')">
-                                            <div class="lottery-type-icon">🟢</div>
-                                            <div class="lottery-type-name">2 ตัวท้าย</div>
-                                            <div class="lottery-type-price">10 เหรียญ</div>
-                                            <div class="lottery-type-prize">รางวัล 500 pts</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="lottery-type-card" id="type-three-card" onclick="selectLotteryType('three')">
-                                            <div class="lottery-type-icon">🔴</div>
-                                            <div class="lottery-type-name">3 ตัวท้าย</div>
-                                            <div class="lottery-type-price">30 เหรียญ</div>
-                                            <div class="lottery-type-prize">รางวัล 3,000 pts</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Number Input -->
-                                <div class="lottery-number-input-area mb-3">
-                                    <label class="fw-semibold mb-2 d-block">
-                                        <i class="fas fa-hashtag me-1 text-success"></i>
-                                        เลือกเลข <span id="lottery-digit-hint" class="text-muted">(00-99)</span>
-                                    </label>
-                                    <div class="d-flex gap-2 align-items-center">
-                                        <input type="text" class="form-control form-control-lg lottery-number-input text-center fw-bold"
-                                               id="lottery-number-input" maxlength="2" placeholder="00"
-                                               inputmode="numeric" pattern="[0-9]*">
-                                        <button class="btn btn-outline-secondary btn-lg" onclick="randomLotteryNumber()" title="สุ่มเลข">
-                                            <i class="fas fa-dice"></i>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="lottery-sticky-action">
-                                    <button class="btn btn-success w-100 fw-bold py-3 lottery-buy-btn" id="btn-lottery-buy" onclick="startLotteryQuiz()">
-                                        <i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety แล้วซื้อ
-                                    </button>
                                 </div>
                             </div>
                         </div>
