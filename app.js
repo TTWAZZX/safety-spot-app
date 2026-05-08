@@ -1148,7 +1148,7 @@ async function loadAndShowActivityDetails(activityId, activityTitle, scrollToSub
     } catch (error) { 
         console.error("Error details from loadAndShowActivityDetails:", error); 
         container.html('<p class="text-center text-danger">ไม่สามารถโหลดข้อมูลรายงานได้</p>'); 
-    } finally { 
+    } finally {
         $('#submissions-loading').hide(); 
     }
 }
@@ -6413,14 +6413,16 @@ async function startLotteryQuiz() {
     AppState.allModals['lottery-quiz'] = quizModal;
     quizModal.show();
 
+    let quizLoaded = false;
     try {
         const res = await callApi('/api/lottery/quiz-question', { lineUserId: AppState.lineProfile.userId });
         _lotteryCurrentQuestion = res;
+        quizLoaded = true;
         renderLotteryQuiz(res);
     } catch (e) {
         $('#lottery-quiz-body').html(`<div class="alert alert-danger">${sanitizeHTML(e.message)}</div>`);
     } finally {
-        $btn.prop('disabled', false).html('<i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety แล้วซื้อ');
+        if (!quizLoaded) $btn.prop('disabled', false).html('<i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety แล้วซื้อ');
     }
 }
 
@@ -6499,6 +6501,7 @@ async function answerLotteryQuiz(selectedOption) {
         }
     } catch (e) {
         Swal.fire('Error', e.message, 'error');
+        $('.lottery-answer-btn').prop('disabled', false);
     }
 }
 
@@ -6574,6 +6577,9 @@ async function executeBuyTicket() {
         // เปิด tab ตั๋วของฉัน
         $('[data-bs-target="#tab-my-tickets"]').trigger('click');
     } catch (e) {
+        _lotteryLastQuizAnswerId = null;
+        $('#btn-lottery-buy').prop('disabled', false)
+            .html('<i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety ใหม่อีกครั้ง');
         Swal.fire({ icon: 'error', title: 'ซื้อไม่สำเร็จ', text: e.message, confirmButtonColor: '#06C755' });
     }
 }

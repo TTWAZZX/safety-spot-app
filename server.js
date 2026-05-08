@@ -4045,6 +4045,10 @@ db.query("ALTER TABLE users ADD COLUMN lotteryTotalWinnings INT DEFAULT 0").catc
 db.query("ALTER TABLE lottery_quiz_answers ADD COLUMN usedForTicketId INT DEFAULT NULL").catch(() => {});
 db.query("ALTER TABLE lottery_quiz_answers ADD INDEX idx_quiz_answers_used (usedForTicketId)").catch(() => {});
 db.query("ALTER TABLE lottery_rounds ADD COLUMN isTest BOOLEAN DEFAULT FALSE").catch(() => {});
+db.query("ALTER TABLE lottery_rounds ADD COLUMN prizeTwoSnapshot INT DEFAULT NULL").catch(() => {});
+db.query("ALTER TABLE lottery_rounds ADD COLUMN prizeThreeSnapshot INT DEFAULT NULL").catch(() => {});
+db.query("ALTER TABLE lottery_rounds ADD COLUMN priceTwoSnapshot INT DEFAULT NULL").catch(() => {});
+db.query("ALTER TABLE lottery_rounds ADD COLUMN priceThreeSnapshot INT DEFAULT NULL").catch(() => {});
 
 db.query(`CREATE TABLE IF NOT EXISTS lottery_rounds (
   roundId       VARCHAR(50) PRIMARY KEY,
@@ -4056,6 +4060,10 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_rounds (
   source        VARCHAR(50) DEFAULT 'manual',
   confirmedBy   VARCHAR(50) DEFAULT NULL,
   isTest        BOOLEAN     DEFAULT FALSE,
+  prizeTwoSnapshot INT      DEFAULT NULL,
+  prizeThreeSnapshot INT    DEFAULT NULL,
+  priceTwoSnapshot INT      DEFAULT NULL,
+  priceThreeSnapshot INT    DEFAULT NULL,
   createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_lottery_rounds_status (status),
   INDEX idx_lottery_rounds_date (drawDate)
@@ -4192,6 +4200,17 @@ async function getLotterySettings(conn = db) {
     };
 }
 
+async function getLotteryRoundPrizeSnapshot(round, conn = db) {
+    const settings = await getLotterySettings(conn);
+    return {
+        prizeTwo: Number(round?.prizeTwoSnapshot) || settings.prizeTwo,
+        prizeThree: Number(round?.prizeThreeSnapshot) || settings.prizeThree,
+        priceTwo: Number(round?.priceTwoSnapshot) || settings.priceTwo,
+        priceThree: Number(round?.priceThreeSnapshot) || settings.priceThree,
+        source: (round?.prizeTwoSnapshot && round?.prizeThreeSnapshot) ? 'round_snapshot' : 'current_settings'
+    };
+}
+
 async function ensureLotteryUserEnabled(conn = db) {
     const settings = await getLotterySettings(conn);
     if (!settings.userEnabled) {
@@ -4217,6 +4236,13 @@ async function isLotteryAdmin(lineUserId, conn = db) {
     if (!lineUserId) return false;
     const [[admin]] = await conn.query('SELECT 1 FROM admins WHERE lineUserId=?', [lineUserId]);
     return !!admin;
+}
+
+async function assertLotteryUserRequestOrAdmin(req, lineUserId, conn = db) {
+    const requesterId = req.body?.requesterId || req.query?.requesterId;
+    if (requesterId && requesterId === lineUserId) return;
+    if (await isLotteryAdmin(requesterId, conn)) return;
+    assertLotteryUserRequest(req, lineUserId);
 }
 
 async function pushLineFlexMessage(lineUserId, flexMessage, logLabel = 'LINE Push') {
@@ -4795,6 +4821,7 @@ app.get('/api/lottery/my-tickets', async (req, res) => {
 app.get('/api/lottery/results', async (req, res) => {
     const { lineUserId } = req.query;
     try {
+        if (lineUserId) await assertLotteryUserRequestOrAdmin(req, lineUserId);
         const [rounds] = await db.query(
             `SELECT r.roundId, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.last2, r.last3_front,
                     r.last3_back, r.status, r.source, r.confirmedBy, r.isTest, r.createdAt,
@@ -4828,7 +4855,7 @@ app.get('/api/lottery/results', async (req, res) => {
         }
 
         res.json({ status: 'success', data: rounds });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+    } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
 });
 
 // GET /api/lottery/stats — สถิติ
@@ -4956,11 +4983,26 @@ app.post('/api/admin/lottery/set-result', async (req, res) => {
             return res.status(400).json({ status: 'error', message: 'ข้อมูลไม่ครบ' });
         if (!/^\d{2}$/.test(last2)) return res.status(400).json({ status: 'error', message: 'รูปแบบ 2 ตัวท้ายไม่ถูกต้อง' });
         if (!/^\d{3}$/.test(last3_back)) return res.status(400).json({ status: 'error', message: 'รูปแบบ 3 ตัวท้ายไม่ถูกต้อง' });
+        if (last3_front && !/^\d{3}$/.test(last3_front)) return res.status(400).json({ status: 'error', message: 'รูปแบบ 3 ตัวหน้าไม่ถูกต้อง' });
 
-        await db.query(
-            `UPDATE lottery_rounds SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source='manual', confirmedBy=? WHERE roundId=?`,
+        const [[round]] = await db.query('SELECT status FROM lottery_rounds WHERE roundId=?', [roundId]);
+        if (!round) return res.status(404).json({ status: 'error', message: 'ไม่พบงวดนี้' });
+        if (round.status === 'completed') {
+            return res.status(400).json({ status: 'error', message: 'งวดนี้ประมวลผลเสร็จแล้ว แก้ไขผลไม่ได้' });
+        }
+        if (!['open', 'closed', 'pending_manual', 'pending_confirm'].includes(round.status)) {
+            return res.status(400).json({ status: 'error', message: 'สถานะงวดนี้ไม่พร้อมให้แก้ไขผล' });
+        }
+
+        const [updateResult] = await db.query(
+            `UPDATE lottery_rounds
+             SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source='manual', confirmedBy=?
+             WHERE roundId=? AND status IN ('open','closed','pending_manual','pending_confirm')`,
             [last2, last3_front || null, last3_back, requesterId, roundId]
         );
+        if (updateResult.affectedRows !== 1) {
+            return res.status(409).json({ status: 'error', message: 'สถานะงวดเปลี่ยนไประหว่างบันทึก กรุณาโหลดใหม่' });
+        }
         await logAdminAction(requesterId, 'LOTTERY_SET_RESULT', 'round', roundId, roundId, { last2, last3_back });
         res.json({ status: 'success', data: { message: 'บันทึกผลรางวัลแล้ว รอยืนยัน' } });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
@@ -5008,11 +5050,22 @@ app.post('/api/admin/lottery/confirm-result', async (req, res) => {
         if (!round) throw new Error('Lottery round not found');
         if (!round.last2 || !round.last3_back)
             throw new Error('Lottery result is incomplete');
+        if (round.status === 'completed')
+            return res.status(400).json({ status: 'error', message: 'งวดนี้ประมวลผลเสร็จแล้ว ยืนยันซ้ำไม่ได้' });
+        if (round.status !== 'pending_confirm')
+            return res.status(400).json({ status: 'error', message: 'ต้องบันทึกผลให้เป็นสถานะรอยืนยันก่อน' });
 
-        await db.query(
-            "UPDATE lottery_rounds SET status='confirmed', confirmedBy=? WHERE roundId=?",
-            [requesterId, roundId]
+        const settings = await getLotterySettings();
+        const [updateResult] = await db.query(
+            `UPDATE lottery_rounds
+             SET status='confirmed', confirmedBy=?,
+                 prizeTwoSnapshot=?, prizeThreeSnapshot=?, priceTwoSnapshot=?, priceThreeSnapshot=?
+             WHERE roundId=? AND status='pending_confirm'`,
+            [requesterId, settings.prizeTwo, settings.prizeThree, settings.priceTwo, settings.priceThree, roundId]
         );
+        if (updateResult.affectedRows !== 1) {
+            return res.status(409).json({ status: 'error', message: 'สถานะงวดเปลี่ยนไประหว่างยืนยัน กรุณาโหลดใหม่' });
+        }
         await logAdminAction(requesterId, 'LOTTERY_CONFIRM_RESULT', 'round', roundId, roundId, { last2: round.last2, last3_back: round.last3_back });
         res.json({ status: 'success', data: { message: 'ยืนยันผลเรียบร้อย พร้อมประมวลรางวัล' } });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
@@ -5031,7 +5084,7 @@ app.get('/api/admin/lottery/preview-winners', async (req, res) => {
         if (!round.last2 || !round.last3_back)
             return res.status(400).json({ status: 'error', message: 'ยังไม่ได้กรอกผลรางวัล' });
 
-        const settings = await getLotterySettings();
+        const prizeSnapshot = await getLotteryRoundPrizeSnapshot(round);
 
         const [win2] = await db.query(
             `SELECT t.ticketId, t.ticketType, t.number, t.isGoldTicket,
@@ -5054,13 +5107,21 @@ app.get('/api/admin/lottery/preview-winners', async (req, res) => {
             [roundId]);
 
         const winners = [
-            ...win2.map(w => ({ ...w, prize: settings.prizeTwo })),
-            ...win3.map(w => ({ ...w, prize: settings.prizeThree }))
+            ...win2.map(w => ({ ...w, prize: prizeSnapshot.prizeTwo })),
+            ...win3.map(w => ({ ...w, prize: prizeSnapshot.prizeThree }))
         ];
         const totalPrizesToPay = winners.reduce((s, w) => s + w.prize, 0);
 
         res.json({ status: 'success', data: {
-            round: { roundId: round.roundId, drawDate: toLotteryDateString(round.drawDate), last2: round.last2, last3_back: round.last3_back, status: round.status, isTest: !!round.isTest },
+            round: {
+                roundId: round.roundId,
+                drawDate: toLotteryDateString(round.drawDate),
+                last2: round.last2,
+                last3_back: round.last3_back,
+                status: round.status,
+                isTest: !!round.isTest,
+                prizeSnapshot
+            },
             winners, totalPrizesToPay,
             totalTickets: Number(totals?.totalTickets || 0),
             totalPlayers: Number(totals?.totalPlayers || 0)
@@ -5103,7 +5164,7 @@ app.post('/api/admin/lottery/process-prizes', async (req, res) => {
         let totalPrizes = 0;
         let paidWinners = 0;
 
-        const prizeSettings = await getLotterySettings(conn);
+        const prizeSettings = await getLotteryRoundPrizeSnapshot(round, conn);
         for (const ticket of allWinners) {
             const prize = ticket.ticketType === 'two' ? prizeSettings.prizeTwo : prizeSettings.prizeThree;
             const [ticketUpdate] = await conn.query(
@@ -5622,94 +5683,196 @@ app.post('/api/admin/lottery/auto-rounds', async (req, res) => {
 app.put('/api/admin/lottery/rounds/:roundId', async (req, res) => {
     const { roundId } = req.params;
     const { requesterId, drawDate } = req.body;
+    let conn;
     try {
         const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
         if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
         if (!drawDate || !/^\d{4}-\d{2}-\d{2}$/.test(drawDate))
             return res.status(400).json({ status: 'error', message: 'วันที่ไม่ถูกต้อง (YYYY-MM-DD)' });
-        const [[round]] = await db.query('SELECT status FROM lottery_rounds WHERE roundId=?', [roundId]);
-        if (!round) return res.status(404).json({ status: 'error', message: 'ไม่พบงวด' });
-        if (round.status !== 'open') return res.status(400).json({ status: 'error', message: 'แก้ไขวันที่ได้เฉพาะงวด open เท่านั้น' });
-        await db.query('UPDATE lottery_rounds SET drawDate=? WHERE roundId=?', [drawDate, roundId]);
-        await logAdminAction(requesterId, 'LOTTERY_EDIT_ROUND', 'round', roundId, drawDate, { oldId: roundId, newDate: drawDate });
-        res.json({ status: 'success', data: { roundId, drawDate } });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+
+        conn = await db.getClient();
+        await conn.beginTransaction();
+        const [[round]] = await conn.query('SELECT status FROM lottery_rounds WHERE roundId=? FOR UPDATE', [roundId]);
+        if (!round) {
+            const err = new Error('ไม่พบงวด');
+            err.statusCode = 404;
+            throw err;
+        }
+        if (round.status !== 'open') {
+            const err = new Error('แก้ไขวันที่ได้เฉพาะงวด open เท่านั้น');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const [[{ ticketCount }]] = await conn.query('SELECT COUNT(*) AS ticketCount FROM lottery_tickets WHERE roundId=?', [roundId]);
+        if (Number(ticketCount || 0) > 0) {
+            const err = new Error('แก้ไขวันที่ไม่ได้ เพราะงวดนี้มีตั๋วแล้ว');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (drawDate !== roundId) {
+            const [[existing]] = await conn.query('SELECT roundId FROM lottery_rounds WHERE roundId=?', [drawDate]);
+            if (existing) {
+                const err = new Error('มีงวดวันที่ใหม่นี้แล้ว');
+                err.statusCode = 400;
+                throw err;
+            }
+        }
+
+        await conn.query('UPDATE lottery_rounds SET roundId=?, drawDate=? WHERE roundId=?', [drawDate, drawDate, roundId]);
+        await conn.commit();
+
+        await logAdminAction(requesterId, 'LOTTERY_EDIT_ROUND', 'round', roundId, drawDate, { oldId: roundId, newDate: drawDate, newRoundId: drawDate });
+        res.json({ status: 'success', data: { roundId: drawDate, drawDate } });
+    } catch (e) {
+        if (conn) {
+            try { await conn.rollback(); } catch (_) {}
+        }
+        res.status(e.statusCode || 500).json({ status: 'error', message: e.message });
+    } finally {
+        if (conn) conn.release();
+    }
 });
 
 // DELETE /api/admin/lottery/rounds/:roundId — ลบงวด
 app.delete('/api/admin/lottery/rounds/:roundId', async (req, res) => {
     const { roundId } = req.params;
     const { requesterId } = req.body;
+    let conn;
     try {
         const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
         if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
-        const [[round]] = await db.query('SELECT isTest, status FROM lottery_rounds WHERE roundId=?', [roundId]);
-        if (!round) return res.status(404).json({ status: 'error', message: 'ไม่พบงวด' });
-        const [[{ cnt }]] = await db.query('SELECT COUNT(*) AS cnt FROM lottery_tickets WHERE roundId=?', [roundId]);
+
+        conn = await db.getClient();
+        await conn.beginTransaction();
+
+        const [[round]] = await conn.query('SELECT isTest, status FROM lottery_rounds WHERE roundId=? FOR UPDATE', [roundId]);
+        if (!round) {
+            const err = new Error('ไม่พบงวด');
+            err.statusCode = 404;
+            throw err;
+        }
+        const [[{ cnt }]] = await conn.query('SELECT COUNT(*) AS cnt FROM lottery_tickets WHERE roundId=?', [roundId]);
         if (cnt > 0 && !round.isTest)
-            return res.status(400).json({ status: 'error', message: `ลบไม่ได้ เพราะมีตั๋ว ${cnt} ใบในงวดนี้` });
-        await db.query('DELETE FROM lottery_tickets WHERE roundId=?', [roundId]);
-        await db.query('DELETE FROM lottery_results_history WHERE roundId=?', [roundId]);
-        await db.query('DELETE FROM lottery_rounds WHERE roundId=?', [roundId]);
+            throw Object.assign(new Error(`ลบไม่ได้ เพราะมีตั๋ว ${cnt} ใบในงวดนี้`), { statusCode: 400 });
+        await conn.query('DELETE FROM lottery_gold_ticket_claims WHERE roundId=?', [roundId]);
+        await conn.query(
+            'UPDATE lottery_quiz_answers SET usedForTicketId=NULL WHERE usedForTicketId IN (SELECT ticketId FROM lottery_tickets WHERE roundId=?)',
+            [roundId]
+        );
+        await conn.query('DELETE FROM lottery_tickets WHERE roundId=?', [roundId]);
+        await conn.query('DELETE FROM lottery_results_history WHERE roundId=?', [roundId]);
+        await conn.query('DELETE FROM lottery_rounds WHERE roundId=?', [roundId]);
+        await conn.commit();
+
         await logAdminAction(requesterId, 'LOTTERY_DELETE_ROUND', 'round', roundId, roundId, { wasTest: !!round.isTest });
         res.json({ status: 'success', data: { deleted: roundId } });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+    } catch (e) {
+        if (conn) {
+            try { await conn.rollback(); } catch (_) {}
+        }
+        res.status(e.statusCode || 500).json({ status: 'error', message: e.message });
+    } finally {
+        if (conn) conn.release();
+    }
 });
 
 // POST /api/admin/lottery/rounds/:roundId/reset-tickets — ลบตั๋วทั้งหมดในงวด ให้ user ซื้อใหม่ได้
 app.post('/api/admin/lottery/rounds/:roundId/reset-tickets', async (req, res) => {
     const { roundId } = req.params;
     const { requesterId } = req.body;
+    let conn;
     try {
         const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
         if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
 
-        const [[round]] = await db.query(
-            `SELECT roundId, DATE_FORMAT(drawDate,'%Y-%m-%d') AS drawDate, status, isTest FROM lottery_rounds WHERE roundId=?`,
+        conn = await db.getClient();
+        await conn.beginTransaction();
+
+        const [[round]] = await conn.query(
+            `SELECT roundId, DATE_FORMAT(drawDate,'%Y-%m-%d') AS drawDate, status, isTest
+             FROM lottery_rounds WHERE roundId=? FOR UPDATE`,
             [roundId]
         );
-        if (!round) return res.status(404).json({ status: 'error', message: 'ไม่พบงวด' });
-        if (['confirmed', 'completed'].includes(round.status))
-            return res.status(400).json({ status: 'error', message: 'งวดนี้ยืนยันผลแล้ว รีเซตไม่ได้' });
+        if (!round) {
+            const err = new Error('ไม่พบงวด');
+            err.statusCode = 404;
+            throw err;
+        }
+        if (['confirmed', 'completed'].includes(round.status)) {
+            const err = new Error('งวดนี้ยืนยันผลแล้ว รีเซตไม่ได้');
+            err.statusCode = 400;
+            throw err;
+        }
 
-        const [[{ ticketCount }]] = await db.query('SELECT COUNT(*) AS ticketCount FROM lottery_tickets WHERE roundId=?', [roundId]);
+        const [[{ ticketCount }]] = await conn.query('SELECT COUNT(*) AS ticketCount FROM lottery_tickets WHERE roundId=?', [roundId]);
 
         // lottery_daily_purchases has no roundId — count/delete by affected users
-        const [affectedRows] = await db.query('SELECT DISTINCT lineUserId FROM lottery_tickets WHERE roundId=?', [roundId]);
-        const affectedIds = affectedRows.map(r => r.lineUserId);
+        const [affectedRows] = await conn.query('SELECT lineUserId FROM lottery_tickets WHERE roundId=? FOR UPDATE', [roundId]);
+        const affectedIds = [...new Set(affectedRows.map(r => r.lineUserId))];
 
         // lottery_quiz_answers has no roundId — count by usedForTicketId linkage
-        const [[{ quizCount }]] = await db.query(
+        const [[{ quizCount }]] = await conn.query(
             `SELECT COUNT(*) AS quizCount FROM lottery_quiz_answers
              WHERE usedForTicketId IN (SELECT ticketId FROM lottery_tickets WHERE roundId=?)`,
             [roundId]
         );
 
         // Reset quiz answer links BEFORE deleting tickets (no FK but keeps answers reusable)
-        await db.query(
+        await conn.query(
             `UPDATE lottery_quiz_answers SET usedForTicketId=NULL
              WHERE usedForTicketId IN (SELECT ticketId FROM lottery_tickets WHERE roundId=?)`,
             [roundId]
         );
 
         // Remove gold ticket claims BEFORE deleting tickets (FK: claims.ticketId → tickets.ticketId)
-        await db.query('DELETE FROM lottery_gold_ticket_claims WHERE roundId=?', [roundId]);
+        await conn.query('DELETE FROM lottery_gold_ticket_claims WHERE roundId=?', [roundId]);
 
         // Delete tickets
-        await db.query('DELETE FROM lottery_tickets WHERE roundId=?', [roundId]);
+        await conn.query('DELETE FROM lottery_tickets WHERE roundId=?', [roundId]);
 
-        // Reset daily purchase quotas for affected users so they can buy again today
-        const purchaseCount = affectedIds.length;
-        if (affectedIds.length > 0) {
-            const ph = affectedIds.map(() => '?').join(',');
-            await db.query(`DELETE FROM lottery_daily_purchases WHERE lineUserId IN (${ph})`, affectedIds);
+        // Recalculate today's quota rows from remaining tickets instead of deleting all user quota.
+        let purchaseCount = 0;
+        const todayTH = getBangkokDateString();
+        for (const lineUserId of affectedIds) {
+            const [[{ remainingToday }]] = await conn.query(
+                `SELECT COUNT(*) AS remainingToday
+                 FROM lottery_tickets
+                 WHERE lineUserId=?
+                   AND DATE(CONVERT_TZ(purchasedAt,'+00:00','+07:00'))=?`,
+                [lineUserId, todayTH]
+            );
+            const remaining = Number(remainingToday || 0);
+            if (remaining > 0) {
+                await conn.query(
+                    `INSERT INTO lottery_daily_purchases (lineUserId, purchaseDate, count) VALUES (?,?,?)
+                     ON DUPLICATE KEY UPDATE count=VALUES(count)`,
+                    [lineUserId, todayTH, remaining]
+                );
+            } else {
+                await conn.query(
+                    `DELETE FROM lottery_daily_purchases WHERE lineUserId=? AND purchaseDate=?`,
+                    [lineUserId, todayTH]
+                );
+            }
+            purchaseCount += 1;
         }
+
+        await conn.commit();
 
         await logAdminAction(requesterId, 'LOTTERY_RESET_TICKETS', 'round', roundId, round.drawDate,
             { ticketCount, purchaseCount, quizCount, isTest: !!round.isTest });
 
         res.json({ status: 'success', data: { ticketCount, purchaseCount, quizCount } });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+    } catch (e) {
+        if (conn) {
+            try { await conn.rollback(); } catch (_) {}
+        }
+        res.status(e.statusCode || 500).json({ status: 'error', message: e.message });
+    } finally {
+        if (conn) conn.release();
+    }
 });
 
 // GET /api/admin/lottery/preview-auto-rounds — Preview dates before auto-creating rounds
@@ -5817,6 +5980,25 @@ app.post('/api/admin/lottery/broadcast-new-round', async (req, res) => {
 // Startup: ensure lottery_dream_logs table exists (safety_dream_items created manually by admin)
 // lottery_dream_logs uses dreamItemId VARCHAR(20) to reference safety_dream_items.dreamId
 
+db.query(`CREATE TABLE IF NOT EXISTS safety_dream_items (
+    dreamId     VARCHAR(20)  PRIMARY KEY,
+    category    VARCHAR(50)  NOT NULL DEFAULT 'ppe',
+    itemName    VARCHAR(120) NOT NULL,
+    itemIcon    VARCHAR(20)  DEFAULT '🔹',
+    number2d    VARCHAR(2)   NOT NULL DEFAULT '00',
+    number3d    VARCHAR(3)   NOT NULL DEFAULT '000',
+    safetyFact  TEXT,
+    promptHint  TEXT,
+    isActive    BOOLEAN      DEFAULT TRUE,
+    createdAt   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updatedAt   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_dream_items_category (category, isActive)
+)`).catch(() => {});
+db.query("ALTER TABLE safety_dream_items ADD COLUMN isActive BOOLEAN DEFAULT TRUE").catch(() => {});
+db.query("ALTER TABLE safety_dream_items ADD COLUMN createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP").catch(() => {});
+db.query("ALTER TABLE safety_dream_items ADD COLUMN updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP").catch(() => {});
+db.query("ALTER TABLE safety_dream_items ADD INDEX idx_dream_items_category (category, isActive)").catch(() => {});
+
 db.query(`CREATE TABLE IF NOT EXISTS lottery_dream_logs (
     logId        VARCHAR(50)  PRIMARY KEY,
     lineUserId   VARCHAR(60)  NOT NULL,
@@ -5834,6 +6016,12 @@ db.query(`SELECT COUNT(*) AS cnt FROM information_schema.columns
       if (cnt) return;
       return db.query('ALTER TABLE lottery_dream_logs ADD COLUMN dreamItemId VARCHAR(20) DEFAULT NULL');
   }).catch(() => {});
+db.query(`SELECT COUNT(*) AS cnt FROM information_schema.columns
+  WHERE table_schema=DATABASE() AND table_name='lottery_dream_logs' AND column_name='result'`)
+  .then(([[{ cnt }]]) => {
+      if (cnt) return;
+      return db.query('ALTER TABLE lottery_dream_logs ADD COLUMN result JSON');
+  }).catch(() => {});
 
 const JOHNNY_SYSTEM_PROMPT = `คุณคือ "ท่านอาจารย์จอห์นนี่" — นักพยากรณ์โหราศาสตร์ลึกลับแห่งอาณาจักรความปลอดภัย
 บุคลิก: พูดด้วยน้ำเสียงลึกลับ ศักดิ์สิทธิ์ มีความเมตตา แต่แฝงด้วยอารมณ์ขันเล็กน้อย
@@ -5841,11 +6029,73 @@ const JOHNNY_SYSTEM_PROMPT = `คุณคือ "ท่านอาจารย
 เชี่ยวชาญ: โยงสัญลักษณ์ความฝัน/สัญลักษณ์ความปลอดภัยเข้ากับตัวเลขมงคล + คำแนะนำความปลอดภัยที่ปฏิบัติได้จริง
 ข้อห้าม: ห้ามรับประกันผลลอตเตอรี่ ต้องใส่ข้อความเตือนว่าการทำนายเพื่อความสนุกเท่านั้น`;
 
+const DREAM_CATEGORIES = new Set(['ppe', 'fire', 'electrical', 'chemical', 'height', 'machine', 'road']);
+
+function parseDreamResult(raw) {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw;
+    try { return JSON.parse(raw); } catch (_) { return null; }
+}
+
+function normalizeDreamNumber(value, digits) {
+    const text = String(value || '').replace(/\D/g, '');
+    if (!text) return null;
+    return text.padStart(digits, '0').slice(-digits);
+}
+
+function normalizeDreamResult(result, fallback2d = null, fallback3d = null) {
+    const safe = result && typeof result === 'object' ? result : {};
+    const number2d = normalizeDreamNumber(safe.number2d, 2) || normalizeDreamNumber(fallback2d, 2) || String(Math.floor(Math.random() * 100)).padStart(2, '0');
+    const number3d = normalizeDreamNumber(safe.number3d, 3) || normalizeDreamNumber(fallback3d, 3) || String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+    return {
+        interpretation: String(safe.interpretation || '').slice(0, 1200),
+        number2d,
+        number3d,
+        numberReason: String(safe.numberReason || '').slice(0, 600),
+        safetyAdvice: String(safe.safetyAdvice || '').slice(0, 800),
+        safetyFact: String(safe.safetyFact || '').slice(0, 800),
+        disclaimer: String(safe.disclaimer || 'การพยากรณ์นี้เพื่อความสนุกและสร้างจิตสำนึกด้านความปลอดภัยเท่านั้น').slice(0, 300),
+        ...(safe.cached ? { cached: true } : {}),
+        ...(safe.fallback ? { fallback: true } : {})
+    };
+}
+
+function validateDreamItemPayload({ dreamId, category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint }, { requireId = false } = {}) {
+    const id = String(dreamId || '').trim();
+    const name = String(itemName || '').trim();
+    const cat = String(category || 'ppe').trim();
+    if (requireId && !/^[A-Za-z0-9_-]{1,20}$/.test(id)) {
+        const err = new Error('Dream ID ต้องเป็น A-Z, 0-9, _ หรือ - และยาวไม่เกิน 20 ตัว');
+        err.statusCode = 400;
+        throw err;
+    }
+    if (!name || name.length > 120) {
+        const err = new Error('itemName จำเป็นและต้องยาวไม่เกิน 120 ตัวอักษร');
+        err.statusCode = 400;
+        throw err;
+    }
+    if (!DREAM_CATEGORIES.has(cat)) {
+        const err = new Error('category ไม่ถูกต้อง');
+        err.statusCode = 400;
+        throw err;
+    }
+    return {
+        dreamId: id,
+        category: cat,
+        itemName: name,
+        itemIcon: String(itemIcon || '🔹').trim().slice(0, 20) || '🔹',
+        number2d: normalizeDreamNumber(number2d, 2) || '00',
+        number3d: normalizeDreamNumber(number3d, 3) || '000',
+        safetyFact: String(safetyFact || '').trim().slice(0, 1000),
+        promptHint: String(promptHint || '').trim().slice(0, 1000)
+    };
+}
+
 // GET /api/lottery/dream-items — รายการสัญลักษณ์ (ใช้ schema จริง: dreamId, itemIcon, number2d, number3d)
 app.get('/api/lottery/dream-items', async (req, res) => {
     try {
         const [rows] = await db.query(
-            'SELECT dreamId, category, itemName, itemIcon, number2d, number3d FROM safety_dream_items ORDER BY category, dreamId'
+            'SELECT dreamId, category, itemName, itemIcon, number2d, number3d FROM safety_dream_items WHERE COALESCE(isActive, TRUE)=TRUE ORDER BY category, dreamId'
         );
         const grouped = {};
         const categoryLabels = { ppe: 'อุปกรณ์ PPE', fire: 'ไฟ/เพลิงไหม้', electrical: 'ไฟฟ้า', chemical: 'สารเคมี', height: 'งานที่สูง', machine: 'เครื่องจักร', road: 'ยานพาหนะ' };
@@ -5862,6 +6112,7 @@ app.get('/api/lottery/dream-today', async (req, res) => {
     const { lineUserId } = req.query;
     if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
     try {
+        await assertLotteryUserRequestOrAdmin(req, lineUserId);
         const today = getBangkokDateString();
         const [[log]] = await db.query(
             `SELECT logId, result, createdAt FROM lottery_dream_logs
@@ -5869,16 +6120,22 @@ app.get('/api/lottery/dream-today', async (req, res) => {
              ORDER BY createdAt DESC LIMIT 1`,
             [lineUserId, today]
         );
+        if (log) log.result = normalizeDreamResult(parseDreamResult(log.result));
         res.json({ status: 'success', data: { hasToday: !!log, log: log || null } });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+    } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
 });
 
 // POST /api/lottery/dream-interpret — ท่านอาจารย์จอห์นนี่พยากรณ์
 app.post('/api/lottery/dream-interpret', async (req, res) => {
-    const { lineUserId, dreamText, itemId, requesterId } = req.body;
+    const { lineUserId, itemId, requesterId } = req.body;
+    const dreamText = String(req.body.dreamText || '').trim().slice(0, 300);
     if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
     if (!dreamText && !itemId) return res.status(400).json({ status: 'error', message: 'dreamText หรือ itemId ต้องระบุอย่างน้อยหนึ่งอย่าง' });
+    const dreamLockName = `lottery_dream:${lineUserId}:${getBangkokDateString()}`;
+    let lockConn = null;
+    let lockAcquired = false;
     try {
+        await assertLotteryUserRequestOrAdmin(req, lineUserId);
         // Admin bypass: แอดมินทำนายได้ไม่จำกัดครั้ง (สำหรับทดสอบ)
         let isAdminCaller = false;
         if (requesterId) {
@@ -5886,32 +6143,47 @@ app.post('/api/lottery/dream-interpret', async (req, res) => {
             isAdminCaller = !!adminRow;
         }
 
+        if (!isAdminCaller) {
+            lockConn = await db.getClient();
+            const [[lockRow]] = await lockConn.query('SELECT GET_LOCK(?, 5) AS gotLock', [dreamLockName]);
+            lockAcquired = Number(lockRow?.gotLock || 0) === 1;
+            if (!lockAcquired) {
+                const err = new Error('ระบบกำลังประมวลผลคำพยากรณ์ก่อนหน้า กรุณาลองอีกครั้ง');
+                err.statusCode = 429;
+                throw err;
+            }
+        }
+        const queryConn = lockConn || db;
+
         // Rate limit: 1 ครั้ง/วัน/user (ข้ามสำหรับแอดมิน)
         const today = getBangkokDateString();
-        const [[existing]] = await db.query(
+        const [[existing]] = await queryConn.query(
             `SELECT logId, result FROM lottery_dream_logs
              WHERE lineUserId=? AND DATE(CONVERT_TZ(createdAt,'+00:00','+07:00'))=?
              ORDER BY createdAt DESC LIMIT 1`,
             [lineUserId, today]
         );
         if (!isAdminCaller && existing) {
-            return res.json({ status: 'success', data: { ...existing.result, cached: true } });
+            return res.json({ status: 'success', data: normalizeDreamResult({ ...(parseDreamResult(existing.result) || {}), cached: true }) });
         }
 
         // Build context for AI — ใช้ schema จริง: dreamId (string), number2d, number3d, promptHint, safetyFact
         let itemName = null, item2d = null, item3d = null, itemPromptHint = null, itemSafetyFact = null;
         if (itemId) {
-            const [[item]] = await db.query(
-                'SELECT itemName, number2d, number3d, promptHint, safetyFact FROM safety_dream_items WHERE dreamId=?',
+            const [[item]] = await queryConn.query(
+                'SELECT itemName, number2d, number3d, promptHint, safetyFact FROM safety_dream_items WHERE dreamId=? AND COALESCE(isActive, TRUE)=TRUE',
                 [itemId]
             );
-            if (item) {
-                itemName = item.itemName;
-                item2d = item.number2d;
-                item3d = item.number3d;
-                itemPromptHint = item.promptHint;
-                itemSafetyFact = item.safetyFact;
+            if (!item) {
+                const err = new Error('ไม่พบสัญลักษณ์ที่เลือก');
+                err.statusCode = 400;
+                throw err;
             }
+            itemName = item.itemName;
+            item2d = item.number2d;
+            item3d = item.number3d;
+            itemPromptHint = item.promptHint;
+            itemSafetyFact = item.safetyFact;
         }
 
         // Focus subject: symbol name, dream text, or both
@@ -5960,7 +6232,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                 );
                 let rawText = geminiRes.data.candidates[0].content.parts[0].text;
                 rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-                result = JSON.parse(rawText);
+                result = normalizeDreamResult(JSON.parse(rawText), item2d, item3d);
                 break;
             } catch (aiErr) {
                 lastErr = aiErr;
@@ -5982,16 +6254,26 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                 fallback: true
             };
         }
+        result = normalizeDreamResult(result, item2d, item3d);
 
         // Save log (dreamItemId = dreamId string reference)
         const logId = 'DREAM' + uuidv4();
-        await db.query(
+        await queryConn.query(
             'INSERT INTO lottery_dream_logs (logId, lineUserId, dreamText, dreamItemId, result) VALUES (?,?,?,?,?)',
             [logId, lineUserId, dreamText || null, itemId || null, JSON.stringify(result)]
         );
 
         res.json({ status: 'success', data: result });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+    } catch (e) {
+        res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code });
+    } finally {
+        if (lockConn) {
+            if (lockAcquired) {
+                try { await lockConn.query('SELECT RELEASE_LOCK(?)', [dreamLockName]); } catch (_) {}
+            }
+            lockConn.release();
+        }
+    }
 });
 
 // POST /api/admin/lottery/dream-items/generate — AI สร้างสัญลักษณ์ใหม่โดยไม่ซ้ำของเดิม
@@ -6054,13 +6336,14 @@ app.post('/api/admin/lottery/dream-items/generate', isAdmin, async (req, res) =>
             nextAiNum++;
             const n2 = String(item.number2d || '00').replace(/\D/g, '').padStart(2, '0').slice(-2);
             const n3 = String(item.number3d || '000').replace(/\D/g, '').padStart(3, '0').slice(-3);
+            const category = DREAM_CATEGORIES.has(item.category) ? item.category : 'ppe';
             try {
                 await db.query(
                     `INSERT INTO safety_dream_items (dreamId, category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [dreamId, item.category || 'ppe', item.itemName, item.itemIcon || '🔹', n2, n3, item.safetyFact || '', item.promptHint || '']
+                    [dreamId, category, String(item.itemName).slice(0, 120), String(item.itemIcon || '🔹').slice(0, 20), n2, n3, String(item.safetyFact || '').slice(0, 1000), String(item.promptHint || '').slice(0, 1000)]
                 );
-                inserted.push({ dreamId, category: item.category, itemName: item.itemName, itemIcon: item.itemIcon, number2d: n2, number3d: n3 });
+                inserted.push({ dreamId, category, itemName: item.itemName, itemIcon: item.itemIcon, number2d: n2, number3d: n3 });
             } catch (_) { /* skip if dreamId collision */ }
         }
 
@@ -6070,43 +6353,38 @@ app.post('/api/admin/lottery/dream-items/generate', isAdmin, async (req, res) =>
 
 // POST /api/admin/lottery/dream-items — เพิ่มสัญลักษณ์เอง (manual)
 app.post('/api/admin/lottery/dream-items', isAdmin, async (req, res) => {
-    const { dreamId, category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint } = req.body;
-    if (!dreamId || !itemName) return res.status(400).json({ status: 'error', message: 'dreamId และ itemName จำเป็น' });
-    const n2 = String(number2d || '00').replace(/\D/g, '').padStart(2, '0').slice(-2);
-    const n3 = String(number3d || '000').replace(/\D/g, '').padStart(3, '0').slice(-3);
     try {
+        const v = validateDreamItemPayload(req.body, { requireId: true });
         await db.query(
-            `INSERT INTO safety_dream_items (dreamId, category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [dreamId.trim(), category || 'ppe', itemName.trim(), itemIcon || '🔹', n2, n3, safetyFact || '', promptHint || '']
+            `INSERT INTO safety_dream_items (dreamId, category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint, isActive)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+            [v.dreamId, v.category, v.itemName, v.itemIcon, v.number2d, v.number3d, v.safetyFact, v.promptHint]
         );
         res.json({ status: 'success' });
     } catch (e) {
-        if (e.code === 'ER_DUP_ENTRY') return res.status(409).json({ status: 'error', message: `dreamId "${dreamId}" มีอยู่แล้ว` });
-        res.status(500).json({ status: 'error', message: e.message });
+        if (e.code === 'ER_DUP_ENTRY') return res.status(409).json({ status: 'error', message: `dreamId "${req.body.dreamId}" มีอยู่แล้ว` });
+        res.status(e.statusCode || 500).json({ status: 'error', message: e.message });
     }
 });
 
 // PUT /api/admin/lottery/dream-items/:dreamId — แก้ไขสัญลักษณ์
 app.put('/api/admin/lottery/dream-items/:dreamId', isAdmin, async (req, res) => {
     const { dreamId } = req.params;
-    const { category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint } = req.body;
-    if (!itemName) return res.status(400).json({ status: 'error', message: 'itemName จำเป็น' });
-    const n2 = String(number2d || '00').replace(/\D/g, '').padStart(2, '0').slice(-2);
-    const n3 = String(number3d || '000').replace(/\D/g, '').padStart(3, '0').slice(-3);
     try {
-        await db.query(
+        const v = validateDreamItemPayload(req.body);
+        const [result] = await db.query(
             `UPDATE safety_dream_items SET category=?, itemName=?, itemIcon=?, number2d=?, number3d=?, safetyFact=?, promptHint=? WHERE dreamId=?`,
-            [category || 'ppe', itemName.trim(), itemIcon || '🔹', n2, n3, safetyFact || '', promptHint || '', dreamId]
+            [v.category, v.itemName, v.itemIcon, v.number2d, v.number3d, v.safetyFact, v.promptHint, dreamId]
         );
+        if (result.affectedRows !== 1) return res.status(404).json({ status: 'error', message: 'ไม่พบสัญลักษณ์' });
         res.json({ status: 'success' });
-    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+    } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message }); }
 });
 
 // GET /api/admin/lottery/dream-items — list all with full details for admin
 app.get('/api/admin/lottery/dream-items', isAdmin, async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM safety_dream_items ORDER BY category, dreamId');
+        const [rows] = await db.query('SELECT * FROM safety_dream_items WHERE COALESCE(isActive, TRUE)=TRUE ORDER BY category, dreamId');
         res.json({ status: 'success', data: rows });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
@@ -6115,7 +6393,8 @@ app.get('/api/admin/lottery/dream-items', isAdmin, async (req, res) => {
 app.delete('/api/admin/lottery/dream-items/:dreamId', isAdmin, async (req, res) => {
     const { dreamId } = req.params;
     try {
-        await db.query('DELETE FROM safety_dream_items WHERE dreamId=?', [dreamId]);
+        const [result] = await db.query('UPDATE safety_dream_items SET isActive=FALSE WHERE dreamId=?', [dreamId]);
+        if (result.affectedRows !== 1) return res.status(404).json({ status: 'error', message: 'ไม่พบสัญลักษณ์' });
         res.json({ status: 'success' });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });

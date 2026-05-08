@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS lottery_rounds (
   source        VARCHAR(50) DEFAULT 'manual',
   confirmedBy   VARCHAR(50) DEFAULT NULL,
   isTest        BOOLEAN     DEFAULT FALSE,
+  prizeTwoSnapshot INT      DEFAULT NULL,
+  prizeThreeSnapshot INT    DEFAULT NULL,
+  priceTwoSnapshot INT      DEFAULT NULL,
+  priceThreeSnapshot INT    DEFAULT NULL,
   createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_lottery_rounds_status (status),
   INDEX idx_lottery_rounds_date (drawDate)
@@ -23,6 +27,10 @@ CREATE TABLE IF NOT EXISTS lottery_rounds (
 -- server.js has a startup migration for this column.
 -- If you apply SQL manually, run the next line only when the column is absent.
 -- ALTER TABLE lottery_rounds ADD COLUMN isTest BOOLEAN DEFAULT FALSE;
+-- ALTER TABLE lottery_rounds ADD COLUMN prizeTwoSnapshot INT DEFAULT NULL;
+-- ALTER TABLE lottery_rounds ADD COLUMN prizeThreeSnapshot INT DEFAULT NULL;
+-- ALTER TABLE lottery_rounds ADD COLUMN priceTwoSnapshot INT DEFAULT NULL;
+-- ALTER TABLE lottery_rounds ADD COLUMN priceThreeSnapshot INT DEFAULT NULL;
 
 -- 2. lottery_tickets — ตั๋วที่ซื้อ
 CREATE TABLE IF NOT EXISTS lottery_tickets (
@@ -124,6 +132,42 @@ CREATE TABLE IF NOT EXISTS lottery_results_history (
   FOREIGN KEY (roundId) REFERENCES lottery_rounds(roundId),
   UNIQUE KEY uq_results_round (roundId)
 );
+
+-- 6.1 safety_dream_items — สัญลักษณ์ของท่านอาจารย์จอห์นนี่
+CREATE TABLE IF NOT EXISTS safety_dream_items (
+  dreamId     VARCHAR(20)  PRIMARY KEY,
+  category    VARCHAR(50)  NOT NULL DEFAULT 'ppe',
+  itemName    VARCHAR(120) NOT NULL,
+  itemIcon    VARCHAR(20)  DEFAULT '🔹',
+  number2d    VARCHAR(2)   NOT NULL DEFAULT '00',
+  number3d    VARCHAR(3)   NOT NULL DEFAULT '000',
+  safetyFact  TEXT,
+  promptHint  TEXT,
+  isActive    BOOLEAN      DEFAULT TRUE,
+  createdAt   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  updatedAt   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_dream_items_category (category, isActive)
+);
+
+-- Existing installs may need:
+-- ALTER TABLE safety_dream_items ADD COLUMN isActive BOOLEAN DEFAULT TRUE;
+-- ALTER TABLE safety_dream_items ADD COLUMN createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+-- ALTER TABLE safety_dream_items ADD COLUMN updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+-- ALTER TABLE safety_dream_items ADD INDEX idx_dream_items_category (category, isActive);
+
+CREATE TABLE IF NOT EXISTS lottery_dream_logs (
+  logId       VARCHAR(50) PRIMARY KEY,
+  lineUserId  VARCHAR(60) NOT NULL,
+  dreamText   TEXT,
+  dreamItemId VARCHAR(20) DEFAULT NULL,
+  result      JSON,
+  createdAt   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_dream_user_date (lineUserId, createdAt)
+);
+
+-- Existing installs may need:
+-- ALTER TABLE lottery_dream_logs ADD COLUMN dreamItemId VARCHAR(20) DEFAULT NULL;
+-- ALTER TABLE lottery_dream_logs ADD COLUMN result JSON;
 
 -- 7. เพิ่ม columns ในตาราง users
 SET @add_lottery_win_count = (

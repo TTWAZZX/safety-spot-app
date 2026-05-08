@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "smoke:lottery": "node scripts/lottery-smoke-check.js",
+    "smoke:lottery:dream": "node -e \"process.env.SMOKE_DREAM='1'; require('./scripts/lottery-smoke-check.js')\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.927.0",

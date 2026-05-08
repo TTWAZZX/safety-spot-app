@@ -217,6 +217,9 @@ fireConfetti('big')      // 3 bursts
   - confirm result
   - process prizes and LINE Push winner notifications
 - If scheduled AI result fetch fails after retries, admins receive in-app notification and LINE Push alert, and the round becomes `pending_manual`
+- Result confirmation is state-guarded: completed rounds cannot be edited/reconfirmed, and confirm only works from `pending_confirm`
+- Confirmed rounds snapshot prize/price settings into `lottery_rounds` so later admin setting changes do not change an already confirmed payout
+- Reset tickets is transaction-safe: it unlinks quiz answers, removes gold-ticket claims before tickets, and recalculates affected users' daily quota from remaining tickets today
 
 ### Safety Lottery — Round Management (Admin)
 - **สร้างงวด**: Manual จาก admin panel หรือ auto-cron 08:00 BKK สร้างงวดล่วงหน้า 3 วันก่อน 1/16 ของเดือน
@@ -249,6 +252,12 @@ promptHint  TEXT                       -- คำใบ้ให้ AI ทำน�
 ```
 ⚠️ **อย่าใช้ `itemId` หรือ `luckyDigit`** — ไม่มีคอลัมน์นี้ ใช้ `dreamId`, `number2d`, `number3d`
 
+Current production-safe schema additions:
+- `category VARCHAR(50)`, `itemName VARCHAR(120)`, `itemIcon VARCHAR(20)`, `number2d VARCHAR(2)`, `number3d VARCHAR(3)`
+- `isActive BOOLEAN DEFAULT TRUE`, `createdAt TIMESTAMP`, `updatedAt TIMESTAMP`
+- `idx_dream_items_category (category, isActive)`
+- Admin delete is a soft delete (`isActive=FALSE`), and user/admin lists only show active symbols
+
 #### Table — lottery_dream_logs
 ```sql
 logId        VARCHAR(50)  PRIMARY KEY
@@ -258,6 +267,8 @@ dreamItemId  VARCHAR(20)  -- FK ref safety_dream_items.dreamId (no hard FK const
 result       JSON         -- full AI response object
 createdAt    TIMESTAMP
 ```
+- `result` is normalized on read/write; `number2d` must be 2 digits and `number3d` must be 3 digits
+- User dream endpoints enforce owner/admin access and use a per-user daily MySQL lock to prevent duplicate concurrent dream logs
 
 #### Admin Dream Management (tab "ท่านอาจารย์" ใน admin lottery modal)
 | Endpoint | วิธีใช้ |
@@ -408,14 +419,32 @@ AppState = {
 node --check app.js
 node --check server.js
 node --check db.js
+node --check scripts/lottery-smoke-check.js
 git diff --check
 ```
+
+Lottery / Johnny API smoke before deploy:
+```bash
+# Requires a running server and an admin lineUserId in admins.
+SMOKE_ADMIN_ID=<admin-line-user-id> npm run smoke:lottery
+
+# Adds admin/user dream-item checks for Johnny.
+SMOKE_ADMIN_ID=<admin-line-user-id> SMOKE_DREAM=1 npm run smoke:lottery
+
+# Full side-effect smoke: buy/reset ticket, dream interpret, then cleanup test data.
+SMOKE_ADMIN_ID=<admin-line-user-id> SMOKE_USER_ID=<test-user-line-id> SMOKE_BUY=1 SMOKE_DREAM=1 SMOKE_DREAM_INTERPRET=1 SMOKE_CLEANUP=1 npm run smoke:lottery
+```
+PowerShell equivalent: set `$env:SMOKE_ADMIN_ID`, `$env:SMOKE_USER_ID`, `$env:SMOKE_DREAM`, etc. before `npm run smoke:lottery`.
 
 Recommended browser smoke after UI changes:
 - Home loads profile/status strip/Quick Actions/Today's Safety Tasks
 - Safety Pulse pages 5 items at a time
 - Quick Actions navigate to activities, KYT, game, leaderboard
 - Safety Lottery opens, rules button works, rounded modal has no square white corners
+- User Lottery: open current/test round as admin, answer quiz, buy 2D and 3D tickets, verify quota and disabled/loading states
+- Admin Lottery: dashboard/settings/monitor, create test round, preview/confirm/process result, reset tickets, delete empty test round
+- Johnny user: open dream modal without an open round, select symbol, generate/view cached result, use number in lottery modal
+- Johnny admin: list/add/edit/generate/soft-delete symbols, view logs, reset today's dream limit
 
 ## Running Locally
 ```bash
