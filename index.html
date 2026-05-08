@@ -1979,14 +1979,15 @@
     <div class="modal fade" id="lottery-quiz-modal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content border-0 lottery-quiz-modal-content">
-                <div class="modal-header border-0 text-white p-4 lottery-quiz-modal-header">
-                    <div>
-                        <h5 class="modal-title fw-bold">
+                <div class="modal-header border-0 text-white lottery-quiz-modal-header">
+                    <div style="width:38px;flex-shrink:0"></div>
+                    <div class="text-center flex-grow-1">
+                        <h5 class="modal-title fw-bold mb-0">
                             <i class="fas fa-shield-alt me-2"></i>Safety Quiz
                         </h5>
                         <p class="mb-0 small opacity-75">ตอบถูก = ซื้อได้ + รับโบนัส 2 เหรียญ!</p>
                     </div>
-                    <button type="button" class="lottery-rules-btn" onclick="cancelLotteryQuiz()" title="ยกเลิก" aria-label="ยกเลิก">
+                    <button type="button" class="lottery-rules-btn flex-shrink-0" onclick="cancelLotteryQuiz()" title="ยกเลิก" aria-label="ยกเลิก">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>

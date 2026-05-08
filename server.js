@@ -4122,7 +4122,9 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_quiz_questions (
 )`).catch(() => {});
 
 db.query(`ALTER TABLE lottery_quiz_questions MODIFY generatedBy VARCHAR(50) DEFAULT 'manual'`).catch(() => {});
-db.query(`ALTER TABLE lottery_quiz_questions ADD COLUMN IF NOT EXISTS explanation TEXT NULL`).catch(() => {});
+db.query(`SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='lottery_quiz_questions' AND COLUMN_NAME='explanation'`)
+  .then(([[{cnt}]]) => { if (!cnt) return db.query(`ALTER TABLE lottery_quiz_questions ADD COLUMN explanation TEXT NULL`); })
+  .catch(() => {});
 
 db.query(`CREATE TABLE IF NOT EXISTS lottery_settings (
   settingKey   VARCHAR(50) PRIMARY KEY,
