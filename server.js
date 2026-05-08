@@ -5723,6 +5723,200 @@ app.post('/api/admin/lottery/broadcast-new-round', async (req, res) => {
 });
 
 // ======================================================
+// SAFETY DREAM NUMBERS — ท่านอาจารย์จอห์นนี่
+// ======================================================
+
+// Startup: seed safety_dream_items if empty
+db.query('SELECT COUNT(*) AS cnt FROM safety_dream_items').then(([[{ cnt }]]) => {
+    if (cnt > 0) return;
+    const items = [
+        // PPE
+        ['ppe', 'หมวกนิรภัย', '01'],
+        ['ppe', 'แว่นตานิรภัย', '02'],
+        ['ppe', 'ถุงมือนิรภัย', '03'],
+        ['ppe', 'รองเท้าเซฟตี้', '04'],
+        ['ppe', 'ชุด PPE เต็มตัว', '05'],
+        // ไฟ
+        ['fire', 'ไฟไหม้', '11'],
+        ['fire', 'ถังดับเพลิง', '12'],
+        ['fire', 'สายดับเพลิง', '13'],
+        ['fire', 'สัญญาณเตือนไฟ', '14'],
+        ['fire', 'ควันไฟ', '15'],
+        // ไฟฟ้า
+        ['electrical', 'สายไฟ', '21'],
+        ['electrical', 'แผงไฟฟ้า', '22'],
+        ['electrical', 'ไฟฟ้าช็อต', '23'],
+        ['electrical', 'สายดิน', '24'],
+        ['electrical', 'กระแสไฟรั่ว', '25'],
+        // สารเคมี
+        ['chemical', 'สารเคมีรั่ว', '31'],
+        ['chemical', 'ถังสารเคมี', '32'],
+        ['chemical', 'ควันพิษ', '33'],
+        ['chemical', 'กรดกัดกร่อน', '34'],
+        ['chemical', 'ป้ายอันตราย', '35'],
+        // ที่สูง
+        ['height', 'ตกจากที่สูง', '41'],
+        ['height', 'นั่งร้าน', '42'],
+        ['height', 'เชือกนิรภัย', '43'],
+        ['height', 'บันได', '44'],
+        ['height', 'หลังคา', '45'],
+        // เครื่องจักร
+        ['machine', 'เครื่องจักร', '51'],
+        ['machine', 'ใบมีดหมุน', '52'],
+        ['machine', 'ระบบลำเลียง', '53'],
+        ['machine', 'การ์ดเครื่องจักร', '54'],
+        ['machine', 'ชิ้นส่วนกระเด็น', '55'],
+        // ถนน/ยานพาหนะ
+        ['road', 'รถโฟล์คลิฟท์', '61'],
+        ['road', 'อุบัติเหตุรถ', '62'],
+        ['road', 'ทางข้ามปลอดภัย', '63'],
+        ['road', 'สัญญาณจราจร', '64'],
+        ['road', 'รถบรรทุก', '65'],
+    ];
+    db.query(
+        `INSERT INTO safety_dream_items (category, itemName, luckyDigit) VALUES ${items.map(() => '(?,?,?)').join(',')}`,
+        items.flat()
+    ).catch(e => console.warn('Dream seed failed:', e.message));
+}).catch(() => {});
+
+// Startup: ensure lottery_dream_logs table exists
+db.query(`CREATE TABLE IF NOT EXISTS lottery_dream_logs (
+    logId       VARCHAR(50) PRIMARY KEY,
+    lineUserId  VARCHAR(60) NOT NULL,
+    dreamText   TEXT,
+    itemId      INT,
+    result      JSON,
+    createdAt   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_dream_user_date (lineUserId, createdAt)
+)`).catch(() => {});
+
+const JOHNNY_SYSTEM_PROMPT = `คุณคือ "ท่านอาจารย์จอห์นนี่" — นักพยากรณ์โหราศาสตร์ลึกลับแห่งอาณาจักรความปลอดภัย
+บุคลิก: พูดด้วยน้ำเสียงลึกลับ ศักดิ์สิทธิ์ มีความเมตตา แต่แฝงด้วยอารมณ์ขันเล็กน้อย
+ภาษา: ไทย ใช้สรรพนาม "อาจารย์" แทนตัวเอง และ "ลูกศิษย์" สำหรับผู้ถาม
+เชี่ยวชาญ: โยงสัญลักษณ์ความฝัน/สัญลักษณ์ความปลอดภัยเข้ากับตัวเลขมงคล + คำแนะนำความปลอดภัยที่ปฏิบัติได้จริง
+ข้อห้าม: ห้ามรับประกันผลลอตเตอรี่ ต้องใส่ข้อความเตือนว่าการทำนายเพื่อความสนุกเท่านั้น`;
+
+// GET /api/lottery/dream-items — รายการสัญลักษณ์
+app.get('/api/lottery/dream-items', async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT itemId, category, itemName, luckyDigit FROM safety_dream_items ORDER BY category, itemId');
+        const grouped = {};
+        const categoryLabels = { ppe: 'อุปกรณ์ PPE', fire: 'ไฟ/เพลิงไหม้', electrical: 'ไฟฟ้า', chemical: 'สารเคมี', height: 'งานที่สูง', machine: 'เครื่องจักร', road: 'ยานพาหนะ' };
+        for (const r of rows) {
+            if (!grouped[r.category]) grouped[r.category] = { label: categoryLabels[r.category] || r.category, items: [] };
+            grouped[r.category].items.push({ itemId: r.itemId, itemName: r.itemName, luckyDigit: r.luckyDigit });
+        }
+        res.json({ status: 'success', data: grouped });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/lottery/dream-today — เช็คว่าวันนี้ขอพยากรณ์แล้วหรือยัง
+app.get('/api/lottery/dream-today', async (req, res) => {
+    const { lineUserId } = req.query;
+    if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
+    try {
+        const today = getBangkokDateString();
+        const [[log]] = await db.query(
+            `SELECT logId, result, createdAt FROM lottery_dream_logs
+             WHERE lineUserId=? AND DATE(CONVERT_TZ(createdAt,'+00:00','+07:00'))=?
+             ORDER BY createdAt DESC LIMIT 1`,
+            [lineUserId, today]
+        );
+        res.json({ status: 'success', data: { hasToday: !!log, log: log || null } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/lottery/dream-interpret — ท่านอาจารย์จอห์นนี่พยากรณ์
+app.post('/api/lottery/dream-interpret', async (req, res) => {
+    const { lineUserId, dreamText, itemId } = req.body;
+    if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
+    if (!dreamText && !itemId) return res.status(400).json({ status: 'error', message: 'dreamText หรือ itemId ต้องระบุอย่างน้อยหนึ่งอย่าง' });
+    try {
+        // Rate limit: 1 ครั้ง/วัน/user
+        const today = getBangkokDateString();
+        const [[existing]] = await db.query(
+            `SELECT logId, result FROM lottery_dream_logs
+             WHERE lineUserId=? AND DATE(CONVERT_TZ(createdAt,'+00:00','+07:00'))=?
+             ORDER BY createdAt DESC LIMIT 1`,
+            [lineUserId, today]
+        );
+        if (existing) {
+            return res.json({ status: 'success', data: { ...existing.result, cached: true } });
+        }
+
+        // Build context for AI
+        let itemContext = '';
+        if (itemId) {
+            const [[item]] = await db.query('SELECT itemName, luckyDigit FROM safety_dream_items WHERE itemId=?', [itemId]);
+            if (item) itemContext = `\nสัญลักษณ์ที่เลือก: ${item.itemName} (เลขนำโชค: ${item.luckyDigit})`;
+        }
+        const userInput = [dreamText ? `ความฝัน/ประสบการณ์: ${dreamText}` : '', itemContext].filter(Boolean).join('\n');
+
+        const prompt = `${userInput}
+
+จงพยากรณ์ตามบุคลิกท่านอาจารย์จอห์นนี่ และตอบเป็น JSON เท่านั้น ห้ามมี markdown backticks:
+{
+  "interpretation": "คำพยากรณ์สไตล์โหราศาสตร์ลึกลับ 2-3 ประโยค",
+  "number2d": "เลข 2 ตัว (00-99)",
+  "number3d": "เลข 3 ตัว (000-999)",
+  "numberReason": "เหตุผลสั้นๆ ว่าทำไมถึงได้เลขนี้",
+  "safetyAdvice": "คำแนะนำความปลอดภัยที่เชื่อมกับสัญลักษณ์ (1-2 ประโยค)",
+  "safetyFact": "ข้อเท็จจริงด้านความปลอดภัยน่ารู้ 1 ประโยค",
+  "disclaimer": "ข้อความเตือนว่าการทำนายเพื่อความสนุกเท่านั้น ไม่ใช่การรับประกันผลลอตเตอรี่"
+}`;
+
+        let result = null;
+        let lastErr = null;
+
+        for (const model of LOTTERY_GEMINI_MODELS) {
+            try {
+                const geminiRes = await axios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+                    {
+                        systemInstruction: { parts: [{ text: JOHNNY_SYSTEM_PROMPT }] },
+                        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0.9 }
+                    },
+                    { timeout: 20000 }
+                );
+                let rawText = geminiRes.data.candidates[0].content.parts[0].text;
+                rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                result = JSON.parse(rawText);
+                break;
+            } catch (aiErr) {
+                lastErr = aiErr;
+                console.warn(`Dream Gemini failed: ${model}`, aiErr.response?.status || aiErr.message);
+            }
+        }
+
+        // Fallback: generate static result if AI fails
+        if (!result) {
+            const digits = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+            const digits3 = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+            result = {
+                interpretation: 'ดวงดาวกำลังเรียงตัว... อาจารย์รับรู้พลังงานของลูกศิษย์ สัญลักษณ์นี้บ่งบอกถึงความระมัดระวัง และโชคดีที่ซ่อนอยู่ในความปลอดภัย',
+                number2d: digits,
+                number3d: digits3,
+                numberReason: 'คำนวณจากพลังงานสัญลักษณ์และตำแหน่งดวงดาวประจำวัน',
+                safetyAdvice: 'จงสวมใส่อุปกรณ์ PPE ทุกครั้งก่อนปฏิบัติงาน เพราะความปลอดภัยคือโชคดีที่แท้จริง',
+                safetyFact: 'อุบัติเหตุในโรงงาน 96% เกิดจากความประมาท ไม่ใช่โชคร้าย',
+                disclaimer: '⚠️ การพยากรณ์นี้เพื่อความสนุกและสร้างจิตสำนึกด้านความปลอดภัยเท่านั้น ไม่ใช่การรับประกันผลลอตเตอรี่ใดๆ',
+                fallback: true
+            };
+        }
+
+        // Save log
+        const logId = 'DREAM' + uuidv4();
+        await db.query(
+            'INSERT INTO lottery_dream_logs (logId, lineUserId, dreamText, itemId, result) VALUES (?,?,?,?,?)',
+            [logId, lineUserId, dreamText || null, itemId || null, JSON.stringify(result)]
+        );
+
+        res.json({ status: 'success', data: result });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// ======================================================
 // SERVER START
 // ======================================================
 app.get('/', (req, res) => {

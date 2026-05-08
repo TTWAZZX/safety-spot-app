@@ -7614,3 +7614,124 @@ async function aiGenerateLotteryQuestions() {
         Swal.fire('Error', e.message, 'error');
     }
 }
+
+// ======================================================
+// SAFETY DREAM NUMBERS — ท่านอาจารย์จอห์นนี่
+// ======================================================
+
+let _dreamItems = null;
+let _dreamSelectedItemId = null;
+let _dreamResult = null;
+
+async function openDreamModal() {
+    _dreamSelectedItemId = null;
+    _dreamResult = null;
+    $('#dream-step-input').removeClass('d-none');
+    $('#dream-step-loading').addClass('d-none');
+    $('#dream-step-result').addClass('d-none');
+    $('#dream-text-input').val('');
+    $('#dream-limit-notice').text('');
+
+    const modal = new bootstrap.Modal(document.getElementById('dream-modal'));
+    modal.show();
+
+    try {
+        const res = await callApi('/api/lottery/dream-today', { lineUserId: AppState.lineProfile.userId }, 'GET');
+        if (res.hasToday && res.log?.result) {
+            $('#dream-limit-notice').html('<span style="color:#f4d03f">✨ ท่านอาจารย์พยากรณ์ไปแล้ววันนี้ — แสดงผลเดิม</span>');
+            setTimeout(() => showDreamResult(res.log.result), 400);
+            return;
+        }
+    } catch (_) {}
+
+    if (!_dreamItems) {
+        try {
+            const res = await callApi('/api/lottery/dream-items', {}, 'GET');
+            _dreamItems = res;
+        } catch (_) { _dreamItems = {}; }
+    }
+    renderDreamItems();
+}
+
+function renderDreamItems() {
+    if (!_dreamItems || Object.keys(_dreamItems).length === 0) {
+        $('#dream-items-container').html('<p class="text-center" style="color:rgba(255,255,255,0.5)">ไม่พบสัญลักษณ์</p>');
+        return;
+    }
+    const categoryIcons = { ppe: '🦺', fire: '🔥', electrical: '⚡', chemical: '☢️', height: '🏗️', machine: '⚙️', road: '🚛' };
+    let html = '';
+    for (const [cat, data] of Object.entries(_dreamItems)) {
+        html += `<div class="dream-category-label">${categoryIcons[cat] || '🔹'} ${sanitizeHTML(data.label)}</div>
+                 <div class="dream-items-row">`;
+        for (const item of data.items) {
+            html += `<button class="dream-item-chip" data-item-id="${item.itemId}" onclick="selectDreamItem(${item.itemId}, this)">
+                         ${sanitizeHTML(item.itemName)}
+                     </button>`;
+        }
+        html += `</div>`;
+    }
+    $('#dream-items-container').html(html);
+}
+
+function selectDreamItem(itemId, el) {
+    _dreamSelectedItemId = itemId;
+    $('.dream-item-chip').removeClass('selected');
+    $(el).addClass('selected');
+}
+
+async function submitDreamInterpret() {
+    const dreamText = $('#dream-text-input').val().trim();
+    if (!dreamText && !_dreamSelectedItemId) {
+        Swal.fire({ icon: 'warning', title: 'โปรดเล่าความฝัน', text: 'เลือกสัญลักษณ์หรือพิมพ์ความฝัน/ประสบการณ์ก่อน', confirmButtonColor: '#6c3483' });
+        return;
+    }
+    $('#dream-step-input').addClass('d-none');
+    $('#dream-step-loading').removeClass('d-none');
+    try {
+        const res = await callApi('/api/lottery/dream-interpret', {
+            lineUserId: AppState.lineProfile.userId,
+            dreamText: dreamText || null,
+            itemId: _dreamSelectedItemId || null
+        }, 'POST');
+        _dreamResult = res;
+        showDreamResult(res);
+    } catch (e) {
+        $('#dream-step-loading').addClass('d-none');
+        $('#dream-step-input').removeClass('d-none');
+        Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: e.message, confirmButtonColor: '#6c3483' });
+    }
+}
+
+function showDreamResult(result) {
+    $('#dream-step-loading').addClass('d-none');
+    $('#dream-step-input').addClass('d-none');
+    $('#dream-step-result').removeClass('d-none');
+    $('#dream-interpretation').text(result.interpretation || '');
+    $('#dream-number-2d').text(result.number2d || '??');
+    $('#dream-number-3d').text(result.number3d || '???');
+    $('#dream-number-reason').text(result.numberReason || '');
+    $('#dream-safety-advice').text(result.safetyAdvice || '');
+    $('#dream-safety-fact').text(result.safetyFact || '');
+    $('#dream-disclaimer').text(result.disclaimer || '');
+    _dreamResult = result;
+}
+
+function useDreamNumber(type) {
+    if (!_dreamResult) return;
+    const num = type === '2d' ? _dreamResult.number2d : _dreamResult.number3d;
+    if (!num) return;
+    bootstrap.Modal.getInstance(document.getElementById('dream-modal'))?.hide();
+    setTimeout(() => {
+        const targetType = type === '2d' ? 'two' : 'three';
+        selectLotteryType(targetType);
+        const $input = $('#lottery-number-input');
+        if ($input.length) {
+            $input.val(num);
+            updateLotteryCharCounter();
+        }
+        const lotteryModalEl = document.getElementById('lottery-modal');
+        if (!lotteryModalEl.classList.contains('show')) {
+            openLotteryModal();
+        }
+    }, 400);
+}

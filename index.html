@@ -1950,6 +1950,12 @@
                                         </div>
                                     </div>
 
+                                    <div class="lottery-dream-shortcut mb-2">
+                                        <button class="btn btn-outline-purple w-100 dream-shortcut-btn" onclick="openDreamModal()">
+                                            <i class="fas fa-moon me-2"></i>🔮 ขอคำพยากรณ์จากท่านอาจารย์จอห์นนี่
+                                        </button>
+                                    </div>
+
                                     <div class="lottery-sticky-action">
                                         <button class="btn btn-success w-100 fw-bold py-3 lottery-buy-btn" id="btn-lottery-buy" onclick="startLotteryQuiz()">
                                             <i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety แล้วซื้อ
@@ -2005,6 +2011,103 @@
                         <div class="spinner-border text-success"></div>
                         <p class="mt-2 text-muted">กำลังโหลดคำถาม...</p>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================== -->
+    <!-- Safety Dream Numbers — ท่านอาจารย์จอห์นนี่ Modal  -->
+    <!-- ================================================== -->
+    <div class="modal fade" id="dream-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 dream-modal-content">
+
+                <!-- Header -->
+                <div class="dream-modal-header d-flex align-items-center justify-content-between px-4 py-3">
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <div class="text-center flex-grow-1">
+                        <div class="dream-header-icon">🔮</div>
+                        <div class="dream-modal-title">ท่านอาจารย์จอห์นนี่</div>
+                        <div class="dream-modal-subtitle">พยากรณ์เลขนำโชคด้านความปลอดภัย</div>
+                    </div>
+                    <div style="width:32px"></div>
+                </div>
+
+                <div class="modal-body dream-modal-body p-0">
+
+                    <!-- Step 1: Input -->
+                    <div id="dream-step-input" class="dream-step px-4 py-3">
+                        <p class="dream-intro-text text-center">
+                            บอกอาจารย์ถึงความฝัน หรือเลือกสัญลักษณ์ที่คุณพบเจอวันนี้<br>
+                            <small class="dream-limit-notice" id="dream-limit-notice"></small>
+                        </p>
+
+                        <!-- Quick pick symbols -->
+                        <div class="dream-section-label"><i class="fas fa-star me-1"></i>เลือกสัญลักษณ์</div>
+                        <div id="dream-items-container" class="dream-items-grid mb-3">
+                            <div class="text-center py-3"><div class="spinner-border spinner-border-sm dream-spinner"></div></div>
+                        </div>
+
+                        <!-- Free text input -->
+                        <div class="dream-section-label"><i class="fas fa-feather-alt me-1"></i>หรือเล่าความฝัน/ประสบการณ์</div>
+                        <textarea id="dream-text-input" class="form-control dream-textarea mb-3"
+                            rows="3" maxlength="300"
+                            placeholder="เช่น ฝันเห็นไฟไหม้ หรือเห็นเพื่อนร่วมงานใส่หมวกนิรภัย..."></textarea>
+
+                        <button class="btn dream-submit-btn w-100 fw-bold py-3" id="btn-dream-submit" onclick="submitDreamInterpret()">
+                            <i class="fas fa-magic me-2"></i>ขอคำพยากรณ์
+                        </button>
+                        <p class="text-center mt-2" style="color:rgba(255,255,255,0.5);font-size:0.7rem">1 ครั้ง / วัน</p>
+                    </div>
+
+                    <!-- Step 2: Loading -->
+                    <div id="dream-step-loading" class="dream-step d-none px-4 py-5 text-center">
+                        <div class="dream-loading-orb mb-3">🔮</div>
+                        <p class="dream-loading-text">ท่านอาจารย์กำลังปรึกษาดวงดาว...</p>
+                        <div class="dream-stars-loading">✨ ⭐ ✨ ⭐ ✨</div>
+                    </div>
+
+                    <!-- Step 3: Result -->
+                    <div id="dream-step-result" class="dream-step d-none px-4 py-3">
+                        <div class="dream-result-header text-center mb-3">
+                            <div class="dream-result-icon">🌟</div>
+                            <p class="dream-result-title">คำพยากรณ์ของท่านอาจารย์</p>
+                        </div>
+
+                        <!-- Interpretation -->
+                        <div class="dream-interpretation-card mb-3" id="dream-interpretation"></div>
+
+                        <!-- Lucky numbers -->
+                        <div class="dream-numbers-row mb-3">
+                            <div class="dream-number-card">
+                                <div class="dream-number-label">เลข 2 ตัว</div>
+                                <div class="dream-number-value" id="dream-number-2d"></div>
+                                <button class="dream-use-btn" onclick="useDreamNumber('2d')">ใช้เลขนี้</button>
+                            </div>
+                            <div class="dream-number-card">
+                                <div class="dream-number-label">เลข 3 ตัว</div>
+                                <div class="dream-number-value" id="dream-number-3d"></div>
+                                <button class="dream-use-btn" onclick="useDreamNumber('3d')">ใช้เลขนี้</button>
+                            </div>
+                        </div>
+                        <p class="dream-number-reason text-center mb-3" id="dream-number-reason"></p>
+
+                        <!-- Safety advice -->
+                        <div class="dream-safety-card mb-3">
+                            <div class="dream-safety-title"><i class="fas fa-shield-alt me-1"></i>คำแนะนำความปลอดภัย</div>
+                            <div id="dream-safety-advice"></div>
+                            <div class="dream-safety-fact mt-2" id="dream-safety-fact"></div>
+                        </div>
+
+                        <!-- Disclaimer -->
+                        <div class="dream-disclaimer" id="dream-disclaimer"></div>
+
+                        <button class="btn dream-close-btn w-100 mt-3" data-bs-dismiss="modal">
+                            <i class="fas fa-check me-2"></i>รับทราบแล้ว
+                        </button>
+                    </div>
+
                 </div>
             </div>
         </div>
