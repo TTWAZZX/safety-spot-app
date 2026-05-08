@@ -5796,7 +5796,7 @@ db.query(`SELECT COUNT(*) AS cnt FROM information_schema.columns
   WHERE table_schema=DATABASE() AND table_name='safety_dream_items' AND column_name='id'`)
   .then(([[{ cnt }]]) => {
       if (!cnt) return;
-      return db.query(`ALTER TABLE safety_dream_items CHANGE id itemId INT AUTO_INCREMENT`);
+      return db.query('ALTER TABLE safety_dream_items CHANGE id itemId INT AUTO_INCREMENT');
   }).catch(() => {});
 
 // Patch: add missing columns to lottery_dream_logs if created with old schema
@@ -5804,10 +5804,9 @@ db.query(`SELECT COUNT(*) AS cnt FROM information_schema.columns
   WHERE table_schema=DATABASE() AND table_name='lottery_dream_logs' AND column_name='result'`)
   .then(([[{ cnt }]]) => {
       if (cnt) return;
-      return db.query(`ALTER TABLE lottery_dream_logs
-        ADD COLUMN dreamText TEXT AFTER lineUserId,
-        ADD COLUMN itemId INT DEFAULT NULL AFTER dreamText,
-        ADD COLUMN result JSON AFTER itemId`);
+      return db.query(
+          'ALTER TABLE lottery_dream_logs ADD COLUMN dreamText TEXT, ADD COLUMN itemId INT DEFAULT NULL, ADD COLUMN result JSON'
+      );
   }).catch(() => {});
 
 db.query('SELECT COUNT(*) AS cnt FROM safety_dream_items').then(([[{ cnt }]]) => {
