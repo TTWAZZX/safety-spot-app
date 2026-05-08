@@ -1814,19 +1814,19 @@
     <div class="modal fade" id="lottery-modal" tabindex="-1">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content border-0 shadow-lg lottery-modal-content">
-                <div class="modal-header border-0 lottery-modal-header p-4">
-                    <div>
-                        <h5 class="modal-title fw-bold text-white">
+                <div class="modal-header border-0 lottery-modal-header">
+                    <button type="button" class="lottery-rules-btn" data-bs-dismiss="modal" aria-label="ปิด">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="text-center">
+                        <h5 class="modal-title fw-bold text-white mb-0">
                             <i class="fas fa-ticket me-2"></i>Safety Lottery
                         </h5>
                         <p class="mb-0 small text-white opacity-75" id="lottery-round-label">กำลังโหลด...</p>
                     </div>
-                    <div class="lottery-modal-actions">
-                        <button type="button" class="lottery-rules-btn" onclick="showLotteryRules()" title="ดูกติกา Safety Lottery" aria-label="ดูกติกา Safety Lottery">
-                            <i class="fas fa-book-open"></i>
-                        </button>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
+                    <button type="button" class="lottery-rules-btn" onclick="showLotteryRules()" title="ดูกติกา" aria-label="ดูกติกา Safety Lottery">
+                        <i class="fas fa-book-open"></i>
+                    </button>
                 </div>
 
                 <div class="modal-body p-0">
@@ -1861,6 +1861,7 @@
                         <!-- Tab: ซื้อตั๋ว -->
                         <div class="tab-pane fade show active" id="tab-buy">
                             <div id="lottery-buy-section">
+                                <div id="lottery-round-banner" class="lottery-round-banner d-none"></div>
                                 <div class="lottery-flow-steps mb-3">
                                     <div class="lottery-flow-step active" id="lottery-step-number"><span>1</span><small>เลือกเลข</small></div>
                                     <div class="lottery-flow-step" id="lottery-step-quiz"><span>2</span><small>Quiz</small></div>
@@ -2127,22 +2128,26 @@
                             </div>
                             <hr>
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">สร้างงวดใหม่</label>
-                                <div class="d-flex gap-2">
+                                <label class="form-label fw-semibold">จัดการงวด</label>
+                                <div class="d-flex gap-2 mb-2">
                                     <input type="date" class="form-control" id="admin-new-round-date">
-                                    <button class="btn btn-outline-success" onclick="adminCreateLotteryRound()" title="สร้างงวด">
-                                        <i class="fas fa-plus"></i>
+                                    <button class="btn btn-outline-success text-nowrap" onclick="adminCreateLotteryRound()" title="สร้างงวดปกติ">
+                                        <i class="fas fa-plus me-1"></i>สร้าง
                                     </button>
                                 </div>
-                                <div class="form-check mt-2">
-                                    <input class="form-check-input" type="checkbox" id="admin-new-round-test">
-                                    <label class="form-check-label small fw-semibold" for="admin-new-round-test">
-                                        สร้างเป็นงวดทดสอบ
-                                    </label>
-                                </div>
-                                <button class="btn btn-success w-100 mt-2 fw-semibold" onclick="adminAutoCreateLotteryRounds()">
-                                    <i class="fas fa-calendar-plus me-1"></i>สร้างงวดถัดไปอัตโนมัติ
+                                <button class="btn btn-success w-100 mb-2 fw-semibold" onclick="adminAutoCreateLotteryRounds()">
+                                    <i class="fas fa-calendar-plus me-1"></i>สร้างงวดถัดไปอัตโนมัติ (1 & 16)
                                 </button>
+                                <div class="border border-warning rounded p-2 bg-warning bg-opacity-10">
+                                    <div class="small fw-bold text-warning mb-1"><i class="fas fa-flask me-1"></i>งวดทดสอบ (Admin เท่านั้น)</div>
+                                    <div class="d-flex gap-2">
+                                        <input type="date" class="form-control form-control-sm" id="admin-new-round-test-date">
+                                        <button class="btn btn-warning btn-sm text-nowrap fw-semibold" onclick="adminCreateTestRound()">
+                                            <i class="fas fa-flask me-1"></i>สร้าง Test
+                                        </button>
+                                    </div>
+                                    <div class="text-muted" style="font-size:0.72rem;margin-top:4px;">ผู้ใช้ไม่เห็น • ไม่นับสถิติจริง • Gold Ticket ล็อก</div>
+                                </div>
                             </div>
                         </div>
 <!-- คำถาม Tab -->

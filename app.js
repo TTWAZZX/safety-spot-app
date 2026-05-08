@@ -6146,6 +6146,8 @@ async function loadLotteryCurrentRound() {
         const drawDate = new Date(res.drawDate + 'T00:00:00+07:00');
         const drawDateStr = drawDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
         $('#lottery-round-label').text(`งวดวันที่ ${drawDateStr}`);
+        $('#lottery-round-banner').removeClass('d-none')
+            .html(`<i class="fas fa-calendar-check me-2"></i>กำลังซื้องวดวันที่ <strong>${drawDateStr}</strong>`);
 
         if (res.isClosed || res.status !== 'open') {
             $('#lottery-countdown-bar').html('<i class="fas fa-lock me-1"></i>ปิดรับแล้ว — รอผลรางวัล');
@@ -6786,12 +6788,19 @@ async function loadAdminLotteryDashboard() {
             const d = new Date(r.drawDate + 'T00:00:00+07:00').toLocaleDateString('th-TH', { month: 'short', day: 'numeric' });
             const color = statusColorMap[r.status] || 'secondary';
             const label = LOTTERY_STATUS_TH[r.status] || r.status;
-            const testBadge = r.isTest ? '<span class="badge bg-dark ms-1">Test</span>' : '';
+            const testBadge = r.isTest ? '<span class="badge bg-warning text-dark ms-1">TEST</span>' : '';
+            const autoBadge = (r.source === 'auto') ? '<span class="badge bg-info text-dark ms-1">Auto</span>' : '';
+            const canEdit = r.status === 'open';
+            const editBtn = canEdit
+                ? `<button class="btn btn-xs py-0 px-1 btn-outline-secondary" onclick="adminEditLotteryRound('${sanitizeHTML(r.roundId)}','${sanitizeHTML(r.drawDate)}')" title="แก้วันที่"><i class="fas fa-pen"></i></button>`
+                : '';
+            const delBtn = `<button class="btn btn-xs py-0 px-1 btn-outline-danger" onclick="adminDeleteLotteryRound('${sanitizeHTML(r.roundId)}',${!!r.isTest},${Number(r.ticketCount||0)})" title="ลบงวด"><i class="fas fa-trash"></i></button>`;
             roundsHtml += `<tr>
                 <td>${sanitizeHTML(d)}</td>
                 <td>${r.last2 ? sanitizeHTML(r.last2) : '-'} / ${r.last3_back ? sanitizeHTML(r.last3_back) : '-'}</td>
-                <td><span class="badge bg-${color}">${label}</span>${testBadge}</td>
+                <td><span class="badge bg-${color}">${label}</span>${testBadge}${autoBadge}</td>
                 <td>${r.totalWinners || 0}</td>
+                <td class="text-end" style="white-space:nowrap">${editBtn} ${delBtn}</td>
             </tr>`;
         });
 
@@ -6864,7 +6873,7 @@ async function loadAdminLotteryDashboard() {
             <h6 class="fw-bold mb-2">งวดล่าสุด</h6>
             <div class="table-responsive mb-3">
                 <table class="table table-sm table-hover">
-                    <thead class="table-light"><tr><th>งวด</th><th>ผล</th><th>สถานะ</th><th>ผู้ถูก</th></tr></thead>
+                    <thead class="table-light"><tr><th>งวด</th><th>ผล</th><th>สถานะ</th><th>ผู้ถูก</th><th></th></tr></thead>
                     <tbody>${roundsHtml}</tbody>
                 </table>
             </div>
@@ -7228,6 +7237,82 @@ async function adminCreateLotteryRound() {
     } catch (e) {
         Swal.fire('Error', e.message, 'error');
     }
+}
+
+async function adminCreateTestRound() {
+    const date = $('#admin-new-round-test-date').val();
+    if (!date) return Swal.fire('ระบุวันที่', 'กรุณาเลือกวันที่สำหรับงวดทดสอบ', 'warning');
+    const confirm = await Swal.fire({
+        icon: 'warning',
+        title: 'สร้างงวดทดสอบ?',
+        html: `<p>งวด <strong>${sanitizeHTML(date)}</strong> จะมองเห็นเฉพาะ Admin<br><small class="text-muted">ผู้ใช้ทั่วไปจะไม่เห็นงวดนี้</small></p>`,
+        showCancelButton: true,
+        confirmButtonText: 'สร้าง Test Round',
+        confirmButtonColor: '#f59e0b',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!confirm.isConfirmed) return;
+    try {
+        await callApi('/api/admin/lottery/rounds', {
+            requesterId: AppState.lineProfile.userId, drawDate: date, isTest: true
+        }, 'POST');
+        showToast(`สร้างงวดทดสอบ ${date} แล้ว`, 'success');
+        $('#admin-new-round-test-date').val('');
+        await loadAdminLotteryDashboard();
+        await loadAdminLotteryRoundSelect();
+        await loadAdminLotteryMonitor(true);
+    } catch (e) { Swal.fire('Error', e.message, 'error'); }
+}
+
+async function adminEditLotteryRound(roundId, currentDate) {
+    const { value: newDate } = await Swal.fire({
+        title: `แก้ไขวันที่งวด`,
+        html: `<p class="text-muted small mb-2">งวดปัจจุบัน: <strong>${sanitizeHTML(currentDate)}</strong></p>
+               <input type="date" id="swal-edit-date" class="swal2-input" value="${sanitizeHTML(currentDate)}">`,
+        showCancelButton: true,
+        confirmButtonText: 'บันทึก',
+        confirmButtonColor: '#06C755',
+        cancelButtonText: 'ยกเลิก',
+        preConfirm: () => {
+            const v = document.getElementById('swal-edit-date').value;
+            if (!v) { Swal.showValidationMessage('กรุณาระบุวันที่'); return false; }
+            return v;
+        }
+    });
+    if (!newDate) return;
+    try {
+        await callApi(`/api/admin/lottery/rounds/${encodeURIComponent(roundId)}`, {
+            requesterId: AppState.lineProfile.userId, drawDate: newDate
+        }, 'PUT');
+        showToast('แก้ไขวันที่งวดแล้ว', 'success');
+        await loadAdminLotteryDashboard();
+        await loadAdminLotteryRoundSelect();
+    } catch (e) { Swal.fire('Error', e.message, 'error'); }
+}
+
+async function adminDeleteLotteryRound(roundId, isTest, ticketCount) {
+    const warnHtml = ticketCount > 0 && !isTest
+        ? `<p class="text-danger small">มีตั๋ว <strong>${ticketCount} ใบ</strong> ในงวดนี้ — ลบไม่ได้</p>`
+        : `<p class="text-muted small">การลบจะไม่สามารถกู้คืนได้</p>`;
+    const confirm = await Swal.fire({
+        icon: 'warning',
+        title: `ลบงวด ${sanitizeHTML(roundId)}?`,
+        html: warnHtml,
+        showCancelButton: true,
+        confirmButtonText: 'ลบงวดนี้',
+        confirmButtonColor: '#dc2626',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!confirm.isConfirmed) return;
+    try {
+        await callApi(`/api/admin/lottery/rounds/${encodeURIComponent(roundId)}`, {
+            requesterId: AppState.lineProfile.userId
+        }, 'DELETE');
+        showToast('ลบงวดแล้ว', 'success');
+        await loadAdminLotteryDashboard();
+        await loadAdminLotteryRoundSelect();
+        await loadAdminLotteryMonitor(true);
+    } catch (e) { Swal.fire('Error', e.message, 'error'); }
 }
 
 async function adminBroadcastLotteryNotification() {

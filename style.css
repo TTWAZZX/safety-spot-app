@@ -3045,11 +3045,19 @@ body {
 }
 .lottery-modal-header {
     background: linear-gradient(135deg, #064e3b 0%, #047857 62%, #06C755 100%);
-}
-.lottery-modal-actions {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    padding: 14px 16px;
+}
+.lottery-round-banner {
+    background: linear-gradient(90deg, #dcfce7, #f0fdf4);
+    border-bottom: 1px solid #bbf7d0;
+    color: #166534;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 10px 16px;
+    text-align: center;
 }
 .lottery-rules-btn {
     width: 34px;

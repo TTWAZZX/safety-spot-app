@@ -4425,6 +4425,28 @@ async function fetchAndSaveLotteryResults(retryCount = 0) {
 // ทุกวันที่ 1 & 16 เวลา 16:00 ไทย = 09:00 UTC
 cron.schedule('0 9 1,16 * *', () => fetchAndSaveLotteryResults(0), { timezone: 'UTC' });
 
+// Auto-create lottery round ทุกวัน 08:00 ไทย — ถ้าอีก 3 วันมีงวด (1 หรือ 16) ให้สร้างอัตโนมัติ
+cron.schedule('0 8 * * *', async () => {
+    try {
+        const nextDates = getNextLotteryDrawDates(2);
+        for (const drawDate of nextDates) {
+            const msUntil = new Date(drawDate + 'T00:00:00+07:00') - new Date();
+            const daysUntil = msUntil / 86400000;
+            if (daysUntil <= 3 && daysUntil >= 0) {
+                try {
+                    await db.query(
+                        `INSERT INTO lottery_rounds (roundId, drawDate, status, source) VALUES (?, ?, 'open', 'auto')`,
+                        [drawDate, drawDate]
+                    );
+                    console.log(`[AutoLottery] Created round: ${drawDate}`);
+                } catch (e) {
+                    if (e.code !== 'ER_DUP_ENTRY') console.error('[AutoLottery] Error:', e.message);
+                }
+            }
+        }
+    } catch (e) { console.error('[AutoLottery] Cron error:', e.message); }
+}, { timezone: 'Asia/Bangkok' });
+
 function getBangkokDateString(date = new Date()) {
     return new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Bangkok',
@@ -5145,9 +5167,11 @@ app.get('/api/admin/lottery/dashboard', async (req, res) => {
         const [rounds] = await db.query(
             `SELECT r.roundId, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.last2, r.last3_front,
                     r.last3_back, r.status, r.source, r.confirmedBy, r.isTest, r.createdAt,
-                    h.totalTicketsSold, h.totalWinners, h.totalPrizesPaid
+                    h.totalTicketsSold, h.totalWinners, h.totalPrizesPaid,
+                    COALESCE(tc.ticketCount, 0) AS ticketCount
              FROM lottery_rounds r
              LEFT JOIN lottery_results_history h ON r.roundId=h.roundId
+             LEFT JOIN (SELECT roundId, COUNT(*) AS ticketCount FROM lottery_tickets GROUP BY roundId) tc ON r.roundId=tc.roundId
              ORDER BY r.drawDate DESC LIMIT 10`);
 
         const [[totals]] = await db.query(
@@ -5559,6 +5583,44 @@ app.post('/api/admin/lottery/auto-rounds', async (req, res) => {
         await logAdminAction(requesterId, 'LOTTERY_AUTO_CREATE_ROUNDS', 'round', 'batch', created.join(',') || 'none',
             { created, skipped });
         res.json({ status: 'success', data: { created, skipped } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// PUT /api/admin/lottery/rounds/:roundId — แก้ไขวันที่งวด
+app.put('/api/admin/lottery/rounds/:roundId', async (req, res) => {
+    const { roundId } = req.params;
+    const { requesterId, drawDate } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+        if (!drawDate || !/^\d{4}-\d{2}-\d{2}$/.test(drawDate))
+            return res.status(400).json({ status: 'error', message: 'วันที่ไม่ถูกต้อง (YYYY-MM-DD)' });
+        const [[round]] = await db.query('SELECT status FROM lottery_rounds WHERE roundId=?', [roundId]);
+        if (!round) return res.status(404).json({ status: 'error', message: 'ไม่พบงวด' });
+        if (round.status !== 'open') return res.status(400).json({ status: 'error', message: 'แก้ไขวันที่ได้เฉพาะงวด open เท่านั้น' });
+        await db.query('UPDATE lottery_rounds SET drawDate=? WHERE roundId=?', [drawDate, roundId]);
+        await logAdminAction(requesterId, 'LOTTERY_EDIT_ROUND', 'round', roundId, drawDate, { oldId: roundId, newDate: drawDate });
+        res.json({ status: 'success', data: { roundId, drawDate } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// DELETE /api/admin/lottery/rounds/:roundId — ลบงวด
+app.delete('/api/admin/lottery/rounds/:roundId', async (req, res) => {
+    const { roundId } = req.params;
+    const { requesterId } = req.body;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+        const [[round]] = await db.query('SELECT isTest, status FROM lottery_rounds WHERE roundId=?', [roundId]);
+        if (!round) return res.status(404).json({ status: 'error', message: 'ไม่พบงวด' });
+        const [[{ cnt }]] = await db.query('SELECT COUNT(*) AS cnt FROM lottery_tickets WHERE roundId=?', [roundId]);
+        if (cnt > 0 && !round.isTest)
+            return res.status(400).json({ status: 'error', message: `ลบไม่ได้ เพราะมีตั๋ว ${cnt} ใบในงวดนี้` });
+        await db.query('DELETE FROM lottery_tickets WHERE roundId=?', [roundId]);
+        await db.query('DELETE FROM lottery_results_history WHERE roundId=?', [roundId]);
+        await db.query('DELETE FROM lottery_rounds WHERE roundId=?', [roundId]);
+        await logAdminAction(requesterId, 'LOTTERY_DELETE_ROUND', 'round', roundId, roundId, { wasTest: !!round.isTest });
+        res.json({ status: 'success', data: { deleted: roundId } });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
