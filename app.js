@@ -5992,19 +5992,36 @@ function setLotteryFlowStep(step) {
 async function refreshLotteryEntryStatusBadge() {
     const $badge = $('#lottery-entry-status-badge');
     if (!$badge.length) return;
+    const $card = $('.safety-lottery-entry');
+    const $subtitle = $('#lottery-entry-subtitle');
+    const $metrics = $('#lottery-entry-metrics');
     try {
         const res = await callApi('/api/lottery/current-round', {
             lineUserId: AppState.lineProfile?.userId || ''
         });
+        $card.removeClass('lottery-admin-test-mode');
         if (res && res.featureEnabled === false) {
             $badge.removeClass('lottery-badge-green').addClass('lottery-badge-muted').text('Developing');
+            $subtitle.text('ยังไม่เปิดให้ผู้ใช้เข้าเล่น');
+            $metrics.html('<span>Closed</span><span>Users Off</span>');
+        } else if (res && res.maintenanceMode) {
+            $card.addClass('lottery-admin-test-mode');
+            $badge.removeClass('lottery-badge-green lottery-badge-muted').addClass('lottery-badge-admin').text('Admin Test');
+            $subtitle.text('ผู้ใช้ทั่วไปปิดอยู่ แอดมินเข้าเพื่อทดสอบ');
+            $metrics.html('<span>Admin</span><span>Users Off</span><span>Test</span>');
         } else if (res && res.status === 'open' && !res.isClosed) {
-            $badge.removeClass('lottery-badge-muted').addClass('lottery-badge-green').text('Open');
+            $badge.removeClass('lottery-badge-muted lottery-badge-admin').addClass('lottery-badge-green').text('Open');
+            $subtitle.text('ซื้อตั๋วด้วย Coins ลุ้นรางวัล');
+            $metrics.html('<span>2D</span><span>3D</span><span>Coins</span>');
         } else {
-            $badge.removeClass('lottery-badge-green').addClass('lottery-badge-muted').text('Waiting');
+            $badge.removeClass('lottery-badge-green lottery-badge-admin').addClass('lottery-badge-muted').text('Waiting');
+            $subtitle.text('รอเปิดงวดถัดไป');
+            $metrics.html('<span>Waiting</span><span>Next Round</span>');
         }
     } catch (_) {
-        $badge.removeClass('lottery-badge-green').addClass('lottery-badge-muted').text('Lottery');
+        $badge.removeClass('lottery-badge-green lottery-badge-admin').addClass('lottery-badge-muted').text('Lottery');
+        $subtitle.text('ซื้อตั๋วด้วย Coins ลุ้นรางวัล');
+        $metrics.html('<span>2D</span><span>3D</span><span>Coins</span>');
     }
 }
 
@@ -6145,9 +6162,12 @@ async function loadLotteryCurrentRound(forceRoundId = null) {
 
         const drawDate = new Date(res.drawDate + 'T00:00:00+07:00');
         const drawDateStr = drawDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-        $('#lottery-round-label').text(`งวดวันที่ ${drawDateStr}`);
+        $('#lottery-round-label').text(res.maintenanceMode ? `Admin Test Mode — งวดวันที่ ${drawDateStr}` : `งวดวันที่ ${drawDateStr}`);
         $('#lottery-round-banner').removeClass('d-none')
-            .html(`<i class="fas fa-calendar-check me-2"></i>กำลังซื้องวดวันที่ <strong>${drawDateStr}</strong>`);
+            .toggleClass('lottery-round-banner-admin', !!res.maintenanceMode)
+            .html(res.maintenanceMode
+                ? `<i class="fas fa-user-shield me-2"></i><strong>Admin Test Mode:</strong> Safety Lottery ปิดสำหรับผู้ใช้ทั่วไปอยู่ตอนนี้ แอดมินยังเข้าได้เพื่อทดสอบเท่านั้น`
+                : `<i class="fas fa-calendar-check me-2"></i>กำลังซื้องวดวันที่ <strong>${drawDateStr}</strong>`);
 
         // แสดง form content ซ่อน empty state (กรณีที่เคย no-round มาก่อน)
         $('#lottery-form-content').removeClass('d-none');
@@ -6181,7 +6201,9 @@ async function loadLotteryCurrentRound(forceRoundId = null) {
             updateLotteryCountdown();
             _lotteryCountdownInterval = setInterval(updateLotteryCountdown, 1000);
             $('#btn-lottery-buy').prop('disabled', false)
-                .html('<i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety แล้วซื้อ');
+                .html(res.maintenanceMode
+                    ? '<i class="fas fa-flask me-2"></i>Admin Test: ตอบคำถามแล้วซื้อ'
+                    : '<i class="fas fa-shield-alt me-2"></i>ตอบคำถาม Safety แล้วซื้อ');
         }
 
         // load daily quota

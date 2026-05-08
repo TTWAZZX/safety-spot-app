@@ -2943,6 +2943,21 @@ body {
     padding: 14px;
 }
 .theme-lottery:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(6,199,85,0.2); }
+.theme-lottery.lottery-admin-test-mode {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 52%, #fff7ed 100%);
+    border-color: #f59e0b;
+    box-shadow: 0 5px 18px rgba(245, 158, 11, 0.16);
+}
+.theme-lottery.lottery-admin-test-mode .bento-title,
+.theme-lottery.lottery-admin-test-mode .bento-sub,
+.theme-lottery.lottery-admin-test-mode .lottery-entry-metrics {
+    color: #92400e !important;
+}
+.theme-lottery.lottery-admin-test-mode .lottery-entry-icon {
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+    border-color: rgba(245, 158, 11, 0.35);
+}
 .safety-lottery-entry .lottery-entry-copy {
     min-width: 0;
     flex: 1;
@@ -3002,6 +3017,11 @@ body {
     color: #475569;
     border: 1px solid rgba(100,116,139,0.25);
 }
+.lottery-badge-admin {
+    background: rgba(245, 158, 11, 0.18);
+    color: #b45309;
+    border: 1px solid rgba(245, 158, 11, 0.36);
+}
 
 /* Quiz Modal — fullscreen */
 .lottery-quiz-modal-content {
@@ -3058,6 +3078,11 @@ body {
     font-weight: 600;
     padding: 10px 16px;
     text-align: center;
+}
+.lottery-round-banner.lottery-round-banner-admin {
+    background: linear-gradient(90deg, #fffbeb, #fff7ed);
+    border-bottom-color: #fed7aa;
+    color: #92400e;
 }
 .lottery-rules-btn {
     width: 34px;
