@@ -18,19 +18,19 @@ LINE LIFF (frontend) → callApi() → Express REST API → MySQL (Aiven)
 ## Key Files
 | File | หน้าที่ |
 |------|---------|
-| `server.js` | Express backend ~3400 บรรทัด — API ทั้งหมด |
+| `server.js` | Express backend ~5800 บรรทัด — API ทั้งหมด |
 | `db.js` | MySQL connection pool — export `query()` และ `getClient()` |
 | `schema.sql` | Full schema สำหรับ fresh install (DROP + CREATE) |
 | `migration.sql` | ALTER statements สำหรับ patch production ที่มีข้อมูลแล้ว |
-| `app.js` | Frontend SPA logic ~5100 บรรทัด |
+| `app.js` | Frontend SPA logic ~7800 บรรทัด |
 | `index.html` | HTML template |
-| `style.css` | Custom styles (Bootstrap 5 overrides, LINE green theme) ~2460 บรรทัด |
+| `style.css` | Custom styles (Bootstrap 5 overrides, LINE green theme) ~3900 บรรทัด |
 
 ## Database
 - **Host:** Aiven Cloud MySQL 8.0
 - **Connection:** ผ่าน `DATABASE_URL` env variable
 - **Pool:** `db.getClient()` สำหรับ transaction, `db.query()` สำหรับ query ธรรมดา
-- **Tables:** 19 ตาราง + `audit_logs` (สร้างอัตโนมัติตอน server start)
+- **Tables:** 19 ตาราง + `audit_logs`, `lottery_dream_logs`, `safety_dream_items` (สร้างอัตโนมัติตอน server start)
 
 ## Environment Variables (.env)
 ```
@@ -208,7 +208,7 @@ fireConfetti('big')      // 3 bursts
 - User rules modal can be reopened from the Lottery modal header
 - Lottery modal content uses rounded clipping to avoid square white corners on mobile
 - User endpoints validate `requesterId`/`lineUserId` for Lottery user-owned data
-- `/api/lottery/current-round` hides test rounds from normal users
+- `/api/lottery/current-round` hides test rounds from normal users; admin (requesterId in admins table) sees test rounds via `includeTestRounds` flag
 - `lottery_rounds.isTest` supports admin-only test rounds
 - Admin result tab supports:
   - manual result entry
@@ -217,6 +217,25 @@ fireConfetti('big')      // 3 bursts
   - confirm result
   - process prizes and LINE Push winner notifications
 - If scheduled AI result fetch fails after retries, admins receive in-app notification and LINE Push alert, and the round becomes `pending_manual`
+
+### Safety Lottery — Round Management (Admin)
+- **สร้างงวด**: Manual จาก admin panel หรือ auto-cron 08:00 BKK สร้างงวดล่วงหน้า 3 วันก่อน 1/16 ของเดือน
+- **งวดทดสอบ** (`isTest=true`): มองเห็นเฉพาะ admin เท่านั้น ปุ่ม 🧪 เปิด lottery modal โดยตรง
+- **แก้งวด**: ปุ่ม ✏️ แก้วันที่ได้เฉพาะ `status=open`
+- **รีเซตตั๋ว**: ปุ่ม 🔄 ลบ tickets + คืน daily quota + คืน quiz answer links → ต้องพิมพ์ `RESET` ยืนยัน; บล็อก `confirmed`/`completed`
+  - ⚠️ `lottery_daily_purchases` ไม่มีคอลัมน์ `roundId` — ลบด้วย `lineUserId IN (affected users)`
+  - ⚠️ `lottery_quiz_answers` ไม่มีคอลัมน์ `roundId` — reset ด้วย `usedForTicketId IN (ticketIds)`
+  - ⚠️ `lottery_gold_ticket_claims` มี FK → `lottery_tickets.ticketId` — ต้องลบก่อน delete tickets
+- **ลบงวด**: ปุ่ม 🗑️ ลบได้เฉพาะงวด test หรืองวดที่ยังไม่มีตั๋ว
+
+### Safety Dream Numbers — ท่านอาจารย์จอห์นนี่
+- ปุ่ม 🔮 ในหน้าซื้อตั๋ว → เปิด dream modal
+- **3-step flow**: input (เลือกสัญลักษณ์ / พิมพ์ความฝัน) → loading → result (เลข 2/3 ตัว + คำแนะนำ Safety)
+- **Rate limit**: 1 ครั้ง/วัน/user — วันเดิมกดได้ดูผลเดิม (cached)
+- **ปุ่ม "ใช้เลขนี้"**: ปิด dream modal → เปิด lottery modal → set เลขในช่อง + switch type อัตโนมัติ
+- **AI**: Gemini `gemini-2.5-flash` → fallback models → static fallback ถ้า AI ล่ม
+- **Tables**: `safety_dream_items` (35 items, 7 categories, auto-seeded), `lottery_dream_logs` (rate limit + history)
+- **`LOTTERY_GEMINI_MODELS`** declared at line ~4169 — ใช้ร่วมกับ generate-questions และ fetch-result
 
 ### Department Leaderboard (Public)
 - `GET /api/department-leaderboard` (public) — top 10 แผนก by avgScore
@@ -284,6 +303,15 @@ fireConfetti('big')      // 3 bursts
 | U-10 | 429 Too Many Requests บน `/api/user/profile` | ลบออกจาก `authLimiter` |
 | U-11 | Profile avatar ไม่ชิดขอบ (now-playing-bar) | Full-bleed: `margin: 0 -18px; border-radius: 0` |
 
+### รอบที่ 4 — Lottery Reset Bugs
+| ID | ปัญหา | วิธีแก้ |
+|----|-------|---------|
+| L-1 | Reset: `DELETE FROM lottery_daily_purchases WHERE roundId=?` — ไม่มีคอลัมน์ `roundId` → SQL crash | ดึง lineUserId จาก tickets ก่อน แล้ว DELETE by `lineUserId IN (...)` |
+| L-2 | Reset: `DELETE FROM lottery_quiz_answers WHERE roundId=?` — ไม่มีคอลัมน์ `roundId` → SQL crash | UPDATE/DELETE by `usedForTicketId IN (SELECT ticketId FROM tickets WHERE roundId=?)` |
+| L-3 | Reset: ลบ lottery_tickets โดยไม่ลบ lottery_gold_ticket_claims ก่อน → FK violation crash | DELETE claims WHERE roundId=? ก่อน delete tickets |
+| L-4 | `loadAdminLotteryMonitor`: ternary ทั้งสองข้างเหมือนกัน → `keepSelection` ไม่มีผล | แก้เป็น `keepSelection ? $sel.val() : null` |
+| L-5 | `useDreamNumber`: ไม่มี null check บน `lotteryModalEl` → crash ถ้า element ไม่อยู่ใน DOM | เพิ่ม `lotteryModalEl &&` ก่อน `.classList` |
+
 ## AppState (Global State)
 ```javascript
 AppState = {
@@ -301,6 +329,8 @@ AppState = {
     _lastActivities,   // last loaded activities (used by filter tabs & home dashboard)
     _streakWarningShown,
     _filterActive,     // flag: filter tab is active (prevent cache overwrite)
+    // Dream Numbers state (module-level vars, not AppState)
+    // _dreamItems, _dreamSelectedItemId, _dreamResult
 }
 ```
 
@@ -319,6 +349,7 @@ AppState = {
 ## Cron Jobs
 - ทุกวัน 12:00 และ 15:00 (Asia/Bangkok) → `broadcastStreakReminders()`
 - แจ้งเตือน LINE push สำหรับ user ที่ streak กำลังจะหมด
+- ทุกวัน 08:00 (Asia/Bangkok) → auto-create lottery rounds สำหรับงวดที่อีก ≤3 วันจะถึง 1st/16th
 - วันที่ 1 และ 16 ตาม schedule ของ Lottery cron → AI fetch Thai lottery result; on repeated failure notify admins and require manual result handling
 
 ## Current Verification Commands

@@ -5641,12 +5641,37 @@ app.post('/api/admin/lottery/rounds/:roundId/reset-tickets', async (req, res) =>
             return res.status(400).json({ status: 'error', message: 'งวดนี้ยืนยันผลแล้ว รีเซตไม่ได้' });
 
         const [[{ ticketCount }]] = await db.query('SELECT COUNT(*) AS ticketCount FROM lottery_tickets WHERE roundId=?', [roundId]);
-        const [[{ purchaseCount }]] = await db.query('SELECT COUNT(*) AS purchaseCount FROM lottery_daily_purchases WHERE roundId=?', [roundId]);
-        const [[{ quizCount }]] = await db.query('SELECT COUNT(*) AS quizCount FROM lottery_quiz_answers WHERE roundId=?', [roundId]);
 
+        // lottery_daily_purchases has no roundId — count/delete by affected users
+        const [affectedRows] = await db.query('SELECT DISTINCT lineUserId FROM lottery_tickets WHERE roundId=?', [roundId]);
+        const affectedIds = affectedRows.map(r => r.lineUserId);
+
+        // lottery_quiz_answers has no roundId — count by usedForTicketId linkage
+        const [[{ quizCount }]] = await db.query(
+            `SELECT COUNT(*) AS quizCount FROM lottery_quiz_answers
+             WHERE usedForTicketId IN (SELECT ticketId FROM lottery_tickets WHERE roundId=?)`,
+            [roundId]
+        );
+
+        // Reset quiz answer links BEFORE deleting tickets (no FK but keeps answers reusable)
+        await db.query(
+            `UPDATE lottery_quiz_answers SET usedForTicketId=NULL
+             WHERE usedForTicketId IN (SELECT ticketId FROM lottery_tickets WHERE roundId=?)`,
+            [roundId]
+        );
+
+        // Remove gold ticket claims BEFORE deleting tickets (FK: claims.ticketId → tickets.ticketId)
+        await db.query('DELETE FROM lottery_gold_ticket_claims WHERE roundId=?', [roundId]);
+
+        // Delete tickets
         await db.query('DELETE FROM lottery_tickets WHERE roundId=?', [roundId]);
-        await db.query('DELETE FROM lottery_daily_purchases WHERE roundId=?', [roundId]);
-        await db.query('DELETE FROM lottery_quiz_answers WHERE roundId=?', [roundId]);
+
+        // Reset daily purchase quotas for affected users so they can buy again today
+        const purchaseCount = affectedIds.length;
+        if (affectedIds.length > 0) {
+            const ph = affectedIds.map(() => '?').join(',');
+            await db.query(`DELETE FROM lottery_daily_purchases WHERE lineUserId IN (${ph})`, affectedIds);
+        }
 
         await logAdminAction(requesterId, 'LOTTERY_RESET_TICKETS', 'round', roundId, round.drawDate,
             { ticketCount, purchaseCount, quizCount, isTest: !!round.isTest });

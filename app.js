@@ -6939,7 +6939,7 @@ async function loadAdminLotteryMonitor(keepSelection = false) {
     const $sel = $('#admin-monitor-round-select');
     if (!$wrap.length) return;
 
-    const selected = keepSelection ? $sel.val() : $sel.val();
+    const selected = keepSelection ? $sel.val() : null;
     $wrap.html('<div class="text-center py-4"><div class="spinner-border text-success"></div></div>');
     try {
         const params = { requesterId: AppState.lineProfile.userId };
@@ -7774,7 +7774,7 @@ function useDreamNumber(type) {
             updateLotteryCharCounter();
         }
         const lotteryModalEl = document.getElementById('lottery-modal');
-        if (!lotteryModalEl.classList.contains('show')) {
+        if (lotteryModalEl && !lotteryModalEl.classList.contains('show')) {
             openLotteryModal();
         }
     }, 400);
