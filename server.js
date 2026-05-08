@@ -4177,7 +4177,7 @@ const DEFAULT_LOTTERY_DISABLED_MESSAGE = 'ขณะนี้ Safety Lottery ก�
 async function getLotterySettings(conn = db) {
     const [rows] = await conn.query(
         `SELECT settingKey, settingValue FROM lottery_settings
-         WHERE settingKey IN ('user_enabled','disabled_message','prize_two','prize_three','price_two','price_three','daily_limit')`
+         WHERE settingKey IN ('user_enabled','disabled_message','prize_two','prize_three','price_two','price_three','daily_limit','maintenance_started_at')`
     );
     const map = Object.fromEntries(rows.map(r => [r.settingKey, r.settingValue]));
     return {
@@ -4187,7 +4187,8 @@ async function getLotterySettings(conn = db) {
         prizeThree: Number(map.prize_three) || 3000,
         priceTwo: Number(map.price_two) || 10,
         priceThree: Number(map.price_three) || 30,
-        dailyLimit: Number(map.daily_limit) || 5
+        dailyLimit: Number(map.daily_limit) || 5,
+        maintenanceStartedAt: map.maintenance_started_at || null
     };
 }
 
@@ -4570,7 +4571,7 @@ app.get('/api/lottery/current-round', async (req, res) => {
             r.status === 'open' &&
             !isLotteryRoundClosed(r) &&
             (includeTestRounds || !r.isTest) &&
-            (settings.userEnabled || r.isTest)
+            (settings.userEnabled || r.isTest || includeTestRounds)  // admin bypasses maintenance
         ) || null;
         if (!round) {
             const nextDrawDates = getNextLotteryDrawDates(2);
@@ -4683,7 +4684,7 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
             [roundId]);
         if (!round) throw new Error('ไม่พบงวดนี้');
         const requesterIsAdmin = await isLotteryAdmin(lineUserId, conn);
-        if (!settings.userEnabled && !(requesterIsAdmin && round.isTest)) {
+        if (!settings.userEnabled && !requesterIsAdmin) {
             const err = new Error(settings.disabledMessage || DEFAULT_LOTTERY_DISABLED_MESSAGE);
             err.statusCode = 403;
             throw err;
@@ -4871,7 +4872,9 @@ app.post('/api/lottery/claim-gold-ticket', async (req, res) => {
     const conn = await db.getClient();
     try {
         await conn.beginTransaction();
-        await ensureLotteryUserEnabled(conn);
+        const requesterId = req.body?.requesterId;
+        const isAdminCaller = requesterId ? await isLotteryAdmin(requesterId, conn) : false;
+        if (!isAdminCaller) await ensureLotteryUserEnabled(conn);
         const eligibility = await getLotteryGoldEligibility(lineUserId, conn);
         if (!eligibility.eligible) throw new Error(eligibility.reason || 'ยังไม่มีสิทธิ์รับตั๋วทอง');
 
@@ -5209,7 +5212,8 @@ app.post('/api/admin/lottery/settings', async (req, res) => {
 
         const pairs = [
             ['user_enabled', enabledValue, requesterId],
-            ['disabled_message', message, requesterId]
+            ['disabled_message', message, requesterId],
+            ['maintenance_started_at', userEnabled ? '' : new Date().toISOString(), requesterId]
         ];
         if (prizeTwo != null && Number(prizeTwo) > 0) pairs.push(['prize_two', String(Number(prizeTwo)), requesterId]);
         if (prizeThree != null && Number(prizeThree) > 0) pairs.push(['prize_three', String(Number(prizeThree)), requesterId]);

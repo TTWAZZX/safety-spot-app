@@ -6773,6 +6773,15 @@ async function openAdminLotteryModal() {
     await loadAdminLotteryMonitor(true);
 }
 
+function _maintenanceDuration(startedAt) {
+    if (!startedAt) return '';
+    const mins = Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000);
+    if (mins < 1) return 'เพิ่งเปิด';
+    if (mins < 60) return `${mins} นาที`;
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return m > 0 ? `${h} ชม. ${m} นาที` : `${h} ชั่วโมง`;
+}
+
 // -----------------------------------------------
 // loadAdminLotteryDashboard — Dashboard
 // -----------------------------------------------
@@ -6819,22 +6828,32 @@ async function loadAdminLotteryDashboard() {
         });
 
         const defaultMsg = 'ขณะนี้ Safety Lottery กำลังอยู่ในการปรับปรุง โปรดติดตามประกาศจากทีมบริหาร';
+        const durationStr = _maintenanceDuration(settings.maintenanceStartedAt);
         $el.html(`
-            <div class="lottery-admin-control mb-3">
-                <div>
-                    <div class="fw-bold">${userEnabled ? 'เปิดให้ผู้ใช้เข้าเล่นแล้ว' : 'ปิดการเข้าเล่นของผู้ใช้'}</div>
-                    <small class="text-muted">Admin ยังจัดการคำถาม งวด ผลรางวัล และ Monitor ได้ตามปกติ</small>
+            <div class="border rounded-3 mb-3 overflow-hidden">
+                <div class="px-3 py-2 d-flex align-items-center gap-2 flex-wrap"
+                     style="background:${userEnabled ? '#d1fae5' : '#fee2e2'}">
+                    <span class="fw-bold" style="color:${userEnabled ? '#065f46' : '#991b1b'}">
+                        ${userEnabled ? '🟢 เปิดให้ผู้ใช้เข้าเล่น' : '🔴 Maintenance Mode'}
+                    </span>
+                    ${!userEnabled && durationStr ? `<span class="badge bg-danger ms-1">เปิดมาแล้ว ${sanitizeHTML(durationStr)}</span>` : ''}
                 </div>
-                <div class="lottery-admin-control-actions">
-                    <input class="form-control form-control-sm" id="admin-lottery-disabled-message"
+                <div class="px-3 py-2 bg-white d-flex flex-wrap gap-2 align-items-center border-top">
+                    <input class="form-control form-control-sm flex-grow-1" id="admin-lottery-disabled-message"
                            value="${sanitizeHTML(settings.disabledMessage || defaultMsg)}"
-                           placeholder="ข้อความที่จะแสดงเมื่อปิดฟีเจอร์">
+                           placeholder="ข้อความที่แสดงให้ผู้ใช้เมื่อปิด"
+                           style="min-width:180px">
                     <div class="form-check form-switch m-0">
                         <input class="form-check-input" type="checkbox" role="switch" id="admin-lottery-user-enabled"
                                ${userEnabled ? 'checked' : ''} onchange="adminToggleLotteryUserAccess()">
-                        <label class="form-check-label small fw-semibold" for="admin-lottery-user-enabled">${userEnabled ? 'Enabled' : 'Disabled'}</label>
+                        <label class="form-check-label small fw-semibold" for="admin-lottery-user-enabled">
+                            ${userEnabled ? 'Enabled' : 'Disabled'}
+                        </label>
                     </div>
                 </div>
+                ${!userEnabled ? `<div class="px-3 py-2 border-top small" style="background:#fffbeb;color:#92400e">
+                    <i class="fas fa-flask me-1"></i>Admin ทดสอบได้ทุกอย่างตามปกติ (ซื้อตั๋ว, ทำนาย, quiz) — ผู้ใช้เห็น Maintenance แทน
+                </div>` : ''}
             </div>
 
             <div class="card mb-3 border-0 bg-light">
