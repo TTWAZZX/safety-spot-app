@@ -7771,9 +7771,7 @@ async function loadAdminDreamItems() {
 }
 
 async function loadAdminDreamLogs() {
-    const $panel = $('#admin-dream-logs-panel');
     const $list = $('#admin-dream-logs-list');
-    $panel.show();
     $list.html('<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-success"></div></div>');
     try {
         const rows = await callApi('/api/admin/lottery/dream-logs', {}, 'GET');
