@@ -18,11 +18,11 @@ LINE LIFF (frontend) → callApi() → Express REST API → MySQL (Aiven)
 ## Key Files
 | File | หน้าที่ |
 |------|---------|
-| `server.js` | Express backend ~5800 บรรทัด — API ทั้งหมด |
+| `server.js` | Express backend ~6130 บรรทัด — API ทั้งหมด |
 | `db.js` | MySQL connection pool — export `query()` และ `getClient()` |
 | `schema.sql` | Full schema สำหรับ fresh install (DROP + CREATE) |
 | `migration.sql` | ALTER statements สำหรับ patch production ที่มีข้อมูลแล้ว |
-| `app.js` | Frontend SPA logic ~7800 บรรทัด |
+| `app.js` | Frontend SPA logic ~7970 บรรทัด |
 | `index.html` | HTML template |
 | `style.css` | Custom styles (Bootstrap 5 overrides, LINE green theme) ~3900 บรรทัด |
 
@@ -229,13 +229,52 @@ fireConfetti('big')      // 3 bursts
 - **ลบงวด**: ปุ่ม 🗑️ ลบได้เฉพาะงวด test หรืองวดที่ยังไม่มีตั๋ว
 
 ### Safety Dream Numbers — ท่านอาจารย์จอห์นนี่
-- ปุ่ม 🔮 ในหน้าซื้อตั๋ว → เปิด dream modal
+- ปุ่ม 🔮 ในหน้าซื้อตั๋ว → เปิด dream modal (แสดงเสมอ แม้ไม่มีงวดเปิด)
 - **3-step flow**: input (เลือกสัญลักษณ์ / พิมพ์ความฝัน) → loading → result (เลข 2/3 ตัว + คำแนะนำ Safety)
-- **Rate limit**: 1 ครั้ง/วัน/user — วันเดิมกดได้ดูผลเดิม (cached)
+- **Rate limit**: 1 ครั้ง/วัน/user — วันเดิมกดได้ดูผลเดิม (cached); **Admin ไม่มี limit** — ทดสอบได้ไม่จำกัด
 - **ปุ่ม "ใช้เลขนี้"**: ปิด dream modal → เปิด lottery modal → set เลขในช่อง + switch type อัตโนมัติ
 - **AI**: Gemini `gemini-2.5-flash` → fallback models → static fallback ถ้า AI ล่ม
-- **Tables**: `safety_dream_items` (35 items, 7 categories, auto-seeded), `lottery_dream_logs` (rate limit + history)
 - **`LOTTERY_GEMINI_MODELS`** declared at line ~4169 — ใช้ร่วมกับ generate-questions และ fetch-result
+
+#### Tables — safety_dream_items (schema จริง)
+```sql
+dreamId     VARCHAR(20)  PRIMARY KEY   -- เช่น PPE001, AI001 (AI-generated)
+category    VARCHAR(20)                -- ppe|fire|electrical|chemical|height|machine|road
+itemName    VARCHAR(100)
+itemIcon    VARCHAR(10)                -- emoji
+number2d    CHAR(2)
+number3d    CHAR(3)
+safetyFact  TEXT                       -- ข้อเท็จจริงด้านความปลอดภัย (ใช้ใน AI prompt)
+promptHint  TEXT                       -- คำใบ้ให้ AI ทำนาย (ใช้ใน AI prompt)
+```
+⚠️ **อย่าใช้ `itemId` หรือ `luckyDigit`** — ไม่มีคอลัมน์นี้ ใช้ `dreamId`, `number2d`, `number3d`
+
+#### Table — lottery_dream_logs
+```sql
+logId        VARCHAR(50)  PRIMARY KEY
+lineUserId   VARCHAR(60)
+dreamText    TEXT
+dreamItemId  VARCHAR(20)  -- FK ref safety_dream_items.dreamId (no hard FK constraint)
+result       JSON         -- full AI response object
+createdAt    TIMESTAMP
+```
+
+#### Admin Dream Management (tab "ท่านอาจารย์" ใน admin lottery modal)
+| Endpoint | วิธีใช้ |
+|----------|---------|
+| `GET /api/admin/lottery/dream-items` | รายการสัญลักษณ์ทั้งหมด (full schema) |
+| `POST /api/admin/lottery/dream-items` | เพิ่มเอง — body: `{dreamId, category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint}` |
+| `PUT /api/admin/lottery/dream-items/:dreamId` | แก้ไข — body: fields ที่ต้องการแก้ |
+| `DELETE /api/admin/lottery/dream-items/:dreamId` | ลบสัญลักษณ์ |
+| `POST /api/admin/lottery/dream-items/generate` | AI สร้างใหม่ — body: `{count: 1-20}` ไม่ซ้ำของเดิม; dreamId auto = `AI001`, `AI002`... |
+| `GET /api/admin/lottery/dream-logs` | ประวัติ 100 รายการล่าสุด พร้อม displayName, department, itemName |
+| `DELETE /api/admin/lottery/dream-logs/user/:lineUserId` | รีเซต daily limit วันนี้ของ user คนนั้น |
+
+**App.js functions**: `loadAdminDreamItems()`, `adminAddDreamItem()`, `adminEditDreamItem(dreamId)`, `adminDeleteDreamItem(dreamId, itemName)`, `adminGenerateDreamItems()`, `loadAdminDreamLogs()`, `adminResetDreamLimit(lineUserId, displayName)`
+
+**⚠️ Swal preConfirm pattern**: admin form functions ต้อง capture `{ value: vals, isConfirmed }` จาก `Swal.fire()` — ห้ามเรียก `_dreamFormValues()` หลัง Swal ปิด เพราะ DOM elements ถูกทำลายแล้ว
+
+**Module-level vars (dream)**: `_dreamItems`, `_dreamSelectedItemId`, `_dreamResult`, `_adminDreamItemsCache`
 
 ### Department Leaderboard (Public)
 - `GET /api/department-leaderboard` (public) — top 10 แผนก by avgScore
@@ -312,6 +351,17 @@ fireConfetti('big')      // 3 bursts
 | L-4 | `loadAdminLotteryMonitor`: ternary ทั้งสองข้างเหมือนกัน → `keepSelection` ไม่มีผล | แก้เป็น `keepSelection ? $sel.val() : null` |
 | L-5 | `useDreamNumber`: ไม่มี null check บน `lotteryModalEl` → crash ถ้า element ไม่อยู่ใน DOM | เพิ่ม `lotteryModalEl &&` ก่อน `.classList` |
 
+### รอบที่ 5 — Dream Numbers Schema & Admin Bugs
+| ID | ปัญหา | วิธีแก้ |
+|----|-------|---------|
+| D-1 | `safety_dream_items` schema ใน production ต่างจากที่ server คาดไว้ — ใช้ `dreamId VARCHAR(20)` ไม่ใช่ `itemId INT`, ใช้ `number2d`/`number3d` ไม่ใช่ `luckyDigit` → 500 ทุก endpoint | Rewrite ทุก query ให้ใช้ schema จริง |
+| D-2 | `lottery_dream_logs` ขาดคอลัมน์ `result`, `dreamItemId` → `Unknown column` error | ALTER TABLE ADD COLUMN (idempotent patch ตอน server start) |
+| D-3 | SQL patch ใช้ `'SELECT "ok"'` → DBeaver ตีความ `"ok"` เป็น column identifier → error | เปลี่ยนเป็น `'SELECT 1'` |
+| D-4 | `renderDreamItems`: `onclick="selectDreamItem(${item.itemId})"` — dreamId เป็น string ไม่มีเครื่องหมาย quote → JS error | แก้เป็น `onclick="selectDreamItem('${item.itemId}', this)"` |
+| D-5 | Dream shortcut button อยู่ใน `#lottery-form-content` → ซ่อนเมื่อไม่มีงวด | ย้ายออกมาอยู่นอก div เพื่อแสดงเสมอ |
+| D-6 | **CRITICAL**: `adminEditDreamItem`/`adminAddDreamItem` เรียก `_dreamFormValues()` หลัง `Swal.fire()` resolve → DOM ถูกทำลายแล้ว → ส่งค่าว่างไป overwrite DB | เปลี่ยนเป็น `const { value: vals, isConfirmed } = await Swal.fire({..., preConfirm: () => _dreamFormValues()})` |
+| D-7 | Admin mutation functions reset `_dreamItems` แต่ไม่ reset `_adminDreamItemsCache` → edit form อาจใช้ข้อมูลเก่า | เพิ่ม `_adminDreamItemsCache = null` ในทุก mutation |
+
 ## AppState (Global State)
 ```javascript
 AppState = {
@@ -331,6 +381,7 @@ AppState = {
     _filterActive,     // flag: filter tab is active (prevent cache overwrite)
     // Dream Numbers state (module-level vars, not AppState)
     // _dreamItems, _dreamSelectedItemId, _dreamResult
+    // _adminDreamItemsCache  — admin dream items list cache (for edit lookup)
 }
 ```
 

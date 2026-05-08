@@ -7660,6 +7660,290 @@ async function aiGenerateLotteryQuestions() {
 }
 
 // ======================================================
+// ADMIN — DREAM ITEMS MANAGEMENT
+// ======================================================
+
+let _adminDreamItemsCache = null;
+
+const DREAM_CATEGORIES = ['ppe', 'fire', 'electrical', 'chemical', 'height', 'machine', 'road'];
+const DREAM_CAT_LABELS = { ppe: 'PPE', fire: 'ไฟ/เพลิงไหม้', electrical: 'ไฟฟ้า', chemical: 'สารเคมี', height: 'งานที่สูง', machine: 'เครื่องจักร', road: 'ยานพาหนะ' };
+const DREAM_CAT_ICONS  = { ppe: '🦺', fire: '🔥', electrical: '⚡', chemical: '☢️', height: '🏗️', machine: '⚙️', road: '🚛' };
+
+function _dreamItemFormHtml(item) {
+    const catOptions = DREAM_CATEGORIES.map(c =>
+        `<option value="${c}" ${item && item.category === c ? 'selected' : ''}>${DREAM_CAT_ICONS[c]} ${DREAM_CAT_LABELS[c]}</option>`
+    ).join('');
+    return `<div class="text-start">
+        <div class="row g-2 mb-2">
+            ${!item ? `<div class="col-6">
+                <label class="form-label small fw-semibold mb-1">Dream ID <span class="text-danger">*</span></label>
+                <input class="form-control form-control-sm" id="df-id" placeholder="เช่น PPE008" maxlength="20" value="">
+            </div>` : `<div class="col-6">
+                <label class="form-label small fw-semibold mb-1">Dream ID</label>
+                <input class="form-control form-control-sm" id="df-id" value="${sanitizeHTML(item.dreamId)}" disabled>
+            </div>`}
+            <div class="col-6">
+                <label class="form-label small fw-semibold mb-1">ไอคอน</label>
+                <input class="form-control form-control-sm text-center" id="df-icon" placeholder="🔹" maxlength="4" value="${item ? sanitizeHTML(item.itemIcon || '') : ''}">
+            </div>
+        </div>
+        <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">ชื่อสัญลักษณ์ <span class="text-danger">*</span></label>
+            <input class="form-control form-control-sm" id="df-name" placeholder="เช่น หมวกนิรภัย" value="${item ? sanitizeHTML(item.itemName) : ''}">
+        </div>
+        <div class="row g-2 mb-2">
+            <div class="col-5">
+                <label class="form-label small fw-semibold mb-1">หมวดหมู่</label>
+                <select class="form-select form-select-sm" id="df-cat">${catOptions}</select>
+            </div>
+            <div class="col-3">
+                <label class="form-label small fw-semibold mb-1">เลข 2D</label>
+                <input class="form-control form-control-sm text-center fw-bold" id="df-2d" maxlength="2" inputmode="numeric" placeholder="47" value="${item ? sanitizeHTML(item.number2d) : ''}">
+            </div>
+            <div class="col-4">
+                <label class="form-label small fw-semibold mb-1">เลข 3D</label>
+                <input class="form-control form-control-sm text-center fw-bold" id="df-3d" maxlength="3" inputmode="numeric" placeholder="234" value="${item ? sanitizeHTML(item.number3d) : ''}">
+            </div>
+        </div>
+        <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Safety Fact</label>
+            <textarea class="form-control form-control-sm" id="df-safety" rows="2" placeholder="ข้อเท็จจริงด้านความปลอดภัย">${item ? sanitizeHTML(item.safetyFact || '') : ''}</textarea>
+        </div>
+        <div class="mb-0">
+            <label class="form-label small fw-semibold mb-1">Prompt Hint (คำใบ้ให้ AI)</label>
+            <textarea class="form-control form-control-sm" id="df-hint" rows="2" placeholder="คำใบ้โยงกับโชคลาภและความปลอดภัย">${item ? sanitizeHTML(item.promptHint || '') : ''}</textarea>
+        </div>
+    </div>`;
+}
+
+function _dreamFormValues() {
+    return {
+        dreamId: (document.getElementById('df-id')?.value || '').trim(),
+        itemName: (document.getElementById('df-name')?.value || '').trim(),
+        itemIcon: (document.getElementById('df-icon')?.value || '').trim() || '🔹',
+        category: document.getElementById('df-cat')?.value || 'ppe',
+        number2d: (document.getElementById('df-2d')?.value || '').trim(),
+        number3d: (document.getElementById('df-3d')?.value || '').trim(),
+        safetyFact: (document.getElementById('df-safety')?.value || '').trim(),
+        promptHint: (document.getElementById('df-hint')?.value || '').trim(),
+    };
+}
+
+async function loadAdminDreamItems() {
+    const $list = $('#admin-dream-items-list');
+    $list.html('<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div></div>');
+    $('#admin-dream-logs-panel').hide();
+    try {
+        const rows = await callApi('/api/admin/lottery/dream-items', {}, 'GET');
+        _adminDreamItemsCache = rows || [];
+        if (!rows || rows.length === 0) {
+            $list.html('<p class="text-muted text-center py-3">ยังไม่มีสัญลักษณ์ กด "AI สร้างสัญลักษณ์" หรือ "เพิ่มเอง" เพื่อเริ่มต้น</p>');
+            return;
+        }
+        const grouped = {};
+        for (const r of rows) {
+            if (!grouped[r.category]) grouped[r.category] = [];
+            grouped[r.category].push(r);
+        }
+        let html = `<div class="table-responsive"><table class="table table-sm table-hover align-middle small mb-0">
+            <thead class="table-light"><tr><th>ID</th><th>ไอคอน</th><th>ชื่อ</th><th>หมวด</th><th>2D</th><th>3D</th><th></th></tr></thead><tbody>`;
+        for (const [cat, items] of Object.entries(grouped)) {
+            html += `<tr class="table-secondary"><td colspan="7"><strong>${DREAM_CAT_ICONS[cat] || '🔹'} ${sanitizeHTML(DREAM_CAT_LABELS[cat] || cat)}</strong> <span class="text-muted">(${items.length})</span></td></tr>`;
+            for (const r of items) {
+                const eid = sanitizeHTML(r.dreamId);
+                html += `<tr>
+                    <td class="text-muted">${eid}</td>
+                    <td class="fs-5">${sanitizeHTML(r.itemIcon || '')}</td>
+                    <td>${sanitizeHTML(r.itemName)}</td>
+                    <td><span class="badge bg-secondary">${sanitizeHTML(r.category)}</span></td>
+                    <td class="fw-bold text-success">${sanitizeHTML(r.number2d)}</td>
+                    <td class="fw-bold text-primary">${sanitizeHTML(r.number3d)}</td>
+                    <td class="text-nowrap">
+                        <button class="btn btn-xs py-0 px-1 btn-outline-primary me-1" onclick="adminEditDreamItem('${eid}')" title="แก้ไข"><i class="fas fa-pen"></i></button>
+                        <button class="btn btn-xs py-0 px-1 btn-outline-danger" onclick="adminDeleteDreamItem('${eid}','${sanitizeHTML(r.itemName)}')" title="ลบ"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            }
+        }
+        html += `</tbody></table></div><p class="text-muted small mt-2 mb-0">รวม ${rows.length} สัญลักษณ์</p>`;
+        $list.html(html);
+    } catch (e) { $list.html(`<div class="alert alert-danger small">${sanitizeHTML(e.message)}</div>`); }
+}
+
+async function loadAdminDreamLogs() {
+    const $panel = $('#admin-dream-logs-panel');
+    const $list = $('#admin-dream-logs-list');
+    $panel.show();
+    $list.html('<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-success"></div></div>');
+    try {
+        const rows = await callApi('/api/admin/lottery/dream-logs', {}, 'GET');
+        if (!rows || rows.length === 0) {
+            $list.html('<p class="text-muted small">ยังไม่มีประวัติการขอพยากรณ์</p>');
+            return;
+        }
+        const html = rows.map(r => {
+            const uid = sanitizeHTML(r.lineUserId);
+            const name = sanitizeHTML(r.displayName || r.lineUserId);
+            return `<div class="d-flex align-items-start gap-2 border-bottom py-2 small">
+                <span class="fs-5">${sanitizeHTML(r.itemIcon || '🔮')}</span>
+                <div class="flex-grow-1">
+                    <div class="fw-semibold">${name} <span class="text-muted fw-normal">${sanitizeHTML(r.department || '')}</span></div>
+                    <div>เลือก: <strong>${sanitizeHTML(r.itemName || '—')}</strong>${r.dreamText ? ` | ฝัน: "${sanitizeHTML(r.dreamText)}"` : ''}</div>
+                </div>
+                <div class="d-flex flex-column align-items-end gap-1">
+                    <span class="text-muted text-nowrap">${formatTimeAgo(r.createdAt)}</span>
+                    <button class="btn btn-xs py-0 px-1 btn-outline-warning" onclick="adminResetDreamLimit('${uid}','${name}')" title="รีเซต daily limit วันนี้"><i class="fas fa-redo"></i></button>
+                </div>
+            </div>`;
+        }).join('');
+        $list.html(html);
+    } catch (e) { $list.html(`<div class="alert alert-danger small">${sanitizeHTML(e.message)}</div>`); }
+}
+
+async function adminEditDreamItem(dreamId) {
+    const item = (_adminDreamItemsCache || []).find(r => r.dreamId === dreamId);
+    if (!item) return Swal.fire('ไม่พบข้อมูล', `dreamId: ${dreamId}`, 'error');
+    const { value: vals, isConfirmed } = await Swal.fire({
+        title: `✏️ แก้ไข ${item.itemName}`,
+        html: _dreamItemFormHtml(item),
+        width: 500,
+        showCancelButton: true,
+        confirmButtonText: 'บันทึก',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#0d6efd',
+        preConfirm: () => {
+            const v = _dreamFormValues();
+            if (!v.itemName) { Swal.showValidationMessage('กรุณากรอกชื่อสัญลักษณ์'); return false; }
+            return v;
+        }
+    });
+    if (!isConfirmed || !vals) return;
+    try {
+        await callApi(`/api/admin/lottery/dream-items/${encodeURIComponent(dreamId)}`, vals, 'PUT');
+        showToast(`บันทึก "${vals.itemName}" แล้ว`, 'success');
+        _adminDreamItemsCache = null;
+        _dreamItems = null;
+        await loadAdminDreamItems();
+    } catch (e) { Swal.fire('Error', e.message, 'error'); }
+}
+
+async function adminAddDreamItem() {
+    const { value: vals, isConfirmed } = await Swal.fire({
+        title: '➕ เพิ่มสัญลักษณ์ใหม่',
+        html: _dreamItemFormHtml(null),
+        width: 500,
+        showCancelButton: true,
+        confirmButtonText: 'เพิ่ม',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#198754',
+        preConfirm: () => {
+            const v = _dreamFormValues();
+            if (!v.dreamId) { Swal.showValidationMessage('กรุณากรอก Dream ID'); return false; }
+            if (!v.itemName) { Swal.showValidationMessage('กรุณากรอกชื่อสัญลักษณ์'); return false; }
+            return v;
+        }
+    });
+    if (!isConfirmed || !vals) return;
+    try {
+        await callApi('/api/admin/lottery/dream-items', vals, 'POST');
+        showToast(`เพิ่ม "${vals.itemName}" แล้ว`, 'success');
+        _adminDreamItemsCache = null;
+        _dreamItems = null;
+        await loadAdminDreamItems();
+    } catch (e) { Swal.fire('Error', e.message, 'error'); }
+}
+
+async function adminDeleteDreamItem(dreamId, itemName) {
+    const { isConfirmed } = await Swal.fire({
+        title: `ลบ "${itemName}"?`,
+        text: `dreamId: ${dreamId} จะถูกลบออกจากระบบ`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ลบ',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#dc3545'
+    });
+    if (!isConfirmed) return;
+    try {
+        await callApi(`/api/admin/lottery/dream-items/${encodeURIComponent(dreamId)}`, {}, 'DELETE');
+        showToast(`ลบ "${itemName}" แล้ว`, 'success');
+        _adminDreamItemsCache = null;
+        _dreamItems = null;
+        await loadAdminDreamItems();
+    } catch (e) { Swal.fire('Error', e.message, 'error'); }
+}
+
+async function adminResetDreamLimit(lineUserId, displayName) {
+    const { isConfirmed } = await Swal.fire({
+        title: `รีเซต daily limit?`,
+        html: `<p>ลบประวัติการทำนายวันนี้ของ <strong>${sanitizeHTML(displayName)}</strong> ออก<br>เพื่อให้ผู้ใช้สามารถขอพยากรณ์ใหม่ได้อีกครั้ง</p>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'รีเซต',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#fd7e14'
+    });
+    if (!isConfirmed) return;
+    try {
+        const result = await callApi(`/api/admin/lottery/dream-logs/user/${encodeURIComponent(lineUserId)}`, {}, 'DELETE');
+        showToast(`รีเซตแล้ว (ลบ ${result?.deleted || 0} รายการ)`, 'success');
+        await loadAdminDreamLogs();
+    } catch (e) { Swal.fire('Error', e.message, 'error'); }
+}
+
+async function adminGenerateDreamItems() {
+    const { value: count, isConfirmed } = await Swal.fire({
+        title: '🔮 AI สร้างสัญลักษณ์ใหม่',
+        html: `<p class="text-muted small mb-3">ท่านอาจารย์จอห์นนี่จะสร้างสัญลักษณ์ใหม่โดยอัตโนมัติ ไม่ซ้ำของเดิม</p>
+               <label class="form-label fw-semibold">จำนวนสัญลักษณ์ที่ต้องการ (สูงสุด 20)</label>
+               <input type="number" id="dream-gen-count" class="swal2-input" value="5" min="1" max="20" style="width:120px">`,
+        showCancelButton: true,
+        confirmButtonText: '🔮 สร้างเลย',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#6f42c1',
+        preConfirm: () => {
+            const v = parseInt(document.getElementById('dream-gen-count').value);
+            if (!v || v < 1 || v > 20) { Swal.showValidationMessage('กรุณากรอก 1–20'); return false; }
+            return v;
+        }
+    });
+    if (!isConfirmed) return;
+
+    Swal.fire({ title: 'กำลังสร้าง...', text: 'ท่านอาจารย์กำลังประทานสัญลักษณ์ใหม่ รอสักครู่', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    try {
+        const result = await callApi('/api/admin/lottery/dream-items/generate', { count }, 'POST');
+        Swal.close();
+        if (!result || !result.inserted) throw new Error('ไม่ได้รับข้อมูลจาก AI');
+
+        const previewHtml = result.inserted.map(item =>
+            `<div class="d-flex align-items-center gap-2 py-1 border-bottom small">
+                <span>${sanitizeHTML(item.itemIcon || '')}</span>
+                <span class="fw-semibold">${sanitizeHTML(item.itemName)}</span>
+                <span class="badge bg-secondary ms-auto">${sanitizeHTML(item.category || '')}</span>
+                <span class="text-success fw-bold">${sanitizeHTML(item.number2d)}</span>
+                <span class="text-primary fw-bold">${sanitizeHTML(item.number3d)}</span>
+            </div>`
+        ).join('');
+
+        await Swal.fire({
+            title: `สร้างสำเร็จ ${result.count} สัญลักษณ์`,
+            html: `<div class="text-start" style="max-height:320px;overflow-y:auto">${previewHtml || '<p class="text-muted">ไม่มีรายการใหม่ (อาจซ้ำทั้งหมด)</p>'}</div>`,
+            icon: 'success',
+            confirmButtonText: 'ตกลง',
+            confirmButtonColor: '#6f42c1'
+        });
+
+        _adminDreamItemsCache = null;
+        _dreamItems = null;
+        await loadAdminDreamItems();
+    } catch (e) {
+        Swal.close();
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
+
+// ======================================================
 // SAFETY DREAM NUMBERS — ท่านอาจารย์จอห์นนี่
 // ======================================================
 
@@ -7708,8 +7992,9 @@ function renderDreamItems() {
         html += `<div class="dream-category-label">${categoryIcons[cat] || '🔹'} ${sanitizeHTML(data.label)}</div>
                  <div class="dream-items-row">`;
         for (const item of data.items) {
-            html += `<button class="dream-item-chip" data-item-id="${item.itemId}" onclick="selectDreamItem(${item.itemId}, this)">
-                         ${sanitizeHTML(item.itemName)}
+            const icon = item.itemIcon ? item.itemIcon + ' ' : '';
+            html += `<button class="dream-item-chip" data-item-id="${item.itemId}" onclick="selectDreamItem('${item.itemId}', this)">
+                         ${icon}${sanitizeHTML(item.itemName)}
                      </button>`;
         }
         html += `</div>`;

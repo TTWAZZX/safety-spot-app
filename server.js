@@ -5782,95 +5782,26 @@ app.post('/api/admin/lottery/broadcast-new-round', async (req, res) => {
 // SAFETY DREAM NUMBERS — ท่านอาจารย์จอห์นนี่
 // ======================================================
 
-// Startup: ensure safety_dream_items table exists then seed if empty
-db.query(`CREATE TABLE IF NOT EXISTS safety_dream_items (
-  itemId      INT AUTO_INCREMENT PRIMARY KEY,
-  category    VARCHAR(30)  NOT NULL,
-  itemName    VARCHAR(100) NOT NULL,
-  luckyDigit  VARCHAR(3)   NOT NULL,
-  INDEX idx_dream_category (category)
-)`).catch(() => {});
+// Startup: ensure lottery_dream_logs table exists (safety_dream_items created manually by admin)
+// lottery_dream_logs uses dreamItemId VARCHAR(20) to reference safety_dream_items.dreamId
 
-// Patch: rename 'id' → 'itemId' if table was created with old schema
-db.query(`SELECT COUNT(*) AS cnt FROM information_schema.columns
-  WHERE table_schema=DATABASE() AND table_name='safety_dream_items' AND column_name='id'`)
-  .then(([[{ cnt }]]) => {
-      if (!cnt) return;
-      return db.query('ALTER TABLE safety_dream_items CHANGE id itemId INT AUTO_INCREMENT');
-  }).catch(() => {});
-
-// Patch: add missing columns to lottery_dream_logs if created with old schema
-db.query(`SELECT COUNT(*) AS cnt FROM information_schema.columns
-  WHERE table_schema=DATABASE() AND table_name='lottery_dream_logs' AND column_name='result'`)
-  .then(([[{ cnt }]]) => {
-      if (cnt) return;
-      return db.query(
-          'ALTER TABLE lottery_dream_logs ADD COLUMN dreamText TEXT, ADD COLUMN itemId INT DEFAULT NULL, ADD COLUMN result JSON'
-      );
-  }).catch(() => {});
-
-db.query('SELECT COUNT(*) AS cnt FROM safety_dream_items').then(([[{ cnt }]]) => {
-    if (cnt > 0) return;
-    const items = [
-        // PPE
-        ['ppe', 'หมวกนิรภัย', '01'],
-        ['ppe', 'แว่นตานิรภัย', '02'],
-        ['ppe', 'ถุงมือนิรภัย', '03'],
-        ['ppe', 'รองเท้าเซฟตี้', '04'],
-        ['ppe', 'ชุด PPE เต็มตัว', '05'],
-        // ไฟ
-        ['fire', 'ไฟไหม้', '11'],
-        ['fire', 'ถังดับเพลิง', '12'],
-        ['fire', 'สายดับเพลิง', '13'],
-        ['fire', 'สัญญาณเตือนไฟ', '14'],
-        ['fire', 'ควันไฟ', '15'],
-        // ไฟฟ้า
-        ['electrical', 'สายไฟ', '21'],
-        ['electrical', 'แผงไฟฟ้า', '22'],
-        ['electrical', 'ไฟฟ้าช็อต', '23'],
-        ['electrical', 'สายดิน', '24'],
-        ['electrical', 'กระแสไฟรั่ว', '25'],
-        // สารเคมี
-        ['chemical', 'สารเคมีรั่ว', '31'],
-        ['chemical', 'ถังสารเคมี', '32'],
-        ['chemical', 'ควันพิษ', '33'],
-        ['chemical', 'กรดกัดกร่อน', '34'],
-        ['chemical', 'ป้ายอันตราย', '35'],
-        // ที่สูง
-        ['height', 'ตกจากที่สูง', '41'],
-        ['height', 'นั่งร้าน', '42'],
-        ['height', 'เชือกนิรภัย', '43'],
-        ['height', 'บันได', '44'],
-        ['height', 'หลังคา', '45'],
-        // เครื่องจักร
-        ['machine', 'เครื่องจักร', '51'],
-        ['machine', 'ใบมีดหมุน', '52'],
-        ['machine', 'ระบบลำเลียง', '53'],
-        ['machine', 'การ์ดเครื่องจักร', '54'],
-        ['machine', 'ชิ้นส่วนกระเด็น', '55'],
-        // ถนน/ยานพาหนะ
-        ['road', 'รถโฟล์คลิฟท์', '61'],
-        ['road', 'อุบัติเหตุรถ', '62'],
-        ['road', 'ทางข้ามปลอดภัย', '63'],
-        ['road', 'สัญญาณจราจร', '64'],
-        ['road', 'รถบรรทุก', '65'],
-    ];
-    db.query(
-        `INSERT INTO safety_dream_items (category, itemName, luckyDigit) VALUES ${items.map(() => '(?,?,?)').join(',')}`,
-        items.flat()
-    ).catch(e => console.warn('Dream seed failed:', e.message));
-}).catch(() => {});
-
-// Startup: ensure lottery_dream_logs table exists
 db.query(`CREATE TABLE IF NOT EXISTS lottery_dream_logs (
-    logId       VARCHAR(50) PRIMARY KEY,
-    lineUserId  VARCHAR(60) NOT NULL,
-    dreamText   TEXT,
-    itemId      INT,
-    result      JSON,
-    createdAt   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    logId        VARCHAR(50)  PRIMARY KEY,
+    lineUserId   VARCHAR(60)  NOT NULL,
+    dreamText    TEXT,
+    dreamItemId  VARCHAR(20)  DEFAULT NULL,
+    result       JSON,
+    createdAt    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_dream_user_date (lineUserId, createdAt)
 )`).catch(() => {});
+
+// Patch: add dreamItemId if table was created without it
+db.query(`SELECT COUNT(*) AS cnt FROM information_schema.columns
+  WHERE table_schema=DATABASE() AND table_name='lottery_dream_logs' AND column_name='dreamItemId'`)
+  .then(([[{ cnt }]]) => {
+      if (cnt) return;
+      return db.query('ALTER TABLE lottery_dream_logs ADD COLUMN dreamItemId VARCHAR(20) DEFAULT NULL');
+  }).catch(() => {});
 
 const JOHNNY_SYSTEM_PROMPT = `คุณคือ "ท่านอาจารย์จอห์นนี่" — นักพยากรณ์โหราศาสตร์ลึกลับแห่งอาณาจักรความปลอดภัย
 บุคลิก: พูดด้วยน้ำเสียงลึกลับ ศักดิ์สิทธิ์ มีความเมตตา แต่แฝงด้วยอารมณ์ขันเล็กน้อย
@@ -5878,15 +5809,17 @@ const JOHNNY_SYSTEM_PROMPT = `คุณคือ "ท่านอาจารย
 เชี่ยวชาญ: โยงสัญลักษณ์ความฝัน/สัญลักษณ์ความปลอดภัยเข้ากับตัวเลขมงคล + คำแนะนำความปลอดภัยที่ปฏิบัติได้จริง
 ข้อห้าม: ห้ามรับประกันผลลอตเตอรี่ ต้องใส่ข้อความเตือนว่าการทำนายเพื่อความสนุกเท่านั้น`;
 
-// GET /api/lottery/dream-items — รายการสัญลักษณ์
+// GET /api/lottery/dream-items — รายการสัญลักษณ์ (ใช้ schema จริง: dreamId, itemIcon, number2d, number3d)
 app.get('/api/lottery/dream-items', async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT itemId, category, itemName, luckyDigit FROM safety_dream_items ORDER BY category, itemId');
+        const [rows] = await db.query(
+            'SELECT dreamId, category, itemName, itemIcon, number2d, number3d FROM safety_dream_items ORDER BY category, dreamId'
+        );
         const grouped = {};
         const categoryLabels = { ppe: 'อุปกรณ์ PPE', fire: 'ไฟ/เพลิงไหม้', electrical: 'ไฟฟ้า', chemical: 'สารเคมี', height: 'งานที่สูง', machine: 'เครื่องจักร', road: 'ยานพาหนะ' };
         for (const r of rows) {
             if (!grouped[r.category]) grouped[r.category] = { label: categoryLabels[r.category] || r.category, items: [] };
-            grouped[r.category].items.push({ itemId: r.itemId, itemName: r.itemName, luckyDigit: r.luckyDigit });
+            grouped[r.category].items.push({ itemId: r.dreamId, itemName: r.itemName, itemIcon: r.itemIcon, number2d: r.number2d, number3d: r.number3d });
         }
         res.json({ status: 'success', data: grouped });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
@@ -5910,11 +5843,18 @@ app.get('/api/lottery/dream-today', async (req, res) => {
 
 // POST /api/lottery/dream-interpret — ท่านอาจารย์จอห์นนี่พยากรณ์
 app.post('/api/lottery/dream-interpret', async (req, res) => {
-    const { lineUserId, dreamText, itemId } = req.body;
+    const { lineUserId, dreamText, itemId, requesterId } = req.body;
     if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
     if (!dreamText && !itemId) return res.status(400).json({ status: 'error', message: 'dreamText หรือ itemId ต้องระบุอย่างน้อยหนึ่งอย่าง' });
     try {
-        // Rate limit: 1 ครั้ง/วัน/user
+        // Admin bypass: แอดมินทำนายได้ไม่จำกัดครั้ง (สำหรับทดสอบ)
+        let isAdminCaller = false;
+        if (requesterId) {
+            const [[adminRow]] = await db.query('SELECT lineUserId FROM admins WHERE lineUserId=? LIMIT 1', [requesterId]);
+            isAdminCaller = !!adminRow;
+        }
+
+        // Rate limit: 1 ครั้ง/วัน/user (ข้ามสำหรับแอดมิน)
         const today = getBangkokDateString();
         const [[existing]] = await db.query(
             `SELECT logId, result FROM lottery_dream_logs
@@ -5922,39 +5862,50 @@ app.post('/api/lottery/dream-interpret', async (req, res) => {
              ORDER BY createdAt DESC LIMIT 1`,
             [lineUserId, today]
         );
-        if (existing) {
+        if (!isAdminCaller && existing) {
             return res.json({ status: 'success', data: { ...existing.result, cached: true } });
         }
 
-        // Build context for AI
-        let itemName = null;
-        let luckyDigit = null;
+        // Build context for AI — ใช้ schema จริง: dreamId (string), number2d, number3d, promptHint, safetyFact
+        let itemName = null, item2d = null, item3d = null, itemPromptHint = null, itemSafetyFact = null;
         if (itemId) {
-            const [[item]] = await db.query('SELECT itemName, luckyDigit FROM safety_dream_items WHERE itemId=?', [itemId]);
-            if (item) { itemName = item.itemName; luckyDigit = item.luckyDigit; }
+            const [[item]] = await db.query(
+                'SELECT itemName, number2d, number3d, promptHint, safetyFact FROM safety_dream_items WHERE dreamId=?',
+                [itemId]
+            );
+            if (item) {
+                itemName = item.itemName;
+                item2d = item.number2d;
+                item3d = item.number3d;
+                itemPromptHint = item.promptHint;
+                itemSafetyFact = item.safetyFact;
+            }
         }
 
         // Focus subject: symbol name, dream text, or both
         const focusSubject = [itemName, dreamText].filter(Boolean).join(' และ ');
-        const seedHint = luckyDigit
-            ? `เลขนำโชคพื้นฐานของ "${itemName}" คือ ${luckyDigit} — ให้ใช้เลขนี้เป็นแก่นในการคำนวณเลข 2 ตัวและ 3 ตัว`
+        const seedHint = item2d
+            ? `เลขนำโชคของ "${itemName}": 2 ตัว = ${item2d}, 3 ตัว = ${item3d} — ให้ใช้เลขคู่นี้เป็นแก่นหลัก และอธิบายความเชื่อมโยงกับสัญลักษณ์`
             : '';
+        const hintFromTable = [itemPromptHint, itemSafetyFact].filter(Boolean).join(' | ');
 
         const prompt = `ลูกศิษย์ถามเรื่อง: "${focusSubject}"
 ${dreamText ? `รายละเอียด: ${dreamText}` : ''}
 ${seedHint}
+${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ยวกับสัญลักษณ์นี้: ${hintFromTable}` : ''}
 
-กฎเหล็ก — ทุก field ในคำตอบต้องคล้องจองและอ้างถึง "${focusSubject}" โดยตรง ห้ามตอบแบบกว้างหรือทั่วไป:
-- interpretation: เล่าเรื่องราวโหราศาสตร์ที่มี "${focusSubject}" เป็นแก่นกลาง 2-3 ประโยค
-- numberReason: อธิบายว่าทำไม "${focusSubject}" ถึงให้เลขนี้ โดยอ้างถึงลักษณะหรือความหมายของสัญลักษณ์นั้นๆ
-- safetyAdvice: คำแนะนำความปลอดภัยเฉพาะเรื่อง "${focusSubject}" เท่านั้น ไม่ใช่เรื่องอื่น
-- safetyFact: ข้อเท็จจริงความปลอดภัยที่เกี่ยวกับ "${focusSubject}" โดยตรง
+กฎเหล็ก — ทุก field ต้องคล้องจองกับ "${focusSubject}" โดยตรง ห้ามตอบแบบกว้างหรือทั่วไปเด็ดขาด:
+- interpretation: เล่าเรื่องราวโหราศาสตร์ที่มี "${focusSubject}" เป็นแก่นกลาง 2-3 ประโยค ต้องพูดถึงสัญลักษณ์นี้โดยตรง
+- number2d / number3d: ถ้ามีเลขนำโชคจากตาราง ให้ใช้เลขนั้นทุกครั้ง ห้ามเปลี่ยน
+- numberReason: อธิบายว่าทำไม "${focusSubject}" ถึงให้เลขนี้ โดยอ้างถึงลักษณะหรือความหมายของสัญลักษณ์
+- safetyAdvice: คำแนะนำความปลอดภัยเฉพาะเรื่อง "${focusSubject}" เท่านั้น ปฏิบัติได้จริง 1-2 ประโยค
+- safetyFact: ข้อเท็จจริงด้านความปลอดภัยที่เกี่ยวกับ "${focusSubject}" โดยตรง
 
 ตอบเป็น JSON เท่านั้น ห้ามมี markdown backticks:
 {
   "interpretation": "...",
-  "number2d": "เลข 2 ตัว (00-99)",
-  "number3d": "เลข 3 ตัว (000-999)",
+  "number2d": "${item2d || 'เลข 2 ตัว (00-99)'}",
+  "number3d": "${item3d || 'เลข 3 ตัว (000-999)'}",
   "numberReason": "...",
   "safetyAdvice": "...",
   "safetyFact": "...",
@@ -5985,32 +5936,183 @@ ${seedHint}
             }
         }
 
-        // Fallback: generate static result if AI fails (use luckyDigit as seed when available)
+        // Fallback: use table's number2d/number3d if available, else random
         if (!result) {
-            const base = luckyDigit ? parseInt(luckyDigit, 10) : Math.floor(Math.random() * 100);
-            const d2 = String(base % 100).padStart(2, '0');
-            const d3 = String((base * 7 + 13) % 1000).padStart(3, '0');
             const subject = focusSubject || 'สัญลักษณ์ความปลอดภัย';
             result = {
                 interpretation: `ดวงดาวแห่ง "${subject}" กำลังส่งพลังงานมายังท่าน อาจารย์รับรู้พลังงานนี้ชัดเจน สัญลักษณ์นี้บ่งบอกถึงการระมัดระวังและโชคดีที่ซ่อนอยู่ในความรับผิดชอบ`,
-                number2d: d2,
-                number3d: d3,
+                number2d: item2d || String(Math.floor(Math.random() * 100)).padStart(2, '0'),
+                number3d: item3d || String(Math.floor(Math.random() * 1000)).padStart(3, '0'),
                 numberReason: `เลขนี้คำนวณจากพลังงานของ "${subject}" และตำแหน่งดวงดาวประจำวัน`,
-                safetyAdvice: `ให้ระมัดระวังเรื่อง "${subject}" เป็นพิเศษในวันนี้ เพราะความปลอดภัยคือโชคดีที่แท้จริง`,
-                safetyFact: 'อุบัติเหตุในโรงงาน 96% เกิดจากความประมาท ไม่ใช่โชคร้าย',
+                safetyAdvice: itemSafetyFact || `ให้ระมัดระวังเรื่อง "${subject}" เป็นพิเศษในวันนี้ เพราะความปลอดภัยคือโชคดีที่แท้จริง`,
+                safetyFact: itemSafetyFact || 'อุบัติเหตุในโรงงาน 96% เกิดจากความประมาท ไม่ใช่โชคร้าย',
                 disclaimer: '⚠️ การพยากรณ์นี้เพื่อความสนุกและสร้างจิตสำนึกด้านความปลอดภัยเท่านั้น',
                 fallback: true
             };
         }
 
-        // Save log
+        // Save log (dreamItemId = dreamId string reference)
         const logId = 'DREAM' + uuidv4();
         await db.query(
-            'INSERT INTO lottery_dream_logs (logId, lineUserId, dreamText, itemId, result) VALUES (?,?,?,?,?)',
+            'INSERT INTO lottery_dream_logs (logId, lineUserId, dreamText, dreamItemId, result) VALUES (?,?,?,?,?)',
             [logId, lineUserId, dreamText || null, itemId || null, JSON.stringify(result)]
         );
 
         res.json({ status: 'success', data: result });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/admin/lottery/dream-items/generate — AI สร้างสัญลักษณ์ใหม่โดยไม่ซ้ำของเดิม
+app.post('/api/admin/lottery/dream-items/generate', isAdmin, async (req, res) => {
+    const count = Math.min(Math.max(parseInt(req.body.count) || 5, 1), 20);
+    try {
+        const [existing] = await db.query('SELECT dreamId, itemName FROM safety_dream_items');
+        const existingNames = existing.map(r => r.itemName);
+        const existingIds = existing.map(r => r.dreamId);
+
+        const aiNums = existingIds.filter(id => /^AI\d+$/.test(id)).map(id => parseInt(id.replace('AI', '')));
+        let nextAiNum = aiNums.length > 0 ? Math.max(...aiNums) + 1 : 1;
+
+        const existingList = existingNames.join(', ') || '(ยังไม่มี)';
+        const prompt = `สร้างรายการสัญลักษณ์ความปลอดภัยใหม่สำหรับระบบดูดวงในโรงงานอุตสาหกรรม จำนวน ${count} รายการ
+
+ห้ามซ้ำกับรายการที่มีอยู่แล้ว: ${existingList}
+
+หมวดหมู่ที่ใช้ได้: ppe (อุปกรณ์PPE), fire (ไฟ/เพลิงไหม้), electrical (ไฟฟ้า), chemical (สารเคมี), height (งานที่สูง), machine (เครื่องจักร), road (ยานพาหนะ/ถนน)
+
+ตอบเป็น JSON array เท่านั้น ห้ามมีข้อความอื่น รูปแบบ:
+[
+  {
+    "category": "ppe",
+    "itemName": "ชื่อสัญลักษณ์ภาษาไทย",
+    "itemIcon": "emoji 1 ตัว",
+    "number2d": "เลข 2 หลัก เช่น 47",
+    "number3d": "เลข 3 หลัก เช่น 234",
+    "safetyFact": "ข้อเท็จจริงด้านความปลอดภัยที่เกี่ยวข้อง 1 ประโยค",
+    "promptHint": "คำใบ้โยงสัญลักษณ์นี้กับโชคลาภและความปลอดภัย 1 ประโยค"
+  }
+]`;
+
+        let newItems = null;
+        let lastErr = null;
+        for (const model of LOTTERY_GEMINI_MODELS) {
+            try {
+                const geminiRes = await axios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+                    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.85, maxOutputTokens: 2500 } },
+                    { headers: { 'Content-Type': 'application/json' }, timeout: 35000 }
+                );
+                const raw = geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                const match = raw.match(/\[[\s\S]*\]/);
+                if (!match) throw new Error('ไม่พบ JSON array ในคำตอบ AI');
+                newItems = JSON.parse(match[0]);
+                if (!Array.isArray(newItems)) throw new Error('ผลลัพธ์ไม่ใช่ array');
+                break;
+            } catch (e) { lastErr = e; }
+        }
+
+        if (!newItems) {
+            return res.status(500).json({ status: 'error', message: 'AI ไม่สามารถสร้างได้: ' + (lastErr?.message || 'unknown') });
+        }
+
+        const inserted = [];
+        for (const item of newItems) {
+            if (!item.itemName) continue;
+            const dreamId = `AI${String(nextAiNum).padStart(3, '0')}`;
+            nextAiNum++;
+            const n2 = String(item.number2d || '00').replace(/\D/g, '').padStart(2, '0').slice(-2);
+            const n3 = String(item.number3d || '000').replace(/\D/g, '').padStart(3, '0').slice(-3);
+            try {
+                await db.query(
+                    `INSERT INTO safety_dream_items (dreamId, category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [dreamId, item.category || 'ppe', item.itemName, item.itemIcon || '🔹', n2, n3, item.safetyFact || '', item.promptHint || '']
+                );
+                inserted.push({ dreamId, category: item.category, itemName: item.itemName, itemIcon: item.itemIcon, number2d: n2, number3d: n3 });
+            } catch (_) { /* skip if dreamId collision */ }
+        }
+
+        res.json({ status: 'success', data: { inserted, count: inserted.length } });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/admin/lottery/dream-items — เพิ่มสัญลักษณ์เอง (manual)
+app.post('/api/admin/lottery/dream-items', isAdmin, async (req, res) => {
+    const { dreamId, category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint } = req.body;
+    if (!dreamId || !itemName) return res.status(400).json({ status: 'error', message: 'dreamId และ itemName จำเป็น' });
+    const n2 = String(number2d || '00').replace(/\D/g, '').padStart(2, '0').slice(-2);
+    const n3 = String(number3d || '000').replace(/\D/g, '').padStart(3, '0').slice(-3);
+    try {
+        await db.query(
+            `INSERT INTO safety_dream_items (dreamId, category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [dreamId.trim(), category || 'ppe', itemName.trim(), itemIcon || '🔹', n2, n3, safetyFact || '', promptHint || '']
+        );
+        res.json({ status: 'success' });
+    } catch (e) {
+        if (e.code === 'ER_DUP_ENTRY') return res.status(409).json({ status: 'error', message: `dreamId "${dreamId}" มีอยู่แล้ว` });
+        res.status(500).json({ status: 'error', message: e.message });
+    }
+});
+
+// PUT /api/admin/lottery/dream-items/:dreamId — แก้ไขสัญลักษณ์
+app.put('/api/admin/lottery/dream-items/:dreamId', isAdmin, async (req, res) => {
+    const { dreamId } = req.params;
+    const { category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint } = req.body;
+    if (!itemName) return res.status(400).json({ status: 'error', message: 'itemName จำเป็น' });
+    const n2 = String(number2d || '00').replace(/\D/g, '').padStart(2, '0').slice(-2);
+    const n3 = String(number3d || '000').replace(/\D/g, '').padStart(3, '0').slice(-3);
+    try {
+        await db.query(
+            `UPDATE safety_dream_items SET category=?, itemName=?, itemIcon=?, number2d=?, number3d=?, safetyFact=?, promptHint=? WHERE dreamId=?`,
+            [category || 'ppe', itemName.trim(), itemIcon || '🔹', n2, n3, safetyFact || '', promptHint || '', dreamId]
+        );
+        res.json({ status: 'success' });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/admin/lottery/dream-items — list all with full details for admin
+app.get('/api/admin/lottery/dream-items', isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT * FROM safety_dream_items ORDER BY category, dreamId');
+        res.json({ status: 'success', data: rows });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// DELETE /api/admin/lottery/dream-items/:dreamId
+app.delete('/api/admin/lottery/dream-items/:dreamId', isAdmin, async (req, res) => {
+    const { dreamId } = req.params;
+    try {
+        await db.query('DELETE FROM safety_dream_items WHERE dreamId=?', [dreamId]);
+        res.json({ status: 'success' });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/admin/lottery/dream-logs — ประวัติการขอพยากรณ์
+app.get('/api/admin/lottery/dream-logs', isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT l.logId, l.lineUserId, u.displayName, u.department,
+                    s.itemName, s.itemIcon, l.dreamText, l.createdAt
+             FROM lottery_dream_logs l
+             LEFT JOIN users u ON u.lineUserId = l.lineUserId
+             LEFT JOIN safety_dream_items s ON s.dreamId = l.dreamItemId
+             ORDER BY l.createdAt DESC LIMIT 100`
+        );
+        res.json({ status: 'success', data: rows });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// DELETE /api/admin/lottery/dream-logs/user/:lineUserId — รีเซต daily limit ของ user วันนี้
+app.delete('/api/admin/lottery/dream-logs/user/:lineUserId', isAdmin, async (req, res) => {
+    const { lineUserId } = req.params;
+    try {
+        const today = getBangkokDateString();
+        const [result] = await db.query(
+            `DELETE FROM lottery_dream_logs WHERE lineUserId=? AND DATE(CONVERT_TZ(createdAt,'+00:00','+07:00'))=?`,
+            [lineUserId, today]
+        );
+        res.json({ status: 'success', data: { deleted: result.affectedRows } });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
