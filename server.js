@@ -5210,11 +5210,20 @@ app.post('/api/admin/lottery/settings', async (req, res) => {
         const enabledValue = userEnabled ? 'true' : 'false';
         const message = String(disabledMessage || DEFAULT_LOTTERY_DISABLED_MESSAGE).slice(0, 255);
 
+        // อ่าน state เดิม — เพื่อเขียน maintenance_started_at เฉพาะตอน user_enabled เปลี่ยนจริง
+        const [[prevSetting]] = await db.query(
+            `SELECT settingValue FROM lottery_settings WHERE settingKey='user_enabled'`
+        );
+        const wasEnabled = prevSetting?.settingValue === 'true';
+        const isNowEnabled = !!userEnabled;
+
         const pairs = [
             ['user_enabled', enabledValue, requesterId],
-            ['disabled_message', message, requesterId],
-            ['maintenance_started_at', userEnabled ? '' : new Date().toISOString(), requesterId]
+            ['disabled_message', message, requesterId]
         ];
+        if (wasEnabled !== isNowEnabled) {
+            pairs.push(['maintenance_started_at', isNowEnabled ? '' : new Date().toISOString(), requesterId]);
+        }
         if (prizeTwo != null && Number(prizeTwo) > 0) pairs.push(['prize_two', String(Number(prizeTwo)), requesterId]);
         if (prizeThree != null && Number(prizeThree) > 0) pairs.push(['prize_three', String(Number(prizeThree)), requesterId]);
         if (priceTwo != null && Number(priceTwo) > 0) pairs.push(['price_two', String(Number(priceTwo)), requesterId]);
