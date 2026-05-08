@@ -4180,6 +4180,33 @@ const LOTTERY_GEMINI_MODELS = [
     'gemini-3.1-flash-lite'
 ];
 
+function parseGeminiJson(rawText, expectedType = 'object') {
+    const cleaned = String(rawText || '')
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+    const candidates = [cleaned];
+    const objectMatch = cleaned.match(/\{[\s\S]*\}/);
+    const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
+    if (expectedType === 'array' && arrayMatch) candidates.push(arrayMatch[0]);
+    if (expectedType !== 'array' && objectMatch) candidates.push(objectMatch[0]);
+    if (arrayMatch) candidates.push(arrayMatch[0]);
+    if (objectMatch) candidates.push(objectMatch[0]);
+
+    let lastErr = null;
+    for (const candidate of [...new Set(candidates)]) {
+        try {
+            const parsed = JSON.parse(candidate);
+            if (expectedType === 'array' && !Array.isArray(parsed)) throw new Error('Gemini JSON is not an array');
+            if (expectedType === 'object' && (Array.isArray(parsed) || !parsed || typeof parsed !== 'object')) throw new Error('Gemini JSON is not an object');
+            return parsed;
+        } catch (err) {
+            lastErr = err;
+        }
+    }
+    throw lastErr || new Error('Gemini JSON parse failed');
+}
+
 const DEFAULT_LOTTERY_DISABLED_MESSAGE = 'ขณะนี้ Safety Lottery กำลังอยู่ในการปรับปรุง โปรดติดตามประกาศจากทีมบริหาร';
 
 async function getLotterySettings(conn = db) {
@@ -4381,7 +4408,8 @@ async function fetchLotteryResultWithGemini() {
         contents: [{ parts: [{ text:
             `จากข้อมูล HTML ผลหวยไทยนี้ ดึงเฉพาะผลรางวัลเลขท้าย 2 ตัว และเลขท้าย 3 ตัว ออกมาเป็น JSON\n` +
             `ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น:\n{"last2":"XX","last3_back":"XXX","last3_front":"XXX"}\n\nHTML:\n${String(htmlRes.data).slice(0, 8000)}`
-        }]}]
+        }]}],
+        generationConfig: { responseMimeType: 'application/json' }
     };
 
     let parsed = null;
@@ -4394,9 +4422,8 @@ async function fetchLotteryResultWithGemini() {
                 geminiPayload, { timeout: 20000 }
             );
 
-            let rawText = geminiRes.data.candidates[0].content.parts[0].text;
-            rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-            parsed = JSON.parse(rawText);
+            const rawText = geminiRes.data.candidates[0].content.parts[0].text;
+            parsed = parseGeminiJson(rawText, 'object');
             sourceModel = model;
             break;
         } catch (geminiErr) {
@@ -5586,13 +5613,12 @@ app.post('/api/admin/lottery/generate-questions', async (req, res) => {
             try {
                 const geminiRes = await axios.post(
                     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-                    { contents: [{ parts: [{ text: prompt }] }] },
+                    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } },
                     { timeout: 30000 }
                 );
 
-                let rawText = geminiRes.data.candidates[0].content.parts[0].text;
-                rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-                questions = JSON.parse(rawText);
+                const rawText = geminiRes.data.candidates[0].content.parts[0].text;
+                questions = parseGeminiJson(rawText, 'array');
                 source = model;
                 break;
             } catch (aiErr) {
@@ -6226,13 +6252,12 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                     {
                         systemInstruction: { parts: [{ text: JOHNNY_SYSTEM_PROMPT }] },
                         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                        generationConfig: { temperature: 0.9 }
+                        generationConfig: { temperature: 0.9, responseMimeType: 'application/json' }
                     },
                     { timeout: 20000 }
                 );
-                let rawText = geminiRes.data.candidates[0].content.parts[0].text;
-                rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-                result = normalizeDreamResult(JSON.parse(rawText), item2d, item3d);
+                const rawText = geminiRes.data.candidates[0].content.parts[0].text;
+                result = normalizeDreamResult(parseGeminiJson(rawText, 'object'), item2d, item3d);
                 break;
             } catch (aiErr) {
                 lastErr = aiErr;
@@ -6313,13 +6338,11 @@ app.post('/api/admin/lottery/dream-items/generate', isAdmin, async (req, res) =>
             try {
                 const geminiRes = await axios.post(
                     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-                    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.85, maxOutputTokens: 2500 } },
+                    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.85, maxOutputTokens: 2500, responseMimeType: 'application/json' } },
                     { headers: { 'Content-Type': 'application/json' }, timeout: 35000 }
                 );
                 const raw = geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                const match = raw.match(/\[[\s\S]*\]/);
-                if (!match) throw new Error('ไม่พบ JSON array ในคำตอบ AI');
-                newItems = JSON.parse(match[0]);
+                newItems = parseGeminiJson(raw, 'array');
                 if (!Array.isArray(newItems)) throw new Error('ผลลัพธ์ไม่ใช่ array');
                 break;
             } catch (e) { lastErr = e; }
