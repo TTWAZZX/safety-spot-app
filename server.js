@@ -4549,6 +4549,8 @@ app.get('/api/lottery/current-round', async (req, res) => {
         const settings = await getLotterySettings();
         const requesterId = req.query.requesterId || req.query.lineUserId;
         const includeTestRounds = await isLotteryAdmin(requesterId).catch(() => false);
+        const forceRoundId = includeTestRounds ? (req.query.forceRoundId || null) : null;
+
         if (!settings.userEnabled && !includeTestRounds) {
             return res.json({
                 status: 'success',
@@ -4561,18 +4563,31 @@ app.get('/api/lottery/current-round', async (req, res) => {
             });
         }
 
-        const [rounds] = await db.query(
-            `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, last2, last3_front, last3_back,
-                    status, source, confirmedBy, isTest, createdAt
-             FROM lottery_rounds WHERE status = 'open'
-             ORDER BY drawDate ASC LIMIT 20`
-        );
-        const round = (rounds || []).find(r =>
-            r.status === 'open' &&
-            !isLotteryRoundClosed(r) &&
-            (includeTestRounds || !r.isTest) &&
-            (settings.userEnabled || r.isTest || includeTestRounds)  // admin bypasses maintenance
-        ) || null;
+        let round = null;
+        if (forceRoundId) {
+            // Admin forcing a specific round (e.g. test round via 🧪 button)
+            const [rows] = await db.query(
+                `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, last2, last3_front, last3_back,
+                        status, source, confirmedBy, isTest, createdAt
+                 FROM lottery_rounds WHERE roundId = ? AND status = 'open' LIMIT 1`,
+                [forceRoundId]
+            );
+            round = rows[0] || null;
+        } else {
+            const [rounds] = await db.query(
+                `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, last2, last3_front, last3_back,
+                        status, source, confirmedBy, isTest, createdAt
+                 FROM lottery_rounds WHERE status = 'open'
+                 ORDER BY drawDate ASC LIMIT 20`
+            );
+            round = (rounds || []).find(r =>
+                r.status === 'open' &&
+                !isLotteryRoundClosed(r) &&
+                (includeTestRounds || !r.isTest) &&
+                (settings.userEnabled || r.isTest || includeTestRounds)  // admin bypasses maintenance
+            ) || null;
+        }
+
         if (!round) {
             const nextDrawDates = getNextLotteryDrawDates(2);
             return res.json({ status: 'success', data: { nextDrawDates } });
@@ -4582,8 +4597,11 @@ app.get('/api/lottery/current-round', async (req, res) => {
         const msLeft = Math.max(0, closeAt - new Date());
         const hoursLeft = Math.floor(msLeft / 3600000);
         const minutesLeft = Math.floor((msLeft % 3600000) / 60000);
+        const maintenanceMode = !settings.userEnabled;  // true = admin bypass; inform client
+        // Admin-forced test rounds are never considered "closed" — allow purchase for testing
+        const isClosed = forceRoundId ? false : isLotteryRoundClosed(round);
 
-        res.json({ status: 'success', data: { ...round, featureEnabled: true, settings, closeAt, hoursLeft, minutesLeft, isClosed: isLotteryRoundClosed(round) } });
+        res.json({ status: 'success', data: { ...round, featureEnabled: true, maintenanceMode, settings, closeAt, hoursLeft, minutesLeft, isClosed } });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
@@ -4694,7 +4712,8 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
             err.statusCode = 403;
             throw err;
         }
-        if (isLotteryRoundClosed(round))
+        // Admin can buy test-round tickets even if past close time (for testing)
+        if (isLotteryRoundClosed(round) && !(round.isTest && requesterIsAdmin))
             throw new Error('งวดนี้ปิดรับแล้ว');
 
         const [[quizPass]] = await conn.query(

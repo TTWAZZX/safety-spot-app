@@ -632,7 +632,7 @@ async function loadHomeTodayTasks(activities) {
 
     try {
         const round = await callApi('/api/lottery/current-round', { lineUserId: AppState.lineProfile.userId });
-        if (round?.featureEnabled && !round.isClosed) {
+        if (round?.featureEnabled && !round.isClosed && !round.maintenanceMode) {
             tasks.push({
                 icon: 'fa-ticket-alt',
                 tone: 'lottery',
@@ -6058,7 +6058,7 @@ function showLotteryRules(options = {}) {
     });
 }
 
-async function openLotteryModal() {
+async function openLotteryModal(forceRoundId = null) {
     triggerHaptic('light');
 
     // แสดง T&C ครั้งแรก
@@ -6085,18 +6085,18 @@ async function openLotteryModal() {
 
     setLotteryFlowStep('number');
     selectLotteryType('two');
-    await loadLotteryCurrentRound();
+    await loadLotteryCurrentRound(forceRoundId);
     refreshLotteryEntryStatusBadge();
 }
 
 // -----------------------------------------------
 // loadLotteryCurrentRound — โหลดงวดปัจจุบัน
 // -----------------------------------------------
-async function loadLotteryCurrentRound() {
+async function loadLotteryCurrentRound(forceRoundId = null) {
     try {
-        const res = await callApi('/api/lottery/current-round', {
-            lineUserId: AppState.lineProfile.userId
-        });
+        const params = { lineUserId: AppState.lineProfile.userId };
+        if (forceRoundId) params.forceRoundId = forceRoundId;
+        const res = await callApi('/api/lottery/current-round', params);
         _lotteryCurrentRound = res?.roundId ? res : null;
         if (res?.settings) applyLotterySettings(res.settings);
 
@@ -6816,7 +6816,7 @@ async function loadAdminLotteryDashboard() {
                 ? `<button class="btn btn-xs py-0 px-1 btn-outline-warning" onclick="adminResetLotteryRound('${sanitizeHTML(r.roundId)}','${sanitizeHTML(r.drawDate)}',${Number(r.ticketCount||0)})" title="รีเซตตั๋วทั้งหมด"><i class="fas fa-undo"></i></button>`
                 : '';
             const testBtn = r.isTest
-                ? `<button class="btn btn-xs py-0 px-1 btn-outline-info" onclick="openLotteryModal()" title="ทดสอบซื้อตั๋ว"><i class="fas fa-flask"></i></button>`
+                ? `<button class="btn btn-xs py-0 px-1 btn-outline-info" onclick="openLotteryModal('${sanitizeHTML(r.roundId)}')" title="ทดสอบซื้อตั๋ว"><i class="fas fa-flask"></i></button>`
                 : '';
             roundsHtml += `<tr>
                 <td>${sanitizeHTML(d)}</td>
