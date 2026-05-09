@@ -4463,7 +4463,7 @@ async function fetchLotteryResultWithGemini() {
         try {
             const geminiRes = await axios.post(
                 `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-                geminiPayload, { timeout: 20000 }
+                geminiPayload, { timeout: 20000, proxy: false }
             );
 
             const rawText = geminiRes.data.candidates[0].content.parts[0].text;
@@ -5665,7 +5665,7 @@ app.post('/api/admin/lottery/generate-questions', async (req, res) => {
                 const geminiRes = await axios.post(
                     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
                     { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } },
-                    { timeout: 30000 }
+                    { timeout: 30000, proxy: false }
                 );
 
                 const rawText = geminiRes.data.candidates[0].content.parts[0].text;
@@ -6621,7 +6621,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                         contents: [{ role: 'user', parts: [{ text: prompt }] }],
                         generationConfig: { temperature: 0.9, responseMimeType: 'application/json' }
                     },
-                    { timeout: 20000 }
+                    { timeout: 20000, proxy: false }
                 );
                 const rawText = geminiRes.data.candidates[0].content.parts[0].text;
                 const aiDream = parseGeminiJson(rawText, 'object');
@@ -6779,7 +6779,7 @@ app.post('/api/admin/lottery/dream-items/generate', isAdmin, async (req, res) =>
                 const geminiRes = await axios.post(
                     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
                     { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.85, maxOutputTokens: 2500, responseMimeType: 'application/json' } },
-                    { headers: { 'Content-Type': 'application/json' }, timeout: 35000 }
+                    { headers: { 'Content-Type': 'application/json' }, timeout: 35000, proxy: false }
                 );
                 const raw = geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
                 newItems = parseGeminiJson(raw, 'array');
