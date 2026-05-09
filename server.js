@@ -6115,13 +6115,45 @@ db.query(`SELECT COUNT(*) AS cnt FROM information_schema.columns
   }).catch(() => {});
 
 const JOHNNY_SYSTEM_PROMPT = `คุณคือ "ท่านอาจารย์จอห์นนี่" — นักพยากรณ์โหราศาสตร์ลึกลับแห่งอาณาจักรความปลอดภัย
-บุคลิก: พูดด้วยน้ำเสียงลึกลับ ศักดิ์สิทธิ์ มีความเมตตา แต่แฝงด้วยอารมณ์ขันเล็กน้อย
-ภาษา: ไทย ใช้สรรพนาม "อาจารย์" แทนตัวเอง และ "ลูกศิษย์" สำหรับผู้ถาม
-เชี่ยวชาญ: โยงสัญลักษณ์ความฝัน/สัญลักษณ์ความปลอดภัยเข้ากับตัวเลขมงคล + คำแนะนำความปลอดภัยที่ปฏิบัติได้จริง
-ข้อห้าม: ห้ามรับประกันผลลอตเตอรี่ ต้องใส่ข้อความเตือนว่าการทำนายเพื่อความสนุกเท่านั้น`;
+บุคลิก: ลึกลับ ศักดิ์สิทธิ์ เมตตา มีอารมณ์ขันบางเบาแบบอาจารย์ผู้รู้หน้างาน
+ภาษา: ไทย เรียกผู้ใช้ว่า "ลูกศิษย์" และแทนตัวเองว่า "อาจารย์"
+สไตล์: ใช้ภาษานิมิต ดวงดาว ลางเตือน เกราะคุ้มครอง อาณาจักรความปลอดภัย แต่ไม่แฟนตาซีจนหลุดจากโลกโรงงาน
+แก่นคำตอบ: ทำนายฝันและเลขให้ขลัง พร้อมแทรก HSE แบบ จป.วิชาชีพที่รู้จริง ไม่ใช่คู่มือราชการแห้ง ๆ
+กฎเหล็ก:
+- เลข number2d และ number3d ต้องตรงกับ oracleNumber2d/oracleNumber3d ที่ระบบให้เท่านั้น ห้ามเปลี่ยนเลขเอง
+- ห้ามรับประกันผลลอตเตอรี่ เลขคือความสนุก แต่คำเตือนความปลอดภัยคือเรื่องจริง
+- ถ้าเกี่ยวกับไฟฟ้า สารเคมี ที่สูง เครื่องจักร ไฟ หรือเหตุฉุกเฉิน ต้องเตือนให้หยุด/แจ้งหัวหน้า/EHS/ทำตามขั้นตอนควบคุมที่ถูกต้อง
+- ห้ามแนะนำการกระทำเสี่ยง ห้ามบอกให้ลองเองโดยไม่มีการควบคุม`;
 
 const DREAM_EXTRA_INTERPRET_COST = 20;
 const DREAM_CATEGORIES = new Set(['ppe', 'fire', 'electrical', 'chemical', 'height', 'machine', 'road']);
+const JOHNNY_CATEGORY_TO_ORACLE_ID = {
+    electrical: 'electric',
+    road: 'vehicle',
+    ppe: 'ppe',
+    fire: 'fire',
+    chemical: 'chemical',
+    height: 'height',
+    machine: 'machine'
+};
+
+const JOHNNY_ORACLE_SYMBOLS = [
+    { id: 'fire', label: 'เปลวไฟ', icon: '🔥', keywords: ['ไฟ', 'ไหม้', 'เพลิง', 'ควัน', 'ร้อน', 'เชื่อม', 'ตัด', 'ประกาย', 'hot work'], number2d: '19', number3d: '119', hseTheme: 'Fire Safety / Hot Work', omenMeaning: 'พลังงานร้อนและลางเตือนจากเปลวเพลิง', hseMeaning: 'งานร้อน แหล่งจุดติดไฟ และวัสดุไวไฟใกล้พื้นที่ทำงาน', warning: 'ตรวจใบอนุญาต Hot Work แยกวัสดุไวไฟ และเตรียมถังดับเพลิงก่อนเริ่มงาน', riskLevel: 'high' },
+    { id: 'water', label: 'น้ำ/ของเหลว', icon: '💧', keywords: ['น้ำ', 'เปียก', 'ลื่น', 'รั่ว', 'หก', 'ท่วม', 'ของเหลว', 'น้ำเสีย'], number2d: '26', number3d: '206', hseTheme: 'Slip/Spill / Environment', omenMeaning: 'กระแสของเหลวที่พาโชคและคำเตือนมาพร้อมกัน', hseMeaning: 'พื้นลื่น การรั่วไหล การหกรั่ว และผลกระทบสิ่งแวดล้อม', warning: 'กั้นพื้นที่ ทำความสะอาดทันที ใช้ spill kit เมื่อจำเป็น และป้องกันของเหลวไหลลงท่อระบายน้ำ', riskLevel: 'medium' },
+    { id: 'chemical', label: 'สารเคมี', icon: '☣️', keywords: ['สารเคมี', 'ถังสาร', 'กรด', 'ด่าง', 'ตัวทำละลาย', 'กลิ่นฉุน', 'ไอระเหย', 'sds', 'ghs', 'พิษ'], number2d: '38', number3d: '038', hseTheme: 'Chemical Safety', omenMeaning: 'ไอหมอกลึกลับของสารที่ซ่อนพลังไว้ในภาชนะ', hseMeaning: 'การสัมผัสสารเคมี การระบายอากาศ SDS/GHS และการตอบโต้เหตุหกรั่ว', warning: 'อ่าน SDS ตรวจฉลาก GHS ใช้ PPE ให้ตรงสาร และแจ้ง EHS เมื่อพบกลิ่น/การรั่วผิดปกติ', riskLevel: 'high' },
+    { id: 'snake', label: 'งู/พิษที่ซ่อนอยู่', icon: '🐍', keywords: ['งู', 'กัด', 'พิษ', 'เลื้อย', 'ซ่อน', 'อันตรายซ่อน'], number2d: '56', number3d: '356', hseTheme: 'Hidden Hazard', omenMeaning: 'ภัยที่ซ่อนตัวอยู่ใต้เงานิ่ง รอให้ผู้ประมาทเข้าใกล้', hseMeaning: 'hazard ที่มองไม่ชัด เช่น pressure ค้าง พลังงานสะสม สารพิษ หรือจุดอับสายตา', warning: 'อย่าจับหรือแก้ไขสิ่งผิดปกติโดยลำพัง ให้หยุด ประเมิน และแจ้งผู้รับผิดชอบก่อนเข้าใกล้', riskLevel: 'high' },
+    { id: 'height', label: 'ที่สูง/การตก', icon: '🪜', keywords: ['ตก', 'ที่สูง', 'บันได', 'นั่งร้าน', 'หลังคา', 'ขอบ', 'ลอย', 'ตกจาก'], number2d: '79', number3d: '479', hseTheme: 'Work at Height', omenMeaning: 'นิมิตจากขอบฟ้าสูงที่ทดสอบสติและจุดยึดของลูกศิษย์', hseMeaning: 'งานที่สูง fall protection จุดยึด และการป้องกันของตก', warning: 'ตรวจนั่งร้าน/บันได ใช้ full body harness และผูกกับ anchor ที่รับแรงได้ก่อนเริ่มงาน', riskLevel: 'high' },
+    { id: 'electric', label: 'ไฟฟ้า', icon: '⚡', keywords: ['ไฟฟ้า', 'ช็อต', 'สายไฟ', 'ปลั๊ก', 'ตู้ไฟ', 'เบรกเกอร์', 'ประกายไฟ', 'ไฟดูด', 'แรงดัน'], number2d: '47', number3d: '247', hseTheme: 'Electrical Safety / LOTO', omenMeaning: 'สายฟ้าที่ส่องวาบเตือนถึงพลังงานที่มองไม่เห็น', hseMeaning: 'พลังงานไฟฟ้า การแยกแหล่งพลังงาน LOTO และอุปกรณ์ชำรุด', warning: 'ตัดแยกแหล่งพลังงาน ทำ LOTO และให้ผู้มีอำนาจตรวจสอบก่อนแตะอุปกรณ์ไฟฟ้า', riskLevel: 'high' },
+    { id: 'machine', label: 'เครื่องจักร', icon: '⚙️', keywords: ['เครื่องจักร', 'สายพาน', 'เฟือง', 'หนีบ', 'บด', 'หมุน', 'การ์ด', 'guard', 'ใบมีด'], number2d: '64', number3d: '664', hseTheme: 'Machine Guarding', omenMeaning: 'ฟันเฟืองแห่งโชคที่หมุนพร้อมบททดสอบความระวัง', hseMeaning: 'จุดหนีบ จุดหมุน machine guarding และการ bypass อุปกรณ์ป้องกัน', warning: 'ห้าม bypass guard หยุดเครื่องและแยกพลังงานก่อนเคลียร์ติดขัดหรือซ่อมบำรุง', riskLevel: 'high' },
+    { id: 'vehicle', label: 'รถ/การจราจร', icon: '🚛', keywords: ['รถ', 'โฟล์คลิฟท์', 'forklift', 'ชน', 'ถนน', 'ทางเดิน', 'ขับ', 'ล้อ', 'บรรทุก'], number2d: '35', number3d: '735', hseTheme: 'Traffic / Forklift Safety', omenMeaning: 'ล้อแห่งชะตาที่หมุนผ่านเส้นทางของคนและงาน', hseMeaning: 'การแยกคนกับรถ blind spot ความเร็ว และเส้นทางจราจร', warning: 'ใช้ทางเดินที่กำหนด สบตาผู้ขับก่อนข้าม และระวัง blind spot ของรถยก', riskLevel: 'medium' },
+    { id: 'ppe', label: 'PPE/เกราะคุ้มครอง', icon: '🦺', keywords: ['หมวก', 'รองเท้า', 'แว่น', 'ถุงมือ', 'หน้ากาก', 'ppe', 'อุปกรณ์ป้องกัน', 'เซฟตี้'], number2d: '24', number3d: '424', hseTheme: 'PPE', omenMeaning: 'เกราะคุ้มครองที่ดวงดาวมอบให้ผู้มีสติ', hseMeaning: 'การเลือก PPE ให้ตรงงาน ตรวจสภาพ และสวมใส่ให้ถูกต้อง', warning: 'ตรวจ PPE ก่อนใช้ เลือกให้ตรง hazard และอย่าให้ PPE เป็นเพียงเครื่องแบบ', riskLevel: 'medium' },
+    { id: 'dark', label: 'ความมืด/จุดอับสายตา', icon: '🌑', keywords: ['มืด', 'กลางคืน', 'แสงน้อย', 'มองไม่เห็น', 'เงา', 'อับ', 'blind spot'], number2d: '08', number3d: '808', hseTheme: 'Visibility / Blind Spot', omenMeaning: 'เงามืดที่บังสัญญาณเตือนจากสายตา', hseMeaning: 'แสงสว่างไม่พอ จุดอับสายตา และการสื่อสารที่ไม่ชัดเจน', warning: 'เพิ่มแสงสว่าง ใช้สัญญาณเตือน และหยุดงานเมื่อมอง hazard ไม่ชัด', riskLevel: 'medium' },
+    { id: 'noise', label: 'เสียงดัง', icon: '🔊', keywords: ['เสียงดัง', 'ดัง', 'หูอื้อ', 'เครื่องเสียง', 'ระเบิด', 'เสียง'], number2d: '11', number3d: '711', hseTheme: 'Occupational Health / Noise', omenMeaning: 'คลื่นเสียงที่สั่นสะเทือนถึงประตูแห่งสติ', hseMeaning: 'noise exposure การสูญเสียการได้ยิน และการสื่อสารผิดพลาด', warning: 'ใช้ hearing protection ลดเวลาสัมผัสเสียง และรายงานพื้นที่เสียงดังผิดปกติ', riskLevel: 'medium' },
+    { id: 'confined', label: 'ที่อับอากาศ', icon: '🕳️', keywords: ['ถัง', 'บ่อ', 'อับอากาศ', 'อุโมงค์', 'หลุม', 'ท่อ', 'ออกซิเจน', 'confined'], number2d: '02', number3d: '902', hseTheme: 'Confined Space', omenMeaning: 'ช่องว่างลึกที่กลืนแสงและทดสอบลมหายใจ', hseMeaning: 'บรรยากาศอันตราย oxygen deficiency gas toxic และ permit to work', warning: 'ห้ามเข้าโดยไม่มี permit ตรวจวัดอากาศ ventilation standby person และ rescue plan', riskLevel: 'high' },
+    { id: 'housekeeping', label: 'ของแตก/พื้นที่ไม่เรียบร้อย', icon: '🧹', keywords: ['แตก', 'เศษ', 'รก', 'สะดุด', 'ล้ม', 'ของวาง', 'พื้น', 'กีดขวาง'], number2d: '17', number3d: '517', hseTheme: 'Housekeeping / Slip Trip Fall', omenMeaning: 'เศษเสี้ยวของระเบียบที่แตกออกจากวงคุ้มครอง', hseMeaning: 'housekeeping ทางเดินกีดขวาง slip trip fall และเศษวัสดุ', warning: 'จัดเก็บพื้นที่ทันที เปิดทางเดินให้โล่ง และกำจัดเศษวัสดุที่ทำให้สะดุดหรือบาดเจ็บ', riskLevel: 'medium' },
+    { id: 'heat', label: 'ความร้อน/แดด', icon: '🌡️', keywords: ['ร้อน', 'แดด', 'เหงื่อ', 'เวียนหัว', 'เป็นลม', 'heat stress', 'อุณหภูมิ'], number2d: '41', number3d: '941', hseTheme: 'Occupational Health / Heat Stress', omenMeaning: 'ไอร้อนที่ทดสอบพลังชีวิตและจังหวะพักของลูกศิษย์', hseMeaning: 'heat stress dehydration fatigue และการทำงานกลางแจ้ง/พื้นที่ร้อน', warning: 'ดื่มน้ำ พักตามรอบ สังเกตอาการ heat stress และแจ้งหัวหน้าทันทีเมื่อเวียนหัวหรืออ่อนแรง', riskLevel: 'medium' },
+    { id: 'environment', label: 'สิ่งแวดล้อม/ของเสีย', icon: '🌿', keywords: ['ขยะ', 'ของเสีย', 'น้ำเสีย', 'ปล่อย', 'รั่วลงท่อ', 'สิ่งแวดล้อม', 'กลิ่น', 'บำบัด'], number2d: '68', number3d: '268', hseTheme: 'Environment', omenMeaning: 'เสียงกระซิบของผืนดินและสายน้ำที่เตือนให้รักษาสมดุล', hseMeaning: 'การจัดการของเสีย น้ำเสีย การหกรั่ว และผลกระทบสิ่งแวดล้อม', warning: 'คัดแยกของเสีย ปิดกั้นการรั่วไหล และแจ้งผู้รับผิดชอบสิ่งแวดล้อมก่อนปล่อยหรือระบายใด ๆ', riskLevel: 'medium' }
+];
 
 function parseDreamResult(raw) {
     if (!raw) return null;
@@ -6139,6 +6171,15 @@ function normalizeDreamResult(result, fallback2d = null, fallback3d = null) {
     const safe = result && typeof result === 'object' ? result : {};
     const number2d = normalizeDreamNumber(safe.number2d, 2) || normalizeDreamNumber(fallback2d, 2) || String(Math.floor(Math.random() * 100)).padStart(2, '0');
     const number3d = normalizeDreamNumber(safe.number3d, 3) || normalizeDreamNumber(fallback3d, 3) || String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+    const dreamSymbols = Array.isArray(safe.dreamSymbols)
+        ? safe.dreamSymbols.slice(0, 5).map(s => ({
+            id: String(s.id || '').slice(0, 40),
+            label: String(s.label || '').slice(0, 80),
+            icon: String(s.icon || '').slice(0, 12),
+            hseTheme: String(s.hseTheme || '').slice(0, 120),
+            role: String(s.role || '').slice(0, 20)
+        }))
+        : [];
     return {
         interpretation: String(safe.interpretation || '').slice(0, 1200),
         number2d,
@@ -6146,9 +6187,114 @@ function normalizeDreamResult(result, fallback2d = null, fallback3d = null) {
         numberReason: String(safe.numberReason || '').slice(0, 600),
         safetyAdvice: String(safe.safetyAdvice || '').slice(0, 800),
         safetyFact: String(safe.safetyFact || '').slice(0, 800),
+        dreamSymbols,
+        omenType: String(safe.omenType || '').slice(0, 120),
+        luckyFormula: String(safe.luckyFormula || '').slice(0, 500),
+        hseReading: String(safe.hseReading || '').slice(0, 900),
+        quickWarning: String(safe.quickWarning || '').slice(0, 400),
+        johnnyVerdict: String(safe.johnnyVerdict || '').slice(0, 500),
+        confidence: Math.max(0, Math.min(100, Number(safe.confidence || 0))),
         disclaimer: String(safe.disclaimer || 'การพยากรณ์นี้เพื่อความสนุกและสร้างจิตสำนึกด้านความปลอดภัยเท่านั้น').slice(0, 300),
         ...(safe.cached ? { cached: true } : {}),
         ...(safe.fallback ? { fallback: true } : {})
+    };
+}
+
+function countKeywordHits(text, keywords) {
+    const haystack = String(text || '').toLowerCase();
+    return (keywords || []).reduce((sum, keyword) => {
+        const k = String(keyword || '').toLowerCase().trim();
+        if (!k) return sum;
+        return sum + (haystack.includes(k) ? 1 : 0);
+    }, 0);
+}
+
+function deriveJohnnyUnknownNumbers(seedText) {
+    const text = String(seedText || getBangkokDateString());
+    let hash = 17;
+    for (let i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) % 9973;
+    return {
+        number2d: String(hash % 100).padStart(2, '0'),
+        number3d: String(hash % 1000).padStart(3, '0')
+    };
+}
+
+function analyzeJohnnyOracle({ dreamText, selectedItem }) {
+    const text = String(dreamText || '');
+    const matches = JOHNNY_ORACLE_SYMBOLS
+        .map(symbol => ({ ...symbol, score: countKeywordHits(text, symbol.keywords) }))
+        .filter(symbol => symbol.score > 0)
+        .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+
+    let selectedSymbol = null;
+    if (selectedItem) {
+        const combined = `${selectedItem.itemName || ''} ${selectedItem.promptHint || ''} ${selectedItem.safetyFact || ''}`;
+        const best = JOHNNY_ORACLE_SYMBOLS
+            .map(symbol => ({ ...symbol, score: countKeywordHits(combined, [symbol.label, symbol.hseTheme, ...symbol.keywords]) }))
+            .sort((a, b) => b.score - a.score)[0];
+        const categoryOracleId = JOHNNY_CATEGORY_TO_ORACLE_ID[selectedItem.category] || selectedItem.category;
+        const categorySymbol = JOHNNY_ORACLE_SYMBOLS.find(s => s.id === categoryOracleId);
+        const baseSymbol = best && best.score > 0 ? best : categorySymbol || JOHNNY_ORACLE_SYMBOLS.find(s => s.id === 'ppe');
+        selectedSymbol = {
+            ...baseSymbol,
+            id: selectedItem.dreamId || best?.id || 'selected',
+            label: selectedItem.itemName || baseSymbol?.label || 'สัญลักษณ์ที่ลูกศิษย์เลือก',
+            icon: selectedItem.itemIcon || baseSymbol?.icon || '🔮',
+            number2d: normalizeDreamNumber(selectedItem.number2d, 2) || baseSymbol?.number2d || '24',
+            number3d: normalizeDreamNumber(selectedItem.number3d, 3) || baseSymbol?.number3d || '424',
+            hseMeaning: selectedItem.safetyFact || baseSymbol?.hseMeaning || 'สัญลักษณ์ความปลอดภัยที่ต้องอ่านด้วยสติ',
+            warning: selectedItem.safetyFact || baseSymbol?.warning || 'ตรวจสภาพหน้างานและใช้มาตรการควบคุมก่อนเริ่มงาน',
+            score: 99,
+            role: 'หลัก'
+        };
+    }
+
+    const symbolMap = new Map();
+    if (selectedSymbol) symbolMap.set(selectedSymbol.id, selectedSymbol);
+    for (const symbol of matches) {
+        const id = symbol.id;
+        if (!symbolMap.has(id)) symbolMap.set(id, { ...symbol, role: selectedSymbol ? 'รอง' : 'หลัก' });
+    }
+    const symbols = Array.from(symbolMap.values()).slice(0, 3);
+    const primary = symbols[0] || null;
+    const secondary = symbols[1] || null;
+    const unknown = !primary;
+    const fallbackNumbers = deriveJohnnyUnknownNumbers(`${text}:${getBangkokDateString()}`);
+    const number2d = primary?.number2d || fallbackNumbers.number2d;
+    const number3d = primary
+        ? (secondary ? `${primary.number2d[0]}${secondary.number2d}`.replace(/\D/g, '').slice(0, 3).padEnd(3, primary.number2d[1] || '0') : primary.number3d)
+        : fallbackNumbers.number3d;
+    const riskOrder = { high: 3, medium: 2, low: 1 };
+    const highestRisk = symbols.slice().sort((a, b) => (riskOrder[b.riskLevel] || 0) - (riskOrder[a.riskLevel] || 0))[0];
+    const confidence = unknown ? 38 : Math.min(95, 58 + symbols.length * 12 + Math.min(text.length, 120) / 6 + (selectedItem ? 12 : 0));
+    const omenType = unknown
+        ? 'นิมิตพร่าเลือน'
+        : highestRisk?.riskLevel === 'high'
+            ? 'นิมิตเตือนภัย'
+            : symbols.length > 1 ? 'นิมิตซ้อน' : 'นิมิตโชคลาภจากความระมัดระวัง';
+    const dreamSymbols = symbols.length
+        ? symbols.map((s, idx) => ({ id: s.id, label: s.label, icon: s.icon, hseTheme: s.hseTheme, role: idx === 0 ? 'หลัก' : 'รอง' }))
+        : [{ id: 'unknown', label: 'นิมิตพร่าเลือน', icon: '🔮', hseTheme: 'General HSE Awareness', role: 'หลัก' }];
+    const luckyFormula = symbols.length
+        ? `${primary.icon || ''} ${primary.label} ให้ ${primary.number2d}/${primary.number3d}${secondary ? ` + ${secondary.icon || ''} ${secondary.label} ให้ ${secondary.number2d} → ${number3d}` : ''}`
+        : `นิมิตยังพร่าเลือน อาจารย์ผูกเลขจากวันและถ้อยคำของลูกศิษย์ → ${number2d}/${number3d}`;
+    const hseReading = symbols.length
+        ? symbols.map(s => `${s.label}: ${s.hseMeaning}`).join(' | ')
+        : 'นิมิตไม่ชี้ hazard เด่นชัด จึงอ่านเป็นสัญญาณให้ตรวจหน้างาน ใช้สติ และรายงานสิ่งผิดปกติก่อนเกิดเหตุ';
+    const quickWarning = highestRisk?.warning || 'หยุดคิดก่อนเริ่มงาน ตรวจพื้นที่ และแจ้งหัวหน้าเมื่อพบความเสี่ยง';
+
+    return {
+        number2d,
+        number3d: normalizeDreamNumber(number3d, 3) || fallbackNumbers.number3d,
+        dreamSymbols,
+        omenType,
+        luckyFormula,
+        hseReading,
+        quickWarning,
+        johnnyVerdict: unknown
+            ? 'นิมิตครั้งนี้ยังมีหมอกบาง ๆ อาจารย์จึงให้เลขจากกระแสดวงประจำวัน แต่คำเตือนคืออย่ามองข้ามสัญญาณเล็กในพื้นที่ทำงาน'
+            : `อาจารย์เห็น ${dreamSymbols.map(s => s.label).join(' และ ')} เป็นแกนของนิมิต จงรับเลขไว้เพื่อความสนุก และรับคำเตือนไว้เพื่อกลับบ้านปลอดภัย`,
+        confidence: Math.round(confidence)
     };
 }
 
@@ -6309,7 +6455,9 @@ app.post('/api/lottery/dream-history/:logId/share', async (req, res) => {
                 number2d: result.number2d,
                 number3d: result.number3d,
                 subject,
-                safetyAdvice: result.safetyAdvice
+                safetyAdvice: result.quickWarning || result.safetyAdvice,
+                omenType: result.omenType,
+                dreamSymbols: result.dreamSymbols
             },
             visibility: 'public'
         });
@@ -6365,11 +6513,12 @@ app.post('/api/lottery/dream-interpret', async (req, res) => {
             }
         }
 
-        // Build context for AI — ใช้ schema จริง: dreamId (string), number2d, number3d, promptHint, safetyFact
+        // Build context for AI — ใช้ schemaจริงและ Johnny Oracle Engine เป็นแกนเลข
+        let selectedItem = null;
         let itemName = null, item2d = null, item3d = null, itemPromptHint = null, itemSafetyFact = null;
         if (itemId) {
             const [[item]] = await queryConn.query(
-                'SELECT itemName, number2d, number3d, promptHint, safetyFact FROM safety_dream_items WHERE dreamId=? AND COALESCE(isActive, TRUE)=TRUE',
+                'SELECT dreamId, category, itemName, itemIcon, number2d, number3d, promptHint, safetyFact FROM safety_dream_items WHERE dreamId=? AND COALESCE(isActive, TRUE)=TRUE',
                 [itemId]
             );
             if (!item) {
@@ -6382,35 +6531,51 @@ app.post('/api/lottery/dream-interpret', async (req, res) => {
             item3d = item.number3d;
             itemPromptHint = item.promptHint;
             itemSafetyFact = item.safetyFact;
+            selectedItem = item;
         }
+        const oracle = analyzeJohnnyOracle({ dreamText, selectedItem });
 
         // Focus subject: symbol name, dream text, or both
         const focusSubject = [itemName, dreamText].filter(Boolean).join(' และ ');
-        const seedHint = item2d
-            ? `เลขนำโชคของ "${itemName}": 2 ตัว = ${item2d}, 3 ตัว = ${item3d} — ให้ใช้เลขคู่นี้เป็นแก่นหลัก และอธิบายความเชื่อมโยงกับสัญลักษณ์`
-            : '';
+        const seedHint = `oracleNumber2d=${oracle.number2d}, oracleNumber3d=${oracle.number3d} — เลขจากตำรา Johnny Oracle ต้องใช้เลขนี้เท่านั้น ห้ามเปลี่ยน`;
         const hintFromTable = [itemPromptHint, itemSafetyFact].filter(Boolean).join(' | ');
 
         const prompt = `ลูกศิษย์ถามเรื่อง: "${focusSubject}"
 ${dreamText ? `รายละเอียด: ${dreamText}` : ''}
 ${seedHint}
 ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ยวกับสัญลักษณ์นี้: ${hintFromTable}` : ''}
+ข้อมูลจากตำราอาจารย์จอห์นนี่:
+- สัญลักษณ์ที่จับได้: ${oracle.dreamSymbols.map(s => `${s.icon || ''}${s.label}(${s.role}/${s.hseTheme})`).join(', ')}
+- ประเภทนิมิต: ${oracle.omenType}
+- สูตรเลข: ${oracle.luckyFormula}
+- คำอ่าน HSE: ${oracle.hseReading}
+- คำเตือนหลัก: ${oracle.quickWarning}
+- ระดับความชัดของนิมิต: ${oracle.confidence}/100
 
 กฎเหล็ก — ทุก field ต้องคล้องจองกับ "${focusSubject}" โดยตรง ห้ามตอบแบบกว้างหรือทั่วไปเด็ดขาด:
-- interpretation: เล่าเรื่องราวโหราศาสตร์ที่มี "${focusSubject}" เป็นแก่นกลาง 2-3 ประโยค ต้องพูดถึงสัญลักษณ์นี้โดยตรง
-- number2d / number3d: ถ้ามีเลขนำโชคจากตาราง ให้ใช้เลขนั้นทุกครั้ง ห้ามเปลี่ยน
-- numberReason: อธิบายว่าทำไม "${focusSubject}" ถึงให้เลขนี้ โดยอ้างถึงลักษณะหรือความหมายของสัญลักษณ์
-- safetyAdvice: คำแนะนำความปลอดภัยเฉพาะเรื่อง "${focusSubject}" เท่านั้น ปฏิบัติได้จริง 1-2 ประโยค
-- safetyFact: ข้อเท็จจริงด้านความปลอดภัยที่เกี่ยวกับ "${focusSubject}" โดยตรง
+- interpretation: เล่าแบบนักพยากรณ์โหราศาสตร์ลึกลับแห่งอาณาจักรความปลอดภัย 2-3 ประโยค ต้องเริ่มจากการอ่านนิมิตของลูกศิษย์
+- number2d / number3d: ต้องเป็น "${oracle.number2d}" และ "${oracle.number3d}" เท่านั้น
+- numberReason: อธิบายสูตรเลขจากตำราอาจารย์ให้ขลังและเข้าใจง่าย
+- safetyAdvice: คำเตือน HSE เฉพาะนิมิตนี้ แบบปฏิบัติได้จริง ไม่ใช่ checklist ยาว
+- safetyFact: ข้อเท็จจริง HSE ที่เกี่ยวข้องกับนิมิตโดยตรง
+- dreamSymbols: ใช้รายการสัญลักษณ์จากตำราเท่านั้น
+- omenType, luckyFormula, hseReading, quickWarning, johnnyVerdict, confidence: ใช้ข้อมูลจากตำราเป็นแกนและเรียบเรียงให้เป็นภาษาอาจารย์
 
 ตอบเป็น JSON เท่านั้น ห้ามมี markdown backticks:
 {
   "interpretation": "...",
-  "number2d": "${item2d || 'เลข 2 ตัว (00-99)'}",
-  "number3d": "${item3d || 'เลข 3 ตัว (000-999)'}",
+  "number2d": "${oracle.number2d}",
+  "number3d": "${oracle.number3d}",
   "numberReason": "...",
   "safetyAdvice": "...",
   "safetyFact": "...",
+  "dreamSymbols": ${JSON.stringify(oracle.dreamSymbols)},
+  "omenType": "${oracle.omenType}",
+  "luckyFormula": "${oracle.luckyFormula.replace(/"/g, '\\"')}",
+  "hseReading": "...",
+  "quickWarning": "${oracle.quickWarning.replace(/"/g, '\\"')}",
+  "johnnyVerdict": "...",
+  "confidence": ${oracle.confidence},
   "disclaimer": "ข้อความเตือนสั้นๆ ว่าการทำนายเพื่อความสนุกเท่านั้น"
 }`;
 
@@ -6429,7 +6594,19 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                     { timeout: 20000 }
                 );
                 const rawText = geminiRes.data.candidates[0].content.parts[0].text;
-                result = normalizeDreamResult(parseGeminiJson(rawText, 'object'), item2d, item3d);
+                const aiDream = parseGeminiJson(rawText, 'object');
+                result = normalizeDreamResult({
+                    ...aiDream,
+                    dreamSymbols: oracle.dreamSymbols,
+                    omenType: oracle.omenType,
+                    luckyFormula: oracle.luckyFormula,
+                    hseReading: aiDream.hseReading || oracle.hseReading,
+                    quickWarning: oracle.quickWarning,
+                    johnnyVerdict: aiDream.johnnyVerdict || oracle.johnnyVerdict,
+                    confidence: oracle.confidence,
+                    number2d: oracle.number2d,
+                    number3d: oracle.number3d
+                }, oracle.number2d, oracle.number3d);
                 break;
             } catch (aiErr) {
                 lastErr = aiErr;
@@ -6441,17 +6618,25 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
         if (!result) {
             const subject = focusSubject || 'สัญลักษณ์ความปลอดภัย';
             result = {
-                interpretation: `ดวงดาวแห่ง "${subject}" กำลังส่งพลังงานมายังท่าน อาจารย์รับรู้พลังงานนี้ชัดเจน สัญลักษณ์นี้บ่งบอกถึงการระมัดระวังและโชคดีที่ซ่อนอยู่ในความรับผิดชอบ`,
-                number2d: item2d || String(Math.floor(Math.random() * 100)).padStart(2, '0'),
-                number3d: item3d || String(Math.floor(Math.random() * 1000)).padStart(3, '0'),
-                numberReason: `เลขนี้คำนวณจากพลังงานของ "${subject}" และตำแหน่งดวงดาวประจำวัน`,
-                safetyAdvice: itemSafetyFact || `ให้ระมัดระวังเรื่อง "${subject}" เป็นพิเศษในวันนี้ เพราะความปลอดภัยคือโชคดีที่แท้จริง`,
-                safetyFact: itemSafetyFact || 'อุบัติเหตุในโรงงาน 96% เกิดจากความประมาท ไม่ใช่โชคร้าย',
+                ...oracle,
+                interpretation: `อาจารย์เห็นนิมิตของ "${subject}" ส่องประกายอยู่เหนืออาณาจักรความปลอดภัย เลขที่ปรากฏตามตำราคือ ${oracle.number2d} และ ${oracle.number3d} แต่นิมิตนี้มิได้มาเพื่อโชคเท่านั้น มันมาเตือนให้ลูกศิษย์กลับบ้านอย่างปลอดภัย`,
+                numberReason: oracle.luckyFormula,
+                safetyAdvice: oracle.quickWarning,
+                safetyFact: itemSafetyFact || oracle.hseReading,
                 disclaimer: '⚠️ การพยากรณ์นี้เพื่อความสนุกและสร้างจิตสำนึกด้านความปลอดภัยเท่านั้น',
                 fallback: true
             };
         }
-        result = normalizeDreamResult(result, item2d, item3d);
+        result = normalizeDreamResult({
+            ...result,
+            dreamSymbols: oracle.dreamSymbols,
+            omenType: oracle.omenType,
+            luckyFormula: oracle.luckyFormula,
+            quickWarning: oracle.quickWarning,
+            confidence: oracle.confidence,
+            number2d: oracle.number2d,
+            number3d: oracle.number3d
+        }, oracle.number2d, oracle.number3d);
 
         // Save log (dreamItemId = dreamId string reference)
         const logId = 'DREAM' + uuidv4();

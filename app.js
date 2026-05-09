@@ -8376,6 +8376,7 @@ function showDreamResult(result, context = {}) {
     const summaryContext = context.subject || getDreamCurrentSubject();
     ensureDreamResultActions();
     updateDreamResultSummary(result, summaryContext);
+    updateDreamOracleDetails(result);
     $('#dream-interpretation').text(result.interpretation || '');
     $('#dream-number-2d').text(result.number2d || '??');
     $('#dream-number-3d').text(result.number3d || '???');
@@ -8415,9 +8416,50 @@ function ensureDreamResultSummary() {
 function updateDreamResultSummary(result, subject) {
     ensureDreamResultSummary();
     $('#dream-summary-number').text(`${result?.number2d || '--'}/${result?.number3d || '---'}`);
-    $('#dream-summary-theme').text(subject || 'ความปลอดภัย');
-    const advice = String(result?.safetyAdvice || result?.safetyFact || 'อ่านคำแนะนำด้านล่าง').trim();
+    const theme = (result?.dreamSymbols || []).map(s => s.label).filter(Boolean).slice(0, 2).join(' • ') || subject || 'ความปลอดภัย';
+    $('#dream-summary-theme').text(theme);
+    const advice = String(result?.quickWarning || result?.safetyAdvice || result?.safetyFact || 'อ่านคำแนะนำด้านล่าง').trim();
     $('#dream-summary-advice').text(advice.length > 64 ? `${advice.slice(0, 64)}...` : advice);
+}
+
+function ensureDreamOracleDetails() {
+    if ($('#dream-oracle-details').length) return;
+    $('#dream-interpretation').before(`
+        <div id="dream-oracle-details" class="dream-oracle-details mb-3">
+            <div class="dream-oracle-head">
+                <span><i class="fas fa-eye me-1"></i>นิมิตที่อาจารย์จับได้</span>
+                <strong id="dream-oracle-confidence">--</strong>
+            </div>
+            <div id="dream-oracle-symbols" class="dream-oracle-symbols"></div>
+            <div class="dream-oracle-grid">
+                <div><span>ประเภทนิมิต</span><strong id="dream-oracle-omen">-</strong></div>
+                <div><span>สูตรเลข</span><strong id="dream-oracle-formula">-</strong></div>
+            </div>
+            <div class="dream-oracle-reading">
+                <span>คำอ่าน HSE</span>
+                <p id="dream-oracle-hse"></p>
+            </div>
+            <div class="dream-oracle-warning">
+                <i class="fas fa-triangle-exclamation"></i>
+                <span id="dream-oracle-warning-text"></span>
+            </div>
+            <div class="dream-oracle-verdict" id="dream-oracle-verdict"></div>
+        </div>
+    `);
+}
+
+function updateDreamOracleDetails(result) {
+    ensureDreamOracleDetails();
+    const symbols = Array.isArray(result?.dreamSymbols) ? result.dreamSymbols : [];
+    $('#dream-oracle-confidence').text(result?.confidence ? `ชัด ${result.confidence}%` : 'นิมิตทั่วไป');
+    $('#dream-oracle-symbols').html(symbols.length
+        ? symbols.map(s => `<span class="dream-oracle-symbol"><b>${sanitizeHTML(s.icon || '🔮')}</b>${sanitizeHTML(s.label || '')}<small>${sanitizeHTML(s.role || '')}</small></span>`).join('')
+        : '<span class="dream-oracle-symbol"><b>🔮</b>นิมิตพร่าเลือน<small>หลัก</small></span>');
+    $('#dream-oracle-omen').text(result?.omenType || 'นิมิตโชคลาภจากความระมัดระวัง');
+    $('#dream-oracle-formula').text(result?.luckyFormula || result?.numberReason || '-');
+    $('#dream-oracle-hse').text(result?.hseReading || result?.safetyFact || '');
+    $('#dream-oracle-warning-text').text(result?.quickWarning || result?.safetyAdvice || '');
+    $('#dream-oracle-verdict').text(result?.johnnyVerdict || '');
 }
 
 function ensureDreamResultActions() {

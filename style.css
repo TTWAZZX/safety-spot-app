@@ -3888,6 +3888,103 @@ body {
 .dream-result-summary > div {
     text-align: left;
 }
+.dream-oracle-details {
+    border: 1px solid rgba(196,156,211,0.18);
+    background: rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 12px;
+}
+.dream-oracle-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    color: #e8d5ff;
+    font-size: 0.78rem;
+    font-weight: 900;
+    margin-bottom: 8px;
+}
+.dream-oracle-head strong {
+    color: #f4d03f;
+    white-space: nowrap;
+}
+.dream-oracle-symbols {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.dream-oracle-symbol {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid rgba(244,208,63,0.26);
+    background: rgba(244,208,63,0.1);
+    color: #f7e8a1;
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+.dream-oracle-symbol small {
+    color: rgba(240,230,255,0.58);
+    font-size: 0.62rem;
+}
+.dream-oracle-grid {
+    display: grid;
+    grid-template-columns: 0.8fr 1.2fr;
+    gap: 8px;
+    margin-bottom: 9px;
+}
+.dream-oracle-grid > div,
+.dream-oracle-reading {
+    border: 1px solid rgba(196,156,211,0.14);
+    background: rgba(26,5,51,0.32);
+    border-radius: 10px;
+    padding: 8px;
+}
+.dream-oracle-grid span,
+.dream-oracle-reading span {
+    display: block;
+    color: rgba(240,230,255,0.55);
+    font-size: 0.65rem;
+    font-weight: 800;
+    margin-bottom: 3px;
+}
+.dream-oracle-grid strong,
+.dream-oracle-reading p {
+    color: #ead9ff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.45;
+    margin: 0;
+}
+.dream-oracle-warning {
+    margin-top: 9px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: #d4efdf;
+    background: rgba(6,199,85,0.08);
+    border: 1px solid rgba(6,199,85,0.22);
+    border-radius: 10px;
+    padding: 9px;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+.dream-oracle-warning i {
+    color: #06C755;
+    margin-top: 2px;
+}
+.dream-oracle-verdict {
+    margin-top: 9px;
+    color: #f0e6ff;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    font-style: italic;
+    border-left: 3px solid rgba(244,208,63,0.45);
+    padding-left: 10px;
+}
 
 /* Section labels */
 .dream-section-label {
@@ -4231,7 +4328,8 @@ body {
     .dream-numbers-row { grid-template-columns: 1fr 1fr; gap: 8px; }
     .dream-number-value { font-size: 2rem; }
     .dream-insight-card,
-    .dream-result-summary {
+    .dream-result-summary,
+    .dream-oracle-grid {
         grid-template-columns: 1fr;
     }
 }
