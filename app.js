@@ -8009,6 +8009,15 @@ let _dreamHistoryRows = [];
 let _dreamHistoryFilter = 'all';
 let _dreamLatestLog = null;
 
+function resetDreamInputState({ clearResult = false } = {}) {
+    _dreamSelectedItemId = null;
+    _dreamSubmitting = false;
+    if (clearResult) _dreamResult = null;
+    $('#dream-text-input').val('');
+    $('.dream-item-chip').removeClass('selected').attr('aria-pressed', 'false');
+    updateDreamSubmitButton();
+}
+
 async function openDreamModal() {
     _dreamSelectedItemId = null;
     _dreamResult = null;
@@ -8021,8 +8030,7 @@ async function openDreamModal() {
     $('#dream-step-input').removeClass('d-none');
     $('#dream-step-loading').addClass('d-none');
     $('#dream-step-result').addClass('d-none');
-    $('#dream-text-input').val('');
-    $('#dream-limit-notice').text('');
+    resetDreamInputState({ clearResult: true });
     ensureDreamTabs();
     ensureDreamHistoryPanel();
     setDreamTab('interpret');
@@ -8048,6 +8056,7 @@ async function openDreamModal() {
         } catch (_) { _dreamItems = {}; }
     }
     renderDreamItems();
+    resetDreamInputState({ clearResult: true });
 }
 
 function ensureDreamTabs() {
@@ -8245,11 +8254,11 @@ function reuseDreamHistory(encodedPayload) {
         const payload = JSON.parse(decodeURIComponent(encodedPayload));
         _dreamSelectedItemId = payload.itemId || null;
         $('#dream-text-input').val(payload.dreamText || '');
-        $('.dream-item-chip').removeClass('selected');
+        $('.dream-item-chip').removeClass('selected').attr('aria-pressed', 'false');
         if (_dreamSelectedItemId) {
             $('.dream-item-chip').filter(function () {
                 return String($(this).data('item-id')) === String(_dreamSelectedItemId);
-            }).addClass('selected');
+            }).addClass('selected').attr('aria-pressed', 'true');
         }
         setDreamTab('interpret');
         showToast('เติมข้อมูลเดิมแล้ว พร้อมทำนายอีกครั้ง', 'success');
@@ -8310,7 +8319,8 @@ function renderDreamItems() {
                  <div class="dream-items-row">`;
         for (const item of data.items) {
             const icon = item.itemIcon ? item.itemIcon + ' ' : '';
-            html += `<button class="dream-item-chip" data-item-id="${item.itemId}" onclick="selectDreamItem('${item.itemId}', this)">
+            const isSelected = String(_dreamSelectedItemId || '') === String(item.itemId || item.dreamId || '');
+            html += `<button class="dream-item-chip ${isSelected ? 'selected' : ''}" data-item-id="${item.itemId}" aria-pressed="${isSelected ? 'true' : 'false'}" onclick="selectDreamItem('${item.itemId}', this)">
                          ${icon}${sanitizeHTML(item.itemName)}
                      </button>`;
         }
@@ -8320,9 +8330,15 @@ function renderDreamItems() {
 }
 
 function selectDreamItem(itemId, el) {
+    if (_dreamSelectedItemId && String(_dreamSelectedItemId) === String(itemId)) {
+        _dreamSelectedItemId = null;
+        $(el).removeClass('selected').attr('aria-pressed', 'false');
+        showToast('ยกเลิกสัญลักษณ์แล้ว เลือกใหม่หรือพิมพ์ฝันเองได้เลย', 'info');
+        return;
+    }
     _dreamSelectedItemId = itemId;
-    $('.dream-item-chip').removeClass('selected');
-    $(el).addClass('selected');
+    $('.dream-item-chip').removeClass('selected').attr('aria-pressed', 'false');
+    $(el).addClass('selected').attr('aria-pressed', 'true');
 }
 
 async function submitDreamInterpret() {
@@ -8435,6 +8451,11 @@ function ensureDreamOracleDetails() {
                 <div><span>ประเภทนิมิต</span><strong id="dream-oracle-omen">-</strong></div>
                 <div><span>สูตรเลข</span><strong id="dream-oracle-formula">-</strong></div>
             </div>
+            <div class="dream-oracle-evidence">
+                <span>ความน่าเชื่อถือของเลข</span>
+                <strong id="dream-oracle-reliability">-</strong>
+                <ul id="dream-oracle-evidence-list"></ul>
+            </div>
             <div class="dream-oracle-reading">
                 <span>คำอ่าน HSE</span>
                 <p id="dream-oracle-hse"></p>
@@ -8457,6 +8478,11 @@ function updateDreamOracleDetails(result) {
         : '<span class="dream-oracle-symbol"><b>🔮</b>นิมิตพร่าเลือน<small>หลัก</small></span>');
     $('#dream-oracle-omen').text(result?.omenType || 'นิมิตโชคลาภจากความระมัดระวัง');
     $('#dream-oracle-formula').text(result?.luckyFormula || result?.numberReason || '-');
+    const evidence = Array.isArray(result?.numberEvidence) ? result.numberEvidence : [];
+    $('#dream-oracle-reliability').text(result?.reliabilityLabel || (result?.confidence ? `ความชัด ${result.confidence}%` : 'เลขถูกล็อกโดยระบบ'));
+    $('#dream-oracle-evidence-list').html(evidence.length
+        ? evidence.map(item => `<li>${sanitizeHTML(item)}</li>`).join('')
+        : '<li>เลขถูกคำนวณและล็อกโดย backend ก่อนส่งให้ AI เรียบเรียง</li>');
     $('#dream-oracle-hse').text(result?.hseReading || result?.safetyFact || '');
     $('#dream-oracle-warning-text').text(result?.quickWarning || result?.safetyAdvice || '');
     $('#dream-oracle-verdict').text(result?.johnnyVerdict || '');
@@ -8480,6 +8506,7 @@ function backToDreamInput(tab = 'interpret') {
     $('#dream-step-loading').addClass('d-none');
     $('#dream-step-result').addClass('d-none');
     $('#dream-step-input').removeClass('d-none');
+    if (tab === 'interpret') resetDreamInputState({ clearResult: true });
     setDreamTab(tab);
     updateDreamCostUi();
 }

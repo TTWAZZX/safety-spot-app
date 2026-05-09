@@ -6190,6 +6190,10 @@ function normalizeDreamResult(result, fallback2d = null, fallback3d = null) {
         dreamSymbols,
         omenType: String(safe.omenType || '').slice(0, 120),
         luckyFormula: String(safe.luckyFormula || '').slice(0, 500),
+        numberEvidence: Array.isArray(safe.numberEvidence)
+            ? safe.numberEvidence.slice(0, 5).map(e => String(e || '').slice(0, 160)).filter(Boolean)
+            : [],
+        reliabilityLabel: String(safe.reliabilityLabel || '').slice(0, 120),
         hseReading: String(safe.hseReading || '').slice(0, 900),
         quickWarning: String(safe.quickWarning || '').slice(0, 400),
         johnnyVerdict: String(safe.johnnyVerdict || '').slice(0, 500),
@@ -6278,6 +6282,25 @@ function analyzeJohnnyOracle({ dreamText, selectedItem }) {
     const luckyFormula = symbols.length
         ? `${primary.icon || ''} ${primary.label} ให้ ${primary.number2d}/${primary.number3d}${secondary ? ` + ${secondary.icon || ''} ${secondary.label} ให้ ${secondary.number2d} → ${number3d}` : ''}`
         : `นิมิตยังพร่าเลือน อาจารย์ผูกเลขจากวันและถ้อยคำของลูกศิษย์ → ${number2d}/${number3d}`;
+    const numberEvidence = symbols.length
+        ? [
+            `เลขหลักมาจากสัญลักษณ์เด่น "${primary.label}" ตามตำรา Johnny Oracle`,
+            secondary ? `เลขสามตัวผูกจากสัญลักษณ์รอง "${secondary.label}" เพื่อสะท้อนนิมิตซ้อน` : `เลขสามตัวยึดจากชุดเดิมของ "${primary.label}" เพื่อให้สูตรไม่แกว่ง`,
+            selectedItem ? 'ผู้ใช้เลือกสัญลักษณ์จากคลังระบบ จึงให้น้ำหนักสัญลักษณ์นั้นเป็นแกนหลัก' : 'ระบบอ่านจาก keyword ในข้อความฝันโดยตรง ไม่ปล่อยให้ AI แต่งเลขเอง',
+            `${highestRisk?.hseTheme || primary.hseTheme || 'General HSE'} เป็นธีม HSE ที่ใช้กำกับคำเตือน`
+        ].filter(Boolean)
+        : [
+            'ไม่พบสัญลักษณ์ HSE เด่นชัด จึงใช้สูตร deterministic จากข้อความฝันและวันที่',
+            'เลขยังถูกล็อกจาก backend เพื่อไม่ให้ AI เปลี่ยนเลขเอง',
+            'แนะนำให้เลือกสัญลักษณ์หรือพิมพ์รายละเอียดเพิ่มเพื่อให้นิมิตชัดขึ้น'
+        ];
+    const reliabilityLabel = unknown
+        ? 'ความชัดต่ำ: ควรเพิ่มรายละเอียดฝันหรือเลือกสัญลักษณ์'
+        : confidence >= 85
+            ? 'ความชัดสูง: พบสัญลักษณ์ HSE หลายชั้นและสูตรเลขนิ่ง'
+            : confidence >= 65
+                ? 'ความชัดกลาง: พบสัญลักษณ์หลักชัดเจน'
+                : 'ความชัดเริ่มต้น: มีสัญลักษณ์หลักแต่บริบทยังน้อย';
     const hseReading = symbols.length
         ? symbols.map(s => `${s.label}: ${s.hseMeaning}`).join(' | ')
         : 'นิมิตไม่ชี้ hazard เด่นชัด จึงอ่านเป็นสัญญาณให้ตรวจหน้างาน ใช้สติ และรายงานสิ่งผิดปกติก่อนเกิดเหตุ';
@@ -6289,6 +6312,8 @@ function analyzeJohnnyOracle({ dreamText, selectedItem }) {
         dreamSymbols,
         omenType,
         luckyFormula,
+        numberEvidence,
+        reliabilityLabel,
         hseReading,
         quickWarning,
         johnnyVerdict: unknown
@@ -6457,7 +6482,8 @@ app.post('/api/lottery/dream-history/:logId/share', async (req, res) => {
                 subject,
                 safetyAdvice: result.quickWarning || result.safetyAdvice,
                 omenType: result.omenType,
-                dreamSymbols: result.dreamSymbols
+                dreamSymbols: result.dreamSymbols,
+                reliabilityLabel: result.reliabilityLabel
             },
             visibility: 'public'
         });
@@ -6548,6 +6574,8 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
 - สัญลักษณ์ที่จับได้: ${oracle.dreamSymbols.map(s => `${s.icon || ''}${s.label}(${s.role}/${s.hseTheme})`).join(', ')}
 - ประเภทนิมิต: ${oracle.omenType}
 - สูตรเลข: ${oracle.luckyFormula}
+- ที่มาเลข: ${oracle.numberEvidence.join(' | ')}
+- ความน่าเชื่อถือของสูตร: ${oracle.reliabilityLabel}
 - คำอ่าน HSE: ${oracle.hseReading}
 - คำเตือนหลัก: ${oracle.quickWarning}
 - ระดับความชัดของนิมิต: ${oracle.confidence}/100
@@ -6559,7 +6587,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
 - safetyAdvice: คำเตือน HSE เฉพาะนิมิตนี้ แบบปฏิบัติได้จริง ไม่ใช่ checklist ยาว
 - safetyFact: ข้อเท็จจริง HSE ที่เกี่ยวข้องกับนิมิตโดยตรง
 - dreamSymbols: ใช้รายการสัญลักษณ์จากตำราเท่านั้น
-- omenType, luckyFormula, hseReading, quickWarning, johnnyVerdict, confidence: ใช้ข้อมูลจากตำราเป็นแกนและเรียบเรียงให้เป็นภาษาอาจารย์
+- omenType, luckyFormula, numberEvidence, reliabilityLabel, hseReading, quickWarning, johnnyVerdict, confidence: ใช้ข้อมูลจากตำราเป็นแกนและเรียบเรียงให้เป็นภาษาอาจารย์
 
 ตอบเป็น JSON เท่านั้น ห้ามมี markdown backticks:
 {
@@ -6572,6 +6600,8 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
   "dreamSymbols": ${JSON.stringify(oracle.dreamSymbols)},
   "omenType": "${oracle.omenType}",
   "luckyFormula": "${oracle.luckyFormula.replace(/"/g, '\\"')}",
+  "numberEvidence": ${JSON.stringify(oracle.numberEvidence)},
+  "reliabilityLabel": "${oracle.reliabilityLabel.replace(/"/g, '\\"')}",
   "hseReading": "...",
   "quickWarning": "${oracle.quickWarning.replace(/"/g, '\\"')}",
   "johnnyVerdict": "...",
@@ -6600,6 +6630,8 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                     dreamSymbols: oracle.dreamSymbols,
                     omenType: oracle.omenType,
                     luckyFormula: oracle.luckyFormula,
+                    numberEvidence: oracle.numberEvidence,
+                    reliabilityLabel: oracle.reliabilityLabel,
                     hseReading: aiDream.hseReading || oracle.hseReading,
                     quickWarning: oracle.quickWarning,
                     johnnyVerdict: aiDream.johnnyVerdict || oracle.johnnyVerdict,
@@ -6633,6 +6665,8 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
             dreamSymbols: oracle.dreamSymbols,
             omenType: oracle.omenType,
             luckyFormula: oracle.luckyFormula,
+            numberEvidence: oracle.numberEvidence,
+            reliabilityLabel: oracle.reliabilityLabel,
             quickWarning: oracle.quickWarning,
             confidence: oracle.confidence,
             number2d: oracle.number2d,

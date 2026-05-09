@@ -3937,6 +3937,7 @@ body {
     margin-bottom: 9px;
 }
 .dream-oracle-grid > div,
+.dream-oracle-evidence,
 .dream-oracle-reading {
     border: 1px solid rgba(196,156,211,0.14);
     background: rgba(26,5,51,0.32);
@@ -3944,6 +3945,7 @@ body {
     padding: 8px;
 }
 .dream-oracle-grid span,
+.dream-oracle-evidence span,
 .dream-oracle-reading span {
     display: block;
     color: rgba(240,230,255,0.55);
@@ -3952,12 +3954,26 @@ body {
     margin-bottom: 3px;
 }
 .dream-oracle-grid strong,
+.dream-oracle-evidence strong,
 .dream-oracle-reading p {
     color: #ead9ff;
     font-size: 0.75rem;
     font-weight: 700;
     line-height: 1.45;
     margin: 0;
+}
+.dream-oracle-evidence {
+    margin-bottom: 9px;
+}
+.dream-oracle-evidence ul {
+    margin: 7px 0 0;
+    padding-left: 17px;
+    color: rgba(240,230,255,0.78);
+    font-size: 0.72rem;
+    line-height: 1.45;
+}
+.dream-oracle-evidence li + li {
+    margin-top: 4px;
 }
 .dream-oracle-warning {
     margin-top: 9px;
