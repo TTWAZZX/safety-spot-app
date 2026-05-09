@@ -6614,12 +6614,13 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
             }
         }
 
-        // Fallback: use table's number2d/number3d if available, else random
+        // Fallback: keep Johnny Oracle useful even if the AI provider is unavailable.
         if (!result) {
             const subject = focusSubject || 'สัญลักษณ์ความปลอดภัย';
+            const symbolText = oracle.dreamSymbols.map(s => `${s.icon || ''}${s.label}`).join(' และ ');
             result = {
                 ...oracle,
-                interpretation: `อาจารย์เห็นนิมิตของ "${subject}" ส่องประกายอยู่เหนืออาณาจักรความปลอดภัย เลขที่ปรากฏตามตำราคือ ${oracle.number2d} และ ${oracle.number3d} แต่นิมิตนี้มิได้มาเพื่อโชคเท่านั้น มันมาเตือนให้ลูกศิษย์กลับบ้านอย่างปลอดภัย`,
+                interpretation: `อาจารย์อ่านนิมิตของลูกศิษย์แล้วเห็น ${symbolText} ส่องประกายอยู่เหนืออาณาจักรความปลอดภัย นี่คือ ${oracle.omenType} ที่ผูกกับ "${subject}" เลขที่ปรากฏตามตำราคือ ${oracle.number2d} และ ${oracle.number3d} แต่ลางนี้มิได้มาเพื่อโชคเท่านั้น มันมาเตือนให้ลูกศิษย์กลับบ้านอย่างปลอดภัย`,
                 numberReason: oracle.luckyFormula,
                 safetyAdvice: oracle.quickWarning,
                 safetyFact: itemSafetyFact || oracle.hseReading,
