@@ -573,7 +573,8 @@ function getPulseMeta(eventType) {
         badge_awarded: { label: 'Badge', icon: 'fa-award', badgeClass: 'bg-warning-subtle text-warning' },
         lottery_ticket_bought: { label: 'Lottery', icon: 'fa-ticket-alt', badgeClass: 'bg-success-subtle text-success' },
         lottery_gold_claimed: { label: 'Gold', icon: 'fa-crown', badgeClass: 'bg-warning text-dark' },
-        lottery_won: { label: 'Winner', icon: 'fa-trophy', badgeClass: 'bg-warning text-dark' }
+        lottery_won: { label: 'Winner', icon: 'fa-trophy', badgeClass: 'bg-warning text-dark' },
+        lottery_dream_interpreted: { label: 'Johnny', icon: 'fa-wand-magic-sparkles', badgeClass: 'bg-secondary-subtle text-purple' }
     };
     return map[eventType] || { label: 'Pulse', icon: 'fa-bolt', badgeClass: 'bg-secondary-subtle text-secondary' };
 }
@@ -3643,6 +3644,11 @@ function renderNotifications(notifications, container) {
         if (notif.type === 'game_gacha') icon = 'fa-gift text-danger';      // ไอคอนกล่องของขวัญสีแดง
         // ✨ เพิ่มบรรทัดนี้
         if (notif.type === 'exchange') icon = 'fa-exchange-alt text-warning';
+
+        if (notif.type === 'lottery_ticket') icon = 'fa-ticket-alt text-success';
+        if (notif.type === 'lottery_gold') icon = 'fa-crown text-warning';
+        if (notif.type === 'lottery_win') icon = 'fa-trophy text-warning';
+        if (notif.type === 'lottery_dream') icon = 'fa-wand-magic-sparkles text-purple';
 
         const isUnreadClass = notif.isRead ? '' : 'list-group-item-light';
         const timeAgo = new Date(notif.createdAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short'});
@@ -7995,26 +8001,35 @@ async function adminGenerateDreamItems() {
 let _dreamItems = null;
 let _dreamSelectedItemId = null;
 let _dreamResult = null;
+let _dreamNextCost = 0;
+let _dreamTodayCount = 0;
+let _dreamSubmitting = false;
 
 async function openDreamModal() {
     _dreamSelectedItemId = null;
     _dreamResult = null;
+    _dreamNextCost = 0;
+    _dreamTodayCount = 0;
+    _dreamSubmitting = false;
     $('#dream-step-input').removeClass('d-none');
     $('#dream-step-loading').addClass('d-none');
     $('#dream-step-result').addClass('d-none');
     $('#dream-text-input').val('');
     $('#dream-limit-notice').text('');
+    ensureDreamTabs();
+    ensureDreamHistoryPanel();
+    setDreamTab('interpret');
+    updateDreamCostUi();
+    loadDreamHistory();
 
     const modal = new bootstrap.Modal(document.getElementById('dream-modal'));
     modal.show();
 
     try {
         const res = await callApi('/api/lottery/dream-today', { lineUserId: AppState.lineProfile.userId }, 'GET');
-        if (res.hasToday && res.log?.result) {
-            $('#dream-limit-notice').html('<span style="color:#f4d03f">✨ ท่านอาจารย์พยากรณ์ไปแล้ววันนี้ — แสดงผลเดิม</span>');
-            setTimeout(() => showDreamResult(res.log.result), 400);
-            return;
-        }
+        _dreamNextCost = Number(res.nextCost || 0);
+        _dreamTodayCount = Number(res.todayCount || 0);
+        updateDreamCostUi();
     } catch (_) {}
 
     if (!_dreamItems) {
@@ -8024,6 +8039,116 @@ async function openDreamModal() {
         } catch (_) { _dreamItems = {}; }
     }
     renderDreamItems();
+}
+
+function ensureDreamTabs() {
+    if ($('#dream-tab-switcher').length) return;
+    $('#dream-step-input').prepend(`
+        <div class="dream-tab-switcher" id="dream-tab-switcher">
+            <button type="button" class="dream-tab-btn active" data-dream-tab="interpret" onclick="setDreamTab('interpret')">
+                <i class="fas fa-wand-magic-sparkles"></i><span>ทำนายใหม่</span>
+            </button>
+            <button type="button" class="dream-tab-btn" data-dream-tab="history" onclick="setDreamTab('history')">
+                <i class="fas fa-history"></i><span>ประวัติ</span>
+            </button>
+        </div>
+    `);
+    $('#dream-step-input')
+        .children(':not(#dream-tab-switcher)')
+        .addClass('dream-interpret-panel');
+}
+
+function setDreamTab(tab) {
+    const isHistory = tab === 'history';
+    $('.dream-tab-btn').removeClass('active');
+    $(`.dream-tab-btn[data-dream-tab="${isHistory ? 'history' : 'interpret'}"]`).addClass('active');
+    $('.dream-interpret-panel').toggleClass('d-none', isHistory);
+    $('#dream-history-panel').toggleClass('d-none', !isHistory);
+    if (isHistory) loadDreamHistory();
+}
+
+function ensureDreamHistoryPanel() {
+    if ($('#dream-history-panel').length) return;
+    $('#dream-step-input').append(`
+        <div id="dream-history-panel" class="dream-history-panel mt-2 d-none">
+            <div class="dream-history-head">
+                <span><i class="fas fa-history me-1"></i>ประวัติคำทำนายของฉัน</span>
+                <button type="button" class="dream-history-refresh" onclick="loadDreamHistory()" title="โหลดใหม่">
+                    <i class="fas fa-rotate-right"></i>
+                </button>
+            </div>
+            <div id="dream-history-list" class="dream-history-list">
+                <div class="dream-history-empty">กำลังโหลด...</div>
+            </div>
+        </div>
+    `);
+}
+
+function updateDreamCostUi() {
+    const cost = Number(_dreamNextCost || 0);
+    const todayCount = Number(_dreamTodayCount || 0);
+    const currentCoins = Number(AppState.currentUser?.coinBalance || $('#coin-display').text().replace(/,/g, '') || 0);
+    if (cost > 0) {
+        $('#dream-limit-notice').html(`<span style="color:#f4d03f">วันนี้ทำนายไปแล้ว ${todayCount} ครั้ง • ครั้งถัดไปใช้ ${cost} เหรียญ</span>`);
+        $('#btn-dream-submit').siblings('p.text-center').first().text(`ครั้งถัดไปใช้ ${cost} เหรียญ`);
+    } else {
+        $('#dream-limit-notice').html('<span style="color:#9be7c7">ครั้งแรกของวันนี้ฟรี • หลังจากนั้นครั้งละ 20 เหรียญ</span>');
+        $('#btn-dream-submit').siblings('p.text-center').first().text('ครั้งแรกของวันนี้ฟรี');
+    }
+    updateDreamSubmitButton(currentCoins);
+}
+
+function updateDreamSubmitButton(currentCoins = null) {
+    const btn = $('#btn-dream-submit');
+    const cost = Number(_dreamNextCost || 0);
+    const coins = currentCoins === null
+        ? Number(AppState.currentUser?.coinBalance || $('#coin-display').text().replace(/,/g, '') || 0)
+        : Number(currentCoins || 0);
+    if (_dreamSubmitting) {
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>กำลังปรึกษาดวงดาว...');
+    } else if (cost > 0 && coins < cost) {
+        btn.prop('disabled', true).html(`<i class="fas fa-coins me-2"></i>เหรียญไม่พอ ต้องใช้ ${cost}`);
+    } else {
+        btn.prop('disabled', false).html(cost > 0
+            ? `<i class="fas fa-coins me-2"></i>ขอคำพยากรณ์ ${cost} เหรียญ`
+            : '<i class="fas fa-magic me-2"></i>ขอคำพยากรณ์ฟรี');
+    }
+}
+
+
+async function loadDreamHistory() {
+    const list = $('#dream-history-list');
+    if (!list.length || !AppState.lineProfile?.userId) return;
+    list.html('<div class="dream-history-empty">กำลังโหลด...</div>');
+    try {
+        const rows = await callApi('/api/lottery/dream-history', { lineUserId: AppState.lineProfile.userId, limit: 20 }, 'GET');
+        if (!rows || rows.length === 0) {
+            list.html('<div class="dream-history-empty">ยังไม่มีประวัติคำทำนาย</div>');
+            return;
+        }
+        list.html(rows.map((row, index) => {
+            const result = row.result || {};
+            const subject = [row.itemName, row.dreamText].filter(Boolean).join(' • ') || 'คำทำนายเลขนำโชค';
+            const dateText = new Date(row.createdAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+            const payload = encodeURIComponent(JSON.stringify(result));
+            return `<button type="button" class="dream-history-item" onclick="showDreamHistoryResult('${payload}')">
+                <span class="dream-history-icon">${sanitizeHTML(row.itemIcon || '🔮')}</span>
+                <span class="dream-history-copy">
+                    <strong>${sanitizeHTML(subject)}</strong>
+                    <small>${sanitizeHTML(dateText)}</small>
+                </span>
+                <span class="dream-history-numbers">${sanitizeHTML(result.number2d || '--')}/${sanitizeHTML(result.number3d || '---')}</span>
+            </button>`;
+        }).join(''));
+    } catch (e) {
+        list.html('<div class="dream-history-empty">โหลดประวัติไม่ได้</div>');
+    }
+}
+
+function showDreamHistoryResult(encodedResult) {
+    try {
+        showDreamResult(JSON.parse(decodeURIComponent(encodedResult)));
+    } catch (_) {}
 }
 
 function renderDreamItems() {
@@ -8054,22 +8179,43 @@ function selectDreamItem(itemId, el) {
 }
 
 async function submitDreamInterpret() {
+    if (_dreamSubmitting) return;
     const dreamText = $('#dream-text-input').val().trim();
     if (!dreamText && !_dreamSelectedItemId) {
         Swal.fire({ icon: 'warning', title: 'โปรดเล่าความฝัน', text: 'เลือกสัญลักษณ์หรือพิมพ์ความฝัน/ประสบการณ์ก่อน', confirmButtonColor: '#6c3483' });
         return;
     }
+    if (_dreamNextCost > 0) {
+        const currentCoins = Number(AppState.currentUser?.coinBalance || $('#coin-display').text().replace(/,/g, '') || 0);
+        if (currentCoins < _dreamNextCost) {
+            Swal.fire({ icon: 'warning', title: 'เหรียญไม่พอ', text: `การทำนายเพิ่มต้องใช้ ${_dreamNextCost} เหรียญ`, confirmButtonColor: '#6c3483' });
+            return;
+        }
+    }
+    _dreamSubmitting = true;
+    updateDreamSubmitButton();
     $('#dream-step-input').addClass('d-none');
     $('#dream-step-loading').removeClass('d-none');
     try {
         const res = await callApi('/api/lottery/dream-interpret', {
             lineUserId: AppState.lineProfile.userId,
-            dreamText: dreamText || null,
+            dreamText,
             itemId: _dreamSelectedItemId || null
         }, 'POST');
         _dreamResult = res;
+        if (res.newCoinBalance !== undefined && res.newCoinBalance !== null) {
+            syncCoins(res.newCoinBalance);
+            $('#home-coins-display').text(Number(res.newCoinBalance || 0).toLocaleString());
+        }
+        _dreamNextCost = Number(res.todayCount || 0) > 0 ? 20 : 0;
+        _dreamTodayCount = Number(res.todayCount || _dreamTodayCount + 1);
+        _dreamSubmitting = false;
+        updateDreamCostUi();
+        loadDreamHistory();
         showDreamResult(res);
     } catch (e) {
+        _dreamSubmitting = false;
+        updateDreamSubmitButton();
         $('#dream-step-loading').addClass('d-none');
         $('#dream-step-input').removeClass('d-none');
         Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: e.message, confirmButtonColor: '#6c3483' });
@@ -8080,6 +8226,7 @@ function showDreamResult(result) {
     $('#dream-step-loading').addClass('d-none');
     $('#dream-step-input').addClass('d-none');
     $('#dream-step-result').removeClass('d-none');
+    ensureDreamResultActions();
     $('#dream-interpretation').text(result.interpretation || '');
     $('#dream-number-2d').text(result.number2d || '??');
     $('#dream-number-3d').text(result.number3d || '???');
@@ -8088,6 +8235,28 @@ function showDreamResult(result) {
     $('#dream-safety-fact').text(result.safetyFact || '');
     $('#dream-disclaimer').text(result.disclaimer || '');
     _dreamResult = result;
+}
+
+function ensureDreamResultActions() {
+    if ($('#dream-result-actions').length) return;
+    $('#dream-disclaimer').after(`
+        <div id="dream-result-actions" class="dream-result-actions mt-3">
+            <button type="button" class="dream-result-action-btn" onclick="backToDreamInput('interpret')">
+                <i class="fas fa-wand-magic-sparkles"></i><span>ทำนายใหม่</span>
+            </button>
+            <button type="button" class="dream-result-action-btn" onclick="backToDreamInput('history')">
+                <i class="fas fa-history"></i><span>ดูประวัติ</span>
+            </button>
+        </div>
+    `);
+}
+
+function backToDreamInput(tab = 'interpret') {
+    $('#dream-step-loading').addClass('d-none');
+    $('#dream-step-result').addClass('d-none');
+    $('#dream-step-input').removeClass('d-none');
+    setDreamTab(tab);
+    updateDreamCostUi();
 }
 
 function useDreamNumber(type) {

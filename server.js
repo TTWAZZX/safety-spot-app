@@ -198,6 +198,26 @@ async function emitActivityEvent({ eventType, actorUserId, entityType, entityId,
     }
 }
 
+async function createNotification({ recipientUserId, message, type, relatedItemId, triggeringUserId }, queryConn = db) {
+    if (!recipientUserId || !message || !type) return;
+    try {
+        await queryConn.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+            [
+                'NOTIF' + uuidv4(),
+                recipientUserId,
+                message,
+                type,
+                relatedItemId || null,
+                triggeringUserId || recipientUserId
+            ]
+        );
+    } catch (err) {
+        console.warn("notification skipped:", err.message);
+    }
+}
+
 // -----------------------------
 //   Auto award badges by score (ADD + REMOVE)
 // -----------------------------
@@ -773,6 +793,30 @@ app.get('/api/home/activity-feed', async (req, res) => {
             title: r.isGoldTicket ? 'รับตั๋วทอง Safety Lottery' : 'ซื้อ Safety Lottery',
             message: `งวด ${r.drawDateText || '-'} • ${r.ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย'}`,
             createdAt: r.purchasedAt
+        })));
+
+        const [dreamRows] = await db.query(
+            `SELECT l.logId, l.lineUserId AS actorUserId, l.createdAt,
+                    u.fullName AS actorName, u.pictureUrl AS actorPictureUrl, u.department,
+                    s.itemName
+             FROM lottery_dream_logs l
+             JOIN users u ON l.lineUserId = u.lineUserId
+             LEFT JOIN safety_dream_items s ON l.dreamItemId = s.dreamId
+             ORDER BY l.createdAt DESC
+             LIMIT ?`,
+            [perSourceLimit]
+        );
+        sources.push(...dreamRows.map(r => ({
+            eventType: 'lottery_dream_interpreted',
+            actorUserId: r.actorUserId,
+            actorName: r.actorName,
+            actorPictureUrl: r.actorPictureUrl,
+            department: r.department,
+            entityType: 'lottery_dream',
+            entityId: r.logId,
+            title: 'ขอคำพยากรณ์อาจารย์จอห์นนี่',
+            message: r.itemName ? `สัญลักษณ์ ${r.itemName}` : 'คำทำนายเลขนำโชคด้านความปลอดภัย',
+            createdAt: r.createdAt
         })));
 
         const rows = sources
@@ -4800,6 +4844,13 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
             [lineUserId, todayTH]);
 
         await conn.commit();
+        createNotification({
+            recipientUserId: lineUserId,
+            message: `ซื้อตั๋ว Safety Lottery งวด ${toLotteryDateString(round.drawDate)} สำเร็จ`,
+            type: 'lottery_ticket',
+            relatedItemId: String(ticketResult.insertId),
+            triggeringUserId: lineUserId
+        });
         emitActivityEvent({
             eventType: 'lottery_ticket_bought',
             actorUserId: lineUserId,
@@ -6055,6 +6106,7 @@ const JOHNNY_SYSTEM_PROMPT = `คุณคือ "ท่านอาจารย
 เชี่ยวชาญ: โยงสัญลักษณ์ความฝัน/สัญลักษณ์ความปลอดภัยเข้ากับตัวเลขมงคล + คำแนะนำความปลอดภัยที่ปฏิบัติได้จริง
 ข้อห้าม: ห้ามรับประกันผลลอตเตอรี่ ต้องใส่ข้อความเตือนว่าการทำนายเพื่อความสนุกเท่านั้น`;
 
+const DREAM_EXTRA_INTERPRET_COST = 20;
 const DREAM_CATEGORIES = new Set(['ppe', 'fire', 'electrical', 'chemical', 'height', 'machine', 'road']);
 
 function parseDreamResult(raw) {
@@ -6146,8 +6198,52 @@ app.get('/api/lottery/dream-today', async (req, res) => {
              ORDER BY createdAt DESC LIMIT 1`,
             [lineUserId, today]
         );
+        const [[usage]] = await db.query(
+            `SELECT COUNT(*) AS todayCount FROM lottery_dream_logs
+             WHERE lineUserId=? AND DATE(CONVERT_TZ(createdAt,'+00:00','+07:00'))=?`,
+            [lineUserId, today]
+        );
+        const todayCount = Number(usage?.todayCount || 0);
         if (log) log.result = normalizeDreamResult(parseDreamResult(log.result));
-        res.json({ status: 'success', data: { hasToday: !!log, log: log || null } });
+        res.json({
+            status: 'success',
+            data: {
+                hasToday: !!log,
+                todayCount,
+                nextCost: todayCount > 0 ? DREAM_EXTRA_INTERPRET_COST : 0,
+                log: log || null
+            }
+        });
+    } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
+});
+
+// GET /api/lottery/dream-history — ประวัติคำทำนายของผู้ใช้
+app.get('/api/lottery/dream-history', async (req, res) => {
+    const { lineUserId } = req.query;
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+    if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
+    try {
+        await assertLotteryUserRequestOrAdmin(req, lineUserId);
+        const [rows] = await db.query(
+            `SELECT l.logId, l.dreamText, l.dreamItemId, l.result, l.createdAt,
+                    s.itemName, s.itemIcon
+             FROM lottery_dream_logs l
+             LEFT JOIN safety_dream_items s ON l.dreamItemId = s.dreamId
+             WHERE l.lineUserId=?
+             ORDER BY l.createdAt DESC
+             LIMIT ?`,
+            [lineUserId, limit]
+        );
+        const history = rows.map(row => ({
+            logId: row.logId,
+            dreamText: row.dreamText || '',
+            dreamItemId: row.dreamItemId || null,
+            itemName: row.itemName || null,
+            itemIcon: row.itemIcon || null,
+            result: normalizeDreamResult(parseDreamResult(row.result)),
+            createdAt: row.createdAt
+        }));
+        res.json({ status: 'success', data: history });
     } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
 });
 
@@ -6181,16 +6277,22 @@ app.post('/api/lottery/dream-interpret', async (req, res) => {
         }
         const queryConn = lockConn || db;
 
-        // Rate limit: 1 ครั้ง/วัน/user (ข้ามสำหรับแอดมิน)
+        // First dream of the Bangkok day is free; additional dreams cost coins.
         const today = getBangkokDateString();
-        const [[existing]] = await queryConn.query(
-            `SELECT logId, result FROM lottery_dream_logs
-             WHERE lineUserId=? AND DATE(CONVERT_TZ(createdAt,'+00:00','+07:00'))=?
-             ORDER BY createdAt DESC LIMIT 1`,
+        const [[usage]] = await queryConn.query(
+            `SELECT COUNT(*) AS todayCount FROM lottery_dream_logs
+             WHERE lineUserId=? AND DATE(CONVERT_TZ(createdAt,'+00:00','+07:00'))=?`,
             [lineUserId, today]
         );
-        if (!isAdminCaller && existing) {
-            return res.json({ status: 'success', data: normalizeDreamResult({ ...(parseDreamResult(existing.result) || {}), cached: true }) });
+        const todayDreamCount = Number(usage?.todayCount || 0);
+        const dreamCost = (!isAdminCaller && todayDreamCount > 0) ? DREAM_EXTRA_INTERPRET_COST : 0;
+        if (dreamCost > 0) {
+            const [[coinUser]] = await queryConn.query('SELECT coinBalance FROM users WHERE lineUserId=?', [lineUserId]);
+            if (!coinUser || Number(coinUser.coinBalance || 0) < dreamCost) {
+                const err = new Error(`เหรียญไม่พอครับ ต้องใช้ ${dreamCost} เหรียญสำหรับการทำนายเพิ่ม`);
+                err.statusCode = 400;
+                throw err;
+            }
         }
 
         // Build context for AI — ใช้ schema จริง: dreamId (string), number2d, number3d, promptHint, safetyFact
@@ -6283,10 +6385,58 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
 
         // Save log (dreamItemId = dreamId string reference)
         const logId = 'DREAM' + uuidv4();
-        await queryConn.query(
-            'INSERT INTO lottery_dream_logs (logId, lineUserId, dreamText, dreamItemId, result) VALUES (?,?,?,?,?)',
-            [logId, lineUserId, dreamText || null, itemId || null, JSON.stringify(result)]
-        );
+        let newCoinBalance = null;
+        if (dreamCost > 0) {
+            await queryConn.beginTransaction();
+            try {
+                const [[coinUser]] = await queryConn.query('SELECT coinBalance FROM users WHERE lineUserId=? FOR UPDATE', [lineUserId]);
+                if (!coinUser || Number(coinUser.coinBalance || 0) < dreamCost) {
+                    const err = new Error(`เหรียญไม่พอครับ ต้องใช้ ${dreamCost} เหรียญสำหรับการทำนายเพิ่ม`);
+                    err.statusCode = 400;
+                    throw err;
+                }
+                await queryConn.query('UPDATE users SET coinBalance = coinBalance - ? WHERE lineUserId=?', [dreamCost, lineUserId]);
+                await queryConn.query(
+                    'INSERT INTO lottery_dream_logs (logId, lineUserId, dreamText, dreamItemId, result) VALUES (?,?,?,?,?)',
+                    [logId, lineUserId, dreamText, itemId || null, JSON.stringify(result)]
+                );
+                const [[updatedUser]] = await queryConn.query('SELECT coinBalance FROM users WHERE lineUserId=?', [lineUserId]);
+                newCoinBalance = Number(updatedUser?.coinBalance || 0);
+                await queryConn.commit();
+            } catch (txErr) {
+                await queryConn.rollback();
+                throw txErr;
+            }
+        } else {
+            await queryConn.query(
+                'INSERT INTO lottery_dream_logs (logId, lineUserId, dreamText, dreamItemId, result) VALUES (?,?,?,?,?)',
+                [logId, lineUserId, dreamText, itemId || null, JSON.stringify(result)]
+            );
+        }
+
+        result.costCoins = dreamCost;
+        if (newCoinBalance !== null) result.newCoinBalance = newCoinBalance;
+        result.todayCount = todayDreamCount + 1;
+
+        createNotification({
+            recipientUserId: lineUserId,
+            message: dreamCost > 0
+                ? `อาจารย์จอห์นนี่ทำนายเพิ่มสำเร็จ หัก ${dreamCost} เหรียญ`
+                : 'อาจารย์จอห์นนี่ทำนายเลขนำโชคของวันนี้แล้ว',
+            type: 'lottery_dream',
+            relatedItemId: logId,
+            triggeringUserId: lineUserId
+        });
+        emitActivityEvent({
+            eventType: 'lottery_dream_interpreted',
+            actorUserId: lineUserId,
+            entityType: 'lottery_dream',
+            entityId: logId,
+            title: 'ขอคำพยากรณ์อาจารย์จอห์นนี่',
+            message: focusSubject ? `เรื่อง ${focusSubject}` : 'คำทำนายเลขนำโชคด้านความปลอดภัย',
+            metadata: { costCoins: dreamCost, itemId: itemId || null },
+            visibility: 'public'
+        });
 
         res.json({ status: 'success', data: result });
     } catch (e) {
