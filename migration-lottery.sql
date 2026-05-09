@@ -161,6 +161,8 @@ CREATE TABLE IF NOT EXISTS lottery_dream_logs (
   dreamText   TEXT,
   dreamItemId VARCHAR(20) DEFAULT NULL,
   result      JSON,
+  isFavorite  BOOLEAN DEFAULT FALSE,
+  sharedAt    TIMESTAMP NULL DEFAULT NULL,
   createdAt   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_dream_user_date (lineUserId, createdAt)
 );
@@ -168,6 +170,8 @@ CREATE TABLE IF NOT EXISTS lottery_dream_logs (
 -- Existing installs may need:
 -- ALTER TABLE lottery_dream_logs ADD COLUMN dreamItemId VARCHAR(20) DEFAULT NULL;
 -- ALTER TABLE lottery_dream_logs ADD COLUMN result JSON;
+-- ALTER TABLE lottery_dream_logs ADD COLUMN isFavorite BOOLEAN DEFAULT FALSE;
+-- ALTER TABLE lottery_dream_logs ADD COLUMN sharedAt TIMESTAMP NULL DEFAULT NULL;
 
 -- 7. เพิ่ม columns ในตาราง users
 SET @add_lottery_win_count = (

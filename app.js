@@ -574,7 +574,8 @@ function getPulseMeta(eventType) {
         lottery_ticket_bought: { label: 'Lottery', icon: 'fa-ticket-alt', badgeClass: 'bg-success-subtle text-success' },
         lottery_gold_claimed: { label: 'Gold', icon: 'fa-crown', badgeClass: 'bg-warning text-dark' },
         lottery_won: { label: 'Winner', icon: 'fa-trophy', badgeClass: 'bg-warning text-dark' },
-        lottery_dream_interpreted: { label: 'Johnny', icon: 'fa-wand-magic-sparkles', badgeClass: 'bg-secondary-subtle text-purple' }
+        lottery_dream_interpreted: { label: 'Johnny', icon: 'fa-wand-magic-sparkles', badgeClass: 'bg-secondary-subtle text-purple' },
+        lottery_dream_shared: { label: 'Johnny', icon: 'fa-share-nodes', badgeClass: 'bg-secondary-subtle text-purple' }
     };
     return map[eventType] || { label: 'Pulse', icon: 'fa-bolt', badgeClass: 'bg-secondary-subtle text-secondary' };
 }
@@ -8004,6 +8005,9 @@ let _dreamResult = null;
 let _dreamNextCost = 0;
 let _dreamTodayCount = 0;
 let _dreamSubmitting = false;
+let _dreamHistoryRows = [];
+let _dreamHistoryFilter = 'all';
+let _dreamLatestLog = null;
 
 async function openDreamModal() {
     _dreamSelectedItemId = null;
@@ -8011,6 +8015,9 @@ async function openDreamModal() {
     _dreamNextCost = 0;
     _dreamTodayCount = 0;
     _dreamSubmitting = false;
+    _dreamHistoryRows = [];
+    _dreamHistoryFilter = 'all';
+    _dreamLatestLog = null;
     $('#dream-step-input').removeClass('d-none');
     $('#dream-step-loading').addClass('d-none');
     $('#dream-step-result').addClass('d-none');
@@ -8029,7 +8036,9 @@ async function openDreamModal() {
         const res = await callApi('/api/lottery/dream-today', { lineUserId: AppState.lineProfile.userId }, 'GET');
         _dreamNextCost = Number(res.nextCost || 0);
         _dreamTodayCount = Number(res.todayCount || 0);
+        _dreamLatestLog = res.log || null;
         updateDreamCostUi();
+        updateDreamInsightCard();
     } catch (_) {}
 
     if (!_dreamItems) {
@@ -8056,6 +8065,22 @@ function ensureDreamTabs() {
     $('#dream-step-input')
         .children(':not(#dream-tab-switcher)')
         .addClass('dream-interpret-panel');
+    $('.dream-intro-text').after(`
+        <div id="dream-insight-card" class="dream-insight-card dream-interpret-panel">
+            <div>
+                <span>วันนี้</span>
+                <strong id="dream-insight-count">0 ครั้ง</strong>
+            </div>
+            <div>
+                <span>ครั้งถัดไป</span>
+                <strong id="dream-insight-cost">ฟรี</strong>
+            </div>
+            <div>
+                <span>เลขล่าสุด</span>
+                <strong id="dream-insight-number">--/---</strong>
+            </div>
+        </div>
+    `);
 }
 
 function setDreamTab(tab) {
@@ -8077,11 +8102,26 @@ function ensureDreamHistoryPanel() {
                     <i class="fas fa-rotate-right"></i>
                 </button>
             </div>
+            <div class="dream-history-filters">
+                <button type="button" class="dream-filter-btn active" data-dream-filter="all" onclick="setDreamHistoryFilter('all')">ทั้งหมด</button>
+                <button type="button" class="dream-filter-btn" data-dream-filter="today" onclick="setDreamHistoryFilter('today')">วันนี้</button>
+                <button type="button" class="dream-filter-btn" data-dream-filter="week" onclick="setDreamHistoryFilter('week')">7 วัน</button>
+                <button type="button" class="dream-filter-btn" data-dream-filter="symbol" onclick="setDreamHistoryFilter('symbol')">สัญลักษณ์</button>
+                <button type="button" class="dream-filter-btn" data-dream-filter="text" onclick="setDreamHistoryFilter('text')">พิมพ์เอง</button>
+                <button type="button" class="dream-filter-btn" data-dream-filter="favorite" onclick="setDreamHistoryFilter('favorite')">ติดดาว</button>
+            </div>
             <div id="dream-history-list" class="dream-history-list">
                 <div class="dream-history-empty">กำลังโหลด...</div>
             </div>
         </div>
     `);
+}
+
+function updateDreamInsightCard() {
+    const latest = _dreamLatestLog?.result || _dreamHistoryRows?.[0]?.result || null;
+    $('#dream-insight-count').text(`${Number(_dreamTodayCount || 0)} ครั้ง`);
+    $('#dream-insight-cost').text(Number(_dreamNextCost || 0) > 0 ? `${_dreamNextCost} เหรียญ` : 'ฟรี');
+    $('#dream-insight-number').text(latest ? `${latest.number2d || '--'}/${latest.number3d || '---'}` : '--/---');
 }
 
 function updateDreamCostUi() {
@@ -8121,34 +8161,141 @@ async function loadDreamHistory() {
     if (!list.length || !AppState.lineProfile?.userId) return;
     list.html('<div class="dream-history-empty">กำลังโหลด...</div>');
     try {
-        const rows = await callApi('/api/lottery/dream-history', { lineUserId: AppState.lineProfile.userId, limit: 20 }, 'GET');
-        if (!rows || rows.length === 0) {
-            list.html('<div class="dream-history-empty">ยังไม่มีประวัติคำทำนาย</div>');
-            return;
+        _dreamHistoryRows = await callApi('/api/lottery/dream-history', { lineUserId: AppState.lineProfile.userId, limit: 100 }, 'GET') || [];
+        if (!_dreamLatestLog && _dreamHistoryRows.length) _dreamLatestLog = _dreamHistoryRows[0];
+        updateDreamInsightCard();
+        renderDreamHistoryList();
+    } catch (e) {
+        list.html('<div class="dream-history-empty">โหลดประวัติไม่ได้</div>');
+    }
+}
+
+function setDreamHistoryFilter(filter) {
+    _dreamHistoryFilter = filter || 'all';
+    $('.dream-filter-btn').removeClass('active');
+    $(`.dream-filter-btn[data-dream-filter="${_dreamHistoryFilter}"]`).addClass('active');
+    renderDreamHistoryList();
+}
+
+function getDreamHistoryFilteredRows() {
+    const now = new Date();
+    const todayKey = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+    return (_dreamHistoryRows || []).filter(row => {
+        const rowDate = new Date(row.createdAt);
+        if (_dreamHistoryFilter === 'today') {
+            return rowDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }) === todayKey;
         }
-        list.html(rows.map((row, index) => {
-            const result = row.result || {};
-            const subject = [row.itemName, row.dreamText].filter(Boolean).join(' • ') || 'คำทำนายเลขนำโชค';
-            const dateText = new Date(row.createdAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
-            const payload = encodeURIComponent(JSON.stringify(result));
-            return `<button type="button" class="dream-history-item" onclick="showDreamHistoryResult('${payload}')">
+        if (_dreamHistoryFilter === 'week') {
+            return (now.getTime() - rowDate.getTime()) <= 7 * 24 * 60 * 60 * 1000;
+        }
+        if (_dreamHistoryFilter === 'symbol') return !!row.dreamItemId;
+        if (_dreamHistoryFilter === 'text') return !!String(row.dreamText || '').trim();
+        if (_dreamHistoryFilter === 'favorite') return !!row.isFavorite;
+        return true;
+    });
+}
+
+function renderDreamHistoryList() {
+    const list = $('#dream-history-list');
+    if (!list.length) return;
+    const rows = getDreamHistoryFilteredRows();
+    if (!rows.length) {
+        list.html('<div class="dream-history-empty">ไม่มีรายการในตัวกรองนี้</div>');
+        return;
+    }
+    list.html(rows.map(row => {
+        const result = row.result || {};
+        const subject = [row.itemName, row.dreamText].filter(Boolean).join(' • ') || 'คำทำนายเลขนำโชค';
+        const dateText = new Date(row.createdAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+        const payload = encodeURIComponent(JSON.stringify({ result, subject, logId: row.logId }));
+        const reusePayload = encodeURIComponent(JSON.stringify({ itemId: row.dreamItemId || '', dreamText: row.dreamText || '' }));
+        return `<div class="dream-history-item">
+            <button type="button" class="dream-history-main" onclick="showDreamHistoryResult('${payload}')">
                 <span class="dream-history-icon">${sanitizeHTML(row.itemIcon || '🔮')}</span>
                 <span class="dream-history-copy">
                     <strong>${sanitizeHTML(subject)}</strong>
                     <small>${sanitizeHTML(dateText)}</small>
                 </span>
                 <span class="dream-history-numbers">${sanitizeHTML(result.number2d || '--')}/${sanitizeHTML(result.number3d || '---')}</span>
-            </button>`;
-        }).join(''));
-    } catch (e) {
-        list.html('<div class="dream-history-empty">โหลดประวัติไม่ได้</div>');
-    }
+            </button>
+            <div class="dream-history-actions">
+                <button type="button" class="dream-history-action ${row.isFavorite ? 'active' : ''}" onclick="toggleDreamFavorite('${sanitizeHTML(row.logId)}', ${row.isFavorite ? 'false' : 'true'})" title="ติดดาว">
+                    <i class="fas fa-star"></i><span>${row.isFavorite ? 'ติดดาวแล้ว' : 'ติดดาว'}</span>
+                </button>
+                <button type="button" class="dream-history-action" onclick="reuseDreamHistory('${reusePayload}')" title="ใช้หัวข้อนี้อีกครั้ง">
+                    <i class="fas fa-rotate-left"></i><span>ใช้ซ้ำ</span>
+                </button>
+                <button type="button" class="dream-history-action ${row.sharedAt ? 'active' : ''}" onclick="shareDreamHistory('${sanitizeHTML(row.logId)}')" title="แชร์ไป Safety Pulse">
+                    <i class="fas fa-share-nodes"></i><span>${row.sharedAt ? 'แชร์แล้ว' : 'แชร์'}</span>
+                </button>
+            </div>
+        </div>`;
+    }).join(''));
 }
 
 function showDreamHistoryResult(encodedResult) {
     try {
-        showDreamResult(JSON.parse(decodeURIComponent(encodedResult)));
+        const payload = JSON.parse(decodeURIComponent(encodedResult));
+        showDreamResult(payload.result || payload, { subject: payload.subject || '' });
     } catch (_) {}
+}
+
+function reuseDreamHistory(encodedPayload) {
+    try {
+        const payload = JSON.parse(decodeURIComponent(encodedPayload));
+        _dreamSelectedItemId = payload.itemId || null;
+        $('#dream-text-input').val(payload.dreamText || '');
+        $('.dream-item-chip').removeClass('selected');
+        if (_dreamSelectedItemId) {
+            $('.dream-item-chip').filter(function () {
+                return String($(this).data('item-id')) === String(_dreamSelectedItemId);
+            }).addClass('selected');
+        }
+        setDreamTab('interpret');
+        showToast('เติมข้อมูลเดิมแล้ว พร้อมทำนายอีกครั้ง', 'success');
+    } catch (_) {}
+}
+
+async function toggleDreamFavorite(logId, isFavorite) {
+    try {
+        await callApi(`/api/lottery/dream-history/${encodeURIComponent(logId)}/favorite`, {
+            lineUserId: AppState.lineProfile.userId,
+            isFavorite
+        }, 'POST');
+        const row = _dreamHistoryRows.find(r => r.logId === logId);
+        if (row) row.isFavorite = !!isFavorite;
+        renderDreamHistoryList();
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'บันทึกไม่ได้', text: e.message, confirmButtonColor: '#6c3483' });
+    }
+}
+
+async function shareDreamHistory(logId) {
+    try {
+        const row = _dreamHistoryRows.find(r => r.logId === logId);
+        if (row?.sharedAt) {
+            showToast('รายการนี้แชร์ไป Safety Pulse แล้ว', 'info');
+            return;
+        }
+        const confirm = await Swal.fire({
+            icon: 'question',
+            title: 'แชร์ไป Safety Pulse?',
+            html: '<div class="text-start small">ระบบจะแชร์เฉพาะเลขเด่นและคำแนะนำความปลอดภัย<br>ไม่แชร์ข้อความความฝันส่วนตัวของคุณ</div>',
+            showCancelButton: true,
+            confirmButtonText: 'แชร์',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#6c3483'
+        });
+        if (!confirm.isConfirmed) return;
+        await callApi(`/api/lottery/dream-history/${encodeURIComponent(logId)}/share`, {
+            lineUserId: AppState.lineProfile.userId
+        }, 'POST');
+        if (row) row.sharedAt = new Date().toISOString();
+        renderDreamHistoryList();
+        showToast('แชร์ไป Safety Pulse แล้ว', 'success');
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'แชร์ไม่ได้', text: e.message, confirmButtonColor: '#6c3483' });
+    }
 }
 
 function renderDreamItems() {
@@ -8222,11 +8369,13 @@ async function submitDreamInterpret() {
     }
 }
 
-function showDreamResult(result) {
+function showDreamResult(result, context = {}) {
     $('#dream-step-loading').addClass('d-none');
     $('#dream-step-input').addClass('d-none');
     $('#dream-step-result').removeClass('d-none');
+    const summaryContext = context.subject || getDreamCurrentSubject();
     ensureDreamResultActions();
+    updateDreamResultSummary(result, summaryContext);
     $('#dream-interpretation').text(result.interpretation || '');
     $('#dream-number-2d').text(result.number2d || '??');
     $('#dream-number-3d').text(result.number3d || '???');
@@ -8235,6 +8384,40 @@ function showDreamResult(result) {
     $('#dream-safety-fact').text(result.safetyFact || '');
     $('#dream-disclaimer').text(result.disclaimer || '');
     _dreamResult = result;
+}
+
+function getDreamCurrentSubject() {
+    const item = findDreamItemById(_dreamSelectedItemId);
+    const dreamText = $('#dream-text-input').val().trim();
+    return [item?.itemName, dreamText].filter(Boolean).join(' • ') || 'ความปลอดภัย';
+}
+
+function findDreamItemById(itemId) {
+    if (!itemId || !_dreamItems) return null;
+    for (const group of Object.values(_dreamItems)) {
+        const found = (group.items || []).find(item => item.itemId === itemId || item.dreamId === itemId);
+        if (found) return found;
+    }
+    return null;
+}
+
+function ensureDreamResultSummary() {
+    if ($('#dream-result-summary').length) return;
+    $('.dream-result-header').after(`
+        <div id="dream-result-summary" class="dream-result-summary mb-3">
+            <div><span>เลขเด่น</span><strong id="dream-summary-number">--/---</strong></div>
+            <div><span>ธีม</span><strong id="dream-summary-theme">-</strong></div>
+            <div><span>คำเตือนหลัก</span><strong id="dream-summary-advice">-</strong></div>
+        </div>
+    `);
+}
+
+function updateDreamResultSummary(result, subject) {
+    ensureDreamResultSummary();
+    $('#dream-summary-number').text(`${result?.number2d || '--'}/${result?.number3d || '---'}`);
+    $('#dream-summary-theme').text(subject || 'ความปลอดภัย');
+    const advice = String(result?.safetyAdvice || result?.safetyFact || 'อ่านคำแนะนำด้านล่าง').trim();
+    $('#dream-summary-advice').text(advice.length > 64 ? `${advice.slice(0, 64)}...` : advice);
 }
 
 function ensureDreamResultActions() {

@@ -644,7 +644,7 @@ app.get('/api/home/activity-feed', async (req, res) => {
                     departmentSnapshot AS department, entityType, entityId, title, message, createdAt
              FROM activity_events
              WHERE visibility = 'public'
-               AND eventType IN ('submission_created','lottery_won','streak_milestone','coins_exchanged')
+               AND eventType IN ('submission_created','lottery_won','lottery_dream_shared','streak_milestone','coins_exchanged')
              ORDER BY createdAt DESC
              LIMIT ?`,
             [perSourceLimit]
@@ -6082,6 +6082,8 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_dream_logs (
     dreamText    TEXT,
     dreamItemId  VARCHAR(20)  DEFAULT NULL,
     result       JSON,
+    isFavorite   BOOLEAN      DEFAULT FALSE,
+    sharedAt     TIMESTAMP    NULL DEFAULT NULL,
     createdAt    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_dream_user_date (lineUserId, createdAt)
 )`).catch(() => {});
@@ -6098,6 +6100,18 @@ db.query(`SELECT COUNT(*) AS cnt FROM information_schema.columns
   .then(([[{ cnt }]]) => {
       if (cnt) return;
       return db.query('ALTER TABLE lottery_dream_logs ADD COLUMN result JSON');
+  }).catch(() => {});
+db.query(`SELECT COUNT(*) AS cnt FROM information_schema.columns
+  WHERE table_schema=DATABASE() AND table_name='lottery_dream_logs' AND column_name='isFavorite'`)
+  .then(([[{ cnt }]]) => {
+      if (cnt) return;
+      return db.query('ALTER TABLE lottery_dream_logs ADD COLUMN isFavorite BOOLEAN DEFAULT FALSE');
+  }).catch(() => {});
+db.query(`SELECT COUNT(*) AS cnt FROM information_schema.columns
+  WHERE table_schema=DATABASE() AND table_name='lottery_dream_logs' AND column_name='sharedAt'`)
+  .then(([[{ cnt }]]) => {
+      if (cnt) return;
+      return db.query('ALTER TABLE lottery_dream_logs ADD COLUMN sharedAt TIMESTAMP NULL DEFAULT NULL');
   }).catch(() => {});
 
 const JOHNNY_SYSTEM_PROMPT = `คุณคือ "ท่านอาจารย์จอห์นนี่" — นักพยากรณ์โหราศาสตร์ลึกลับแห่งอาณาจักรความปลอดภัย
@@ -6225,7 +6239,7 @@ app.get('/api/lottery/dream-history', async (req, res) => {
     try {
         await assertLotteryUserRequestOrAdmin(req, lineUserId);
         const [rows] = await db.query(
-            `SELECT l.logId, l.dreamText, l.dreamItemId, l.result, l.createdAt,
+            `SELECT l.logId, l.dreamText, l.dreamItemId, l.result, l.isFavorite, l.sharedAt, l.createdAt,
                     s.itemName, s.itemIcon
              FROM lottery_dream_logs l
              LEFT JOIN safety_dream_items s ON l.dreamItemId = s.dreamId
@@ -6241,9 +6255,65 @@ app.get('/api/lottery/dream-history', async (req, res) => {
             itemName: row.itemName || null,
             itemIcon: row.itemIcon || null,
             result: normalizeDreamResult(parseDreamResult(row.result)),
+            isFavorite: !!row.isFavorite,
+            sharedAt: row.sharedAt || null,
             createdAt: row.createdAt
         }));
         res.json({ status: 'success', data: history });
+    } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
+});
+
+// POST /api/lottery/dream-history/:logId/favorite — บันทึก/ยกเลิก favorite ของคำทำนาย
+app.post('/api/lottery/dream-history/:logId/favorite', async (req, res) => {
+    const { logId } = req.params;
+    const { lineUserId, isFavorite } = req.body;
+    if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
+    try {
+        await assertLotteryUserRequestOrAdmin(req, lineUserId);
+        const [result] = await db.query(
+            'UPDATE lottery_dream_logs SET isFavorite=? WHERE logId=? AND lineUserId=?',
+            [!!isFavorite, logId, lineUserId]
+        );
+        if (!result.affectedRows) return res.status(404).json({ status: 'error', message: 'ไม่พบคำทำนายนี้' });
+        res.json({ status: 'success', data: { logId, isFavorite: !!isFavorite } });
+    } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
+});
+
+// POST /api/lottery/dream-history/:logId/share — แชร์แบบปลอดภัยไป Safety Pulse
+app.post('/api/lottery/dream-history/:logId/share', async (req, res) => {
+    const { logId } = req.params;
+    const { lineUserId } = req.body;
+    if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
+    try {
+        await assertLotteryUserRequestOrAdmin(req, lineUserId);
+        const [[row]] = await db.query(
+            `SELECT l.logId, l.result, l.dreamItemId, l.sharedAt, s.itemName
+             FROM lottery_dream_logs l
+             LEFT JOIN safety_dream_items s ON l.dreamItemId=s.dreamId
+             WHERE l.logId=? AND l.lineUserId=? LIMIT 1`,
+            [logId, lineUserId]
+        );
+        if (!row) return res.status(404).json({ status: 'error', message: 'ไม่พบคำทำนายนี้' });
+        if (row.sharedAt) return res.json({ status: 'success', data: { logId, sharedAt: row.sharedAt, alreadyShared: true } });
+        const result = normalizeDreamResult(parseDreamResult(row.result));
+        const subject = row.itemName || 'ความปลอดภัย';
+        await db.query('UPDATE lottery_dream_logs SET sharedAt=COALESCE(sharedAt, NOW()) WHERE logId=? AND lineUserId=?', [logId, lineUserId]);
+        emitActivityEvent({
+            eventType: 'lottery_dream_shared',
+            actorUserId: lineUserId,
+            entityType: 'lottery_dream',
+            entityId: logId,
+            title: 'แชร์คำแนะนำจากอาจารย์จอห์นนี่',
+            message: `เลขเด่น ${result.number2d}/${result.number3d} • คำแนะนำเรื่อง ${subject}`,
+            metadata: {
+                number2d: result.number2d,
+                number3d: result.number3d,
+                subject,
+                safetyAdvice: result.safetyAdvice
+            },
+            visibility: 'public'
+        });
+        res.json({ status: 'success', data: { logId, sharedAt: new Date().toISOString() } });
     } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }
 });
 

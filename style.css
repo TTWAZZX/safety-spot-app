@@ -3846,6 +3846,48 @@ body {
     background: rgba(255,255,255,0.07);
     color: #f0e6ff;
 }
+.dream-insight-card,
+.dream-result-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+.dream-insight-card {
+    margin: 10px 0 14px;
+}
+.dream-insight-card > div,
+.dream-result-summary > div {
+    min-width: 0;
+    border: 1px solid rgba(196,156,211,0.18);
+    background: rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 9px 8px;
+    text-align: center;
+}
+.dream-insight-card span,
+.dream-result-summary span {
+    display: block;
+    color: rgba(240,230,255,0.58);
+    font-size: 0.66rem;
+    font-weight: 700;
+    margin-bottom: 3px;
+}
+.dream-insight-card strong,
+.dream-result-summary strong {
+    display: block;
+    color: #f4d03f;
+    font-size: 0.78rem;
+    font-weight: 900;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dream-result-summary {
+    grid-template-columns: 0.9fr 1fr 1.45fr;
+}
+.dream-result-summary > div {
+    text-align: left;
+}
 
 /* Section labels */
 .dream-section-label {
@@ -4026,6 +4068,29 @@ body {
     font-weight: 700;
     margin-bottom: 8px;
 }
+.dream-history-filters {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+.dream-filter-btn {
+    flex: 0 0 auto;
+    border: 1px solid rgba(196,156,211,0.18);
+    background: rgba(26,5,51,0.48);
+    color: rgba(240,230,255,0.72);
+    border-radius: 999px;
+    min-height: 30px;
+    padding: 5px 10px;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+.dream-filter-btn.active {
+    background: rgba(244,208,63,0.18);
+    border-color: rgba(244,208,63,0.42);
+    color: #f4d03f;
+}
 .dream-history-refresh {
     width: 28px;
     height: 28px;
@@ -4050,6 +4115,13 @@ body {
     color: #f0e6ff;
     border-radius: 10px;
     padding: 8px;
+}
+.dream-history-main {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
     display: grid;
     grid-template-columns: 28px 1fr auto;
     align-items: center;
@@ -4089,6 +4161,32 @@ body {
 .dream-history-empty {
     text-align: center;
     padding: 10px 4px;
+}
+.dream-history-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 8px;
+}
+.dream-history-action {
+    min-height: 28px;
+    border-radius: 999px;
+    border: 1px solid rgba(196,156,211,0.18);
+    background: rgba(255,255,255,0.07);
+    color: rgba(240,230,255,0.72);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 4px 9px;
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+.dream-history-action.active {
+    border-color: rgba(244,208,63,0.45);
+    background: rgba(244,208,63,0.16);
+    color: #f4d03f;
 }
 
 .dream-result-actions {
@@ -4132,4 +4230,8 @@ body {
 @media (max-width: 576px) {
     .dream-numbers-row { grid-template-columns: 1fr 1fr; gap: 8px; }
     .dream-number-value { font-size: 2rem; }
+    .dream-insight-card,
+    .dream-result-summary {
+        grid-template-columns: 1fr;
+    }
 }
