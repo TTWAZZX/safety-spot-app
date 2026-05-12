@@ -6392,7 +6392,12 @@ function normalizeDreamResult(result, fallback2d = null, fallback3d = null) {
         disclaimer: String(safe.disclaimer || 'การพยากรณ์นี้เพื่อความสนุกและสร้างจิตสำนึกด้านความปลอดภัยเท่านั้น').slice(0, 300),
         oracleNumber2d: normalizeDreamNumber(safe.oracleNumber2d, 2) || null,
         oracleNumber3d: normalizeDreamNumber(safe.oracleNumber3d, 3) || null,
-        oracleCompare: String(safe.oracleCompare || '').slice(0, 300),
+        oracleCompare: (() => {
+            const on2 = normalizeDreamNumber(safe.oracleNumber2d, 2);
+            const on3 = normalizeDreamNumber(safe.oracleNumber3d, 3);
+            if (!on2 && !on3) return '';
+            return `📖 เลขตำราชี้ ${on2 || '??'} / ${on3 || '???'} — นิมิตวันนี้อาจารย์เห็น ${number2d} / ${number3d}`;
+        })(),
         luckyColor: (() => {
             const raw = safe.luckyColor;
             if (!raw) return null;
