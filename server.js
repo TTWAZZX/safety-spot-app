@@ -19,6 +19,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const cron = require('node-cron'); // เพิ่มบรรทัดนี้ต่อจาก require อื่นๆ
 
+// Render terminates HTTPS and forwards the real client IP via X-Forwarded-For.
+// express-rate-limit needs this so it can identify users correctly behind the proxy.
+app.set('trust proxy', 1);
+
 // -----------------------------
 //   CORS
 // -----------------------------
