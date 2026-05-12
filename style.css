@@ -3938,6 +3938,7 @@ body {
 }
 .dream-oracle-grid > div,
 .dream-oracle-evidence,
+.dream-oracle-refs,
 .dream-oracle-reading {
     border: 1px solid rgba(196,156,211,0.14);
     background: rgba(26,5,51,0.32);
@@ -3946,6 +3947,7 @@ body {
 }
 .dream-oracle-grid span,
 .dream-oracle-evidence span,
+.dream-oracle-refs > span,
 .dream-oracle-reading span {
     display: block;
     color: rgba(240,230,255,0.55);
@@ -3974,6 +3976,34 @@ body {
 }
 .dream-oracle-evidence li + li {
     margin-top: 4px;
+}
+.dream-oracle-refs {
+    margin-top: 9px;
+}
+.dream-oracle-ref {
+    border-top: 1px solid rgba(196,156,211,0.12);
+    padding-top: 7px;
+    margin-top: 7px;
+}
+.dream-oracle-ref strong,
+.dream-oracle-ref small {
+    display: block;
+}
+.dream-oracle-ref strong {
+    color: #f7e8a1;
+    font-size: 0.76rem;
+    font-weight: 900;
+}
+.dream-oracle-ref small {
+    color: rgba(240,230,255,0.55);
+    font-size: 0.65rem;
+    margin-top: 1px;
+}
+.dream-oracle-ref p {
+    color: rgba(240,230,255,0.82);
+    font-size: 0.72rem;
+    line-height: 1.45;
+    margin: 4px 0 0;
 }
 .dream-oracle-warning {
     margin-top: 9px;

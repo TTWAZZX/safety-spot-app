@@ -6268,6 +6268,19 @@ const JOHNNY_ORACLE_SYMBOLS = [
     { id: 'environment', label: 'สิ่งแวดล้อม/ของเสีย', icon: '🌿', keywords: ['ขยะ', 'ของเสีย', 'น้ำเสีย', 'ปล่อย', 'รั่วลงท่อ', 'สิ่งแวดล้อม', 'กลิ่น', 'บำบัด'], number2d: '68', number3d: '268', hseTheme: 'Environment', omenMeaning: 'เสียงกระซิบของผืนดินและสายน้ำที่เตือนให้รักษาสมดุล', hseMeaning: 'การจัดการของเสีย น้ำเสีย การหกรั่ว และผลกระทบสิ่งแวดล้อม', warning: 'คัดแยกของเสีย ปิดกั้นการรั่วไหล และแจ้งผู้รับผิดชอบสิ่งแวดล้อมก่อนปล่อยหรือระบายใด ๆ', riskLevel: 'medium' }
 ];
 
+const JOHNNY_HSE_KNOWLEDGE = [
+    { id: 'hot-work-permit', title: 'Hot Work Permit', theme: 'Fire Safety / Hot Work', keywords: ['hot work', 'เชื่อม', 'ตัด', 'เจียร', 'ประกาย', 'ไฟ', 'ควัน'], guidance: 'งานร้อนต้องมีใบอนุญาต ตรวจพื้นที่ 11 เมตรรอบจุดทำงาน แยกของไวไฟ และจัด fire watch เมื่อมีความเสี่ยงหลังงาน', controls: ['Permit to Work', 'Fire watch', 'ถังดับเพลิงพร้อมใช้', 'แยกวัสดุไวไฟ'] },
+    { id: 'chemical-sds-ghs', title: 'SDS / GHS', theme: 'Chemical Safety', keywords: ['chemical', 'สารเคมี', 'sds', 'ghs', 'กรด', 'ด่าง', 'กลิ่นฉุน', 'ไอระเหย', 'พิษ'], guidance: 'สารเคมีต้องอ่าน SDS ตรวจ pictogram/คำเตือน GHS รู้วิธีปฐมพยาบาลและ spill response ก่อนสัมผัส', controls: ['SDS', 'GHS label', 'PPE ตามชนิดสาร', 'Spill kit'] },
+    { id: 'loto-energy', title: 'LOTO / Energy Isolation', theme: 'Electrical Safety / Machine Safety', keywords: ['loto', 'ไฟฟ้า', 'ตู้ไฟ', 'ช็อต', 'เครื่องจักร', 'ซ่อม', 'ติดขัด', 'พลังงาน'], guidance: 'ก่อนซ่อม ล้างติดขัด หรือเปิด guard ต้องตัดแยกพลังงาน ล็อก-แท็ก และ verify zero energy ทุกครั้ง', controls: ['Lockout Tagout', 'Zero energy check', 'ผู้มีอำนาจอนุญาต', 'ห้าม bypass guard'] },
+    { id: 'work-at-height', title: 'Work at Height', theme: 'Work at Height', keywords: ['ที่สูง', 'ตก', 'บันได', 'นั่งร้าน', 'หลังคา', 'ขอบ', 'ลอย'], guidance: 'งานที่สูงต้องตรวจจุดยึด ทางขึ้นลง พื้นยืน และป้องกันของตก ไม่ทำงานเดี่ยวเมื่อพื้นที่เสี่ยง', controls: ['Full body harness', 'Anchor point', 'Scaffold tag', 'Toe board / tool lanyard'] },
+    { id: 'confined-space', title: 'Confined Space', theme: 'Confined Space', keywords: ['confined', 'อับอากาศ', 'ถัง', 'บ่อ', 'หลุม', 'ท่อ', 'ออกซิเจน', 'แก๊ส'], guidance: 'ที่อับอากาศห้ามเข้าโดยไม่มี permit ต้องตรวจวัดอากาศ ระบายอากาศ มี standby person และแผนช่วยเหลือ', controls: ['Entry permit', 'Gas test', 'Ventilation', 'Standby person / rescue plan'] },
+    { id: 'traffic-separation', title: 'Traffic Management', theme: 'Traffic / Forklift Safety', keywords: ['forklift', 'โฟล์คลิฟท์', 'รถยก', 'รถ', 'ชน', 'blind spot', 'ทางเดิน', 'ถนน'], guidance: 'พื้นที่รถยกต้องแยกคนกับรถ ใช้ทางเดินที่กำหนด ลด blind spot และสื่อสารกับผู้ขับก่อนเข้าเขตรถ', controls: ['ทางเดินคน', 'Speed limit', 'Mirror / warning light', 'สบตาผู้ขับก่อนข้าม'] },
+    { id: 'ppe-selection', title: 'PPE Selection', theme: 'PPE', keywords: ['ppe', 'หมวก', 'รองเท้า', 'แว่น', 'ถุงมือ', 'หน้ากาก', 'เซฟตี้', 'อุปกรณ์ป้องกัน'], guidance: 'PPE ต้องเลือกตาม hazard ไม่ใช่เลือกตามความเคยชิน ตรวจสภาพก่อนใช้และเปลี่ยนทันทีเมื่อเสื่อม', controls: ['PPE matrix', 'Fit check', 'Pre-use inspection', 'เปลี่ยนเมื่อชำรุด'] },
+    { id: 'housekeeping-5s', title: '5S / Housekeeping', theme: 'Housekeeping / Slip Trip Fall', keywords: ['รก', 'สะดุด', 'ล้ม', 'พื้น', 'ของวาง', 'แตก', 'เศษ', 'กีดขวาง', 'ลื่น'], guidance: 'พื้นที่ไม่เรียบร้อยเป็นสัญญาณก่อนเกิดอุบัติเหตุ ต้องเปิดทางเดินให้โล่ง เก็บเศษวัสดุ และจัดการจุดลื่นทันที', controls: ['5S', 'ทางเดินโล่ง', 'ป้ายเตือนพื้นเปียก', 'กำจัดเศษวัสดุ'] },
+    { id: 'heat-stress', title: 'Heat Stress', theme: 'Occupational Health / Heat Stress', keywords: ['ร้อน', 'แดด', 'เหงื่อ', 'เวียนหัว', 'เป็นลม', 'heat stress', 'อุณหภูมิ'], guidance: 'งานร้อนต้องมีรอบพัก น้ำดื่ม และสังเกตอาการผิดปกติ เช่น เวียนหัว คลื่นไส้ อ่อนแรง หรือสับสน', controls: ['Work-rest cycle', 'น้ำดื่ม', 'Buddy check', 'แจ้งหัวหน้าเมื่อมีอาการ'] },
+    { id: 'environment-spill', title: 'Spill / Waste Control', theme: 'Environment', keywords: ['ขยะ', 'ของเสีย', 'น้ำเสีย', 'รั่วลงท่อ', 'ปล่อย', 'สิ่งแวดล้อม', 'บำบัด'], guidance: 'เหตุหกรั่วหรือของเสียต้องกั้นไม่ให้ลงท่อ แยกประเภท และแจ้งผู้รับผิดชอบสิ่งแวดล้อมก่อนเคลื่อนย้ายหรือปล่อยทิ้ง', controls: ['Spill kit', 'Drain cover', 'Waste segregation', 'Environmental notification'] }
+];
+
 function parseDreamResult(raw) {
     if (!raw) return null;
     if (typeof raw === 'object') return raw;
@@ -6306,6 +6319,15 @@ function normalizeDreamResult(result, fallback2d = null, fallback3d = null) {
         numberEvidence: Array.isArray(safe.numberEvidence)
             ? safe.numberEvidence.slice(0, 5).map(e => String(e || '').slice(0, 160)).filter(Boolean)
             : [],
+        hseReferences: Array.isArray(safe.hseReferences)
+            ? safe.hseReferences.slice(0, 4).map(ref => ({
+                id: String(ref.id || '').slice(0, 60),
+                title: String(ref.title || '').slice(0, 100),
+                theme: String(ref.theme || '').slice(0, 120),
+                guidance: String(ref.guidance || '').slice(0, 260),
+                controls: Array.isArray(ref.controls) ? ref.controls.slice(0, 4).map(c => String(c || '').slice(0, 80)).filter(Boolean) : []
+            })).filter(ref => ref.title || ref.guidance)
+            : [],
         reliabilityLabel: String(safe.reliabilityLabel || '').slice(0, 120),
         hseReading: String(safe.hseReading || '').slice(0, 900),
         quickWarning: String(safe.quickWarning || '').slice(0, 400),
@@ -6324,6 +6346,42 @@ function countKeywordHits(text, keywords) {
         if (!k) return sum;
         return sum + (haystack.includes(k) ? 1 : 0);
     }, 0);
+}
+
+function matchJohnnyHseKnowledge(text, symbols = []) {
+    const symbolText = symbols.map(s => `${s.label || ''} ${s.hseTheme || ''} ${s.hseMeaning || ''}`).join(' ');
+    const haystack = `${text || ''} ${symbolText}`.toLowerCase();
+    return JOHNNY_HSE_KNOWLEDGE
+        .map(entry => ({
+            ...entry,
+            score: countKeywordHits(haystack, [entry.title, entry.theme, ...entry.keywords])
+        }))
+        .filter(entry => entry.score > 0)
+        .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+        .slice(0, 3)
+        .map(({ score, keywords, ...entry }) => entry);
+}
+
+function pickJohnnyPhrase(seedText, phrases) {
+    const text = String(seedText || '');
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) hash = (hash * 33 + text.charCodeAt(i)) % 997;
+    return phrases[hash % phrases.length];
+}
+
+function buildJohnnyFallbackInterpretation({ subject, oracle }) {
+    const symbolText = oracle.dreamSymbols.map(s => `${s.icon || ''}${s.label}`).join(' และ ');
+    const refs = (oracle.hseReferences || []).map(ref => ref.title).filter(Boolean).slice(0, 2).join(' กับ ');
+    const opener = pickJohnnyPhrase(`${subject}:${oracle.number2d}`, [
+        `ลูกศิษย์เอ๋ย อาจารย์เห็น ${symbolText} ลอยขึ้นจากม่านหมอกแห่งอาณาจักรความปลอดภัย`,
+        `เมื่ออาจารย์แตะลูกแก้วแห่ง HSE นิมิตของ "${subject}" ปรากฏเป็น ${symbolText}`,
+        `ดวงดาวหน้าโรงงานคืนนี้กระซิบถึง ${symbolText} และชี้ให้เห็นรอยต่อของโชคกับความระวัง`,
+        `ในตำราเกราะนิรภัยของอาจารย์ นิมิต "${subject}" ส่องแสงผ่าน ${symbolText}`
+    ]);
+    const middle = refs
+        ? ` อาจารย์จึงเปิดคัมภีร์ ${refs} ประกอบการอ่านลาง`
+        : ' อาจารย์จึงอ่านเป็นสัญญาณให้ตรวจหน้างานและตั้งสติก่อนเริ่มงาน';
+    return `${opener}${middle} เลขที่ผูกกับนิมิตนี้คือ ${oracle.number2d}/${oracle.number3d} แต่สิ่งที่อาจารย์ให้ถือหนักกว่าเลขคือคำเตือน: ${oracle.quickWarning}`;
 }
 
 function deriveJohnnyUnknownNumbers(seedText) {
@@ -6392,6 +6450,7 @@ function analyzeJohnnyOracle({ dreamText, selectedItem }) {
     const dreamSymbols = symbols.length
         ? symbols.map((s, idx) => ({ id: s.id, label: s.label, icon: s.icon, hseTheme: s.hseTheme, role: idx === 0 ? 'หลัก' : 'รอง' }))
         : [{ id: 'unknown', label: 'นิมิตพร่าเลือน', icon: '🔮', hseTheme: 'General HSE Awareness', role: 'หลัก' }];
+    const hseReferences = matchJohnnyHseKnowledge(text, symbols);
     const luckyFormula = symbols.length
         ? `${primary.icon || ''} ${primary.label} ให้ ${primary.number2d}/${primary.number3d}${secondary ? ` + ${secondary.icon || ''} ${secondary.label} ให้ ${secondary.number2d} → ${number3d}` : ''}`
         : `นิมิตยังพร่าเลือน อาจารย์ผูกเลขจากวันและถ้อยคำของลูกศิษย์ → ${number2d}/${number3d}`;
@@ -6400,7 +6459,8 @@ function analyzeJohnnyOracle({ dreamText, selectedItem }) {
             `เลขหลักมาจากสัญลักษณ์เด่น "${primary.label}" ตามตำรา Johnny Oracle`,
             secondary ? `เลขสามตัวผูกจากสัญลักษณ์รอง "${secondary.label}" เพื่อสะท้อนนิมิตซ้อน` : `เลขสามตัวยึดจากชุดเดิมของ "${primary.label}" เพื่อให้สูตรไม่แกว่ง`,
             selectedItem ? 'ผู้ใช้เลือกสัญลักษณ์จากคลังระบบ จึงให้น้ำหนักสัญลักษณ์นั้นเป็นแกนหลัก' : 'ระบบอ่านจาก keyword ในข้อความฝันโดยตรง ไม่ปล่อยให้ AI แต่งเลขเอง',
-            `${highestRisk?.hseTheme || primary.hseTheme || 'General HSE'} เป็นธีม HSE ที่ใช้กำกับคำเตือน`
+            `${highestRisk?.hseTheme || primary.hseTheme || 'General HSE'} เป็นธีม HSE ที่ใช้กำกับคำเตือน`,
+            hseReferences[0] ? `อ้างอิงคัมภีร์ HSE: ${hseReferences[0].title}` : ''
         ].filter(Boolean)
         : [
             'ไม่พบสัญลักษณ์ HSE เด่นชัด จึงใช้สูตร deterministic จากข้อความฝันและวันที่',
@@ -6414,9 +6474,13 @@ function analyzeJohnnyOracle({ dreamText, selectedItem }) {
             : confidence >= 65
                 ? 'ความชัดกลาง: พบสัญลักษณ์หลักชัดเจน'
                 : 'ความชัดเริ่มต้น: มีสัญลักษณ์หลักแต่บริบทยังน้อย';
-    const hseReading = symbols.length
-        ? symbols.map(s => `${s.label}: ${s.hseMeaning}`).join(' | ')
-        : 'นิมิตไม่ชี้ hazard เด่นชัด จึงอ่านเป็นสัญญาณให้ตรวจหน้างาน ใช้สติ และรายงานสิ่งผิดปกติก่อนเกิดเหตุ';
+    const hseReadingParts = symbols.length
+        ? symbols.map(s => `${s.label}: ${s.hseMeaning}`)
+        : ['นิมิตไม่ชี้ hazard เด่นชัด จึงอ่านเป็นสัญญาณให้ตรวจหน้างาน ใช้สติ และรายงานสิ่งผิดปกติก่อนเกิดเหตุ'];
+    if (hseReferences.length) {
+        hseReadingParts.push(`คัมภีร์ HSE ที่เกี่ยวข้อง: ${hseReferences.map(ref => `${ref.title} - ${ref.guidance}`).join(' | ')}`);
+    }
+    const hseReading = hseReadingParts.join(' | ');
     const quickWarning = highestRisk?.warning || 'หยุดคิดก่อนเริ่มงาน ตรวจพื้นที่ และแจ้งหัวหน้าเมื่อพบความเสี่ยง';
 
     return {
@@ -6426,6 +6490,7 @@ function analyzeJohnnyOracle({ dreamText, selectedItem }) {
         omenType,
         luckyFormula,
         numberEvidence,
+        hseReferences,
         reliabilityLabel,
         hseReading,
         quickWarning,
@@ -6689,6 +6754,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
 - สูตรเลข: ${oracle.luckyFormula}
 - ที่มาเลข: ${oracle.numberEvidence.join(' | ')}
 - ความน่าเชื่อถือของสูตร: ${oracle.reliabilityLabel}
+- คัมภีร์ HSE ที่ใช้ตีความ: ${oracle.hseReferences.map(ref => `${ref.title}(${ref.theme})`).join(', ') || 'General HSE Awareness'}
 - คำอ่าน HSE: ${oracle.hseReading}
 - คำเตือนหลัก: ${oracle.quickWarning}
 - ระดับความชัดของนิมิต: ${oracle.confidence}/100
@@ -6700,7 +6766,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
 - safetyAdvice: คำเตือน HSE เฉพาะนิมิตนี้ แบบปฏิบัติได้จริง ไม่ใช่ checklist ยาว
 - safetyFact: ข้อเท็จจริง HSE ที่เกี่ยวข้องกับนิมิตโดยตรง
 - dreamSymbols: ใช้รายการสัญลักษณ์จากตำราเท่านั้น
-- omenType, luckyFormula, numberEvidence, reliabilityLabel, hseReading, quickWarning, johnnyVerdict, confidence: ใช้ข้อมูลจากตำราเป็นแกนและเรียบเรียงให้เป็นภาษาอาจารย์
+- omenType, luckyFormula, numberEvidence, hseReferences, reliabilityLabel, hseReading, quickWarning, johnnyVerdict, confidence: ใช้ข้อมูลจากตำราเป็นแกนและเรียบเรียงให้เป็นภาษาอาจารย์
 
 ตอบเป็น JSON เท่านั้น ห้ามมี markdown backticks:
 {
@@ -6714,6 +6780,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
   "omenType": "${oracle.omenType}",
   "luckyFormula": "${oracle.luckyFormula.replace(/"/g, '\\"')}",
   "numberEvidence": ${JSON.stringify(oracle.numberEvidence)},
+  "hseReferences": ${JSON.stringify(oracle.hseReferences)},
   "reliabilityLabel": "${oracle.reliabilityLabel.replace(/"/g, '\\"')}",
   "hseReading": "...",
   "quickWarning": "${oracle.quickWarning.replace(/"/g, '\\"')}",
@@ -6744,6 +6811,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                     omenType: oracle.omenType,
                     luckyFormula: oracle.luckyFormula,
                     numberEvidence: oracle.numberEvidence,
+                    hseReferences: oracle.hseReferences,
                     reliabilityLabel: oracle.reliabilityLabel,
                     hseReading: aiDream.hseReading || oracle.hseReading,
                     quickWarning: oracle.quickWarning,
@@ -6765,7 +6833,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
             const symbolText = oracle.dreamSymbols.map(s => `${s.icon || ''}${s.label}`).join(' และ ');
             result = {
                 ...oracle,
-                interpretation: `อาจารย์อ่านนิมิตของลูกศิษย์แล้วเห็น ${symbolText} ส่องประกายอยู่เหนืออาณาจักรความปลอดภัย นี่คือ ${oracle.omenType} ที่ผูกกับ "${subject}" เลขที่ปรากฏตามตำราคือ ${oracle.number2d} และ ${oracle.number3d} แต่ลางนี้มิได้มาเพื่อโชคเท่านั้น มันมาเตือนให้ลูกศิษย์กลับบ้านอย่างปลอดภัย`,
+                interpretation: buildJohnnyFallbackInterpretation({ subject, oracle }),
                 numberReason: oracle.luckyFormula,
                 safetyAdvice: oracle.quickWarning,
                 safetyFact: itemSafetyFact || oracle.hseReading,
@@ -6779,6 +6847,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
             omenType: oracle.omenType,
             luckyFormula: oracle.luckyFormula,
             numberEvidence: oracle.numberEvidence,
+            hseReferences: oracle.hseReferences,
             reliabilityLabel: oracle.reliabilityLabel,
             quickWarning: oracle.quickWarning,
             confidence: oracle.confidence,

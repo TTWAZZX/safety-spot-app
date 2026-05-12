@@ -8487,6 +8487,10 @@ function ensureDreamOracleDetails() {
                 <span>คำอ่าน HSE</span>
                 <p id="dream-oracle-hse"></p>
             </div>
+            <div class="dream-oracle-refs">
+                <span>คัมภีร์ HSE ที่ใช้ตีความ</span>
+                <div id="dream-oracle-refs-list"></div>
+            </div>
             <div class="dream-oracle-warning">
                 <i class="fas fa-triangle-exclamation"></i>
                 <span id="dream-oracle-warning-text"></span>
@@ -8511,6 +8515,10 @@ function updateDreamOracleDetails(result) {
         ? evidence.map(item => `<li>${sanitizeHTML(item)}</li>`).join('')
         : '<li>เลขถูกคำนวณและล็อกโดย backend ก่อนส่งให้ AI เรียบเรียง</li>');
     $('#dream-oracle-hse').text(result?.hseReading || result?.safetyFact || '');
+    const refs = Array.isArray(result?.hseReferences) ? result.hseReferences : [];
+    $('#dream-oracle-refs-list').html(refs.length
+        ? refs.map(ref => `<div class="dream-oracle-ref"><strong>${sanitizeHTML(ref.title || '')}</strong><small>${sanitizeHTML(ref.theme || '')}</small><p>${sanitizeHTML(ref.guidance || '')}</p></div>`).join('')
+        : '<div class="dream-oracle-ref"><strong>General HSE Awareness</strong><small>คัมภีร์พื้นฐาน</small><p>ตรวจพื้นที่ ใช้สติ และรายงานสิ่งผิดปกติก่อนเกิดเหตุ</p></div>');
     $('#dream-oracle-warning-text').text(result?.quickWarning || result?.safetyAdvice || '');
     $('#dream-oracle-verdict').text(result?.johnnyVerdict || '');
 }
