@@ -2079,19 +2079,26 @@
                         <!-- Interpretation -->
                         <div class="dream-interpretation-card mb-3" id="dream-interpretation"></div>
 
-                        <!-- Lucky numbers -->
-                        <div class="dream-numbers-row mb-3">
+                        <!-- Lucky numbers — เลขนิมิต (AI) -->
+                        <div class="dream-numbers-section-label">🔮 เลขนิมิตวันนี้</div>
+                        <div class="dream-numbers-row mb-2">
                             <div class="dream-number-card">
-                                <div class="dream-number-label">เลข 2 ตัว</div>
+                                <div class="dream-number-label">2 ตัว</div>
                                 <div class="dream-number-value" id="dream-number-2d"></div>
                                 <button class="dream-use-btn" onclick="useDreamNumber('2d')">ใช้เลขนี้</button>
                             </div>
                             <div class="dream-number-card">
-                                <div class="dream-number-label">เลข 3 ตัว</div>
+                                <div class="dream-number-label">3 ตัว</div>
                                 <div class="dream-number-value" id="dream-number-3d"></div>
                                 <button class="dream-use-btn" onclick="useDreamNumber('3d')">ใช้เลขนี้</button>
                             </div>
                         </div>
+                        <!-- Oracle reference numbers -->
+                        <div class="dream-oracle-ref mb-1" id="dream-oracle-ref">
+                            <span class="dream-oracle-ref-label">📖 เลขตำราอาจารย์:</span>
+                            <span class="dream-oracle-ref-nums"><span id="dream-oracle-2d">--</span> / <span id="dream-oracle-3d">---</span></span>
+                        </div>
+                        <p class="dream-oracle-compare text-center mb-2 d-none" id="dream-oracle-compare"></p>
                         <p class="dream-number-reason text-center mb-3" id="dream-number-reason"></p>
 
                         <!-- Safety advice -->

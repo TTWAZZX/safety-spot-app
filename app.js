@@ -8425,6 +8425,15 @@ function showDreamResult(result, context = {}) {
     $('#dream-interpretation').text(getCompactDreamText(result.interpretation || ''));
     $('#dream-number-2d').text(result.number2d || '??');
     $('#dream-number-3d').text(result.number3d || '???');
+    // Oracle reference numbers
+    const hasOracle = result.oracleNumber2d && result.oracleNumber2d !== result.number2d;
+    $('#dream-oracle-ref').toggleClass('d-none', !hasOracle);
+    if (hasOracle) {
+        $('#dream-oracle-2d').text(result.oracleNumber2d || '--');
+        $('#dream-oracle-3d').text(result.oracleNumber3d || '---');
+    }
+    const compare = result.oracleCompare || '';
+    $('#dream-oracle-compare').text(compare).toggleClass('d-none', !compare);
     $('#dream-number-reason').text(result.numberReason || '');
     $('#dream-safety-advice').text(result.quickWarning || result.safetyAdvice || '');
     const refTitle = Array.isArray(result.hseReferences) && result.hseReferences[0]?.title ? `คัมภีร์ที่ใช้: ${result.hseReferences[0].title}` : '';

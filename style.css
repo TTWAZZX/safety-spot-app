@@ -4164,6 +4164,33 @@ body {
 }
 
 /* Lucky numbers */
+.dream-numbers-section-label {
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: rgba(196,156,211,0.85);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+.dream-oracle-ref {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(26,5,51,0.5);
+    border: 1px solid rgba(196,156,211,0.18);
+    border-radius: 8px;
+    padding: 5px 12px;
+    font-size: 0.78rem;
+}
+.dream-oracle-ref-label { color: rgba(196,156,211,0.7); }
+.dream-oracle-ref-nums { color: #f4d03f; font-weight: 700; letter-spacing: 2px; }
+.dream-oracle-compare {
+    font-size: 0.75rem;
+    color: rgba(196,156,211,0.8);
+    font-style: italic;
+}
 .dream-numbers-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .dream-number-card {
     background: radial-gradient(circle at top, rgba(244,208,63,0.22), transparent 42%), linear-gradient(135deg, rgba(74,35,90,0.75), rgba(44,14,78,0.92));

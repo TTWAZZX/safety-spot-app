@@ -6297,8 +6297,9 @@ function normalizeDreamNumber(value, digits) {
 
 function normalizeDreamResult(result, fallback2d = null, fallback3d = null) {
     const safe = result && typeof result === 'object' ? result : {};
-    const number2d = normalizeDreamNumber(safe.number2d, 2) || normalizeDreamNumber(fallback2d, 2) || String(Math.floor(Math.random() * 100)).padStart(2, '0');
-    const number3d = normalizeDreamNumber(safe.number3d, 3) || normalizeDreamNumber(fallback3d, 3) || String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+    // divineNumber = AI's fresh prediction; fall back to number2d, then Oracle fallback
+    const number2d = normalizeDreamNumber(safe.divineNumber2d, 2) || normalizeDreamNumber(safe.number2d, 2) || normalizeDreamNumber(fallback2d, 2) || String(Math.floor(Math.random() * 100)).padStart(2, '0');
+    const number3d = normalizeDreamNumber(safe.divineNumber3d, 3) || normalizeDreamNumber(safe.number3d, 3) || normalizeDreamNumber(fallback3d, 3) || String(Math.floor(Math.random() * 1000)).padStart(3, '0');
     const dreamSymbols = Array.isArray(safe.dreamSymbols)
         ? safe.dreamSymbols.slice(0, 5).map(s => ({
             id: String(s.id || '').slice(0, 40),
@@ -6336,6 +6337,9 @@ function normalizeDreamResult(result, fallback2d = null, fallback3d = null) {
         johnnyVerdict: String(safe.johnnyVerdict || '').slice(0, 500),
         confidence: Math.max(0, Math.min(100, Number(safe.confidence || 0))),
         disclaimer: String(safe.disclaimer || 'การพยากรณ์นี้เพื่อความสนุกและสร้างจิตสำนึกด้านความปลอดภัยเท่านั้น').slice(0, 300),
+        oracleNumber2d: normalizeDreamNumber(safe.oracleNumber2d, 2) || null,
+        oracleNumber3d: normalizeDreamNumber(safe.oracleNumber3d, 3) || null,
+        oracleCompare: String(safe.oracleCompare || '').slice(0, 300),
         ...(safe.cached ? { cached: true } : {}),
         ...(safe.fallback ? { fallback: true } : {})
     };
@@ -6759,7 +6763,7 @@ app.post('/api/lottery/dream-interpret', async (req, res) => {
 
         // Focus subject: symbol name, dream text, or both
         const focusSubject = [itemName, dreamText].filter(Boolean).join(' และ ');
-        const seedHint = `oracleNumber2d=${oracle.number2d}, oracleNumber3d=${oracle.number3d} — เลขจากตำรา Johnny Oracle ต้องใช้เลขนี้เท่านั้น ห้ามเปลี่ยน`;
+        const seedHint = `เลขจากตำราอาจารย์ (อ้างอิง): oracleNumber2d=${oracle.number2d}, oracleNumber3d=${oracle.number3d}\nท่านอาจารย์ต้องทำนาย "เลขนิมิต" ของลูกศิษย์วันนี้แยกต่างหาก (divineNumber2d, divineNumber3d) จากการวิเคราะห์นิมิตและพลังงานของวัน — อาจสอดคล้องหรือแตกต่างจากตำราก็ได้ พร้อม oracleCompare อธิบายความสัมพันธ์สั้นๆ`;
         const hintFromTable = [itemPromptHint, itemSafetyFact].filter(Boolean).join(' | ');
 
         const prompt = `ลูกศิษย์ถามเรื่อง: "${focusSubject}"
@@ -6779,8 +6783,9 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
 
 กฎเหล็ก — ทุก field ต้องคล้องจองกับ "${focusSubject}" โดยตรง ห้ามตอบแบบกว้างหรือทั่วไปเด็ดขาด:
 - interpretation: เล่าแบบนักพยากรณ์โหราศาสตร์ลึกลับแห่งอาณาจักรความปลอดภัย 2-3 ประโยค ต้องเริ่มจากการอ่านนิมิตของลูกศิษย์
-- number2d / number3d: ต้องเป็น "${oracle.number2d}" และ "${oracle.number3d}" เท่านั้น
-- numberReason: อธิบายสูตรเลขจากตำราอาจารย์ให้ขลังและเข้าใจง่าย
+- divineNumber2d / divineNumber3d: เลขนิมิตที่ท่านอาจารย์ทำนายสดจากนิมิตนี้ — 2 หลักและ 3 หลัก ห้ามเป็น 00 หรือ 000
+- numberReason: อธิบายว่าทำไมนิมิตนี้ชี้เลขดังกล่าว ให้ขลังและเข้าใจง่าย
+- oracleCompare: เปรียบเลขนิมิตกับเลขตำรา (${oracle.number2d}/${oracle.number3d}) สั้นๆ 1 ประโยค
 - safetyAdvice: คำเตือน HSE เฉพาะนิมิตนี้ แบบปฏิบัติได้จริง ไม่ใช่ checklist ยาว
 - safetyFact: ข้อเท็จจริง HSE ที่เกี่ยวข้องกับนิมิตโดยตรง
 - dreamSymbols: ใช้รายการสัญลักษณ์จากตำราเท่านั้น
@@ -6789,9 +6794,10 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
 ตอบเป็น JSON เท่านั้น ห้ามมี markdown backticks:
 {
   "interpretation": "...",
-  "number2d": "${oracle.number2d}",
-  "number3d": "${oracle.number3d}",
+  "divineNumber2d": "XX",
+  "divineNumber3d": "XXX",
   "numberReason": "...",
+  "oracleCompare": "...",
   "safetyAdvice": "...",
   "safetyFact": "...",
   "dreamSymbols": ${JSON.stringify(oracle.dreamSymbols)},
@@ -6835,8 +6841,10 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                     quickWarning: oracle.quickWarning,
                     johnnyVerdict: aiDream.johnnyVerdict || oracle.johnnyVerdict,
                     confidence: oracle.confidence,
-                    number2d: oracle.number2d,
-                    number3d: oracle.number3d
+                    oracleNumber2d: oracle.number2d,
+                    oracleNumber3d: oracle.number3d,
+                    oracleCompare: aiDream.oracleCompare || ''
+                    // divineNumber2d/3d comes from aiDream — NOT overridden
                 }, oracle.number2d, oracle.number3d);
                 break;
             } catch (aiErr) {
@@ -6849,7 +6857,6 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
         if (!result) {
             console.error(`[Johnny] All Gemini models failed. Last error: ${sanitizeGeminiError(lastErr)} — using static fallback`);
             const subject = focusSubject || 'สัญลักษณ์ความปลอดภัย';
-            const symbolText = oracle.dreamSymbols.map(s => `${s.icon || ''}${s.label}`).join(' และ ');
             result = {
                 ...oracle,
                 interpretation: buildJohnnyFallbackInterpretation({ subject, oracle }),
@@ -6857,6 +6864,9 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                 safetyAdvice: oracle.safetyAdvice || oracle.quickWarning,
                 safetyFact: itemSafetyFact || oracle.hseReading,
                 disclaimer: '⚠️ การพยากรณ์นี้เพื่อความสนุกและสร้างจิตสำนึกด้านความปลอดภัยเท่านั้น',
+                oracleNumber2d: oracle.number2d,
+                oracleNumber3d: oracle.number3d,
+                oracleCompare: '',
                 fallback: true
             };
         }
@@ -6871,8 +6881,8 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
             safetyAdvice: oracle.safetyAdvice || result.safetyAdvice,
             quickWarning: oracle.quickWarning,
             confidence: oracle.confidence,
-            number2d: oracle.number2d,
-            number3d: oracle.number3d
+            oracleNumber2d: oracle.number2d,
+            oracleNumber3d: oracle.number3d
         }, oracle.number2d, oracle.number3d);
 
         // Save log (dreamItemId = dreamId string reference)
