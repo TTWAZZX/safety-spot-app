@@ -1736,6 +1736,7 @@ app.get('/api/admin/submissions/pending', isAdmin, async (req, res) => {
             JOIN users u ON s.lineUserId = u.lineUserId
             WHERE s.status = 'pending'
             ORDER BY s.createdAt ASC
+            LIMIT 300
         `);
 
         res.json({ status: "success", data: rows });
@@ -1869,6 +1870,9 @@ app.post('/api/admin/submissions/bulk-approve', isAdmin, async (req, res) => {
     const { submissionIds, scores, requesterId } = req.body;
     if (!Array.isArray(submissionIds) || submissionIds.length === 0) {
         return res.status(400).json({ status: 'error', message: 'ไม่มีรายการที่เลือก' });
+    }
+    if (submissionIds.length > 200) {
+        return res.status(400).json({ status: 'error', message: 'อนุมัติได้สูงสุด 200 รายการต่อครั้ง' });
     }
     const conn = await db.getClient();
     let approved = 0;
@@ -4658,6 +4662,16 @@ cron.schedule('0 8 * * *', async () => {
             }
         }
     } catch (e) { console.error('[AutoLottery] Cron error:', e.message); }
+}, { timezone: 'Asia/Bangkok' });
+
+// ทำความสะอาด activity_events เก่ากว่า 90 วัน ทุกคืนเที่ยงคืน
+cron.schedule('0 0 * * *', async () => {
+    try {
+        const [result] = await db.query(
+            "DELETE FROM activity_events WHERE createdAt < NOW() - INTERVAL 90 DAY"
+        );
+        if (result.affectedRows > 0) console.log(`[Cleanup] Deleted ${result.affectedRows} old activity_events`);
+    } catch (e) { console.error('[Cleanup] activity_events error:', e.message); }
 }, { timezone: 'Asia/Bangkok' });
 
 function getBangkokDateString(date = new Date()) {
