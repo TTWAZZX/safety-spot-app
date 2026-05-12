@@ -4094,6 +4094,8 @@ app.get('/api/admin/audit-logs', isAdmin, async (req, res) => {
 // ======================================================
 db.query("ALTER TABLE users ADD COLUMN lotteryWinCount INT DEFAULT 0").catch(() => {});
 db.query("ALTER TABLE users ADD COLUMN lotteryTotalWinnings INT DEFAULT 0").catch(() => {});
+db.query("ALTER TABLE users ADD COLUMN dreamStreak INT NOT NULL DEFAULT 0").catch(() => {});
+db.query("ALTER TABLE users ADD COLUMN lastDreamDate DATE DEFAULT NULL").catch(() => {});
 db.query("ALTER TABLE lottery_quiz_answers ADD COLUMN usedForTicketId INT DEFAULT NULL").catch(() => {});
 db.query("ALTER TABLE lottery_quiz_answers ADD INDEX idx_quiz_answers_used (usedForTicketId)").catch(() => {});
 db.query("ALTER TABLE lottery_rounds ADD COLUMN isTest BOOLEAN DEFAULT FALSE").catch(() => {});
@@ -6266,6 +6268,32 @@ const JOHNNY_SYSTEM_PROMPT = `คุณคือ "ท่านอาจารย
 
 const DREAM_EXTRA_INTERPRET_COST = 20;
 const DREAM_CATEGORIES = new Set(['ppe', 'fire', 'electrical', 'chemical', 'height', 'machine', 'road']);
+
+const DREAM_LUCKY_COLORS = {
+    electric:    { hex: '#f4d03f', base: 'สีเหลืองทอง' },
+    fire:        { hex: '#e74c3c', base: 'สีเพลิงแดง' },
+    chemical:    { hex: '#27ae60', base: 'สีเขียวนิรภัย' },
+    height:      { hex: '#2980b9', base: 'สีฟ้าสูง' },
+    machine:     { hex: '#7f8c8d', base: 'สีเหล็กกล้า' },
+    ppe:         { hex: '#9b59b6', base: 'สีม่วงพิทักษ์' },
+    vehicle:     { hex: '#e67e22', base: 'สีส้มจราจร' },
+    environment: { hex: '#16a085', base: 'สีเขียวธรรมชาติ' },
+    confined:    { hex: '#2c3e50', base: 'สีคืนอันตราย' },
+    heat:        { hex: '#f39c12', base: 'สีแสงตะวัน' },
+    housekeeping:{ hex: '#3498db', base: 'สีฟ้าสะอาด' }
+};
+
+function getSafetySpecialDate(bangkokDateStr) {
+    const mmdd = bangkokDateStr.slice(5);
+    const specials = {
+        '04-28': { name: 'วันความปลอดภัยและสุขภาพในการทำงานโลก', emoji: '🌍', theme: 'World Day for Safety and Health at Work — ท่านอาจารย์ต้องเน้นความสำคัญของการดูแลสุขภาพแรงงานในคำทำนาย' },
+        '05-01': { name: 'วันแรงงานสากล', emoji: '👷', theme: 'International Labour Day — ท่านอาจารย์ต้องกล่าวถึงเกียรติยศของแรงงานและการทำงานอย่างปลอดภัย' },
+        '06-09': { name: 'วันเริ่มสัปดาห์ความปลอดภัยแห่งชาติไทย', emoji: '🇹🇭', theme: 'Thai National Safety Week — ท่านอาจารย์ต้องปลุกใจให้ลูกศิษย์ภูมิใจในความปลอดภัยของชาติ' },
+        '06-10': { name: 'สัปดาห์ความปลอดภัยในการทำงานแห่งชาติ', emoji: '🛡️', theme: 'Thai National Safety Week — ท่านอาจารย์ต้องเน้นพลังรวมใจด้านความปลอดภัย' }
+    };
+    return specials[mmdd] || null;
+}
+
 const JOHNNY_CATEGORY_TO_ORACLE_ID = {
     electrical: 'electric',
     road: 'vehicle',
@@ -6365,6 +6393,16 @@ function normalizeDreamResult(result, fallback2d = null, fallback3d = null) {
         oracleNumber2d: normalizeDreamNumber(safe.oracleNumber2d, 2) || null,
         oracleNumber3d: normalizeDreamNumber(safe.oracleNumber3d, 3) || null,
         oracleCompare: String(safe.oracleCompare || '').slice(0, 300),
+        luckyColor: (() => {
+            const raw = safe.luckyColor;
+            if (!raw) return null;
+            if (typeof raw === 'object') return {
+                name: String(raw.name || '').slice(0, 40),
+                hex: /^#[0-9a-fA-F]{3,6}$/.test(raw.hex || '') ? raw.hex : null,
+                meaning: String(raw.meaning || '').slice(0, 150)
+            };
+            return { name: String(raw).slice(0, 40), hex: null, meaning: '' };
+        })(),
         ...(safe.cached ? { cached: true } : {}),
         ...(safe.fallback ? { fallback: true } : {})
     };
@@ -6718,10 +6756,12 @@ app.post('/api/lottery/dream-history/:logId/share', async (req, res) => {
 
 // POST /api/lottery/dream-interpret — ท่านอาจารย์จอห์นนี่พยากรณ์
 app.post('/api/lottery/dream-interpret', async (req, res) => {
-    const { lineUserId, itemId, requesterId } = req.body;
+    const { lineUserId, requesterId } = req.body;
+    const rawItemIds = Array.isArray(req.body.itemIds) ? req.body.itemIds : (req.body.itemId ? [req.body.itemId] : []);
+    const itemIds = [...new Set(rawItemIds.map(String).filter(Boolean))].slice(0, 3);
     const dreamText = String(req.body.dreamText || '').trim().slice(0, 300);
     if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
-    if (!dreamText && !itemId) return res.status(400).json({ status: 'error', message: 'dreamText หรือ itemId ต้องระบุอย่างน้อยหนึ่งอย่าง' });
+    if (!dreamText && itemIds.length === 0) return res.status(400).json({ status: 'error', message: 'dreamText หรือ itemId ต้องระบุอย่างน้อยหนึ่งอย่าง' });
     const dreamLockName = `lottery_dream:${lineUserId}:${getBangkokDateString()}`;
     let lockConn = null;
     let lockAcquired = false;
@@ -6765,35 +6805,46 @@ app.post('/api/lottery/dream-interpret', async (req, res) => {
         }
 
         // Build context for AI — ใช้ schemaจริงและ Johnny Oracle Engine เป็นแกนเลข
-        let selectedItem = null;
+        let selectedItems = [];
         let itemName = null, item2d = null, item3d = null, itemPromptHint = null, itemSafetyFact = null;
-        if (itemId) {
-            const [[item]] = await queryConn.query(
-                'SELECT dreamId, category, itemName, itemIcon, number2d, number3d, promptHint, safetyFact FROM safety_dream_items WHERE dreamId=? AND COALESCE(isActive, TRUE)=TRUE',
-                [itemId]
+        if (itemIds.length > 0) {
+            const placeholders = itemIds.map(() => '?').join(',');
+            const [items] = await queryConn.query(
+                `SELECT dreamId, category, itemName, itemIcon, number2d, number3d, promptHint, safetyFact FROM safety_dream_items WHERE dreamId IN (${placeholders}) AND COALESCE(isActive, TRUE)=TRUE`,
+                itemIds
             );
-            if (!item) {
+            if (items.length === 0) {
                 const err = new Error('ไม่พบสัญลักษณ์ที่เลือก');
                 err.statusCode = 400;
                 throw err;
             }
-            itemName = item.itemName;
-            item2d = item.number2d;
-            item3d = item.number3d;
-            itemPromptHint = item.promptHint;
-            itemSafetyFact = item.safetyFact;
-            selectedItem = item;
+            selectedItems = items;
+            itemName = items.map(i => i.itemName).filter(Boolean).join(' และ ');
+            item2d = items[0]?.number2d || null;
+            item3d = items[0]?.number3d || null;
+            itemPromptHint = items.map(i => i.promptHint).filter(Boolean).join(' | ');
+            itemSafetyFact = items.map(i => i.safetyFact).filter(Boolean).join(' | ');
         }
+        const selectedItem = selectedItems[0] || null;
         const oracle = analyzeJohnnyOracle({ dreamText, selectedItem });
 
         // Focus subject: symbol name, dream text, or both
         const focusSubject = [itemName, dreamText].filter(Boolean).join(' และ ');
         const seedHint = `เลขจากตำราอาจารย์ (อ้างอิง): oracleNumber2d=${oracle.number2d}, oracleNumber3d=${oracle.number3d}\nท่านอาจารย์ต้องทำนาย "เลขนิมิต" ของลูกศิษย์วันนี้แยกต่างหาก (divineNumber2d, divineNumber3d) จากการวิเคราะห์นิมิตและพลังงานของวัน — อาจสอดคล้องหรือแตกต่างจากตำราก็ได้ พร้อม oracleCompare อธิบายความสัมพันธ์สั้นๆ`;
         const hintFromTable = [itemPromptHint, itemSafetyFact].filter(Boolean).join(' | ');
+        // Lucky color — server-determined hex, AI writes poetic name + meaning
+        const primaryOracleId = oracle.dreamSymbols[0]?.id || 'ppe';
+        const colorKey = Object.keys(DREAM_LUCKY_COLORS).find(k => primaryOracleId.startsWith(k)) || 'ppe';
+        const luckyColorMeta = DREAM_LUCKY_COLORS[colorKey];
+        // Special safety date context
+        const specialDate = getSafetySpecialDate(today);
+        const specialDateNote = specialDate
+            ? `\n🌟 วันพิเศษ: วันนี้คือ${specialDate.name} ${specialDate.emoji} — ${specialDate.theme}\n`
+            : '';
 
         const prompt = `ลูกศิษย์ถามเรื่อง: "${focusSubject}"
 ${dreamText ? `รายละเอียด: ${dreamText}` : ''}
-${seedHint}
+${specialDateNote}${seedHint}
 ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ยวกับสัญลักษณ์นี้: ${hintFromTable}` : ''}
 ข้อมูลจากตำราอาจารย์จอห์นนี่:
 - สัญลักษณ์ที่จับได้: ${oracle.dreamSymbols.map(s => `${s.icon || ''}${s.label}(${s.role}/${s.hseTheme})`).join(', ')}
@@ -6814,6 +6865,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
 - safetyAdvice: คำเตือน HSE เฉพาะนิมิตนี้ แบบปฏิบัติได้จริง ไม่ใช่ checklist ยาว
 - safetyFact: ข้อเท็จจริง HSE ที่เกี่ยวข้องกับนิมิตโดยตรง
 - dreamSymbols: ใช้รายการสัญลักษณ์จากตำราเท่านั้น
+- luckyColor: สีมงคลของนิมิตนี้ — สีหลักคือ "${luckyColorMeta.base}" (hex: ${luckyColorMeta.hex}) ให้ตั้งชื่อสีให้ขลังและบอกความหมายด้าน HSE สั้นๆ รูปแบบ: {"name":"ชื่อสีที่ขลัง","meaning":"ความหมาย HSE 1 ประโยค"}
 - johnnyMotto: ประโยคปิดท้ายสั้นๆ สไตล์โหราจารย์ ไม่เกิน 1 ประโยค เช่น "ผู้มีสติเท่านั้นที่ดาวจะคุ้มครอง"
 - omenType, luckyFormula, numberEvidence, hseReferences, reliabilityLabel, hseReading, quickWarning, johnnyVerdict, confidence: ใช้ข้อมูลจากตำราเป็นแกนและเรียบเรียงให้เป็นภาษาอาจารย์
 
@@ -6836,6 +6888,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
   "quickWarning": "${oracle.quickWarning.replace(/"/g, '\\"')}",
   "johnnyVerdict": "...",
   "johnnyMotto": "ประโยคเด็ดสั้นๆ สไตล์โหราจารย์ เช่น ผู้มีสติเท่านั้นที่ดาวจะคุ้มครอง",
+  "luckyColor": {"name": "ชื่อสีที่ขลัง", "meaning": "ความหมาย HSE สั้นๆ"},
   "confidence": ${oracle.confidence},
   "disclaimer": "ข้อความเตือนสั้นๆ ว่าการทำนายเพื่อความสนุกเท่านั้น"
 }`;
@@ -6900,6 +6953,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                     'ความระมัดระวังคืออาวุธล้ำค่ากว่าโชคชะตา',
                     'เมื่อสติมั่นคง นิมิตจึงส่องทาง'
                 ]),
+                luckyColor: { name: luckyColorMeta.base, hex: luckyColorMeta.hex, meaning: '' },
                 fallback: true
             };
         }
@@ -6918,6 +6972,14 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
             oracleNumber3d: oracle.number3d
         }, oracle.number2d, oracle.number3d);
 
+        // Enrich lucky color with server-determined hex (overrides AI hex for consistency)
+        if (result.luckyColor) {
+            result.luckyColor.hex = luckyColorMeta.hex;
+        } else {
+            result.luckyColor = { name: luckyColorMeta.base, hex: luckyColorMeta.hex, meaning: '' };
+        }
+        result.nextCost = todayDreamCount > 0 ? DREAM_EXTRA_INTERPRET_COST : 0;
+
         // Save log (dreamItemId = dreamId string reference)
         const logId = 'DREAM' + uuidv4();
         let newCoinBalance = null;
@@ -6933,7 +6995,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                 await queryConn.query('UPDATE users SET coinBalance = coinBalance - ? WHERE lineUserId=?', [dreamCost, lineUserId]);
                 await queryConn.query(
                     'INSERT INTO lottery_dream_logs (logId, lineUserId, dreamText, dreamItemId, result) VALUES (?,?,?,?,?)',
-                    [logId, lineUserId, dreamText, itemId || null, JSON.stringify(result)]
+                    [logId, lineUserId, dreamText, selectedItems[0]?.dreamId || null, JSON.stringify(result)]
                 );
                 const [[updatedUser]] = await queryConn.query('SELECT coinBalance FROM users WHERE lineUserId=?', [lineUserId]);
                 newCoinBalance = Number(updatedUser?.coinBalance || 0);
@@ -6953,6 +7015,43 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
         if (newCoinBalance !== null) result.newCoinBalance = newCoinBalance;
         result.todayCount = todayDreamCount + 1;
 
+        // Dream Streak — อัปเดตเฉพาะครั้งแรกของวัน (todayDreamCount === 0)
+        let dreamStreak = 0;
+        let streakMilestone = null;
+        if (todayDreamCount === 0) {
+            try {
+                const [[streakRow]] = await db.query(
+                    'SELECT dreamStreak, lastDreamDate FROM users WHERE lineUserId=?', [lineUserId]
+                );
+                const yesterday = getBangkokDateString(new Date(Date.now() - 86400000));
+                const lastDate = streakRow?.lastDreamDate ? String(streakRow.lastDreamDate).slice(0, 10) : null;
+                dreamStreak = lastDate === today
+                    ? Number(streakRow.dreamStreak || 1)
+                    : lastDate === yesterday
+                        ? Number(streakRow.dreamStreak || 0) + 1
+                        : 1;
+                await db.query(
+                    'UPDATE users SET dreamStreak=?, lastDreamDate=? WHERE lineUserId=?',
+                    [dreamStreak, today, lineUserId]
+                );
+                const milestones = [3, 7, 14, 30, 60, 100];
+                if (milestones.includes(dreamStreak)) {
+                    streakMilestone = dreamStreak;
+                    const bonusCoins = dreamStreak >= 30 ? 50 : dreamStreak >= 14 ? 20 : dreamStreak >= 7 ? 10 : 5;
+                    await db.query('UPDATE users SET coinBalance = coinBalance + ? WHERE lineUserId=?', [bonusCoins, lineUserId]);
+                    createNotification({
+                        recipientUserId: lineUserId,
+                        message: `🔥 Johnny Streak ${dreamStreak} วัน! รับโบนัส ${bonusCoins} เหรียญ`,
+                        type: 'lottery_dream',
+                        relatedItemId: logId,
+                        triggeringUserId: lineUserId
+                    });
+                }
+            } catch (_) { /* streak update is non-critical */ }
+        }
+        result.dreamStreak = dreamStreak;
+        result.streakMilestone = streakMilestone;
+
         createNotification({
             recipientUserId: lineUserId,
             message: dreamCost > 0
@@ -6969,7 +7068,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
             entityId: logId,
             title: 'ขอคำพยากรณ์อาจารย์จอห์นนี่',
             message: focusSubject ? `เรื่อง ${focusSubject}` : 'คำทำนายเลขนำโชคด้านความปลอดภัย',
-            metadata: { costCoins: dreamCost, itemId: itemId || null },
+            metadata: { costCoins: dreamCost, itemIds },
             visibility: 'public'
         });
 
@@ -7135,6 +7234,45 @@ app.delete('/api/admin/lottery/dream-logs/user/:lineUserId', isAdmin, async (req
         );
         res.json({ status: 'success', data: { deleted: result.affectedRows } });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// GET /api/admin/lottery/dream-analytics — สถิติ Johnny Oracle
+app.get('/api/admin/lottery/dream-analytics', isAdmin, async (req, res) => {
+    try {
+        const today = getBangkokDateString();
+        const [[todayRow]] = await db.query(
+            `SELECT COUNT(*) AS totalToday, COUNT(DISTINCT lineUserId) AS activeToday
+             FROM lottery_dream_logs WHERE DATE(CONVERT_TZ(createdAt,'+00:00','+07:00'))=?`,
+            [today]
+        );
+        const [[weekRow]] = await db.query(
+            `SELECT COUNT(*) AS total7d, COUNT(DISTINCT lineUserId) AS activeUsers7d,
+             SUM(sharedAt IS NOT NULL) AS sharedCount
+             FROM lottery_dream_logs WHERE createdAt >= NOW() - INTERVAL 7 DAY`
+        );
+        const [topSymbols] = await db.query(
+            `SELECT l.dreamItemId, s.itemName, s.itemIcon, COUNT(*) AS usageCount
+             FROM lottery_dream_logs l
+             LEFT JOIN safety_dream_items s ON l.dreamItemId = s.dreamId
+             WHERE l.dreamItemId IS NOT NULL AND l.createdAt >= NOW() - INTERVAL 7 DAY
+             GROUP BY l.dreamItemId, s.itemName, s.itemIcon
+             ORDER BY usageCount DESC LIMIT 5`
+        );
+        const [dailyTrend] = await db.query(
+            `SELECT DATE(CONVERT_TZ(createdAt,'+00:00','+07:00')) AS day, COUNT(*) AS cnt
+             FROM lottery_dream_logs WHERE createdAt >= NOW() - INTERVAL 7 DAY
+             GROUP BY day ORDER BY day`
+        );
+        res.json({ status: 'success', data: {
+            totalToday: Number(todayRow.totalToday || 0),
+            activeToday: Number(todayRow.activeToday || 0),
+            total7d: Number(weekRow.total7d || 0),
+            activeUsers7d: Number(weekRow.activeUsers7d || 0),
+            sharedCount: Number(weekRow.sharedCount || 0),
+            topSymbols,
+            dailyTrend
+        }});
+    } catch (err) { res.status(500).json({ status: 'error', message: err.message }); }
 });
 
 // ======================================================

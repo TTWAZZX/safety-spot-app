@@ -2031,6 +2031,7 @@
                         <div class="dream-header-icon">🔮</div>
                         <div class="dream-modal-title">ท่านอาจารย์จอห์นนี่</div>
                         <div class="dream-modal-subtitle">พยากรณ์เลขนำโชคด้านความปลอดภัย</div>
+                        <div class="dream-streak-badge d-none" id="dream-streak-badge"></div>
                     </div>
                     <div style="width:32px"></div>
                 </div>
@@ -2045,7 +2046,7 @@
                         </p>
 
                         <!-- Quick pick symbols -->
-                        <div class="dream-section-label"><i class="fas fa-star me-1"></i>เลือกสัญลักษณ์</div>
+                        <div class="dream-section-label"><i class="fas fa-star me-1"></i>เลือกสัญลักษณ์ <span id="dream-select-count" class="dream-select-count d-none"></span></div>
                         <div id="dream-items-container" class="dream-items-grid mb-3">
                             <div class="text-center py-3"><div class="spinner-border spinner-border-sm dream-spinner"></div></div>
                         </div>
@@ -2064,9 +2065,13 @@
 
                     <!-- Step 2: Loading -->
                     <div id="dream-step-loading" class="dream-step d-none px-4 py-5 text-center">
-                        <div class="dream-loading-orb mb-3">🔮</div>
-                        <p class="dream-loading-text">ท่านอาจารย์กำลังปรึกษาดวงดาว...</p>
-                        <div class="dream-stars-loading">✨ ⭐ ✨ ⭐ ✨</div>
+                        <div class="dream-loading-orbit mb-3">
+                            <div class="dream-loading-orb">🔮</div>
+                            <span class="dream-orbit-particle" style="--i:0">⭐</span>
+                            <span class="dream-orbit-particle" style="--i:1">✨</span>
+                            <span class="dream-orbit-particle" style="--i:2">⭐</span>
+                        </div>
+                        <p class="dream-loading-text" id="dream-loading-text">ท่านอาจารย์กำลังปรึกษาดวงดาว...</p>
                     </div>
 
                     <!-- Step 3: Result -->
@@ -2100,6 +2105,13 @@
                         </div>
                         <p class="dream-oracle-compare text-center mb-2 d-none" id="dream-oracle-compare"></p>
                         <p class="dream-johnny-motto text-center mb-2 d-none" id="dream-johnny-motto"></p>
+                        <div class="dream-lucky-color d-none mb-2" id="dream-lucky-color">
+                            <div class="dream-lucky-color-swatch" id="dream-lucky-color-swatch"></div>
+                            <div class="dream-lucky-color-info">
+                                <div class="dream-lucky-color-name" id="dream-lucky-color-name"></div>
+                                <div class="dream-lucky-color-meaning" id="dream-lucky-color-meaning"></div>
+                            </div>
+                        </div>
                         <p class="dream-number-reason text-center mb-3" id="dream-number-reason"></p>
 
                         <!-- Safety advice -->
@@ -2381,6 +2393,13 @@
                                         <i class="fas fa-history me-1"></i>ประวัติดูดวง
                                     </button>
                                 </li>
+                                <li class="nav-item">
+                                    <button class="nav-link small py-1 px-2" id="dst-analytics-tab"
+                                            data-bs-toggle="pill" data-bs-target="#dst-analytics"
+                                            onclick="loadAdminDreamAnalytics()">
+                                        <i class="fas fa-chart-bar me-1"></i>สถิติ
+                                    </button>
+                                </li>
                             </ul>
 
                             <div class="tab-content">
@@ -2413,6 +2432,13 @@
                                         </button>
                                     </div>
                                     <div id="admin-dream-logs-list">
+                                        <div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div></div>
+                                    </div>
+                                </div>
+
+                                <!-- สถิติ sub-tab -->
+                                <div class="tab-pane fade" id="dst-analytics">
+                                    <div id="admin-dream-analytics">
                                         <div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div></div>
                                     </div>
                                 </div>

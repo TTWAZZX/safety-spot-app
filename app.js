@@ -7949,6 +7949,33 @@ async function adminResetDreamLimit(lineUserId, displayName) {
     } catch (e) { Swal.fire('Error', e.message, 'error'); }
 }
 
+async function loadAdminDreamAnalytics() {
+    const $el = $('#admin-dream-analytics');
+    $el.html('<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div></div>');
+    try {
+        const data = await callApi('/api/admin/lottery/dream-analytics', {}, 'GET');
+        const topHtml = data.topSymbols?.length
+            ? data.topSymbols.map((s, i) => `
+                <div class="d-flex align-items-center gap-2 py-1 border-bottom border-secondary">
+                    <span class="fw-bold text-warning" style="width:20px">${i + 1}</span>
+                    <span>${sanitizeHTML(s.itemIcon || '🔹')} ${sanitizeHTML(s.itemName || s.dreamItemId || '-')}</span>
+                    <span class="ms-auto badge bg-secondary">${s.usageCount} ครั้ง</span>
+                </div>`).join('')
+            : '<p class="text-muted small text-center py-2">ยังไม่มีข้อมูล 7 วันล่าสุด</p>';
+        $el.html(`
+            <div class="row g-2 mb-3">
+                <div class="col-6"><div class="dream-stat-card"><div class="dream-stat-val">${data.totalToday}</div><div class="dream-stat-label">ทำนายวันนี้</div></div></div>
+                <div class="col-6"><div class="dream-stat-card"><div class="dream-stat-val">${data.activeToday}</div><div class="dream-stat-label">ผู้ใช้วันนี้</div></div></div>
+                <div class="col-4"><div class="dream-stat-card"><div class="dream-stat-val">${data.total7d}</div><div class="dream-stat-label">7 วัน รวม</div></div></div>
+                <div class="col-4"><div class="dream-stat-card"><div class="dream-stat-val">${data.activeUsers7d}</div><div class="dream-stat-label">7 วัน Users</div></div></div>
+                <div class="col-4"><div class="dream-stat-card"><div class="dream-stat-val">${data.sharedCount}</div><div class="dream-stat-label">แชร์แล้ว</div></div></div>
+            </div>
+            <p class="fw-semibold small mb-2 text-secondary">🏆 สัญลักษณ์ยอดนิยม 7 วัน</p>
+            <div>${topHtml}</div>
+        `);
+    } catch (e) { $el.html(`<div class="alert alert-danger small">${sanitizeHTML(e.message)}</div>`); }
+}
+
 async function adminGenerateDreamItems() {
     const { value: count, isConfirmed } = await Swal.fire({
         title: '🔮 AI สร้างสัญลักษณ์ใหม่',
@@ -8006,7 +8033,7 @@ async function adminGenerateDreamItems() {
 // ======================================================
 
 let _dreamItems = null;
-let _dreamSelectedItemId = null;
+let _dreamSelectedItemIds = [];
 let _dreamResult = null;
 let _dreamNextCost = 0;
 let _dreamTodayCount = 0;
@@ -8027,7 +8054,7 @@ function resetDreamInputState({ clearResult = false } = {}) {
 }
 
 async function openDreamModal() {
-    _dreamSelectedItemId = null;
+    _dreamSelectedItemIds = [];
     _dreamResult = null;
     _dreamNextCost = 0;
     _dreamTodayCount = 0;
@@ -8346,7 +8373,7 @@ function renderDreamItems() {
                  <div class="dream-items-row">`;
         for (const item of data.items) {
             const icon = item.itemIcon ? item.itemIcon + ' ' : '';
-            const isSelected = String(_dreamSelectedItemId || '') === String(item.itemId || item.dreamId || '');
+            const isSelected = _dreamSelectedItemIds.includes(String(item.itemId || item.dreamId || ''));
             html += `<button class="dream-item-chip ${isSelected ? 'selected' : ''}" data-item-id="${item.itemId}" aria-pressed="${isSelected ? 'true' : 'false'}" onclick="selectDreamItem('${item.itemId}', this)">
                          ${icon}${sanitizeHTML(item.itemName)}
                      </button>`;
@@ -8357,22 +8384,31 @@ function renderDreamItems() {
 }
 
 function selectDreamItem(itemId, el) {
-    if (_dreamSelectedItemId && String(_dreamSelectedItemId) === String(itemId)) {
-        _dreamSelectedItemId = null;
+    const id = String(itemId);
+    const idx = _dreamSelectedItemIds.indexOf(id);
+    if (idx !== -1) {
+        _dreamSelectedItemIds.splice(idx, 1);
         $(el).removeClass('selected').attr('aria-pressed', 'false');
-        showToast('ยกเลิกสัญลักษณ์แล้ว เลือกใหม่หรือพิมพ์ฝันเองได้เลย', 'info');
-        return;
+    } else {
+        if (_dreamSelectedItemIds.length >= 3) {
+            showToast('เลือกได้สูงสุด 3 สัญลักษณ์ กดค้างที่เลือกไว้เพื่อยกเลิก', 'warning');
+            return;
+        }
+        _dreamSelectedItemIds.push(id);
+        $(el).addClass('selected').attr('aria-pressed', 'true');
     }
-    _dreamSelectedItemId = itemId;
-    $('.dream-item-chip').removeClass('selected').attr('aria-pressed', 'false');
-    $(el).addClass('selected').attr('aria-pressed', 'true');
+    _updateDreamSelectCount();
+}
+function _updateDreamSelectCount() {
+    const n = _dreamSelectedItemIds.length;
+    $('#dream-select-count').text(n > 0 ? `เลือกแล้ว ${n}/3` : '').toggleClass('d-none', n === 0);
 }
 
 async function submitDreamInterpret() {
     if (_dreamSubmitting) return;
     const dreamText = $('#dream-text-input').val().trim();
-    if (!dreamText && !_dreamSelectedItemId) {
-        Swal.fire({ icon: 'warning', title: 'โปรดเล่าความฝัน', text: 'เลือกสัญลักษณ์หรือพิมพ์ความฝัน/ประสบการณ์ก่อน', confirmButtonColor: '#6c3483' });
+    if (!dreamText && _dreamSelectedItemIds.length === 0) {
+        Swal.fire({ icon: 'warning', title: 'โปรดเล่าความฝัน', text: 'เลือกสัญลักษณ์ (สูงสุด 3 อัน) หรือพิมพ์ความฝัน/ประสบการณ์ก่อน', confirmButtonColor: '#6c3483' });
         return;
     }
     if (_dreamNextCost > 0) {
@@ -8386,21 +8422,51 @@ async function submitDreamInterpret() {
     updateDreamSubmitButton();
     $('#dream-step-input').addClass('d-none');
     $('#dream-step-loading').removeClass('d-none');
+    const _loadingPhrases = [
+        'ท่านอาจารย์กำลังปรึกษาดวงดาว...',
+        'ลูกแก้วกำลังฉายภาพนิมิต...',
+        'ตำราโหราศาสตร์กำลังไขรหัส...',
+        'พลังจักรวาลกำลังรวมตัว...',
+        'อาจารย์กำลังอ่านพลังนิมิต...'
+    ];
+    let _phraseIdx = 0;
+    const _phraseTimer = setInterval(() => {
+        _phraseIdx = (_phraseIdx + 1) % _loadingPhrases.length;
+        $('#dream-loading-text').text(_loadingPhrases[_phraseIdx]);
+    }, 2000);
     try {
         const res = await callApi('/api/lottery/dream-interpret', {
             lineUserId: AppState.lineProfile.userId,
             dreamText,
-            itemId: _dreamSelectedItemId || null
+            itemIds: _dreamSelectedItemIds.length > 0 ? _dreamSelectedItemIds : []
         }, 'POST');
         _dreamResult = res;
         if (res.newCoinBalance !== undefined && res.newCoinBalance !== null) {
             syncCoins(res.newCoinBalance);
             $('#home-coins-display').text(Number(res.newCoinBalance || 0).toLocaleString());
         }
-        _dreamNextCost = Number(res.todayCount || 0) > 0 ? 20 : 0;
+        _dreamNextCost = Number(res.nextCost ?? (Number(res.todayCount || 0) > 0 ? 20 : 0));
         _dreamTodayCount = Number(res.todayCount || _dreamTodayCount + 1);
         _dreamSubmitting = false;
         updateDreamCostUi();
+        // Dream streak display
+        if (res.dreamStreak > 0) {
+            $('#dream-streak-badge').text(`🔥 Streak ${res.dreamStreak} วัน`).removeClass('d-none');
+        }
+        if (res.streakMilestone) {
+            const bonusCoins = res.streakMilestone >= 30 ? 50 : res.streakMilestone >= 14 ? 20 : res.streakMilestone >= 7 ? 10 : 5;
+            setTimeout(() => {
+                Swal.fire({
+                    icon: 'success',
+                    title: `🔥 Streak ${res.streakMilestone} วัน!`,
+                    html: `<p>ท่านอาจารย์ประทับใจ — ลูกศิษย์ซื่อสัตย์ต่อการทำนาย<br>รับโบนัส <strong>${bonusCoins} เหรียญ</strong> แห่งความซื่อสัตย์</p>`,
+                    confirmButtonColor: '#6c3483',
+                    timer: 4000,
+                    timerProgressBar: true
+                });
+                if (typeof fireConfetti === 'function') fireConfetti('streak');
+            }, 800);
+        }
         loadDreamHistory();
         showDreamResult(res);
     } catch (e) {
@@ -8409,6 +8475,8 @@ async function submitDreamInterpret() {
         $('#dream-step-loading').addClass('d-none');
         $('#dream-step-input').removeClass('d-none');
         Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: e.message, confirmButtonColor: '#6c3483' });
+    } finally {
+        clearInterval(_phraseTimer);
     }
 }
 
@@ -8436,6 +8504,16 @@ function showDreamResult(result, context = {}) {
     $('#dream-oracle-compare').text(compare).toggleClass('d-none', !compare);
     const motto = result.johnnyMotto || '';
     $('#dream-johnny-motto').text(motto ? `✦ ${motto} ✦` : '').toggleClass('d-none', !motto);
+    // Lucky color
+    const lc = result.luckyColor;
+    if (lc && lc.name) {
+        $('#dream-lucky-color').removeClass('d-none');
+        $('#dream-lucky-color-swatch').css('background', lc.hex || '#9b59b6');
+        $('#dream-lucky-color-name').text(lc.name);
+        $('#dream-lucky-color-meaning').text(lc.meaning || '');
+    } else {
+        $('#dream-lucky-color').addClass('d-none');
+    }
     $('#dream-number-reason').text(result.numberReason || '');
     $('#dream-safety-advice').text(result.quickWarning || result.safetyAdvice || '');
     const refTitle = Array.isArray(result.hseReferences) && result.hseReferences[0]?.title ? `คัมภีร์ที่ใช้: ${result.hseReferences[0].title}` : '';
