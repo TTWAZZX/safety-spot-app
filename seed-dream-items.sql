@@ -6,7 +6,7 @@
 -- ============================================================
 
 INSERT INTO safety_dream_items
-  (dreamId, category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint, isActive)
+  (dreamId, category, itemName, itemIcon, number2d, number3d, safetyFact, promptHint)
 VALUES
 
 -- ══════════════════════════════════════════════
@@ -218,4 +218,4 @@ ON DUPLICATE KEY UPDATE
   number3d   = VALUES(number3d),
   safetyFact = VALUES(safetyFact),
   promptHint = VALUES(promptHint),
-  isActive   = TRUE;
+  isActive   = COALESCE(isActive, TRUE);
