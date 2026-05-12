@@ -4225,7 +4225,8 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_results_history (
 const LOTTERY_GEMINI_MODELS = [
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
-    'gemini-2.0-flash'
+    'gemini-2.0-flash',
+    'gemini-1.5-flash'
 ];
 let lastGeminiDiagnostic = null;
 
@@ -6845,6 +6846,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
 
         // Fallback: keep Johnny Oracle useful even if the AI provider is unavailable.
         if (!result) {
+            console.error(`[Johnny] All Gemini models failed. Last error: ${sanitizeGeminiError(lastErr)} — using static fallback`);
             const subject = focusSubject || 'สัญลักษณ์ความปลอดภัย';
             const symbolText = oracle.dreamSymbols.map(s => `${s.icon || ''}${s.label}`).join(' และ ');
             result = {
