@@ -6272,6 +6272,57 @@ const JOHNNY_SYSTEM_PROMPT = `คุณคือ "ท่านอาจารย
 const DREAM_EXTRA_INTERPRET_COST = 20;
 const DREAM_CATEGORIES = new Set(['ppe', 'fire', 'electrical', 'chemical', 'height', 'machine', 'road']);
 
+// ตำราฝันไทย — keyword → dreamId mapping สำหรับ auto-match จากข้อความที่พิมพ์
+const DREAM_KEYWORD_MAP = [
+    // PPE
+    { dreamId: 'PPE001', keywords: ['หมวก', 'หมวกกันน็อค', 'หมวกเซฟตี้', 'หมวกนิรภัย', 'หัว', 'กะโหลก'] },
+    { dreamId: 'PPE002', keywords: ['ถุงมือ', 'มือ', 'แขน', 'นิ้ว', 'ฝ่ามือ'] },
+    { dreamId: 'PPE003', keywords: ['รองเท้า', 'เท้า', 'เดิน', 'ก้าว', 'ส้นเท้า', 'นิ้วเท้า'] },
+    { dreamId: 'PPE004', keywords: ['แว่น', 'ตา', 'มองเห็น', 'สายตา', 'แว่นตา', 'ดวงตา', 'มอง'] },
+    { dreamId: 'PPE005', keywords: ['หน้ากาก', 'ผ้าปิดปาก', 'หน้า', 'ปาก', 'หายใจ', 'ลมหายใจ', 'กรอง'] },
+    // FIRE
+    { dreamId: 'FIRE001', keywords: ['ไฟ', 'เพลิง', 'ไหม้', 'ลุกไหม้', 'เปลวไฟ', 'ไฟลุก', 'ร้อน', 'ความร้อน', 'เผา', 'เปลว'] },
+    { dreamId: 'FIRE002', keywords: ['ถังดับเพลิง', 'ดับไฟ', 'ดับเพลิง', 'ถัง', 'สีแดง'] },
+    { dreamId: 'FIRE003', keywords: ['สัญญาณไฟ', 'แจ้งเตือน', 'ระฆัง', 'เสียงเตือน', 'ไซเรน', 'สัญญาณเตือน', 'กริ่ง'] },
+    { dreamId: 'FIRE004', keywords: ['สปริงเกลอร์', 'ฉีดน้ำ', 'ฝนตก', 'ฝน', 'น้ำพุ', 'น้ำไหล', 'น้ำฉีด'] },
+    // ELECTRICAL
+    { dreamId: 'ELEC001', keywords: ['ฟ้าผ่า', 'ฟ้า', 'ไฟฟ้า', 'สายฟ้า', 'ฟ้าร้อง', 'ไฟดูด', 'ไฟช็อต', 'ช็อต', 'อิเล็กทริก', 'กระแสไฟ', 'ประกายไฟ', 'วาบ'] },
+    { dreamId: 'ELEC002', keywords: ['สายไฟ', 'สายเคเบิล', 'สายพลังงาน', 'ปลั๊ก', 'เต้าเสียบ', 'เต้ารับ'] },
+    { dreamId: 'ELEC003', keywords: ['ตู้ไฟ', 'ตู้ควบคุม', 'แผงไฟ', 'สวิตช์', 'เบรกเกอร์', 'ฟิวส์'] },
+    { dreamId: 'ELEC004', keywords: ['ดิน', 'แผ่นดิน', 'พื้นดิน', 'สายดิน', 'กราวด์', 'โลก', 'ดินฟ้า'] },
+    // CHEMICAL
+    { dreamId: 'CHEM001', keywords: ['งู', 'พิษ', 'สารพิษ', 'สารเคมี', 'เคมี', 'ของมีพิษ', 'กัมมันตรังสี', 'อันตราย'] },
+    { dreamId: 'CHEM002', keywords: ['ควัน', 'หมอก', 'ก๊าซ', 'ไอ', 'กลิ่น', 'ไอพิษ', 'ก๊าซพิษ', 'ควันดำ', 'ควันขาว'] },
+    { dreamId: 'CHEM003', keywords: ['เลือด', 'กรด', 'กัดกร่อน', 'แผล', 'บาดแผล', 'ไหม้', 'กรดกัด', 'กัด'] },
+    { dreamId: 'CHEM004', keywords: ['ระเบิด', 'ไวไฟ', 'น้ำมัน', 'แก๊ส', 'ปะทุ', 'วาบ', 'ติดไฟ', 'ลุกวาบ', 'ไอน้ำมัน'] },
+    // HEIGHT
+    { dreamId: 'HIGH001', keywords: ['ตก', 'ร่วง', 'หล่น', 'ตกจากที่สูง', 'ล้ม', 'พลัดตก', 'ตกลงมา', 'โดดตก', 'กระโดด'] },
+    { dreamId: 'HIGH002', keywords: ['บันได', 'ขั้นบันได', 'ไต่บันได', 'ปีนบันได', 'เหยียบ', 'ขึ้น', 'ลง'] },
+    { dreamId: 'HIGH003', keywords: ['นั่งร้าน', 'โครงสร้าง', 'ก่อสร้าง', 'แบกหาม', 'สูง', 'ที่สูง', 'เหนือพื้น'] },
+    { dreamId: 'HIGH004', keywords: ['เชือก', 'สายรัด', 'ผูก', 'มัด', 'รัด', 'แขวน', 'โรยตัว', 'หย่อน'] },
+    // MACHINE
+    { dreamId: 'MACH001', keywords: ['เครื่องจักร', 'จักร', 'เฟือง', 'มอเตอร์', 'เครื่อง', 'เครื่องยนต์', 'หมุน', 'โรงงาน'] },
+    { dreamId: 'MACH002', keywords: ['มีด', 'ใบมีด', 'เลื่อย', 'คม', 'ตัด', 'บาด', 'ใบเลื่อย', 'กรรไกร', 'ของมีคม'] },
+    { dreamId: 'MACH003', keywords: ['สายพาน', 'ลำเลียง', 'คอนเวเยอร์', 'เลื้อย', 'ส่ง', 'ลำเลียงสินค้า'] },
+    { dreamId: 'MACH004', keywords: ['หม้อ', 'ไอน้ำ', 'แรงดัน', 'ความดัน', 'ปั๊ม', 'วาล์ว', 'ท่อ', 'อบไอน้ำ'] },
+    // ROAD
+    { dreamId: 'ROAD001', keywords: ['รถ', 'ยานพาหนะ', 'รถยก', 'โฟล์คลิฟต์', 'รถบรรทุก', 'รถพุ่ม', 'รถฟอร์คลิฟท์', 'ขับรถ', 'รถยนต์', 'รถไฟ'] },
+    { dreamId: 'ROAD002', keywords: ['ป้าย', 'สัญลักษณ์', 'เตือน', 'สัญญาณจราจร', 'ป้ายไฟ', 'ป้ายเตือน', 'สัญญาณ'] },
+    { dreamId: 'ROAD003', keywords: ['คน', 'ฝูงชน', 'ทางม้าลาย', 'คนเดิน', 'คนงาน', 'ผู้คน', 'กลุ่มคน', 'เดิน'] },
+    { dreamId: 'ROAD004', keywords: ['มืด', 'กลางคืน', 'พระจันทร์', 'ดวงจันทร์', 'ไฟส่อง', 'แสง', 'ความมืด', 'ค่ำคืน', 'ดาว', 'คืน'] },
+];
+
+function matchDreamTextToItem(text) {
+    if (!text) return null;
+    const lower = text.toLowerCase();
+    let bestId = null, bestScore = 0;
+    for (const entry of DREAM_KEYWORD_MAP) {
+        const score = entry.keywords.reduce((s, kw) => s + (lower.includes(kw) ? 1 : 0), 0);
+        if (score > bestScore) { bestScore = score; bestId = entry.dreamId; }
+    }
+    return bestScore > 0 ? bestId : null;
+}
+
 const DREAM_LUCKY_COLORS = {
     electric:    { hex: '#f4d03f', base: 'สีเหลืองทอง' },
     fire:        { hex: '#e74c3c', base: 'สีเพลิงแดง' },
@@ -6815,11 +6866,20 @@ app.post('/api/lottery/dream-interpret', async (req, res) => {
         // Build context for AI — ใช้ schemaจริงและ Johnny Oracle Engine เป็นแกนเลข
         let selectedItems = [];
         let itemName = null, item2d = null, item3d = null, itemPromptHint = null, itemSafetyFact = null;
-        if (itemIds.length > 0) {
-            const placeholders = itemIds.map(() => '?').join(',');
+        let autoMatchedItem = null;
+
+        // Auto-match จากข้อความฝัน ถ้าไม่ได้เลือกสัญลักษณ์
+        let resolvedItemIds = [...itemIds];
+        if (resolvedItemIds.length === 0 && dreamText) {
+            const autoId = matchDreamTextToItem(dreamText);
+            if (autoId) resolvedItemIds = [autoId];
+        }
+
+        if (resolvedItemIds.length > 0) {
+            const placeholders = resolvedItemIds.map(() => '?').join(',');
             const [items] = await queryConn.query(
                 `SELECT dreamId, category, itemName, itemIcon, number2d, number3d, promptHint, safetyFact FROM safety_dream_items WHERE dreamId IN (${placeholders}) AND COALESCE(isActive, TRUE)=TRUE`,
-                itemIds
+                resolvedItemIds
             );
             if (items.length === 0) {
                 const err = new Error('ไม่พบสัญลักษณ์ที่เลือก');
@@ -6827,6 +6887,10 @@ app.post('/api/lottery/dream-interpret', async (req, res) => {
                 throw err;
             }
             selectedItems = items;
+            // ถ้า auto-match ให้คืนข้อมูล item นั้นให้ frontend ด้วย
+            if (itemIds.length === 0 && resolvedItemIds.length > 0) {
+                autoMatchedItem = items[0] || null;
+            }
             itemName = items.map(i => i.itemName).filter(Boolean).join(' และ ');
             item2d = items[0]?.number2d || null;
             item3d = items[0]?.number3d || null;
@@ -6987,6 +7051,11 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
             result.luckyColor = { name: luckyColorMeta.base, hex: luckyColorMeta.hex, meaning: '' };
         }
         result.nextCost = todayDreamCount > 0 ? DREAM_EXTRA_INTERPRET_COST : 0;
+        if (autoMatchedItem) result.autoMatchedItem = {
+            dreamId: autoMatchedItem.dreamId,
+            itemName: autoMatchedItem.itemName,
+            itemIcon: autoMatchedItem.itemIcon
+        };
 
         // Save log (dreamItemId = dreamId string reference)
         const logId = 'DREAM' + uuidv4();

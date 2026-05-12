@@ -8448,6 +8448,17 @@ async function submitDreamInterpret() {
             $('#home-coins-display').text(Number(res.newCoinBalance || 0).toLocaleString());
         }
         _dreamNextCost = Number(res.nextCost ?? (Number(res.todayCount || 0) > 0 ? 20 : 0));
+        // Auto-match: highlight chip และแสดง label
+        if (res.autoMatchedItem) {
+            const aid = String(res.autoMatchedItem.dreamId);
+            _dreamSelectedItemIds = [aid];
+            $('.dream-item-chip').removeClass('selected').attr('aria-pressed', 'false');
+            $('.dream-item-chip').filter(function () {
+                return String($(this).data('item-id')) === aid;
+            }).addClass('selected').attr('aria-pressed', 'true');
+            _updateDreamSelectCount();
+            showToast(`อาจารย์จับนิมิต: ${res.autoMatchedItem.itemIcon || ''} ${res.autoMatchedItem.itemName}`, 'info');
+        }
         _dreamTodayCount = Number(res.todayCount || _dreamTodayCount + 1);
         _dreamSubmitting = false;
         updateDreamCostUi();
