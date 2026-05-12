@@ -8451,9 +8451,9 @@ function prioritizeDreamNumbers() {
 
 function getCompactDreamText(text) {
     const clean = String(text || '').replace(/\s+/g, ' ').trim();
-    if (clean.length <= 210) return clean;
-    const sentence = clean.match(/^(.{80,210}?[.!?।]|.{80,210}?)(\s|$)/);
-    return `${(sentence?.[1] || clean.slice(0, 200)).trim()}...`;
+    if (clean.length <= 360) return clean;
+    const sentence = clean.match(/^(.{180,360}?[.!?।]|.{180,360}?)(\s|$)/);
+    return `${(sentence?.[1] || clean.slice(0, 340)).trim()}...`;
 }
 
 function getDreamCurrentSubject() {

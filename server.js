@@ -6373,18 +6373,29 @@ function buildJohnnyFallbackInterpretation({ subject, oracle }) {
     const symbolText = oracle.dreamSymbols.map(s => `${s.icon || ''}${s.label}`).join(' และ ');
     const refs = (oracle.hseReferences || []).map(ref => ref.title).filter(Boolean).slice(0, 2).join(' กับ ');
     const opener = pickJohnnyPhrase(`${subject}:${oracle.number2d}`, [
-        `ลูกศิษย์เอ๋ย อาจารย์เห็น ${symbolText} ลอยขึ้นจากม่านหมอกแห่งอาณาจักรความปลอดภัย`,
-        `เมื่ออาจารย์แตะลูกแก้วแห่ง HSE นิมิตของ "${subject}" ปรากฏเป็น ${symbolText}`,
-        `ดวงดาวหน้าโรงงานคืนนี้กระซิบถึง ${symbolText} และชี้ให้เห็นรอยต่อของโชคกับความระวัง`,
-        `ในตำราเกราะนิรภัยของอาจารย์ นิมิต "${subject}" ส่องแสงผ่าน ${symbolText}`
+        `ลูกศิษย์เอ๋ย อาจารย์เพ่งเนตรลงในลูกแก้วแห่งอาณาจักรความปลอดภัย เห็น ${symbolText} เคลื่อนผ่านม่านหมอกเป็นลางเด่น`,
+        `เมื่ออาจารย์เปิดตำราโหราศาสตร์นิรภัย นิมิต "${subject}" ส่องแสงเป็น ${symbolText} ประหนึ่งดวงดาวเตือนบนฟ้าโรงงาน`,
+        `ดวงดาวหน้าโรงงานคืนนี้มิได้กระซิบเบา ๆ แต่วาดภาพ ${symbolText} ให้เห็นชัด ณ รอยต่อของโชคและความระมัดระวัง`,
+        `ในคัมภีร์เกราะนิรภัยของอาจารย์ นิมิต "${subject}" แตกประกายเป็น ${symbolText} และชี้ทางไปยังเลขที่ควรรับไว้`
     ]);
-    const middle = refs ? ` อาจารย์เปิดคัมภีร์ ${refs} แล้วเห็นเลขเด่น ${oracle.number2d}/${oracle.number3d}` : ` เลขเด่นที่ผูกกับนิมิตนี้คือ ${oracle.number2d}/${oracle.number3d}`;
+    const middle = refs
+        ? ` เมื่อเทียบกับคัมภีร์ ${refs} แล้ว เลขเด่นจึงปรากฏเป็น ${oracle.number2d}/${oracle.number3d}`
+        : ` เลขเด่นที่ผูกกับนิมิตนี้จึงปรากฏเป็น ${oracle.number2d}/${oracle.number3d}`;
     const close = pickJohnnyPhrase(`${subject}:${oracle.number3d}:close`, [
-        `รับเลขไว้เพื่อความสนุก และอย่าลืมคำเตือนสั้น ๆ: ${oracle.quickWarning}`,
-        `โชคอาจอยู่ที่เลข แต่เกราะคุ้มครองอยู่ที่สติ: ${oracle.quickWarning}`,
-        `อาจารย์ให้เลขนี้พร้อมลางเตือนเดียวที่ต้องจำ: ${oracle.quickWarning}`
+        `เลขนี้รับไว้เพื่อความสนุก แต่ลางเตือนของอาจารย์ให้ถือจริง: ${oracle.quickWarning}`,
+        `โชคอาจอยู่ที่เลข ทว่าความคุ้มครองอยู่ที่วินัยหน้างาน: ${oracle.quickWarning}`,
+        `อาจารย์มอบเลขพร้อมคำกำชับจากดวงดาวว่า ${oracle.quickWarning}`
     ]);
     return `${opener}${middle} ${close}`;
+}
+
+function buildJohnnySafetyAdvice(oracle) {
+    const refs = oracle.hseReferences || [];
+    if (!refs.length) return oracle.quickWarning;
+    const controls = refs.flatMap(ref => ref.controls || []).slice(0, 4);
+    const mainRef = refs[0];
+    const controlText = controls.length ? ` มาตรการที่ควรจับตาคือ ${controls.join(', ')}.` : '';
+    return `${oracle.quickWarning} อาจารย์อ่านตามคัมภีร์ ${mainRef.title}: ${mainRef.guidance}${controlText}`;
 }
 
 function deriveJohnnyUnknownNumbers(seedText) {
@@ -6485,6 +6496,7 @@ function analyzeJohnnyOracle({ dreamText, selectedItem }) {
     }
     const hseReading = hseReadingParts.join(' | ');
     const quickWarning = highestRisk?.warning || 'หยุดคิดก่อนเริ่มงาน ตรวจพื้นที่ และแจ้งหัวหน้าเมื่อพบความเสี่ยง';
+    const safetyAdvice = buildJohnnySafetyAdvice({ quickWarning, hseReferences });
 
     return {
         number2d,
@@ -6497,6 +6509,7 @@ function analyzeJohnnyOracle({ dreamText, selectedItem }) {
         reliabilityLabel,
         hseReading,
         quickWarning,
+        safetyAdvice,
         johnnyVerdict: unknown
             ? 'นิมิตครั้งนี้ยังมีหมอกบาง ๆ อาจารย์จึงให้เลขจากกระแสดวงประจำวัน แต่คำเตือนคืออย่ามองข้ามสัญญาณเล็กในพื้นที่ทำงาน'
             : `อาจารย์เห็น ${dreamSymbols.map(s => s.label).join(' และ ')} เป็นแกนของนิมิต จงรับเลขไว้เพื่อความสนุก และรับคำเตือนไว้เพื่อกลับบ้านปลอดภัย`,
@@ -6838,7 +6851,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                 ...oracle,
                 interpretation: buildJohnnyFallbackInterpretation({ subject, oracle }),
                 numberReason: oracle.luckyFormula,
-                safetyAdvice: oracle.quickWarning,
+                safetyAdvice: oracle.safetyAdvice || oracle.quickWarning,
                 safetyFact: itemSafetyFact || oracle.hseReading,
                 disclaimer: '⚠️ การพยากรณ์นี้เพื่อความสนุกและสร้างจิตสำนึกด้านความปลอดภัยเท่านั้น',
                 fallback: true
@@ -6852,6 +6865,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
             numberEvidence: oracle.numberEvidence,
             hseReferences: oracle.hseReferences,
             reliabilityLabel: oracle.reliabilityLabel,
+            safetyAdvice: oracle.safetyAdvice || result.safetyAdvice,
             quickWarning: oracle.quickWarning,
             confidence: oracle.confidence,
             number2d: oracle.number2d,

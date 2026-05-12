@@ -4156,10 +4156,10 @@ body {
     background: rgba(108,52,131,0.18);
     border: 1px solid rgba(196,156,211,0.16);
     border-radius: 12px;
-    padding: 11px 13px;
-    font-size: 0.84rem;
+    padding: 13px 15px;
+    font-size: 0.86rem;
     color: #ead9ff;
-    line-height: 1.48;
+    line-height: 1.62;
     font-style: italic;
 }
 
@@ -4202,11 +4202,11 @@ body {
     background: rgba(6,199,85,0.08);
     border: 1px solid rgba(6,199,85,0.2);
     border-radius: 14px;
-    padding: 11px 13px;
-    font-size: 0.82rem;
+    padding: 13px 15px;
+    font-size: 0.84rem;
 }
 .dream-safety-title { font-weight: 700; color: #06C755; margin-bottom: 6px; font-size: 0.8rem; }
-#dream-safety-advice { color: #d4efdf; line-height: 1.5; }
+#dream-safety-advice { color: #d4efdf; line-height: 1.62; }
 .dream-safety-fact { color: rgba(212,239,223,0.7); font-size: 0.78rem; border-top: 1px solid rgba(6,199,85,0.15); padding-top: 8px; }
 
 /* Disclaimer */
