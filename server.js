@@ -4229,10 +4229,9 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_results_history (
 // LOTTERY HELPER — LINE Push Flex Message
 // ======================================================
 const LOTTERY_GEMINI_MODELS = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-1.5-pro'
+    'gemini-2.5-flash',       // primary
+    'gemini-2.5-flash-lite',  // fallback 1
+    'gemini-3.1-flash-lite'   // fallback 2
 ];
 let lastGeminiDiagnostic = null;
 
@@ -4252,8 +4251,9 @@ async function callGeminiGenerate(model, payload, { timeout = 20000, context = '
         err.code = 'MISSING_GEMINI_API_KEY';
         throw err;
     }
-    // gemini-2.5-x requires thinkingBudget:0 when using JSON response mode
-    const finalPayload = model.startsWith('gemini-2.5') && payload.generationConfig?.responseMimeType
+    // gemini-2.5+ and 3.x have thinking enabled by default — disable when using JSON mode
+    const needsThinkingOff = (model.startsWith('gemini-2.5') || model.startsWith('gemini-3.')) && payload.generationConfig?.responseMimeType;
+    const finalPayload = needsThinkingOff
         ? { ...payload, generationConfig: { ...payload.generationConfig, thinkingConfig: { thinkingBudget: 0 } } }
         : payload;
     const controller = new AbortController();
