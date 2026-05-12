@@ -8417,17 +8417,43 @@ function showDreamResult(result, context = {}) {
     $('#dream-step-input').addClass('d-none');
     $('#dream-step-result').removeClass('d-none');
     const summaryContext = context.subject || getDreamCurrentSubject();
+    prioritizeDreamNumbers();
     ensureDreamResultActions();
     updateDreamResultSummary(result, summaryContext);
     updateDreamOracleDetails(result);
-    $('#dream-interpretation').text(result.interpretation || '');
+    prioritizeDreamNumbers();
+    $('#dream-interpretation').text(getCompactDreamText(result.interpretation || ''));
     $('#dream-number-2d').text(result.number2d || '??');
     $('#dream-number-3d').text(result.number3d || '???');
     $('#dream-number-reason').text(result.numberReason || '');
-    $('#dream-safety-advice').text(result.safetyAdvice || '');
-    $('#dream-safety-fact').text(result.safetyFact || '');
+    $('#dream-safety-advice').text(result.quickWarning || result.safetyAdvice || '');
+    const refTitle = Array.isArray(result.hseReferences) && result.hseReferences[0]?.title ? `คัมภีร์ที่ใช้: ${result.hseReferences[0].title}` : '';
+    $('#dream-safety-fact').text(refTitle).toggleClass('d-none', !refTitle);
     $('#dream-disclaimer').text(result.disclaimer || '');
     _dreamResult = result;
+}
+
+function prioritizeDreamNumbers() {
+    const $header = $('.dream-result-header');
+    const $numbers = $('#dream-number-2d').closest('.dream-numbers-row');
+    const $reason = $('#dream-number-reason');
+    const $interpretation = $('#dream-interpretation');
+    const $safety = $('.dream-safety-card');
+    const $oracle = $('#dream-oracle-details');
+    if ($header.length && $numbers.length) {
+        $header.after($numbers);
+        $numbers.after($reason);
+    }
+    if ($reason.length && $interpretation.length) $reason.after($interpretation);
+    if ($interpretation.length && $safety.length) $interpretation.after($safety);
+    if ($safety.length && $oracle.length) $safety.after($oracle);
+}
+
+function getCompactDreamText(text) {
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    if (clean.length <= 210) return clean;
+    const sentence = clean.match(/^(.{80,210}?[.!?।]|.{80,210}?)(\s|$)/);
+    return `${(sentence?.[1] || clean.slice(0, 200)).trim()}...`;
 }
 
 function getDreamCurrentSubject() {
@@ -8449,7 +8475,6 @@ function ensureDreamResultSummary() {
     if ($('#dream-result-summary').length) return;
     $('.dream-result-header').after(`
         <div id="dream-result-summary" class="dream-result-summary mb-3">
-            <div><span>เลขเด่น</span><strong id="dream-summary-number">--/---</strong></div>
             <div><span>ธีม</span><strong id="dream-summary-theme">-</strong></div>
             <div><span>คำเตือนหลัก</span><strong id="dream-summary-advice">-</strong></div>
         </div>
@@ -8458,7 +8483,6 @@ function ensureDreamResultSummary() {
 
 function updateDreamResultSummary(result, subject) {
     ensureDreamResultSummary();
-    $('#dream-summary-number').text(`${result?.number2d || '--'}/${result?.number3d || '---'}`);
     const theme = (result?.dreamSymbols || []).map(s => s.label).filter(Boolean).slice(0, 2).join(' • ') || subject || 'ความปลอดภัย';
     $('#dream-summary-theme').text(theme);
     const advice = String(result?.quickWarning || result?.safetyAdvice || result?.safetyFact || 'อ่านคำแนะนำด้านล่าง').trim();
@@ -8474,30 +8498,35 @@ function ensureDreamOracleDetails() {
                 <strong id="dream-oracle-confidence">--</strong>
             </div>
             <div id="dream-oracle-symbols" class="dream-oracle-symbols"></div>
-            <div class="dream-oracle-grid">
-                <div><span>ประเภทนิมิต</span><strong id="dream-oracle-omen">-</strong></div>
-                <div><span>สูตรเลข</span><strong id="dream-oracle-formula">-</strong></div>
+            <button type="button" class="dream-oracle-toggle" onclick="toggleDreamOracleDetails()">
+                <i class="fas fa-book-open"></i><span>ดูที่มาเลขและคัมภีร์ HSE</span><i class="fas fa-chevron-down"></i>
+            </button>
+            <div id="dream-oracle-body" class="dream-oracle-body d-none">
+                <div class="dream-oracle-grid">
+                    <div><span>ประเภทนิมิต</span><strong id="dream-oracle-omen">-</strong></div>
+                    <div><span>สูตรเลข</span><strong id="dream-oracle-formula">-</strong></div>
+                </div>
+                <div class="dream-oracle-evidence">
+                    <span>ความน่าเชื่อถือของเลข</span>
+                    <strong id="dream-oracle-reliability">-</strong>
+                    <ul id="dream-oracle-evidence-list"></ul>
+                </div>
+                <div class="dream-oracle-reading">
+                    <span>คำอ่าน HSE</span>
+                    <p id="dream-oracle-hse"></p>
+                </div>
+                <div class="dream-oracle-refs">
+                    <span>คัมภีร์ HSE ที่ใช้ตีความ</span>
+                    <div id="dream-oracle-refs-list"></div>
+                </div>
             </div>
-            <div class="dream-oracle-evidence">
-                <span>ความน่าเชื่อถือของเลข</span>
-                <strong id="dream-oracle-reliability">-</strong>
-                <ul id="dream-oracle-evidence-list"></ul>
-            </div>
-            <div class="dream-oracle-reading">
-                <span>คำอ่าน HSE</span>
-                <p id="dream-oracle-hse"></p>
-            </div>
-            <div class="dream-oracle-refs">
-                <span>คัมภีร์ HSE ที่ใช้ตีความ</span>
-                <div id="dream-oracle-refs-list"></div>
-            </div>
-            <div class="dream-oracle-warning">
-                <i class="fas fa-triangle-exclamation"></i>
-                <span id="dream-oracle-warning-text"></span>
-            </div>
-            <div class="dream-oracle-verdict" id="dream-oracle-verdict"></div>
         </div>
     `);
+}
+
+function toggleDreamOracleDetails() {
+    $('#dream-oracle-body').toggleClass('d-none');
+    $('#dream-oracle-details').toggleClass('expanded', !$('#dream-oracle-body').hasClass('d-none'));
 }
 
 function updateDreamOracleDetails(result) {
@@ -8519,8 +8548,6 @@ function updateDreamOracleDetails(result) {
     $('#dream-oracle-refs-list').html(refs.length
         ? refs.map(ref => `<div class="dream-oracle-ref"><strong>${sanitizeHTML(ref.title || '')}</strong><small>${sanitizeHTML(ref.theme || '')}</small><p>${sanitizeHTML(ref.guidance || '')}</p></div>`).join('')
         : '<div class="dream-oracle-ref"><strong>General HSE Awareness</strong><small>คัมภีร์พื้นฐาน</small><p>ตรวจพื้นที่ ใช้สติ และรายงานสิ่งผิดปกติก่อนเกิดเหตุ</p></div>');
-    $('#dream-oracle-warning-text').text(result?.quickWarning || result?.safetyAdvice || '');
-    $('#dream-oracle-verdict').text(result?.johnnyVerdict || '');
 }
 
 function ensureDreamResultActions() {

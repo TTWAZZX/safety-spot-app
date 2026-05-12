@@ -6378,10 +6378,13 @@ function buildJohnnyFallbackInterpretation({ subject, oracle }) {
         `ดวงดาวหน้าโรงงานคืนนี้กระซิบถึง ${symbolText} และชี้ให้เห็นรอยต่อของโชคกับความระวัง`,
         `ในตำราเกราะนิรภัยของอาจารย์ นิมิต "${subject}" ส่องแสงผ่าน ${symbolText}`
     ]);
-    const middle = refs
-        ? ` อาจารย์จึงเปิดคัมภีร์ ${refs} ประกอบการอ่านลาง`
-        : ' อาจารย์จึงอ่านเป็นสัญญาณให้ตรวจหน้างานและตั้งสติก่อนเริ่มงาน';
-    return `${opener}${middle} เลขที่ผูกกับนิมิตนี้คือ ${oracle.number2d}/${oracle.number3d} แต่สิ่งที่อาจารย์ให้ถือหนักกว่าเลขคือคำเตือน: ${oracle.quickWarning}`;
+    const middle = refs ? ` อาจารย์เปิดคัมภีร์ ${refs} แล้วเห็นเลขเด่น ${oracle.number2d}/${oracle.number3d}` : ` เลขเด่นที่ผูกกับนิมิตนี้คือ ${oracle.number2d}/${oracle.number3d}`;
+    const close = pickJohnnyPhrase(`${subject}:${oracle.number3d}:close`, [
+        `รับเลขไว้เพื่อความสนุก และอย่าลืมคำเตือนสั้น ๆ: ${oracle.quickWarning}`,
+        `โชคอาจอยู่ที่เลข แต่เกราะคุ้มครองอยู่ที่สติ: ${oracle.quickWarning}`,
+        `อาจารย์ให้เลขนี้พร้อมลางเตือนเดียวที่ต้องจำ: ${oracle.quickWarning}`
+    ]);
+    return `${opener}${middle} ${close}`;
 }
 
 function deriveJohnnyUnknownNumbers(seedText) {

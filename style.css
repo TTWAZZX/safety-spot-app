@@ -3883,16 +3883,18 @@ body {
     white-space: nowrap;
 }
 .dream-result-summary {
-    grid-template-columns: 0.9fr 1fr 1.45fr;
+    grid-template-columns: 0.9fr 1.2fr;
+    margin-top: 2px;
+    display: none !important;
 }
 .dream-result-summary > div {
     text-align: left;
 }
 .dream-oracle-details {
     border: 1px solid rgba(196,156,211,0.18);
-    background: rgba(255,255,255,0.06);
-    border-radius: 14px;
-    padding: 12px;
+    background: rgba(255,255,255,0.045);
+    border-radius: 12px;
+    padding: 10px;
 }
 .dream-oracle-head {
     display: flex;
@@ -3912,7 +3914,7 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 .dream-oracle-symbol {
     display: inline-flex;
@@ -3925,6 +3927,26 @@ body {
     padding: 5px 9px;
     font-size: 0.72rem;
     font-weight: 800;
+}
+.dream-oracle-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 1px solid rgba(244,208,63,0.2);
+    background: rgba(244,208,63,0.08);
+    color: #f7e8a1;
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 0.74rem;
+    font-weight: 800;
+}
+.dream-oracle-details.expanded .dream-oracle-toggle .fa-chevron-down {
+    transform: rotate(180deg);
+}
+.dream-oracle-body {
+    margin-top: 9px;
 }
 .dream-oracle-symbol small {
     color: rgba(240,230,255,0.58);
@@ -4131,32 +4153,33 @@ body {
 .dream-result-title { color: #e8d5ff; font-size: 0.8rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
 
 .dream-interpretation-card {
-    background: rgba(108,52,131,0.25);
-    border: 1px solid rgba(196,156,211,0.2);
-    border-radius: 14px;
-    padding: 14px 16px;
-    font-size: 0.88rem;
+    background: rgba(108,52,131,0.18);
+    border: 1px solid rgba(196,156,211,0.16);
+    border-radius: 12px;
+    padding: 11px 13px;
+    font-size: 0.84rem;
     color: #ead9ff;
-    line-height: 1.6;
+    line-height: 1.48;
     font-style: italic;
 }
 
 /* Lucky numbers */
-.dream-numbers-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dream-numbers-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .dream-number-card {
-    background: linear-gradient(135deg, rgba(74,35,90,0.6), rgba(44,14,78,0.8));
-    border: 1px solid rgba(196,156,211,0.3);
+    background: radial-gradient(circle at top, rgba(244,208,63,0.22), transparent 42%), linear-gradient(135deg, rgba(74,35,90,0.75), rgba(44,14,78,0.92));
+    border: 1px solid rgba(244,208,63,0.34);
     border-radius: 16px;
-    padding: 14px 12px;
+    padding: 16px 12px 13px;
     text-align: center;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.16), inset 0 0 22px rgba(244,208,63,0.05);
 }
 .dream-number-label { font-size: 0.7rem; color: rgba(196,156,211,0.7); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 .dream-number-value {
-    font-size: 2.4rem;
-    font-weight: 700;
+    font-size: 3rem;
+    font-weight: 900;
     color: #f4d03f;
-    letter-spacing: 4px;
-    text-shadow: 0 0 12px rgba(244,208,63,0.4);
+    letter-spacing: 3px;
+    text-shadow: 0 0 16px rgba(244,208,63,0.55);
     margin-bottom: 8px;
     font-family: 'Courier New', monospace;
 }
@@ -4172,15 +4195,15 @@ body {
 }
 .dream-use-btn:hover { background: rgba(244,208,63,0.3); }
 
-.dream-number-reason { font-size: 0.75rem; color: rgba(196,156,211,0.7); }
+.dream-number-reason { font-size: 0.73rem; color: rgba(244,208,63,0.72); margin-top: -4px; }
 
 /* Safety card */
 .dream-safety-card {
     background: rgba(6,199,85,0.08);
     border: 1px solid rgba(6,199,85,0.2);
     border-radius: 14px;
-    padding: 14px 16px;
-    font-size: 0.85rem;
+    padding: 11px 13px;
+    font-size: 0.82rem;
 }
 .dream-safety-title { font-weight: 700; color: #06C755; margin-bottom: 6px; font-size: 0.8rem; }
 #dream-safety-advice { color: #d4efdf; line-height: 1.5; }
