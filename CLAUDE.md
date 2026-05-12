@@ -265,9 +265,13 @@ lineUserId   VARCHAR(60)
 dreamText    TEXT
 dreamItemId  VARCHAR(20)  -- FK ref safety_dream_items.dreamId (no hard FK constraint)
 result       JSON         -- full AI response object
+isFavorite   BOOLEAN      DEFAULT FALSE
+sharedAt     TIMESTAMP    NULL DEFAULT NULL
 createdAt    TIMESTAMP
 ```
 - `result` is normalized on read/write; `number2d` must be 2 digits and `number3d` must be 3 digits
+- `isFavorite` / `sharedAt` — added via idempotent ALTER TABLE at server start (already in production)
+- Admin dream-logs endpoint extracts `number2d`/`number3d` via `JSON_EXTRACT` — ไม่ต้อง fetch full `result` JSON
 - User dream endpoints enforce owner/admin access and use a per-user daily MySQL lock to prevent duplicate concurrent dream logs
 
 #### Admin Dream Management (tab "ท่านอาจารย์" ใน admin lottery modal)

@@ -7835,20 +7835,26 @@ async function loadAdminDreamLogs() {
         }
         const html = rows.map(r => {
             const uid = sanitizeHTML(r.lineUserId);
-            const name = sanitizeHTML(r.displayName || r.lineUserId);
-            return `<div class="d-flex align-items-start gap-2 border-bottom py-2 small">
+            const num2d = sanitizeHTML(r.number2d || '--');
+            const num3d = sanitizeHTML(r.number3d || '---');
+            return `<div class="d-flex align-items-start gap-2 border-bottom py-2 small" data-uid="${uid}" data-name="${sanitizeHTML(r.displayName || r.lineUserId)}">
                 <span class="fs-5">${sanitizeHTML(r.itemIcon || '🔮')}</span>
                 <div class="flex-grow-1">
-                    <div class="fw-semibold">${name} <span class="text-muted fw-normal">${sanitizeHTML(r.department || '')}</span></div>
+                    <div class="fw-semibold">${sanitizeHTML(r.displayName || r.lineUserId)} <span class="text-muted fw-normal">${sanitizeHTML(r.department || '')}</span></div>
                     <div>เลือก: <strong>${sanitizeHTML(r.itemName || '—')}</strong>${r.dreamText ? ` | ฝัน: "${sanitizeHTML(r.dreamText)}"` : ''}</div>
+                    <div class="mt-1"><span class="badge bg-success me-1">${num2d}</span><span class="badge bg-primary">${num3d}</span></div>
                 </div>
                 <div class="d-flex flex-column align-items-end gap-1">
                     <span class="text-muted text-nowrap">${formatTimeAgo(r.createdAt)}</span>
-                    <button class="btn btn-xs py-0 px-1 btn-outline-warning" onclick="adminResetDreamLimit('${uid}','${name}')" title="รีเซต daily limit วันนี้"><i class="fas fa-redo"></i></button>
+                    <button class="btn btn-xs py-0 px-1 btn-outline-warning dream-log-reset-btn" title="รีเซต daily limit วันนี้"><i class="fas fa-redo"></i></button>
                 </div>
             </div>`;
         }).join('');
         $list.html(html);
+        $list.off('click', '.dream-log-reset-btn').on('click', '.dream-log-reset-btn', function () {
+            const row = $(this).closest('[data-uid]');
+            adminResetDreamLimit(row.data('uid'), row.data('name'));
+        });
     } catch (e) { $list.html(`<div class="alert alert-danger small">${sanitizeHTML(e.message)}</div>`); }
 }
 
@@ -8007,6 +8013,8 @@ let _dreamTodayCount = 0;
 let _dreamSubmitting = false;
 let _dreamHistoryRows = [];
 let _dreamHistoryFilter = 'all';
+let _dreamHistoryPage = 0;
+const DREAM_HISTORY_PAGE_SIZE = 5;
 let _dreamLatestLog = null;
 
 function resetDreamInputState({ clearResult = false } = {}) {
@@ -8171,6 +8179,7 @@ async function loadDreamHistory() {
     list.html('<div class="dream-history-empty">กำลังโหลด...</div>');
     try {
         _dreamHistoryRows = await callApi('/api/lottery/dream-history', { lineUserId: AppState.lineProfile.userId, limit: 100 }, 'GET') || [];
+        _dreamHistoryPage = 0;
         if (!_dreamLatestLog && _dreamHistoryRows.length) _dreamLatestLog = _dreamHistoryRows[0];
         updateDreamInsightCard();
         renderDreamHistoryList();
@@ -8181,6 +8190,7 @@ async function loadDreamHistory() {
 
 function setDreamHistoryFilter(filter) {
     _dreamHistoryFilter = filter || 'all';
+    _dreamHistoryPage = 0;
     $('.dream-filter-btn').removeClass('active');
     $(`.dream-filter-btn[data-dream-filter="${_dreamHistoryFilter}"]`).addClass('active');
     renderDreamHistoryList();
@@ -8204,15 +8214,32 @@ function getDreamHistoryFilteredRows() {
     });
 }
 
+function changeDreamHistoryPage(delta) {
+    const total = getDreamHistoryFilteredRows().length;
+    const totalPages = Math.max(1, Math.ceil(total / DREAM_HISTORY_PAGE_SIZE));
+    _dreamHistoryPage = Math.max(0, Math.min(_dreamHistoryPage + delta, totalPages - 1));
+    renderDreamHistoryList();
+}
+
 function renderDreamHistoryList() {
     const list = $('#dream-history-list');
     if (!list.length) return;
     const rows = getDreamHistoryFilteredRows();
-    if (!rows.length) {
+    const total = rows.length;
+    if (!total) {
         list.html('<div class="dream-history-empty">ไม่มีรายการในตัวกรองนี้</div>');
         return;
     }
-    list.html(rows.map(row => {
+    const totalPages = Math.max(1, Math.ceil(total / DREAM_HISTORY_PAGE_SIZE));
+    _dreamHistoryPage = Math.min(_dreamHistoryPage, totalPages - 1);
+    const pageRows = rows.slice(_dreamHistoryPage * DREAM_HISTORY_PAGE_SIZE, (_dreamHistoryPage + 1) * DREAM_HISTORY_PAGE_SIZE);
+    const pagerHtml = totalPages > 1 ? `
+        <div class="dream-history-pager">
+            <button class="dream-pager-btn" onclick="changeDreamHistoryPage(-1)" ${_dreamHistoryPage === 0 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+            <span class="dream-pager-status">${_dreamHistoryPage + 1} / ${totalPages} <span class="text-muted">(${total})</span></span>
+            <button class="dream-pager-btn" onclick="changeDreamHistoryPage(1)" ${_dreamHistoryPage >= totalPages - 1 ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+        </div>` : '';
+    list.html(pageRows.map(row => {
         const result = row.result || {};
         const subject = [row.itemName, row.dreamText].filter(Boolean).join(' • ') || 'คำทำนายเลขนำโชค';
         const dateText = new Date(row.createdAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
@@ -8239,7 +8266,7 @@ function renderDreamHistoryList() {
                 </button>
             </div>
         </div>`;
-    }).join(''));
+    }).join('') + pagerHtml);
 }
 
 function showDreamHistoryResult(encodedResult) {

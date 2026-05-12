@@ -4221,7 +4221,7 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_results_history (
 const LOTTERY_GEMINI_MODELS = [
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
-    'gemini-3.1-flash-lite'
+    'gemini-2.0-flash'
 ];
 
 function parseGeminiJson(rawText, expectedType = 'object') {
@@ -6867,7 +6867,9 @@ app.get('/api/admin/lottery/dream-logs', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(
             `SELECT l.logId, l.lineUserId, u.displayName, u.department,
-                    s.itemName, s.itemIcon, l.dreamText, l.createdAt
+                    s.itemName, s.itemIcon, l.dreamText, l.createdAt,
+                    JSON_UNQUOTE(JSON_EXTRACT(l.result, '$.number2d')) AS number2d,
+                    JSON_UNQUOTE(JSON_EXTRACT(l.result, '$.number3d')) AS number3d
              FROM lottery_dream_logs l
              LEFT JOIN users u ON u.lineUserId = l.lineUserId
              LEFT JOIN safety_dream_items s ON s.dreamId = l.dreamItemId
