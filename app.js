@@ -8434,6 +8434,8 @@ function showDreamResult(result, context = {}) {
     }
     const compare = result.oracleCompare || '';
     $('#dream-oracle-compare').text(compare).toggleClass('d-none', !compare);
+    const motto = result.johnnyMotto || '';
+    $('#dream-johnny-motto').text(motto ? `✦ ${motto} ✦` : '').toggleClass('d-none', !motto);
     $('#dream-number-reason').text(result.numberReason || '');
     $('#dream-safety-advice').text(result.quickWarning || result.safetyAdvice || '');
     const refTitle = Array.isArray(result.hseReferences) && result.hseReferences[0]?.title ? `คัมภีร์ที่ใช้: ${result.hseReferences[0].title}` : '';

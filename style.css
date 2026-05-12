@@ -4191,6 +4191,15 @@ body {
     color: rgba(196,156,211,0.8);
     font-style: italic;
 }
+.dream-johnny-motto {
+    font-size: 0.8rem;
+    font-style: italic;
+    color: #f4d03f;
+    text-align: center;
+    letter-spacing: 0.3px;
+    opacity: 0.9;
+    text-shadow: 0 0 10px rgba(244,208,63,0.35);
+}
 .dream-numbers-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .dream-number-card {
     background: radial-gradient(circle at top, rgba(244,208,63,0.22), transparent 42%), linear-gradient(135deg, rgba(74,35,90,0.75), rgba(44,14,78,0.92));
