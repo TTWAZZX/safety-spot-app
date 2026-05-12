@@ -8451,14 +8451,14 @@ async function submitDreamInterpret() {
         updateDreamCostUi();
         // Dream streak display
         if (res.dreamStreak > 0) {
-            $('#dream-streak-badge').text(`🔥 Streak ${res.dreamStreak} วัน`).removeClass('d-none');
+            $('#dream-streak-badge').text(`💫 Streak ${res.dreamStreak} วัน`).removeClass('d-none');
         }
         if (res.streakMilestone) {
             const bonusCoins = res.streakMilestone >= 30 ? 50 : res.streakMilestone >= 14 ? 20 : res.streakMilestone >= 7 ? 10 : 5;
             setTimeout(() => {
                 Swal.fire({
                     icon: 'success',
-                    title: `🔥 Streak ${res.streakMilestone} วัน!`,
+                    title: `💫 Streak ${res.streakMilestone} วัน!`,
                     html: `<p>ท่านอาจารย์ประทับใจ — ลูกศิษย์ซื่อสัตย์ต่อการทำนาย<br>รับโบนัส <strong>${bonusCoins} เหรียญ</strong> แห่งความซื่อสัตย์</p>`,
                     confirmButtonColor: '#6c3483',
                     timer: 4000,

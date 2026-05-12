@@ -7041,7 +7041,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                     await db.query('UPDATE users SET coinBalance = coinBalance + ? WHERE lineUserId=?', [bonusCoins, lineUserId]);
                     createNotification({
                         recipientUserId: lineUserId,
-                        message: `🔥 Johnny Streak ${dreamStreak} วัน! รับโบนัส ${bonusCoins} เหรียญ`,
+                        message: `💫 Johnny Streak ${dreamStreak} วัน! รับโบนัส ${bonusCoins} เหรียญ`,
                         type: 'lottery_dream',
                         relatedItemId: logId,
                         triggeringUserId: lineUserId

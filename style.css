@@ -4364,12 +4364,22 @@ body {
     display: inline-block;
     font-size: 0.7rem;
     font-weight: 700;
-    background: linear-gradient(90deg, #e74c3c, #f39c12);
-    color: #fff;
+    background: linear-gradient(90deg, #6c3483, #f4d03f, #c39bd3, #f4d03f, #6c3483);
+    background-size: 300% 100%;
+    color: #1a0a2e;
     border-radius: 12px;
     padding: 2px 10px;
     margin-top: 3px;
     letter-spacing: 0.3px;
+    animation: dreamStreakShimmer 2.5s linear infinite, dreamStreakGlow 2s ease-in-out infinite;
+}
+@keyframes dreamStreakShimmer {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+@keyframes dreamStreakGlow {
+    0%, 100% { box-shadow: 0 0 6px rgba(244,208,63,0.4); }
+    50%       { box-shadow: 0 0 14px rgba(244,208,63,0.85), 0 0 4px rgba(196,156,211,0.5); }
 }
 .dream-stat-card {
     background: rgba(255,255,255,0.06);
