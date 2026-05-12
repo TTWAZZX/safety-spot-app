@@ -8503,7 +8503,7 @@ function showDreamResult(result, context = {}) {
     updateDreamResultSummary(result, summaryContext);
     updateDreamOracleDetails(result);
     prioritizeDreamNumbers();
-    $('#dream-interpretation').text(getCompactDreamText(result.interpretation || ''));
+    $('#dream-interpretation').text(String(result.interpretation || '').trim());
     $('#dream-number-2d').text(result.number2d || '??');
     $('#dream-number-3d').text(result.number3d || '???');
     // Oracle reference numbers

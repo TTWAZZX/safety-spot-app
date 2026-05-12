@@ -6447,8 +6447,8 @@ function normalizeDreamResult(result, fallback2d = null, fallback3d = null) {
         oracleNumber2d: normalizeDreamNumber(safe.oracleNumber2d, 2) || null,
         oracleNumber3d: normalizeDreamNumber(safe.oracleNumber3d, 3) || null,
         oracleCompare: (() => {
-            const on2 = normalizeDreamNumber(safe.oracleNumber2d, 2);
-            const on3 = normalizeDreamNumber(safe.oracleNumber3d, 3);
+            const on2 = normalizeDreamNumber(safe.oracleNumber2d, 2) || normalizeDreamNumber(fallback2d, 2);
+            const on3 = normalizeDreamNumber(safe.oracleNumber3d, 3) || normalizeDreamNumber(fallback3d, 3);
             if (!on2 && !on3) return '';
             return `📖 เลขตำราชี้ ${on2 || '??'} / ${on3 || '???'} — นิมิตวันนี้อาจารย์เห็น ${number2d} / ${number3d}`;
         })(),
