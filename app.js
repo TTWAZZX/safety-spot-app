@@ -8045,7 +8045,7 @@ const DREAM_HISTORY_PAGE_SIZE = 5;
 let _dreamLatestLog = null;
 
 function resetDreamInputState({ clearResult = false } = {}) {
-    _dreamSelectedItemId = null;
+    _dreamSelectedItemIds = [];
     _dreamSubmitting = false;
     if (clearResult) _dreamResult = null;
     $('#dream-text-input').val('');
@@ -8306,14 +8306,16 @@ function showDreamHistoryResult(encodedResult) {
 function reuseDreamHistory(encodedPayload) {
     try {
         const payload = JSON.parse(decodeURIComponent(encodedPayload));
-        _dreamSelectedItemId = payload.itemId || null;
+        const reuseId = payload.itemId || null;
+        _dreamSelectedItemIds = reuseId ? [String(reuseId)] : [];
         $('#dream-text-input').val(payload.dreamText || '');
         $('.dream-item-chip').removeClass('selected').attr('aria-pressed', 'false');
-        if (_dreamSelectedItemId) {
+        if (reuseId) {
             $('.dream-item-chip').filter(function () {
-                return String($(this).data('item-id')) === String(_dreamSelectedItemId);
+                return String($(this).data('item-id')) === String(reuseId);
             }).addClass('selected').attr('aria-pressed', 'true');
         }
+        _updateDreamSelectCount();
         setDreamTab('interpret');
         showToast('เติมข้อมูลเดิมแล้ว พร้อมทำนายอีกครั้ง', 'success');
     } catch (_) {}
@@ -8546,7 +8548,7 @@ function getCompactDreamText(text) {
 }
 
 function getDreamCurrentSubject() {
-    const item = findDreamItemById(_dreamSelectedItemId);
+    const item = findDreamItemById(_dreamSelectedItemIds[0] || null);
     const dreamText = $('#dream-text-input').val().trim();
     return [item?.itemName, dreamText].filter(Boolean).join(' • ') || 'ความปลอดภัย';
 }

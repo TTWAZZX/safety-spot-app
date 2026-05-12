@@ -7007,7 +7007,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
         } else {
             await queryConn.query(
                 'INSERT INTO lottery_dream_logs (logId, lineUserId, dreamText, dreamItemId, result) VALUES (?,?,?,?,?)',
-                [logId, lineUserId, dreamText, itemId || null, JSON.stringify(result)]
+                [logId, lineUserId, dreamText, selectedItems[0]?.dreamId || null, JSON.stringify(result)]
             );
         }
 
