@@ -4230,10 +4230,9 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_results_history (
 // ======================================================
 const LOTTERY_GEMINI_MODELS = [
     'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-3.1-flash-lite',
     'gemini-2.0-flash',
-    'gemini-1.5-flash'
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-pro'
 ];
 let lastGeminiDiagnostic = null;
 
@@ -4253,6 +4252,10 @@ async function callGeminiGenerate(model, payload, { timeout = 20000, context = '
         err.code = 'MISSING_GEMINI_API_KEY';
         throw err;
     }
+    // gemini-2.5-x requires thinkingBudget:0 when using JSON response mode
+    const finalPayload = model.startsWith('gemini-2.5') && payload.generationConfig?.responseMimeType
+        ? { ...payload, generationConfig: { ...payload.generationConfig, thinkingConfig: { thinkingBudget: 0 } } }
+        : payload;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
     const startedAt = Date.now();
@@ -4262,7 +4265,7 @@ async function callGeminiGenerate(model, payload, { timeout = 20000, context = '
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(finalPayload),
                 signal: controller.signal
             }
         );
