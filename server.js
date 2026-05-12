@@ -4223,6 +4223,69 @@ const LOTTERY_GEMINI_MODELS = [
     'gemini-2.5-flash-lite',
     'gemini-2.0-flash'
 ];
+let lastGeminiDiagnostic = null;
+
+function sanitizeGeminiError(err) {
+    const raw = err?.responseText || err?.response?.data?.error?.message || err?.message || String(err || 'Unknown Gemini error');
+    const key = process.env.GEMINI_API_KEY || '';
+    return String(raw)
+        .replace(key, '[GEMINI_API_KEY]')
+        .replace(/key=([^&\s]+)/g, 'key=[REDACTED]')
+        .slice(0, 500);
+}
+
+async function callGeminiGenerate(model, payload, { timeout = 20000, context = 'gemini' } = {}) {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+        const err = new Error('GEMINI_API_KEY is missing');
+        err.code = 'MISSING_GEMINI_API_KEY';
+        throw err;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    const startedAt = Date.now();
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                signal: controller.signal
+            }
+        );
+        const responseText = await response.text();
+        if (!response.ok) {
+            const err = new Error(`Gemini HTTP ${response.status}`);
+            err.status = response.status;
+            err.responseText = responseText;
+            throw err;
+        }
+        lastGeminiDiagnostic = {
+            at: new Date().toISOString(),
+            context,
+            model,
+            ok: true,
+            status: response.status,
+            durationMs: Date.now() - startedAt
+        };
+        return { status: response.status, data: JSON.parse(responseText) };
+    } catch (err) {
+        if (err?.name === 'AbortError') err.message = `Gemini request timeout after ${timeout}ms`;
+        lastGeminiDiagnostic = {
+            at: new Date().toISOString(),
+            context,
+            model,
+            ok: false,
+            status: err?.status || null,
+            durationMs: Date.now() - startedAt,
+            error: sanitizeGeminiError(err)
+        };
+        throw err;
+    } finally {
+        clearTimeout(timer);
+    }
+}
 
 function parseGeminiJson(rawText, expectedType = 'object') {
     const cleaned = String(rawText || '')
@@ -4250,6 +4313,55 @@ function parseGeminiJson(rawText, expectedType = 'object') {
     }
     throw lastErr || new Error('Gemini JSON parse failed');
 }
+
+app.get('/api/admin/lottery/gemini-diagnostic', isAdmin, async (_req, res) => {
+    const payload = {
+        contents: [{ parts: [{ text: 'Return JSON only: {"ok":true,"source":"production-diagnostic"}' }] }],
+        generationConfig: { responseMimeType: 'application/json' }
+    };
+    const results = [];
+    for (const model of LOTTERY_GEMINI_MODELS) {
+        const startedAt = Date.now();
+        try {
+            const geminiRes = await callGeminiGenerate(model, payload, { timeout: 20000, context: 'admin-diagnostic' });
+            const rawText = geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const parsed = parseGeminiJson(rawText, 'object');
+            results.push({
+                model,
+                ok: true,
+                status: geminiRes.status,
+                durationMs: Date.now() - startedAt,
+                parsedOk: parsed?.ok === true,
+                textPreview: rawText.slice(0, 120)
+            });
+        } catch (err) {
+            results.push({
+                model,
+                ok: false,
+                status: err?.status || null,
+                durationMs: Date.now() - startedAt,
+                error: sanitizeGeminiError(err)
+            });
+        }
+    }
+    res.json({
+        status: 'success',
+        data: {
+            checkedAt: new Date().toISOString(),
+            keyPresent: !!process.env.GEMINI_API_KEY,
+            keyLength: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.length : 0,
+            nodeVersion: process.version,
+            fetchAvailable: typeof fetch === 'function',
+            proxyEnvPresent: {
+                HTTP_PROXY: !!process.env.HTTP_PROXY,
+                HTTPS_PROXY: !!process.env.HTTPS_PROXY,
+                ALL_PROXY: !!process.env.ALL_PROXY
+            },
+            models: results,
+            lastGeminiDiagnostic
+        }
+    });
+});
 
 const DEFAULT_LOTTERY_DISABLED_MESSAGE = 'ขณะนี้ Safety Lottery กำลังอยู่ในการปรับปรุง โปรดติดตามประกาศจากทีมบริหาร';
 
@@ -4461,10 +4573,7 @@ async function fetchLotteryResultWithGemini() {
     let lastGeminiError = null;
     for (const model of LOTTERY_GEMINI_MODELS) {
         try {
-            const geminiRes = await axios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-                geminiPayload, { timeout: 20000, proxy: false }
-            );
+            const geminiRes = await callGeminiGenerate(model, geminiPayload, { timeout: 20000, context: 'lottery-result' });
 
             const rawText = geminiRes.data.candidates[0].content.parts[0].text;
             parsed = parseGeminiJson(rawText, 'object');
@@ -5662,10 +5771,10 @@ app.post('/api/admin/lottery/generate-questions', async (req, res) => {
 
         for (const model of LOTTERY_GEMINI_MODELS) {
             try {
-                const geminiRes = await axios.post(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+                const geminiRes = await callGeminiGenerate(
+                    model,
                     { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } },
-                    { timeout: 30000, proxy: false }
+                    { timeout: 30000, context: 'lottery-question-generate' }
                 );
 
                 const rawText = geminiRes.data.candidates[0].content.parts[0].text;
@@ -6614,14 +6723,14 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
 
         for (const model of LOTTERY_GEMINI_MODELS) {
             try {
-                const geminiRes = await axios.post(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+                const geminiRes = await callGeminiGenerate(
+                    model,
                     {
                         systemInstruction: { parts: [{ text: JOHNNY_SYSTEM_PROMPT }] },
                         contents: [{ role: 'user', parts: [{ text: prompt }] }],
                         generationConfig: { temperature: 0.9, responseMimeType: 'application/json' }
                     },
-                    { timeout: 20000, proxy: false }
+                    { timeout: 20000, context: 'dream-interpret' }
                 );
                 const rawText = geminiRes.data.candidates[0].content.parts[0].text;
                 const aiDream = parseGeminiJson(rawText, 'object');
@@ -6642,7 +6751,7 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                 break;
             } catch (aiErr) {
                 lastErr = aiErr;
-                console.warn(`Dream Gemini failed: ${model}`, aiErr.response?.status || aiErr.message);
+                console.warn(`Dream Gemini failed: ${model}`, aiErr.status || sanitizeGeminiError(aiErr));
             }
         }
 
@@ -6776,10 +6885,10 @@ app.post('/api/admin/lottery/dream-items/generate', isAdmin, async (req, res) =>
         let lastErr = null;
         for (const model of LOTTERY_GEMINI_MODELS) {
             try {
-                const geminiRes = await axios.post(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+                const geminiRes = await callGeminiGenerate(
+                    model,
                     { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.85, maxOutputTokens: 2500, responseMimeType: 'application/json' } },
-                    { headers: { 'Content-Type': 'application/json' }, timeout: 35000, proxy: false }
+                    { timeout: 35000, context: 'dream-items-generate' }
                 );
                 const raw = geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
                 newItems = parseGeminiJson(raw, 'array');
