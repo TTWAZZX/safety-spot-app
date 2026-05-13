@@ -94,7 +94,7 @@
                 </div>
 
                 <!-- Quick Actions -->
-                <div class="home-quick-actions mb-4">
+                <div class="home-quick-actions mb-3">
                     <button class="home-quick-action primary" onclick="$('[data-page=activities-page]').trigger('click')">
                         <i class="fas fa-triangle-exclamation"></i><span>รายงานจุดเสี่ยง</span>
                     </button>
@@ -108,6 +108,16 @@
                         <i class="fas fa-trophy"></i><span>ดูรางวัล</span>
                     </button>
                 </div>
+
+                <!-- Johnny Oracle Banner -->
+                <button class="home-johnny-banner mb-4" onclick="openDreamModal()">
+                    <span class="home-johnny-icon">🔮</span>
+                    <span class="home-johnny-text">
+                        <span class="home-johnny-title">ท่านอาจารย์จอห์นนี่</span>
+                        <span class="home-johnny-sub">ขอคำพยากรณ์เลขนำโชคด้านความปลอดภัย</span>
+                    </span>
+                    <i class="fas fa-chevron-right home-johnny-arrow"></i>
+                </button>
 
                 <div id="home-today-tasks" class="mb-4">
                     <div class="today-tasks-card">
@@ -2021,7 +2031,7 @@
     <!-- Safety Dream Numbers — ท่านอาจารย์จอห์นนี่ Modal  -->
     <!-- ================================================== -->
     <div class="modal fade" id="dream-modal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-dialog modal-fullscreen">
             <div class="modal-content border-0 dream-modal-content">
 
                 <!-- Header -->
@@ -2031,9 +2041,14 @@
                         <div class="dream-header-icon">🔮</div>
                         <div class="dream-modal-title">ท่านอาจารย์จอห์นนี่</div>
                         <div class="dream-modal-subtitle">พยากรณ์เลขนำโชคด้านความปลอดภัย</div>
-                        <div class="dream-streak-badge d-none" id="dream-streak-badge"></div>
                     </div>
                     <div style="width:32px"></div>
+                </div>
+
+                <!-- Streak Bar — always visible -->
+                <div id="dream-streak-bar" class="dream-streak-bar">
+                    <span id="dream-streak-icon">💫</span>
+                    <span id="dream-streak-label">กำลังโหลด...</span>
                 </div>
 
                 <div class="modal-body dream-modal-body p-0">

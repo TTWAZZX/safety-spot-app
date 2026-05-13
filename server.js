@@ -6727,13 +6727,22 @@ app.get('/api/lottery/dream-today', async (req, res) => {
         );
         const todayCount = Number(usage?.todayCount || 0);
         if (log) log.result = normalizeDreamResult(parseDreamResult(log.result));
+        const [[userRow]] = await db.query(
+            'SELECT dreamStreak, lastDreamDate FROM users WHERE lineUserId=?', [lineUserId]
+        );
+        const yesterday = getBangkokDateString(new Date(Date.now() - 86400000));
+        const lastDate = userRow?.lastDreamDate ? String(userRow.lastDreamDate).slice(0, 10) : null;
+        const currentStreak = Number(userRow?.dreamStreak || 0);
+        const streakActive = lastDate === today || lastDate === yesterday;
         res.json({
             status: 'success',
             data: {
                 hasToday: !!log,
                 todayCount,
                 nextCost: todayCount > 0 ? DREAM_EXTRA_INTERPRET_COST : 0,
-                log: log || null
+                log: log || null,
+                dreamStreak: streakActive ? currentStreak : 0,
+                doneToday: lastDate === today
             }
         });
     } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }

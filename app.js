@@ -6067,6 +6067,22 @@ function showLotteryRules(options = {}) {
                 <li>แผนกไม่มีรายงานอุบัติเหตุในช่วง 30 วันที่ผ่านมา</li>
                 <li>รับได้ 1 ตั๋วต่อ 1 งวด</li>
             </ul>
+            <p class="mb-2 fw-semibold">🔮 ท่านอาจารย์จอห์นนี่:</p>
+            <ul class="mb-3 ps-3">
+                <li>ขอคำพยากรณ์เลขนำโชคจาก AI ได้ 1 ครั้ง/วัน</li>
+                <li>กด "ใช้เลขนี้" เพื่อนำเลขจากคำทำนายมาซื้อตั๋วได้เลย</li>
+                <li>ขอพยากรณ์ต่อเนื่องทุกวันรับโบนัสเหรียญพิเศษ:</li>
+            </ul>
+            <div class="ms-3 mb-3">
+                <table class="table table-sm table-borderless mb-0" style="font-size:0.8rem;">
+                    <tbody>
+                        <tr><td>💫 3 วันต่อเนื่อง</td><td class="text-success fw-semibold">+5 เหรียญ</td></tr>
+                        <tr><td>💫 7 วันต่อเนื่อง</td><td class="text-success fw-semibold">+10 เหรียญ</td></tr>
+                        <tr><td>💫 14 วันต่อเนื่อง</td><td class="text-success fw-semibold">+20 เหรียญ</td></tr>
+                        <tr><td>💫 30 วันต่อเนื่อง</td><td class="text-success fw-semibold">+50 เหรียญ</td></tr>
+                    </tbody>
+                </table>
+            </div>
             <p class="mb-0 fw-semibold">ข้อกำหนด:</p>
             <ul class="mb-0 ps-3">
                 <li>ซื้อได้ไม่เกิน ${dailyLimit} ใบ/วัน</li>
@@ -8082,7 +8098,8 @@ async function openDreamModal() {
         _dreamLatestLog = res.log || null;
         updateDreamCostUi();
         updateDreamInsightCard();
-    } catch (_) {}
+        updateDreamStreakBar(Number(res.dreamStreak || 0), !!res.doneToday);
+    } catch (_) { updateDreamStreakBar(0, false); }
 
     if (!_dreamItems) {
         try {
@@ -8092,6 +8109,22 @@ async function openDreamModal() {
     }
     renderDreamItems();
     resetDreamInputState({ clearResult: true });
+}
+
+function updateDreamStreakBar(streak, doneToday) {
+    const icon = document.getElementById('dream-streak-icon');
+    const label = document.getElementById('dream-streak-label');
+    if (!icon || !label) return;
+    if (doneToday && streak > 0) {
+        icon.textContent = '💫';
+        label.textContent = `ขอพยากรณ์วันนี้แล้ว · ${streak} วัน ต่อเนื่อง`;
+    } else if (streak > 0) {
+        icon.textContent = '💫';
+        label.textContent = `${streak} วัน ต่อเนื่อง · ขอพยากรณ์วันนี้เพื่อรักษา streak!`;
+    } else {
+        icon.textContent = '💫';
+        label.textContent = 'ขอพยากรณ์ทุกวันรับโบนัสเหรียญพิเศษ · เริ่มต้นวันนี้!';
+    }
 }
 
 function ensureDreamTabs() {
@@ -8462,10 +8495,7 @@ async function submitDreamInterpret() {
         _dreamTodayCount = Number(res.todayCount || _dreamTodayCount + 1);
         _dreamSubmitting = false;
         updateDreamCostUi();
-        // Dream streak display
-        if (res.dreamStreak > 0) {
-            $('#dream-streak-badge').text(`💫 Streak ${res.dreamStreak} วัน`).removeClass('d-none');
-        }
+        updateDreamStreakBar(Number(res.dreamStreak || 0), true);
         if (res.streakMilestone) {
             const bonusCoins = res.streakMilestone >= 30 ? 50 : res.streakMilestone >= 14 ? 20 : res.streakMilestone >= 7 ? 10 : 5;
             setTimeout(() => {
