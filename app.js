@@ -7491,7 +7491,10 @@ async function adminDeleteLotteryRound(roundId, isTest, ticketCount) {
 }
 
 async function adminResetLotteryRound(roundId, drawDate, ticketCount) {
+    const adminModal = document.getElementById('admin-lottery-modal') || document.body;
     const { value: typed, isConfirmed } = await Swal.fire({
+        target: adminModal,
+        returnFocus: false,
         icon: 'warning',
         title: `รีเซตตั๋วงวด ${sanitizeHTML(drawDate)}`,
         html: `<p>ตั๋วทั้งหมด <strong class="text-danger">${ticketCount} ใบ</strong> จะถูกลบ<br>
@@ -7503,11 +7506,12 @@ async function adminResetLotteryRound(roundId, drawDate, ticketCount) {
         confirmButtonText: 'รีเซตตั๋ว',
         confirmButtonColor: '#d97706',
         cancelButtonText: 'ยกเลิก',
+        didOpen: () => Swal.getInput()?.focus(),
         inputValidator: (val) => {
-            if (!val || val.trim() !== 'RESET') return 'พิมพ์ RESET ให้ถูกต้องก่อน';
+            if (!val || val.trim().toUpperCase() !== 'RESET') return 'พิมพ์ RESET ให้ถูกต้องก่อน';
         }
     });
-    if (!isConfirmed || typed !== 'RESET') return;
+    if (!isConfirmed || String(typed || '').trim().toUpperCase() !== 'RESET') return;
     try {
         const res = await callApi(`/api/admin/lottery/rounds/${encodeURIComponent(roundId)}/reset-tickets`, {
             requesterId: AppState.lineProfile.userId
