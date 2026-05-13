@@ -4472,111 +4472,290 @@ async function pushLineFlexMessage(lineUserId, flexMessage, logLabel = 'LINE Pus
 }
 
 async function sendLotteryWinNotification(lineUserId, ticketData) {
+    const isTwo       = ticketData.ticketType === 'two';
+    const isGold      = !!ticketData.isGoldTicket;
+    const typeBadgeBg = isTwo ? '#065F46' : '#7C2D12';
+    const typeLabel   = isTwo ? '2 ตัวท้าย' : '3 ตัวท้าย';
+    const typeCode    = isTwo ? '2D' : '3D';
+    const goldSuffix  = isGold ? ' · Gold Ticket' : '';
+
     const flexMessage = {
         type: 'flex',
-        altText: '🎉 ยินดีด้วย! คุณถูก Safety Lottery!',
+        altText: `[Safety Lottery] ยินดีด้วย! คุณถูกรางวัล ${typeCode}${goldSuffix} — งวด ${ticketData.drawDate} รับ ${Number(ticketData.prizeAmount).toLocaleString()} Points`.slice(0, 400),
         contents: {
             type: 'bubble', size: 'mega',
             header: {
-                type: 'box', layout: 'vertical', backgroundColor: '#06C755', paddingAll: '20px',
+                type: 'box', layout: 'vertical', backgroundColor: '#B45309', paddingAll: '20px',
                 contents: [
-                    { type: 'text', text: '🎉 ยินดีด้วย!', color: '#FFFFFF', size: 'xl', weight: 'bold', align: 'center' },
-                    { type: 'text', text: 'คุณถูก Safety Lottery!', color: '#FFFFFF', size: 'md', align: 'center', margin: 'sm' }
+                    {
+                        type: 'box', layout: 'horizontal', margin: 'none',
+                        contents: [
+                            { type: 'text', text: 'Safety Lottery', color: '#FFFFFF', weight: 'bold', size: 'xl', flex: 1 },
+                            {
+                                type: 'box', layout: 'vertical', flex: 0,
+                                backgroundColor: 'rgba(0,0,0,0.2)', cornerRadius: '4px',
+                                paddingTop: '4px', paddingBottom: '4px', paddingStart: '8px', paddingEnd: '8px',
+                                contents: [{ type: 'text', text: 'WINNER', color: '#FFFFFF', size: 'xs', weight: 'bold' }]
+                            }
+                        ]
+                    },
+                    { type: 'text', text: 'ยินดีด้วย คุณถูกรางวัล!', color: '#FFFFFF', size: 'sm', margin: 'sm' }
                 ]
             },
             body: {
-                type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '20px',
+                type: 'box', layout: 'vertical', paddingAll: '20px', spacing: 'none',
                 contents: [
-                    { type: 'box', layout: 'horizontal', contents: [
-                        { type: 'text', text: 'งวดวันที่', size: 'sm', color: '#888888', flex: 1 },
-                        { type: 'text', text: ticketData.drawDate, size: 'sm', weight: 'bold', flex: 2, align: 'end' }
-                    ]},
-                    { type: 'box', layout: 'horizontal', contents: [
-                        { type: 'text', text: 'ประเภท', size: 'sm', color: '#888888', flex: 1 },
-                        { type: 'text', text: ticketData.ticketType === 'two' ? '🟢 2 ตัวท้าย' : '🔴 3 ตัวท้าย', size: 'sm', weight: 'bold', flex: 2, align: 'end' }
-                    ]},
-                    { type: 'box', layout: 'horizontal', contents: [
-                        { type: 'text', text: 'เลขของคุณ', size: 'sm', color: '#888888', flex: 1 },
-                        { type: 'text', text: ticketData.number, size: 'xl', weight: 'bold', color: '#06C755', flex: 2, align: 'end' }
-                    ]},
-                    { type: 'separator', margin: 'lg' },
-                    { type: 'box', layout: 'horizontal', margin: 'lg', contents: [
-                        { type: 'text', text: '🏆 รางวัล', size: 'md', weight: 'bold', flex: 1 },
-                        { type: 'text', text: `+${ticketData.prizeAmount.toLocaleString()} Points`, size: 'lg', weight: 'bold', color: '#FFB800', flex: 2, align: 'end' }
-                    ]}
+                    {
+                        type: 'box', layout: 'horizontal', margin: 'none',
+                        contents: [
+                            { type: 'text', text: 'งวดประจำวันที่', size: 'sm', color: '#6B7280', flex: 0 },
+                            { type: 'text', text: ticketData.drawDate, size: 'sm', color: '#111827', weight: 'bold', align: 'end', flex: 1 }
+                        ]
+                    },
+                    { type: 'separator', margin: 'md' },
+                    {
+                        type: 'box', layout: 'vertical', margin: 'md',
+                        backgroundColor: '#FFFBEB', cornerRadius: '8px', paddingAll: '14px',
+                        contents: [
+                            {
+                                type: 'box', layout: 'horizontal', margin: 'none',
+                                contents: [
+                                    { type: 'text', text: 'ประเภทตั๋ว', size: 'sm', color: '#6B7280', flex: 1 },
+                                    {
+                                        type: 'box', layout: 'horizontal', flex: 0, spacing: 'sm',
+                                        contents: [
+                                            {
+                                                type: 'box', layout: 'vertical',
+                                                backgroundColor: typeBadgeBg, cornerRadius: '4px',
+                                                paddingTop: '2px', paddingBottom: '2px', paddingStart: '8px', paddingEnd: '8px',
+                                                contents: [{ type: 'text', text: typeCode, color: '#FFFFFF', size: 'xs', weight: 'bold' }]
+                                            },
+                                            ...(isGold ? [{
+                                                type: 'box', layout: 'vertical',
+                                                backgroundColor: '#B45309', cornerRadius: '4px',
+                                                paddingTop: '2px', paddingBottom: '2px', paddingStart: '8px', paddingEnd: '8px',
+                                                contents: [{ type: 'text', text: 'GOLD', color: '#FFFFFF', size: 'xs', weight: 'bold' }]
+                                            }] : [])
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                type: 'box', layout: 'horizontal', margin: 'sm',
+                                contents: [
+                                    { type: 'text', text: typeLabel, size: 'sm', color: '#374151', flex: 1 },
+                                    { type: 'text', text: ticketData.number, size: 'xxl', color: '#B45309', weight: 'bold', align: 'end' }
+                                ]
+                            }
+                        ]
+                    },
+                    { type: 'separator', margin: 'md' },
+                    {
+                        type: 'box', layout: 'vertical', margin: 'md',
+                        backgroundColor: '#F0FDF4', cornerRadius: '8px', paddingAll: '14px',
+                        contents: [
+                            { type: 'text', text: 'รางวัลที่ได้รับ', size: 'xs', color: '#065F46', weight: 'bold' },
+                            {
+                                type: 'box', layout: 'horizontal', margin: 'sm',
+                                contents: [
+                                    { type: 'text', text: 'Points', size: 'sm', color: '#374151', flex: 1 },
+                                    { type: 'text', text: `+${Number(ticketData.prizeAmount).toLocaleString()}`, size: 'xl', color: '#065F46', weight: 'bold', align: 'end' }
+                                ]
+                            }
+                        ]
+                    }
                 ]
             },
             footer: {
-                type: 'box', layout: 'vertical', paddingAll: '15px',
+                type: 'box', layout: 'vertical', paddingAll: '12px',
                 contents: [{
-                    type: 'button',
-                    action: { type: 'uri', label: '🎰 ดูรายละเอียด', uri: `https://liff.line.me/${process.env.LIFF_ID}` },
-                    style: 'primary', color: '#06C755', height: 'sm'
+                    type: 'button', style: 'primary', color: '#06C755', height: 'sm',
+                    action: { type: 'uri', label: 'ดูรายละเอียด', uri: `https://liff.line.me/${process.env.LIFF_ID}` }
                 }]
             }
         }
     };
-    await pushLineFlexMessage(lineUserId, flexMessage, 'Lottery LINE Push');
+    await pushLineFlexMessage(lineUserId, flexMessage, 'Lottery WIN Push');
+}
+
+// สร้าง Flex Message สำหรับแจ้ง admin เรื่องผลสลาก
+function _buildLotteryResultFlex({ success, drawDateStr, result, reason }) {
+    const headerBg  = success ? '#00875A' : '#B91C1C';
+    const statusTag = success ? 'SUCCESS' : 'FAILED';
+    const statusTH  = success ? 'ดึงผลรางวัลสำเร็จ' : 'ดึงผลรางวัลไม่สำเร็จ';
+    const altText   = success
+        ? `[Safety Lottery] ดึงผลสำเร็จ — งวด ${drawDateStr} | 2D ${result.last2} | 3D ${result.last3_back}`
+        : `[Safety Lottery] ดึงผลไม่สำเร็จ — งวด ${drawDateStr} กรุณาดำเนินการใน Admin`;
+
+    const successBody = [
+        {
+            type: 'box', layout: 'horizontal', margin: 'none',
+            contents: [
+                { type: 'text', text: 'งวดประจำวันที่', size: 'sm', color: '#6B7280', flex: 0 },
+                { type: 'text', text: drawDateStr, size: 'sm', color: '#111827', weight: 'bold', align: 'end', flex: 1 }
+            ]
+        },
+        { type: 'separator', margin: 'md' },
+        {
+            type: 'box', layout: 'vertical', margin: 'md',
+            backgroundColor: '#F0FDF4', cornerRadius: '8px', paddingAll: '14px',
+            contents: [
+                {
+                    type: 'box', layout: 'horizontal', margin: 'none',
+                    contents: [
+                        { type: 'text', text: '2 ตัวท้าย', size: 'sm', color: '#374151', flex: 1 },
+                        { type: 'text', text: result.last2 || '-', size: 'xxl', color: '#065F46', weight: 'bold', align: 'end' }
+                    ]
+                },
+                {
+                    type: 'box', layout: 'horizontal', margin: 'sm',
+                    contents: [
+                        { type: 'text', text: '3 ตัวหน้า', size: 'sm', color: '#374151', flex: 1 },
+                        { type: 'text', text: result.last3_front || '-', size: 'xl', color: '#1F2937', weight: 'bold', align: 'end' }
+                    ]
+                },
+                {
+                    type: 'box', layout: 'horizontal', margin: 'sm',
+                    contents: [
+                        { type: 'text', text: '3 ตัวหลัง', size: 'sm', color: '#374151', flex: 1 },
+                        { type: 'text', text: result.last3_back || '-', size: 'xl', color: '#1F2937', weight: 'bold', align: 'end' }
+                    ]
+                }
+            ]
+        },
+        { type: 'separator', margin: 'md' },
+        {
+            type: 'box', layout: 'horizontal', margin: 'sm',
+            contents: [
+                { type: 'text', text: 'Source', size: 'xs', color: '#9CA3AF', flex: 0 },
+                { type: 'text', text: result.source || '-', size: 'xs', color: '#9CA3AF', align: 'end', flex: 1, wrap: true }
+            ]
+        },
+        { type: 'separator', margin: 'md' },
+        {
+            type: 'text', margin: 'md', wrap: true, size: 'sm', color: '#374151',
+            text: 'กรุณาตรวจสอบผลและยืนยันใน Admin ก่อนประมวลผลรางวัล'
+        }
+    ];
+
+    const failureBody = [
+        {
+            type: 'box', layout: 'horizontal', margin: 'none',
+            contents: [
+                { type: 'text', text: 'งวดประจำวันที่', size: 'sm', color: '#6B7280', flex: 0 },
+                { type: 'text', text: drawDateStr, size: 'sm', color: '#111827', weight: 'bold', align: 'end', flex: 1 }
+            ]
+        },
+        { type: 'separator', margin: 'md' },
+        {
+            type: 'box', layout: 'vertical', margin: 'md',
+            backgroundColor: '#FEF2F2', cornerRadius: '8px', paddingAll: '12px',
+            contents: [
+                { type: 'text', text: 'Error Details', size: 'xs', color: '#991B1B', weight: 'bold' },
+                { type: 'text', text: reason || 'ไม่สามารถดึงผลได้', size: 'sm', color: '#7F1D1D', wrap: true, margin: 'xs' }
+            ]
+        },
+        { type: 'separator', margin: 'md' },
+        {
+            type: 'box', layout: 'vertical', margin: 'md',
+            backgroundColor: '#F9FAFB', cornerRadius: '8px', paddingAll: '12px',
+            contents: [
+                { type: 'text', text: 'Action Required', size: 'xs', color: '#374151', weight: 'bold' },
+                { type: 'text', text: 'ดึงผลด้วย AI อีกครั้ง หรือกรอกผลเองแล้วกดยืนยัน', size: 'sm', color: '#374151', wrap: true, margin: 'xs' }
+            ]
+        },
+        {
+            type: 'box', layout: 'vertical', margin: 'md',
+            backgroundColor: '#FFFBEB', cornerRadius: '8px', paddingAll: '12px',
+            contents: [
+                { type: 'text', text: 'NOTE — หากสลากถูกเลื่อนวัน', size: 'xs', color: '#92400E', weight: 'bold' },
+                { type: 'text', text: 'แก้วันที่งวดใน Admin ให้ตรงกับวันออกรางวัลจริงก่อน แล้วค่อยดึงผลด้วย AI ใหม่', size: 'sm', color: '#78350F', wrap: true, margin: 'xs' }
+            ]
+        }
+    ];
+
+    return {
+        type: 'flex',
+        altText: altText.slice(0, 400),
+        contents: {
+            type: 'bubble',
+            size: 'mega',
+            header: {
+                type: 'box', layout: 'vertical',
+                backgroundColor: headerBg, paddingAll: '20px',
+                contents: [
+                    {
+                        type: 'box', layout: 'horizontal', margin: 'none',
+                        contents: [
+                            { type: 'text', text: 'Safety Lottery', color: '#FFFFFF', weight: 'bold', size: 'xl', flex: 1 },
+                            {
+                                type: 'box', layout: 'vertical', flex: 0,
+                                backgroundColor: 'rgba(0,0,0,0.2)', cornerRadius: '4px',
+                                paddingTop: '4px', paddingBottom: '4px', paddingStart: '8px', paddingEnd: '8px',
+                                contents: [{ type: 'text', text: statusTag, color: '#FFFFFF', size: 'xs', weight: 'bold' }]
+                            }
+                        ]
+                    },
+                    { type: 'text', text: statusTH, color: '#FFFFFF', size: 'sm', margin: 'sm' }
+                ]
+            },
+            body: {
+                type: 'box', layout: 'vertical', paddingAll: '20px', spacing: 'none',
+                contents: success ? successBody : failureBody
+            },
+            footer: {
+                type: 'box', layout: 'vertical', paddingAll: '12px',
+                contents: [{
+                    type: 'button', style: 'primary', color: '#06C755', height: 'sm',
+                    action: { type: 'uri', label: 'เปิดหน้า Admin', uri: `https://liff.line.me/${process.env.LIFF_ID}` }
+                }]
+            }
+        }
+    };
+}
+
+// แจ้ง admin ทุกคนผ่าน LINE เมื่อ AI ดึงผล (สำเร็จหรือล้มเหลว)
+async function notifyLotteryAdminsAIFetch(roundId, drawDateStr, { success, result, reason } = {}) {
+    const [admins] = await db.query(
+        `SELECT a.lineUserId, u.fullName FROM admins a LEFT JOIN users u ON u.lineUserId = a.lineUserId`
+    );
+    if (!admins.length) return { sent: 0 };
+
+    const dbMessage = success
+        ? `[Safety Lottery] ดึงผลงวด ${drawDateStr} สำเร็จ — 2D: ${result.last2} | 3D: ${result.last3_back} | Source: ${result.source || '-'}`
+        : `[Safety Lottery] ดึงผลงวด ${drawDateStr} ไม่สำเร็จ — ${reason || 'unknown error'}`;
+
+    const flex = _buildLotteryResultFlex({ success, drawDateStr, result: result || {}, reason });
+
+    let sent = 0;
+    for (const admin of admins) {
+        await db.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, 'lottery_admin_alert', ?, ?, NOW())`,
+            ['NOTIF' + uuidv4(), admin.lineUserId, dbMessage, roundId, admin.lineUserId]
+        ).catch(() => {});
+        if (await pushLineFlexMessage(admin.lineUserId, flex, 'Lottery AI fetch notification')) sent += 1;
+    }
+    return { sent };
 }
 
 async function notifyLotteryAdminsForManualResult(roundId, reason) {
     const [admins] = await db.query(
-        `SELECT a.lineUserId, u.fullName
-         FROM admins a
-         LEFT JOIN users u ON u.lineUserId = a.lineUserId`
+        `SELECT a.lineUserId, u.fullName FROM admins a LEFT JOIN users u ON u.lineUserId = a.lineUserId`
     );
     if (!admins.length) return { sent: 0 };
 
-    const title = 'Safety Lottery ต้องกรอกผลเอง';
-    const message = `AI ดึงผลรางวัลงวด ${roundId} ไม่สำเร็จ กรุณาเปิดหน้า Admin เพื่อลองดึงด้วย AI อีกครั้งหรือกรอกผลเอง`;
+    const dbMessage = `[Safety Lottery] ดึงผลงวด ${roundId} ไม่สำเร็จ (retry ครบแล้ว) — ${reason || 'unknown error'}`;
+    const flex = _buildLotteryResultFlex({ success: false, drawDateStr: roundId, result: {}, reason });
+
     let sent = 0;
     for (const admin of admins) {
-        const notificationId = 'NOTIF' + uuidv4();
         await db.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
              VALUES (?, ?, ?, 'lottery_admin_alert', ?, ?, NOW())`,
-            [notificationId, admin.lineUserId, message, roundId, admin.lineUserId]
+            ['NOTIF' + uuidv4(), admin.lineUserId, dbMessage, roundId, admin.lineUserId]
         ).catch(() => {});
-
-        const flexMessage = {
-            type: 'flex',
-            altText: title,
-            contents: {
-                type: 'bubble',
-                header: {
-                    type: 'box',
-                    layout: 'vertical',
-                    backgroundColor: '#f59e0b',
-                    paddingAll: '18px',
-                    contents: [
-                        { type: 'text', text: 'Safety Lottery', color: '#FFFFFF', weight: 'bold', size: 'lg' },
-                        { type: 'text', text: 'AI ดึงผลไม่สำเร็จ', color: '#FFFFFF', size: 'sm', margin: 'sm' }
-                    ]
-                },
-                body: {
-                    type: 'box',
-                    layout: 'vertical',
-                    spacing: 'md',
-                    contents: [
-                        { type: 'text', text: `งวด ${roundId}`, weight: 'bold', size: 'md', wrap: true },
-                        { type: 'text', text: reason || 'ระบบตั้งสถานะเป็นรอกรอกผลเองแล้ว', size: 'sm', color: '#666666', wrap: true },
-                        { type: 'text', text: 'เข้าไปลองดึงผลด้วย AI อีกครั้ง หรือกรอกผลเองแล้วกดยืนยันผล', size: 'sm', color: '#444444', wrap: true }
-                    ]
-                },
-                footer: {
-                    type: 'box',
-                    layout: 'vertical',
-                    contents: [{
-                        type: 'button',
-                        style: 'primary',
-                        color: '#06C755',
-                        height: 'sm',
-                        action: { type: 'uri', label: 'เปิด Safety Lottery Admin', uri: `https://liff.line.me/${process.env.LIFF_ID}` }
-                    }]
-                }
-            }
-        };
-        if (await pushLineFlexMessage(admin.lineUserId, flexMessage, 'Lottery admin alert push')) sent += 1;
+        if (await pushLineFlexMessage(admin.lineUserId, flex, 'Lottery admin alert push')) sent += 1;
     }
     return { sent };
 }
@@ -4594,7 +4773,7 @@ function _sanitizeLotteryParsed(parsed) {
 
 // Strategy 1 — scrape GLO official results page then ask Gemini to extract
 async function _fetchLotteryFromGLO(drawDateStr) {
-    const res = await axios.get('https://www.glo.or.th/result/thai-government-lottery', {
+    const res = await axios.get('https://www.glo.or.th/mission/awarding/orderby-time', {
         timeout: 15000,
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
     });
@@ -4688,13 +4867,15 @@ async function fetchAndSaveLotteryResultsForRound(roundId, { requesterId = null,
     if (!round) throw new Error('ไม่พบงวดที่พร้อมดึงผล');
     if (round.isTest) throw new Error('งวดทดสอบต้องกรอกผลเอง');
 
-    const { parsed, sourceModel } = await fetchLotteryResultWithGemini(round.drawDateStr);
-    const source = sourceModel ? `${sourcePrefix}:${sourceModel}` : sourcePrefix;
+    const { parsed, sourceModel, warning } = await fetchLotteryResultWithGemini(round.drawDateStr);
+    if (warning) console.warn(`⚠️ Lottery result warning (${roundId}): ${warning}`);
+    const sourceTag = warning ? ':ss' : ':cv';
+    const source = (`${sourcePrefix}:${sourceModel || 'unknown'}${sourceTag}`).slice(0, 50);
     await db.query(
         `UPDATE lottery_rounds SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source=?, confirmedBy=? WHERE roundId=?`,
         [parsed.last2, parsed.last3_front || null, parsed.last3_back, source, requesterId, roundId]
     );
-    return { roundId, last2: parsed.last2, last3_front: parsed.last3_front || null, last3_back: parsed.last3_back, source };
+    return { roundId, drawDateStr: round.drawDateStr, last2: parsed.last2, last3_front: parsed.last3_front || null, last3_back: parsed.last3_back, source };
 }
 
 async function fetchAndSaveLotteryResults(retryCount = 0) {
@@ -4704,6 +4885,8 @@ async function fetchAndSaveLotteryResults(retryCount = 0) {
     try {
         const result = await fetchAndSaveLotteryResultsForRound(dateStr);
         console.log(`✅ Lottery result fetched: 2ตัว=${result.last2} 3ตัวท้าย=${result.last3_back}`);
+        notifyLotteryAdminsAIFetch(result.roundId, result.drawDateStr || dateStr, { success: true, result })
+            .catch(e => console.error('❌ notifyLotteryAdminsAIFetch (auto success) failed:', e.message));
     } catch (err) {
         console.error(`❌ fetchLotteryResults failed (retry ${retryCount}):`, err.message);
         if (retryCount < 3) {
@@ -4711,9 +4894,8 @@ async function fetchAndSaveLotteryResults(retryCount = 0) {
             setTimeout(() => fetchAndSaveLotteryResults(retryCount + 1), delays[retryCount] * 60 * 1000);
         } else {
             await db.query("UPDATE lottery_rounds SET status='pending_manual' WHERE roundId=?", [dateStr]).catch(() => {});
-            await notifyLotteryAdminsForManualResult(dateStr, err.message).catch(pushErr => {
-                console.error('❌ notifyLotteryAdminsForManualResult failed:', pushErr.message);
-            });
+            notifyLotteryAdminsAIFetch(dateStr, dateStr, { success: false, reason: err.message })
+                .catch(pushErr => console.error('❌ notifyLotteryAdminsAIFetch (auto fail) failed:', pushErr.message));
             console.log('⚠️ Lottery auto-fetch failed 3 times — set to pending_manual and notified admins');
         }
     }
@@ -5308,6 +5490,8 @@ app.post('/api/admin/lottery/fetch-result', async (req, res) => {
             sourcePrefix: 'admin_ai'
         });
         await logAdminAction(requesterId, 'LOTTERY_AI_FETCH_RESULT', 'round', roundId, roundId, result);
+        notifyLotteryAdminsAIFetch(roundId, result.drawDateStr || roundId, { success: true, result })
+            .catch(e => console.warn('notifyLotteryAdminsAIFetch (success) failed:', e.message));
         res.json({
             status: 'success',
             data: {
@@ -5316,12 +5500,19 @@ app.post('/api/admin/lottery/fetch-result', async (req, res) => {
             }
         });
     } catch (e) {
+        let drawDateStr = roundId;
         if (roundId) {
+            const [[rnd]] = await db.query(
+                "SELECT DATE_FORMAT(drawDate,'%Y-%m-%d') AS d FROM lottery_rounds WHERE roundId=?", [roundId]
+            ).catch(() => [[null]]);
+            if (rnd) drawDateStr = rnd.d || roundId;
             await db.query(
                 "UPDATE lottery_rounds SET status='pending_manual' WHERE roundId=? AND status IN ('open','closed','pending_manual','pending_confirm')",
                 [roundId]
             ).catch(() => {});
         }
+        notifyLotteryAdminsAIFetch(roundId, drawDateStr, { success: false, reason: e.message })
+            .catch(ne => console.warn('notifyLotteryAdminsAIFetch (fail) failed:', ne.message));
         res.status(e.statusCode || 500).json({ status: 'error', message: e.message });
     }
 });
@@ -6204,41 +6395,87 @@ app.post('/api/admin/lottery/broadcast-new-round', async (req, res) => {
 
         const flexMessage = {
             type: 'flex',
-            altText: `🎰 Safety Lottery งวด ${drawDateStr} เปิดรับตั๋วแล้ว!`,
+            altText: `[Safety Lottery] งวดประจำวันที่ ${drawDateStr} เปิดรับตั๋วแล้ว — ตอบคำถาม Safety ก่อนซื้อ รับโบนัส 2 เหรียญ`.slice(0, 400),
             contents: {
                 type: 'bubble', size: 'mega',
                 header: {
-                    type: 'box', layout: 'vertical', backgroundColor: '#06C755', paddingAll: '20px',
+                    type: 'box', layout: 'vertical', backgroundColor: '#065F46', paddingAll: '20px',
                     contents: [
-                        { type: 'text', text: '🎰 Safety Lottery', color: '#FFFFFF', size: 'xl', weight: 'bold', align: 'center' },
-                        { type: 'text', text: 'เปิดรับตั๋วแล้ว!', color: '#FFFFFF', size: 'md', align: 'center', margin: 'sm' }
+                        {
+                            type: 'box', layout: 'horizontal', margin: 'none',
+                            contents: [
+                                { type: 'text', text: 'Safety Lottery', color: '#FFFFFF', weight: 'bold', size: 'xl', flex: 1 },
+                                {
+                                    type: 'box', layout: 'vertical', flex: 0,
+                                    backgroundColor: 'rgba(0,0,0,0.2)', cornerRadius: '4px',
+                                    paddingTop: '4px', paddingBottom: '4px', paddingStart: '8px', paddingEnd: '8px',
+                                    contents: [{ type: 'text', text: 'NEW ROUND', color: '#FFFFFF', size: 'xs', weight: 'bold' }]
+                                }
+                            ]
+                        },
+                        { type: 'text', text: 'เปิดรับตั๋วแล้ว', color: '#FFFFFF', size: 'sm', margin: 'sm' }
                     ]
                 },
                 body: {
-                    type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '20px',
+                    type: 'box', layout: 'vertical', paddingAll: '20px', spacing: 'none',
                     contents: [
-                        { type: 'box', layout: 'horizontal', contents: [
-                            { type: 'text', text: '📅 งวดวันที่', size: 'sm', color: '#888888', flex: 1 },
-                            { type: 'text', text: drawDateStr, size: 'sm', weight: 'bold', flex: 2, align: 'end' }
-                        ]},
-                        { type: 'box', layout: 'horizontal', contents: [
-                            { type: 'text', text: '🟢 2 ตัวท้าย', size: 'sm', color: '#888888', flex: 1 },
-                            { type: 'text', text: `${settings.priceTwo} เหรียญ / รางวัล ${settings.prizeTwo.toLocaleString()} pts`, size: 'sm', weight: 'bold', flex: 2, align: 'end' }
-                        ]},
-                        { type: 'box', layout: 'horizontal', contents: [
-                            { type: 'text', text: '🔴 3 ตัวท้าย', size: 'sm', color: '#888888', flex: 1 },
-                            { type: 'text', text: `${settings.priceThree} เหรียญ / รางวัล ${settings.prizeThree.toLocaleString()} pts`, size: 'sm', weight: 'bold', flex: 2, align: 'end' }
-                        ]},
-                        { type: 'separator', margin: 'lg' },
-                        { type: 'text', text: `ต้องตอบคำถาม Safety ถูกก่อนซื้อ รับโบนัส 2 เหรียญ!`, size: 'xs', color: '#475569', align: 'center', margin: 'lg', wrap: true }
+                        {
+                            type: 'box', layout: 'horizontal', margin: 'none',
+                            contents: [
+                                { type: 'text', text: 'งวดประจำวันที่', size: 'sm', color: '#6B7280', flex: 0 },
+                                { type: 'text', text: drawDateStr, size: 'sm', color: '#111827', weight: 'bold', align: 'end', flex: 1 }
+                            ]
+                        },
+                        { type: 'separator', margin: 'md' },
+                        {
+                            type: 'box', layout: 'vertical', margin: 'md',
+                            backgroundColor: '#F0FDF4', cornerRadius: '8px', paddingAll: '14px',
+                            contents: [
+                                { type: 'text', text: 'ราคาตั๋ว / รางวัล', size: 'xs', color: '#065F46', weight: 'bold' },
+                                {
+                                    type: 'box', layout: 'horizontal', margin: 'sm',
+                                    contents: [
+                                        {
+                                            type: 'box', layout: 'vertical', flex: 0,
+                                            backgroundColor: '#065F46', cornerRadius: '4px',
+                                            paddingTop: '2px', paddingBottom: '2px', paddingStart: '6px', paddingEnd: '6px',
+                                            contents: [{ type: 'text', text: '2D', color: '#FFFFFF', size: 'xs', weight: 'bold' }]
+                                        },
+                                        { type: 'text', text: '2 ตัวท้าย', size: 'sm', color: '#374151', flex: 1, margin: 'sm' },
+                                        { type: 'text', text: `${settings.priceTwo} เหรียญ / ${settings.prizeTwo.toLocaleString()} pts`, size: 'sm', color: '#111827', weight: 'bold', align: 'end' }
+                                    ]
+                                },
+                                {
+                                    type: 'box', layout: 'horizontal', margin: 'sm',
+                                    contents: [
+                                        {
+                                            type: 'box', layout: 'vertical', flex: 0,
+                                            backgroundColor: '#7C2D12', cornerRadius: '4px',
+                                            paddingTop: '2px', paddingBottom: '2px', paddingStart: '6px', paddingEnd: '6px',
+                                            contents: [{ type: 'text', text: '3D', color: '#FFFFFF', size: 'xs', weight: 'bold' }]
+                                        },
+                                        { type: 'text', text: '3 ตัวท้าย', size: 'sm', color: '#374151', flex: 1, margin: 'sm' },
+                                        { type: 'text', text: `${settings.priceThree} เหรียญ / ${settings.prizeThree.toLocaleString()} pts`, size: 'sm', color: '#111827', weight: 'bold', align: 'end' }
+                                    ]
+                                }
+                            ]
+                        },
+                        { type: 'separator', margin: 'md' },
+                        {
+                            type: 'box', layout: 'vertical', margin: 'md',
+                            backgroundColor: '#FFFBEB', cornerRadius: '8px', paddingAll: '12px',
+                            contents: [
+                                { type: 'text', text: 'BONUS', size: 'xs', color: '#92400E', weight: 'bold' },
+                                { type: 'text', text: 'ตอบคำถาม Safety ให้ถูกต้องก่อนซื้อตั๋ว รับโบนัส +2 เหรียญ', size: 'sm', color: '#78350F', wrap: true, margin: 'xs' }
+                            ]
+                        }
                     ]
                 },
                 footer: {
-                    type: 'box', layout: 'vertical', paddingAll: '15px',
+                    type: 'box', layout: 'vertical', paddingAll: '12px',
                     contents: [{
-                        type: 'button',
-                        action: { type: 'uri', label: '🎰 ซื้อตั๋วเลย', uri: `https://liff.line.me/${process.env.LIFF_ID}` },
-                        style: 'primary', color: '#06C755', height: 'sm'
+                        type: 'button', style: 'primary', color: '#06C755', height: 'sm',
+                        action: { type: 'uri', label: 'ซื้อตั๋วเลย', uri: `https://liff.line.me/${process.env.LIFF_ID}` }
                     }]
                 }
             }

@@ -2153,7 +2153,7 @@
     <!-- ADMIN — Safety Lottery Modal                       -->
     <!-- ================================================== -->
     <div class="modal fade" id="admin-lottery-modal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-xl modal-fullscreen-sm-down">
+        <div class="modal-dialog modal-fullscreen">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-success text-white">
                     <h5 class="modal-title fw-bold">
@@ -2171,7 +2171,8 @@
                             </button>
                         </li>
                         <li class="nav-item">
-                            <button class="nav-link small" data-bs-toggle="tab" data-bs-target="#al-tab-result">
+                            <button class="nav-link small" data-bs-toggle="tab" data-bs-target="#al-tab-result"
+                                    onclick="loadAdminLotteryRoundSelect()">
                                 <i class="fas fa-flag-checkered me-1"></i>กรอกผล
                             </button>
                         </li>
@@ -2225,25 +2226,28 @@
                         </div>
 
                                                 <div class="tab-pane fade" id="al-tab-result">
-                            <div class="admin-result-steps mb-3">
-                                <div class="admin-result-step">
+                            <div class="admin-result-steps mb-1">
+                                <div class="admin-result-step" id="lottery-admin-step-1">
                                     <div class="step-num">1</div>
                                     <div class="step-label">บันทึกผล</div>
                                 </div>
                                 <div class="admin-result-step-arrow">→</div>
-                                <div class="admin-result-step">
+                                <div class="admin-result-step" id="lottery-admin-step-2">
                                     <div class="step-num">2</div>
                                     <div class="step-label">ยืนยันผล</div>
                                 </div>
                                 <div class="admin-result-step-arrow">→</div>
-                                <div class="admin-result-step">
+                                <div class="admin-result-step" id="lottery-admin-step-3">
                                     <div class="step-num">3</div>
                                     <div class="step-label">จ่ายรางวัล</div>
                                 </div>
                             </div>
+                            <div class="text-center mb-3">
+                                <small class="text-muted" id="lottery-admin-current-status"></small>
+                            </div>
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">เลือกงวด</label>
-                                <select class="form-select" id="admin-lottery-round-select"></select>
+                                <select class="form-select" id="admin-lottery-round-select" onchange="adminOnRoundSelectChange()"></select>
                             </div>
                             <div class="alert alert-light border small mb-3">
                                 ใช้ปุ่มดึงผลด้วย AI สำหรับงวดจริง หรือกรอกเองสำหรับงวดทดสอบ/กรณี AI ดึงไม่สำเร็จ แล้วตรวจสอบก่อนยืนยันทุกครั้ง

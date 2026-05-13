@@ -3616,6 +3616,13 @@ body {
 }
 .step-label { font-size: 0.7rem; color: #6c757d; font-weight: 600; white-space: nowrap; }
 .admin-result-step-arrow { color: #adb5bd; font-size: 1rem; }
+.admin-result-step.step-active .step-num {
+    background: #06C755; color: #fff;
+    box-shadow: 0 0 0 3px rgba(6,199,85,0.25);
+}
+.admin-result-step.step-active .step-label { color: #06C755; font-weight: 700; }
+.admin-result-step.step-done .step-num { background: #198754; color: #fff; }
+.admin-result-step.step-done .step-label { color: #198754; }
 
 /* Winner announcement banner */
 .lottery-win-banner {

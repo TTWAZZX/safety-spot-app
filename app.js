@@ -6992,15 +6992,49 @@ async function loadAdminLotteryDashboard() {
 // -----------------------------------------------
 // loadAdminLotteryRoundSelect — โหลด dropdown งวด
 // -----------------------------------------------
+let _adminLotteryRounds = [];
+
+const LOTTERY_STEP_STATUS = {
+    open:            { step: 1, label: 'งวดเปิดรับตั๋วอยู่ — รอปิดและบันทึกผล' },
+    closed:          { step: 1, label: 'ปิดรับตั๋วแล้ว — รอบันทึกผลรางวัล' },
+    pending_manual:  { step: 1, label: 'AI ดึงผลไม่สำเร็จ — กรุณากรอกผลเอง' },
+    pending_confirm: { step: 2, label: 'ผลถูกบันทึกแล้ว — รอตรวจสอบและยืนยัน' },
+    completed:       { step: 3, label: 'ประมวลผลและจ่ายรางวัลเสร็จสิ้น ✅' }
+};
+
+function updateAdminLotteryStepIndicator(status) {
+    const info = LOTTERY_STEP_STATUS[status] || null;
+    const activeStep = info ? info.step : 0;
+    for (let i = 1; i <= 3; i++) {
+        const el = document.getElementById(`lottery-admin-step-${i}`);
+        if (!el) continue;
+        el.classList.remove('step-active', 'step-done');
+        if (activeStep > 0) {
+            if (i < activeStep) el.classList.add('step-done');
+            else if (i === activeStep) el.classList.add('step-active');
+        }
+    }
+    const statusEl = document.getElementById('lottery-admin-current-status');
+    if (statusEl) statusEl.textContent = info ? info.label : (status ? status : '');
+}
+
+function adminOnRoundSelectChange() {
+    const roundId = $('#admin-lottery-round-select').val();
+    const round = _adminLotteryRounds.find(r => r.roundId === roundId);
+    updateAdminLotteryStepIndicator(round ? round.status : null);
+}
+
 async function loadAdminLotteryRoundSelect() {
     try {
         const res = await callApi('/api/admin/lottery/dashboard', { requesterId: AppState.lineProfile.userId });
+        _adminLotteryRounds = res.rounds || [];
         const $sel = $('#admin-lottery-round-select');
         $sel.empty().append('<option value="">— เลือกงวด —</option>');
-        (res.rounds || []).forEach(r => {
+        _adminLotteryRounds.forEach(r => {
             const label = `${r.drawDate} — ${LOTTERY_STATUS_TH[r.status] || r.status}${r.isTest ? ' · TEST' : ''}`;
             $sel.append(`<option value="${sanitizeHTML(r.roundId)}">${sanitizeHTML(label)}</option>`);
         });
+        adminOnRoundSelectChange();
     } catch (e) { console.error('loadAdminLotteryRoundSelect:', e); }
 }
 
@@ -7193,6 +7227,7 @@ async function adminFetchLotteryResultWithAI() {
         await loadAdminLotteryRoundSelect();
         await loadAdminLotteryMonitor(true);
         $('#admin-lottery-round-select').val(roundId);
+        adminOnRoundSelectChange();
     } catch (e) {
         Swal.fire('AI ดึงผลไม่สำเร็จ', `${sanitizeHTML(e.message)}<br><small class="text-muted">สามารถกรอกผลเองแล้วกดบันทึกผลรางวัลได้</small>`, 'warning');
     }
