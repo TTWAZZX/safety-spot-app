@@ -4245,30 +4245,43 @@ function sanitizeGeminiError(err) {
 }
 
 async function callGeminiGenerate(model, payload, { timeout = 20000, context = 'gemini' } = {}) {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) {
-        const err = new Error('GEMINI_API_KEY is missing');
-        err.code = 'MISSING_GEMINI_API_KEY';
-        throw err;
-    }
+    const proxyUrl = process.env.VERCEL_AI_PROXY_URL;
+    const proxyToken = process.env.INTERNAL_AI_TOKEN;
+    const useProxy = !!(proxyUrl && proxyToken);
+
     // gemini-2.5+ and 3.x have thinking enabled by default — disable when using JSON mode
     const needsThinkingOff = (model.startsWith('gemini-2.5') || model.startsWith('gemini-3.')) && payload.generationConfig?.responseMimeType;
     const finalPayload = needsThinkingOff
         ? { ...payload, generationConfig: { ...payload.generationConfig, thinkingConfig: { thinkingBudget: 0 } } }
         : payload;
+
+    let fetchUrl, fetchHeaders, fetchBody;
+    if (useProxy) {
+        fetchUrl = proxyUrl;
+        fetchHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${proxyToken}` };
+        fetchBody = JSON.stringify({ model, payload: finalPayload });
+    } else {
+        const key = process.env.GEMINI_API_KEY;
+        if (!key) {
+            const err = new Error('GEMINI_API_KEY is missing');
+            err.code = 'MISSING_GEMINI_API_KEY';
+            throw err;
+        }
+        fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+        fetchHeaders = { 'Content-Type': 'application/json' };
+        fetchBody = JSON.stringify(finalPayload);
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
     const startedAt = Date.now();
     try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(finalPayload),
-                signal: controller.signal
-            }
-        );
+        const response = await fetch(fetchUrl, {
+            method: 'POST',
+            headers: fetchHeaders,
+            body: fetchBody,
+            signal: controller.signal
+        });
         const responseText = await response.text();
         if (!response.ok) {
             const err = new Error(`Gemini HTTP ${response.status}`);
@@ -4282,7 +4295,8 @@ async function callGeminiGenerate(model, payload, { timeout = 20000, context = '
             model,
             ok: true,
             status: response.status,
-            durationMs: Date.now() - startedAt
+            durationMs: Date.now() - startedAt,
+            via: useProxy ? 'proxy' : 'direct'
         };
         return { status: response.status, data: JSON.parse(responseText) };
     } catch (err) {
@@ -4294,7 +4308,8 @@ async function callGeminiGenerate(model, payload, { timeout = 20000, context = '
             ok: false,
             status: err?.status || null,
             durationMs: Date.now() - startedAt,
-            error: sanitizeGeminiError(err)
+            error: sanitizeGeminiError(err),
+            via: useProxy ? 'proxy' : 'direct'
         };
         throw err;
     } finally {
