@@ -4493,7 +4493,7 @@ async function sendLotteryWinNotification(lineUserId, ticketData) {
                             { type: 'text', text: 'Safety Lottery', color: '#FFFFFF', weight: 'bold', size: 'xl', flex: 1 },
                             {
                                 type: 'box', layout: 'vertical', flex: 0,
-                                backgroundColor: 'rgba(0,0,0,0.2)', cornerRadius: '4px',
+                                backgroundColor: '#00000033', cornerRadius: '4px',
                                 paddingTop: '4px', paddingBottom: '4px', paddingStart: '8px', paddingEnd: '8px',
                                 contents: [{ type: 'text', text: 'WINNER', color: '#FFFFFF', size: 'xs', weight: 'bold' }]
                             }
@@ -4690,7 +4690,7 @@ function _buildLotteryResultFlex({ success, drawDateStr, result, reason }) {
                             { type: 'text', text: 'Safety Lottery', color: '#FFFFFF', weight: 'bold', size: 'xl', flex: 1 },
                             {
                                 type: 'box', layout: 'vertical', flex: 0,
-                                backgroundColor: 'rgba(0,0,0,0.2)', cornerRadius: '4px',
+                                backgroundColor: '#00000033', cornerRadius: '4px',
                                 paddingTop: '4px', paddingBottom: '4px', paddingStart: '8px', paddingEnd: '8px',
                                 contents: [{ type: 'text', text: statusTag, color: '#FFFFFF', size: 'xs', weight: 'bold' }]
                             }
@@ -6407,7 +6407,7 @@ app.post('/api/admin/lottery/broadcast-new-round', async (req, res) => {
                                 { type: 'text', text: 'Safety Lottery', color: '#FFFFFF', weight: 'bold', size: 'xl', flex: 1 },
                                 {
                                     type: 'box', layout: 'vertical', flex: 0,
-                                    backgroundColor: 'rgba(0,0,0,0.2)', cornerRadius: '4px',
+                                    backgroundColor: '#00000033', cornerRadius: '4px',
                                     paddingTop: '4px', paddingBottom: '4px', paddingStart: '8px', paddingEnd: '8px',
                                     contents: [{ type: 'text', text: 'NEW ROUND', color: '#FFFFFF', size: 'xs', weight: 'bold' }]
                                 }
