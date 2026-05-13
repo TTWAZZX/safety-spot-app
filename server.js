@@ -795,7 +795,7 @@ app.get('/api/home/activity-feed', async (req, res) => {
             entityType: 'lottery_ticket',
             entityId: String(r.ticketId),
             title: r.isGoldTicket ? 'รับตั๋วทอง Safety Lottery' : 'ซื้อ Safety Lottery',
-            message: `งวด ${r.drawDateText || '-'} • ${r.ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย'}`,
+            message: `งวด ${r.drawDateText || '-'} • ${r.ticketType === 'six' ? 'รางวัลที่ 1 (6 ตัว)' : r.ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย'}`,
             createdAt: r.purchasedAt
         })));
 
@@ -4112,20 +4112,25 @@ db.query("ALTER TABLE lottery_rounds ADD COLUMN priceSixSnapshot INT DEFAULT NUL
 db.query("ALTER TABLE lottery_tickets MODIFY number VARCHAR(6) NOT NULL").catch(() => {});
 
 db.query(`CREATE TABLE IF NOT EXISTS lottery_rounds (
-  roundId       VARCHAR(50) PRIMARY KEY,
-  drawDate      DATE NOT NULL,
-  last2         VARCHAR(2)  DEFAULT NULL,
-  last3_front   VARCHAR(3)  DEFAULT NULL,
-  last3_back    VARCHAR(3)  DEFAULT NULL,
-  status        VARCHAR(20) DEFAULT 'open',
-  source        VARCHAR(50) DEFAULT 'manual',
-  confirmedBy   VARCHAR(50) DEFAULT NULL,
-  isTest        BOOLEAN     DEFAULT FALSE,
-  prizeTwoSnapshot INT      DEFAULT NULL,
-  prizeThreeSnapshot INT    DEFAULT NULL,
-  priceTwoSnapshot INT      DEFAULT NULL,
-  priceThreeSnapshot INT    DEFAULT NULL,
-  createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+  roundId            VARCHAR(50) PRIMARY KEY,
+  drawDate           DATE NOT NULL,
+  first_prize        VARCHAR(6)  DEFAULT NULL,
+  last2              VARCHAR(2)  DEFAULT NULL,
+  last3_front        VARCHAR(3)  DEFAULT NULL,
+  last3_front2       VARCHAR(3)  DEFAULT NULL,
+  last3_back         VARCHAR(3)  DEFAULT NULL,
+  last3_back2        VARCHAR(3)  DEFAULT NULL,
+  status             VARCHAR(20) DEFAULT 'open',
+  source             VARCHAR(50) DEFAULT 'manual',
+  confirmedBy        VARCHAR(50) DEFAULT NULL,
+  isTest             BOOLEAN     DEFAULT FALSE,
+  prizeTwoSnapshot   INT         DEFAULT NULL,
+  prizeThreeSnapshot INT         DEFAULT NULL,
+  priceThreeSnapshot INT         DEFAULT NULL,
+  priceTwoSnapshot   INT         DEFAULT NULL,
+  prizeSixSnapshot   INT         DEFAULT NULL,
+  priceSixSnapshot   INT         DEFAULT NULL,
+  createdAt          TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_lottery_rounds_status (status),
   INDEX idx_lottery_rounds_date (drawDate)
 )`).catch(() => {});
@@ -4135,7 +4140,7 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_tickets (
   lineUserId    VARCHAR(50) NOT NULL,
   roundId       VARCHAR(50) NOT NULL,
   ticketType    VARCHAR(10) NOT NULL,
-  number        VARCHAR(3)  NOT NULL,
+  number        VARCHAR(6)  NOT NULL,
   price         INT         NOT NULL DEFAULT 0,
   isGoldTicket  BOOLEAN     DEFAULT FALSE,
   isWinner      BOOLEAN     DEFAULT FALSE,
@@ -4433,7 +4438,7 @@ async function getLotteryRoundPrizeSnapshot(round, conn = db) {
         priceThree: Number(round?.priceThreeSnapshot) || settings.priceThree,
         prizeSix: Number(round?.prizeSixSnapshot) || settings.prizeSix,
         priceSix: Number(round?.priceSixSnapshot) || settings.priceSix,
-        source: (round?.prizeTwoSnapshot && round?.prizeThreeSnapshot) ? 'round_snapshot' : 'current_settings'
+        source: (round?.prizeTwoSnapshot && round?.prizeThreeSnapshot && round?.prizeSixSnapshot) ? 'round_snapshot' : 'current_settings'
     };
 }
 
@@ -4786,10 +4791,10 @@ async function notifyLotteryAdminsForManualResult(roundId, reason) {
 // ======================================================
 // Sanitize a parsed lottery result object in-place; returns true if valid
 function _sanitizeLotteryParsed(parsed) {
-    if (parsed.last2)        { const m = String(parsed.last2).match(/\d{2}/);        if (m) parsed.last2        = m[0]; }
-    if (parsed.last3_back)   { const m = String(parsed.last3_back).match(/\d{3}/);   if (m) parsed.last3_back   = m[0]; }
+    if (parsed.last2)        { const m = String(parsed.last2).match(/\d{2}/);        if (m) parsed.last2        = m[0]; else delete parsed.last2; }
+    if (parsed.last3_back)   { const m = String(parsed.last3_back).match(/\d{3}/);   if (m) parsed.last3_back   = m[0]; else delete parsed.last3_back; }
     if (parsed.last3_back2)  { const m = String(parsed.last3_back2).match(/\d{3}/);  if (m) parsed.last3_back2  = m[0]; else delete parsed.last3_back2; }
-    if (parsed.last3_front)  { const m = String(parsed.last3_front).match(/\d{3}/);  if (m) parsed.last3_front  = m[0]; }
+    if (parsed.last3_front)  { const m = String(parsed.last3_front).match(/\d{3}/);  if (m) parsed.last3_front  = m[0]; else delete parsed.last3_front; }
     if (parsed.last3_front2) { const m = String(parsed.last3_front2).match(/\d{3}/); if (m) parsed.last3_front2 = m[0]; else delete parsed.last3_front2; }
     if (parsed.first_prize)  { const m = String(parsed.first_prize).match(/\d{6}/);  if (m) parsed.first_prize  = m[0]; else delete parsed.first_prize; }
     return /^\d{2}$/.test(parsed.last2 || '') && /^\d{3}$/.test(parsed.last3_back || '');
@@ -5095,7 +5100,7 @@ app.get('/api/lottery/current-round', async (req, res) => {
             const [rows] = await db.query(
                 `SELECT roundId, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDate, last2, last3_front, last3_back,
                         status, source, confirmedBy, isTest, createdAt
-                 FROM lottery_rounds WHERE roundId = ? AND status = 'open' LIMIT 1`,
+                 FROM lottery_rounds WHERE roundId = ? LIMIT 1`,
                 [forceRoundId]
             );
             round = rows[0] || null;
@@ -5286,7 +5291,7 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
             entityType: 'lottery_ticket',
             entityId: String(ticketResult.insertId),
             title: 'ซื้อ Safety Lottery',
-            message: `งวด ${toLotteryDateString(round.drawDate)} • ${ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย'}`,
+            message: `งวด ${toLotteryDateString(round.drawDate)} • ${ticketType === 'six' ? 'รางวัลที่ 1 (6 ตัว)' : ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย'}`,
             metadata: { roundId, ticketType, isNumberMasked: true },
             visibility: 'public'
         });
@@ -5308,7 +5313,8 @@ app.get('/api/lottery/my-tickets', async (req, res) => {
     try {
         assertLotteryUserRequest(req, lineUserId);
         const [tickets] = await db.query(
-            `SELECT t.*, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.status AS roundStatus, r.last2, r.last3_back
+            `SELECT t.*, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.status AS roundStatus,
+                    r.last2, r.last3_back, r.last3_back2, r.first_prize
              FROM lottery_tickets t
              JOIN lottery_rounds r ON t.roundId = r.roundId
              WHERE t.lineUserId = ?
@@ -5330,8 +5336,9 @@ app.get('/api/lottery/results', async (req, res) => {
     try {
         if (lineUserId) await assertLotteryUserRequestOrAdmin(req, lineUserId);
         const [rounds] = await db.query(
-            `SELECT r.roundId, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.last2, r.last3_front,
-                    r.last3_back, r.status, r.source, r.confirmedBy, r.isTest, r.createdAt,
+            `SELECT r.roundId, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate,
+                    r.last2, r.last3_front, r.last3_front2, r.last3_back, r.last3_back2, r.first_prize,
+                    r.status, r.source, r.confirmedBy, r.isTest, r.createdAt,
                     h.totalTicketsSold, h.totalWinners, h.totalPrizesPaid
              FROM lottery_rounds r
              LEFT JOIN lottery_results_history h ON r.roundId = h.roundId

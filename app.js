@@ -7301,7 +7301,8 @@ async function adminConfirmLotteryResult() {
         return Swal.fire('Error', e.message, 'error');
     }
 
-    const { round, winners, totalPrizesToPay, totalTickets, totalPlayers } = preview;
+    const { round, winners = [], totalPrizesToPay = 0, totalTickets = 0, totalPlayers = 0 } = preview || {};
+    if (!round) return Swal.fire('Error', 'ไม่พบข้อมูลงวด', 'error');
     const testWarn = round.isTest ? '<div class="alert alert-warning py-2 mb-2">งวดนี้เป็นงวดทดสอบ ผู้ใช้ทั่วไปจะไม่เห็นงวดนี้</div>' : '';
     const winnerRows = winners.length
         ? winners.map(w => `<tr>
@@ -7360,7 +7361,8 @@ async function adminProcessLotteryPrizes() {
         return Swal.fire('Error', e.message, 'error');
     }
 
-    const { round, winners, totalPrizesToPay } = preview;
+    const { round, winners = [], totalPrizesToPay = 0 } = preview || {};
+    if (!round) return Swal.fire('Error', 'ไม่พบข้อมูลงวด', 'error');
     const testWarn = round?.isTest ? '<p class="text-warning fw-bold small">งวดนี้เป็นงวดทดสอบ</p>' : '';
     const confirm = await Swal.fire({
         icon: 'warning', title: 'ประมวลผลและจ่ายรางวัล?',
