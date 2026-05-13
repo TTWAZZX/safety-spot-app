@@ -4584,61 +4584,111 @@ async function notifyLotteryAdminsForManualResult(roundId, reason) {
 // ======================================================
 // LOTTERY CRON — ดึงผลหวยอัตโนมัติ 16:00 ไทย (09:00 UTC) วันที่ 1 & 16
 // ======================================================
-async function fetchLotteryResultWithGemini() {
-    const htmlRes = await axios.get('https://www.glo.or.th/check/getLotteryResult', {
-        timeout: 15000,
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
+// Sanitize a parsed lottery result object in-place; returns true if valid
+function _sanitizeLotteryParsed(parsed) {
+    if (parsed.last2)       { const m = String(parsed.last2).match(/\d{2}/);       if (m) parsed.last2       = m[0]; }
+    if (parsed.last3_back)  { const m = String(parsed.last3_back).match(/\d{3}/);  if (m) parsed.last3_back  = m[0]; }
+    if (parsed.last3_front) { const m = String(parsed.last3_front).match(/\d{3}/); if (m) parsed.last3_front = m[0]; }
+    return /^\d{2}$/.test(parsed.last2 || '') && /^\d{3}$/.test(parsed.last3_back || '');
+}
 
-    const geminiPayload = {
+// Strategy 1 — scrape GLO official results page then ask Gemini to extract
+async function _fetchLotteryFromGLO(drawDateStr) {
+    const res = await axios.get('https://www.glo.or.th/result/thai-government-lottery', {
+        timeout: 15000,
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    });
+    const payload = {
         contents: [{ parts: [{ text:
-            `จากข้อมูลผลหวยไทยนี้ ดึงเฉพาะผลรางวัลดังนี้ออกมาเป็น JSON:\n` +
-            `- last2: เลขท้าย 2 ตัว (2 หลักเท่านั้น ตัวเลขเดียว)\n` +
-            `- last3_back: เลขท้าย 3 ตัวหลัง (3 หลักเท่านั้น ถ้ามีหลายรางวัลให้เอาตัวแรก)\n` +
-            `- last3_front: เลขท้าย 3 ตัวหน้า (3 หลักเท่านั้น ถ้ามีหลายรางวัลให้เอาตัวแรก)\n` +
-            `ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น ห้ามใส่ลูกน้ำหรือหลายค่า:\n` +
-            `{"last2":"XX","last3_back":"XXX","last3_front":"XXX"}\n\nข้อมูล:\n${String(htmlRes.data).slice(0, 8000)}`
+            `จากข้อมูลด้านล่างนี้ หาผลสลากกินแบ่งรัฐบาลไทยงวดวันที่ ${drawDateStr} เท่านั้น\n` +
+            `ถ้าไม่พบผลสำหรับวันที่นี้ ให้ตอบ {"error":"not_found"}\n` +
+            `- last2: เลขท้าย 2 ตัว (2 หลัก ตัวเดียว)\n` +
+            `- last3_back: เลขท้าย 3 ตัวหลัง (3 หลัก ถ้ามีหลายรางวัลให้เอาตัวแรก)\n` +
+            `- last3_front: เลขท้าย 3 ตัวหน้า (3 หลัก ถ้ามีหลายรางวัลให้เอาตัวแรก)\n` +
+            `ตอบ JSON เท่านั้น: {"last2":"XX","last3_back":"XXX","last3_front":"XXX"}\n\nข้อมูล:\n${String(res.data).slice(0, 8000)}`
         }]}],
         generationConfig: { responseMimeType: 'application/json' }
     };
-
-    let parsed = null;
-    let sourceModel = null;
-    let lastGeminiError = null;
+    let parsed = null, lastErr = null;
     for (const model of LOTTERY_GEMINI_MODELS) {
         try {
-            const geminiRes = await callGeminiGenerate(model, geminiPayload, { timeout: 20000, context: 'lottery-result' });
-
-            const rawText = geminiRes.data.candidates[0].content.parts[0].text;
-            parsed = parseGeminiJson(rawText, 'object');
-            sourceModel = model;
+            const r = await callGeminiGenerate(model, payload, { timeout: 20000, context: 'lottery-result-glo' });
+            parsed = parseGeminiJson(r.data.candidates[0].content.parts[0].text, 'object');
             break;
-        } catch (geminiErr) {
-            lastGeminiError = geminiErr;
-            console.warn(`Lottery result Gemini model failed: ${model}`, geminiErr.response?.status || geminiErr.message);
-        }
+        } catch (e) { lastErr = e; }
     }
-    if (!parsed) throw lastGeminiError || new Error('Unable to parse lottery result with Gemini');
+    if (!parsed) throw lastErr || new Error('GLO scrape: Gemini failed');
+    if (parsed.error === 'not_found') throw new Error('GLO: ไม่พบผลหวยงวดนี้ในหน้า');
+    if (!_sanitizeLotteryParsed(parsed)) throw new Error(`GLO: ข้อมูลไม่ถูกต้อง last2=${parsed.last2} last3_back=${parsed.last3_back}`);
+    return { data: parsed, source: 'glo-official' };
+}
 
-    // Sanitize: AI อาจส่งค่าหลายรางวัลคั่นด้วยลูกน้ำ → ดึงเฉพาะลำดับตัวเลขที่ถูกต้องตัวแรก
-    if (parsed.last2) { const m = String(parsed.last2).match(/\d{2}/); if (m) parsed.last2 = m[0]; }
-    if (parsed.last3_back) { const m = String(parsed.last3_back).match(/\d{3}/); if (m) parsed.last3_back = m[0]; }
-    if (parsed.last3_front) { const m = String(parsed.last3_front).match(/\d{3}/); if (m) parsed.last3_front = m[0]; }
+// Strategy 2 — Gemini Google Search grounding (ค้นหาผลเองจากแหล่งน่าเชื่อถือ)
+async function _fetchLotteryFromGrounding(drawDateStr) {
+    const [y, mo, d] = drawDateStr.split('-');
+    const thaiMonths = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+    const thaiDate = `${parseInt(d)} ${thaiMonths[parseInt(mo)]} ${parseInt(y) + 543}`;
+    const payload = {
+        contents: [{ parts: [{ text:
+            `ค้นหาผลสลากกินแบ่งรัฐบาลไทย งวดประจำวันที่ ${thaiDate} (${drawDateStr}) จากแหล่งทางการ\n` +
+            `ต้องการเฉพาะ: เลขท้าย 2 ตัว, เลขท้าย 3 ตัวหน้า, เลขท้าย 3 ตัวหลัง\n` +
+            `ถ้ามีหลายรางวัลในประเภทเดียวกันให้เอาตัวแรก ห้ามใส่ลูกน้ำหรือหลายค่า\n` +
+            `ตอบ JSON เท่านั้น: {"last2":"XX","last3_back":"XXX","last3_front":"XXX"}`
+        }]}],
+        tools: [{ google_search: {} }]
+    };
+    const r = await callGeminiGenerate('gemini-2.5-flash', payload, { timeout: 30000, context: 'lottery-result-grounding' });
+    const parsed = parseGeminiJson(r.data.candidates[0].content.parts[0].text, 'object');
+    if (!_sanitizeLotteryParsed(parsed)) throw new Error(`Grounding: ข้อมูลไม่ถูกต้อง last2=${parsed.last2} last3_back=${parsed.last3_back}`);
+    return { data: parsed, source: 'gemini-grounding' };
+}
 
-    if (!parsed.last2 || !/^\d{2}$/.test(parsed.last2)) throw new Error('Invalid last2: ' + parsed.last2);
-    if (!parsed.last3_back || !/^\d{3}$/.test(parsed.last3_back)) throw new Error('Invalid last3_back: ' + parsed.last3_back);
-    return { parsed, sourceModel };
+// ดึงผลจาก 2 แหล่งคู่ขนาน แล้ว cross-validate ก่อน return
+async function fetchLotteryResultWithGemini(drawDateStr) {
+    const [gloRes, groundRes] = await Promise.allSettled([
+        _fetchLotteryFromGLO(drawDateStr),
+        _fetchLotteryFromGrounding(drawDateStr)
+    ]);
+
+    const ok = [];
+    if (gloRes.status === 'fulfilled')   ok.push(gloRes.value);
+    if (groundRes.status === 'fulfilled') ok.push(groundRes.value);
+
+    if (ok.length === 0) {
+        const msgs = [gloRes.reason?.message, groundRes.reason?.message].filter(Boolean).join(' | ');
+        throw new Error('ดึงผลล้มเหลวทุกแหล่ง: ' + msgs);
+    }
+
+    if (ok.length >= 2) {
+        const [a, b] = ok;
+        if (a.data.last2 !== b.data.last2 || a.data.last3_back !== b.data.last3_back) {
+            throw new Error(
+                `ผลไม่ตรงกันระหว่างแหล่ง กรุณากรอกเอง — ` +
+                `${a.source}: 2ตัว=${a.data.last2} 3ตัวหลัง=${a.data.last3_back} | ` +
+                `${b.source}: 2ตัว=${b.data.last2} 3ตัวหลัง=${b.data.last3_back}`
+            );
+        }
+        console.log(`✅ Cross-validated lottery result: last2=${ok[0].data.last2} last3_back=${ok[0].data.last3_back} (${ok.map(s=>s.source).join('+')})`);
+    } else {
+        console.warn(`⚠️ Lottery result from single source only: ${ok[0].source}`);
+    }
+
+    return {
+        parsed: ok[0].data,
+        sourceModel: ok.map(s => s.source).join('+'),
+        warning: ok.length === 1 ? `ได้จากแหล่งเดียว (${ok[0].source})` : null
+    };
 }
 
 async function fetchAndSaveLotteryResultsForRound(roundId, { requesterId = null, sourcePrefix = 'auto_gemini' } = {}) {
     const [[round]] = await db.query(
-        "SELECT * FROM lottery_rounds WHERE roundId = ? AND status IN ('open','closed','pending_manual','pending_confirm')",
+        "SELECT *, DATE_FORMAT(drawDate, '%Y-%m-%d') AS drawDateStr FROM lottery_rounds WHERE roundId = ? AND status IN ('open','closed','pending_manual','pending_confirm')",
         [roundId]
     );
     if (!round) throw new Error('ไม่พบงวดที่พร้อมดึงผล');
     if (round.isTest) throw new Error('งวดทดสอบต้องกรอกผลเอง');
 
-    const { parsed, sourceModel } = await fetchLotteryResultWithGemini();
+    const { parsed, sourceModel } = await fetchLotteryResultWithGemini(round.drawDateStr);
     const source = sourceModel ? `${sourcePrefix}:${sourceModel}` : sourcePrefix;
     await db.query(
         `UPDATE lottery_rounds SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source=?, confirmedBy=? WHERE roundId=?`,
