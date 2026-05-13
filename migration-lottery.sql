@@ -7,17 +7,22 @@
 CREATE TABLE IF NOT EXISTS lottery_rounds (
   roundId       VARCHAR(50) PRIMARY KEY,
   drawDate      DATE NOT NULL,
+  first_prize   VARCHAR(6)  DEFAULT NULL,
   last2         VARCHAR(2)  DEFAULT NULL,
   last3_front   VARCHAR(3)  DEFAULT NULL,
+  last3_front2  VARCHAR(3)  DEFAULT NULL,
   last3_back    VARCHAR(3)  DEFAULT NULL,
+  last3_back2   VARCHAR(3)  DEFAULT NULL,
   status        VARCHAR(20) DEFAULT 'open',
   source        VARCHAR(50) DEFAULT 'manual',
   confirmedBy   VARCHAR(50) DEFAULT NULL,
   isTest        BOOLEAN     DEFAULT FALSE,
   prizeTwoSnapshot INT      DEFAULT NULL,
   prizeThreeSnapshot INT    DEFAULT NULL,
+  prizeSixSnapshot INT      DEFAULT NULL,
   priceTwoSnapshot INT      DEFAULT NULL,
   priceThreeSnapshot INT    DEFAULT NULL,
+  priceSixSnapshot INT      DEFAULT NULL,
   createdAt     TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_lottery_rounds_status (status),
   INDEX idx_lottery_rounds_date (drawDate)
@@ -31,6 +36,11 @@ CREATE TABLE IF NOT EXISTS lottery_rounds (
 -- ALTER TABLE lottery_rounds ADD COLUMN prizeThreeSnapshot INT DEFAULT NULL;
 -- ALTER TABLE lottery_rounds ADD COLUMN priceTwoSnapshot INT DEFAULT NULL;
 -- ALTER TABLE lottery_rounds ADD COLUMN priceThreeSnapshot INT DEFAULT NULL;
+-- ALTER TABLE lottery_rounds ADD COLUMN first_prize VARCHAR(6) DEFAULT NULL;
+-- ALTER TABLE lottery_rounds ADD COLUMN last3_back2 VARCHAR(3) DEFAULT NULL;
+-- ALTER TABLE lottery_rounds ADD COLUMN last3_front2 VARCHAR(3) DEFAULT NULL;
+-- ALTER TABLE lottery_rounds ADD COLUMN prizeSixSnapshot INT DEFAULT NULL;
+-- ALTER TABLE lottery_rounds ADD COLUMN priceSixSnapshot INT DEFAULT NULL;
 
 -- 2. lottery_tickets — ตั๋วที่ซื้อ
 CREATE TABLE IF NOT EXISTS lottery_tickets (
@@ -38,7 +48,7 @@ CREATE TABLE IF NOT EXISTS lottery_tickets (
   lineUserId    VARCHAR(50) NOT NULL,
   roundId       VARCHAR(50) NOT NULL,
   ticketType    VARCHAR(10) NOT NULL,
-  number        VARCHAR(3)  NOT NULL,
+  number        VARCHAR(6)  NOT NULL,
   price         INT         NOT NULL DEFAULT 0,
   isGoldTicket  BOOLEAN     DEFAULT FALSE,
   isWinner      BOOLEAN     DEFAULT FALSE,
@@ -103,7 +113,14 @@ CREATE TABLE IF NOT EXISTS lottery_settings (
 
 INSERT IGNORE INTO lottery_settings (settingKey, settingValue) VALUES
   ('user_enabled', 'false'),
-  ('disabled_message', 'Safety Lottery is being prepared by the admin team.');
+  ('disabled_message', 'Safety Lottery is being prepared by the admin team.'),
+  ('prize_two', '500'),
+  ('prize_three', '3000'),
+  ('prize_six', '100000'),
+  ('price_two', '10'),
+  ('price_three', '30'),
+  ('price_six', '100'),
+  ('daily_limit', '5');
 
 -- 5. lottery_quiz_answers — สถิติตอบคำถาม
 CREATE TABLE IF NOT EXISTS lottery_quiz_answers (

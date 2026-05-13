@@ -6360,8 +6360,29 @@ app.post('/api/admin/lottery/rounds/:roundId/reset-tickets', async (req, res) =>
         const [[{ ticketCount }]] = await conn.query('SELECT COUNT(*) AS ticketCount FROM lottery_tickets WHERE roundId=?', [roundId]);
 
         // lottery_daily_purchases has no roundId — count/delete by affected users
-        const [affectedRows] = await conn.query('SELECT lineUserId FROM lottery_tickets WHERE roundId=? FOR UPDATE', [roundId]);
+        const [affectedRows] = await conn.query(
+            'SELECT ticketId, lineUserId, price, isGoldTicket FROM lottery_tickets WHERE roundId=? FOR UPDATE',
+            [roundId]
+        );
         const affectedIds = [...new Set(affectedRows.map(r => r.lineUserId))];
+        const quizBonus = 2;
+        const coinAdjustmentByUser = new Map();
+        for (const ticket of affectedRows) {
+            if (ticket.isGoldTicket) continue;
+            const adjustment = Number(ticket.price || 0) - quizBonus;
+            if (adjustment === 0) continue;
+            coinAdjustmentByUser.set(ticket.lineUserId, (coinAdjustmentByUser.get(ticket.lineUserId) || 0) + adjustment);
+        }
+        for (const [lineUserId, coinAdjustment] of coinAdjustmentByUser.entries()) {
+            await conn.query(
+                'UPDATE users SET coinBalance = GREATEST(0, coinBalance + ?) WHERE lineUserId=?',
+                [coinAdjustment, lineUserId]
+            );
+        }
+        const coinAdjustment = [...coinAdjustmentByUser.values()].reduce((sum, value) => sum + value, 0);
+        const refundCoins = [...coinAdjustmentByUser.values()]
+            .filter(value => value > 0)
+            .reduce((sum, value) => sum + value, 0);
 
         // lottery_quiz_answers has no roundId — count by usedForTicketId linkage
         const [[{ quizCount }]] = await conn.query(
@@ -6413,9 +6434,9 @@ app.post('/api/admin/lottery/rounds/:roundId/reset-tickets', async (req, res) =>
         await conn.commit();
 
         await logAdminAction(requesterId, 'LOTTERY_RESET_TICKETS', 'round', roundId, round.drawDate,
-            { ticketCount, purchaseCount, quizCount, isTest: !!round.isTest });
+            { ticketCount, purchaseCount, quizCount, refundCoins, coinAdjustment, adjustedUsers: coinAdjustmentByUser.size, isTest: !!round.isTest });
 
-        res.json({ status: 'success', data: { ticketCount, purchaseCount, quizCount } });
+        res.json({ status: 'success', data: { ticketCount, purchaseCount, quizCount, refundCoins, coinAdjustment, adjustedUsers: coinAdjustmentByUser.size } });
     } catch (e) {
         if (conn) {
             try { await conn.rollback(); } catch (_) {}
