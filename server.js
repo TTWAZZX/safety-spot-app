@@ -4592,8 +4592,12 @@ async function fetchLotteryResultWithGemini() {
 
     const geminiPayload = {
         contents: [{ parts: [{ text:
-            `จากข้อมูล HTML ผลหวยไทยนี้ ดึงเฉพาะผลรางวัลเลขท้าย 2 ตัว และเลขท้าย 3 ตัว ออกมาเป็น JSON\n` +
-            `ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น:\n{"last2":"XX","last3_back":"XXX","last3_front":"XXX"}\n\nHTML:\n${String(htmlRes.data).slice(0, 8000)}`
+            `จากข้อมูลผลหวยไทยนี้ ดึงเฉพาะผลรางวัลดังนี้ออกมาเป็น JSON:\n` +
+            `- last2: เลขท้าย 2 ตัว (2 หลักเท่านั้น ตัวเลขเดียว)\n` +
+            `- last3_back: เลขท้าย 3 ตัวหลัง (3 หลักเท่านั้น ถ้ามีหลายรางวัลให้เอาตัวแรก)\n` +
+            `- last3_front: เลขท้าย 3 ตัวหน้า (3 หลักเท่านั้น ถ้ามีหลายรางวัลให้เอาตัวแรก)\n` +
+            `ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น ห้ามใส่ลูกน้ำหรือหลายค่า:\n` +
+            `{"last2":"XX","last3_back":"XXX","last3_front":"XXX"}\n\nข้อมูล:\n${String(htmlRes.data).slice(0, 8000)}`
         }]}],
         generationConfig: { responseMimeType: 'application/json' }
     };
@@ -4615,6 +4619,12 @@ async function fetchLotteryResultWithGemini() {
         }
     }
     if (!parsed) throw lastGeminiError || new Error('Unable to parse lottery result with Gemini');
+
+    // Sanitize: AI อาจส่งค่าหลายรางวัลคั่นด้วยลูกน้ำ → ดึงเฉพาะลำดับตัวเลขที่ถูกต้องตัวแรก
+    if (parsed.last2) { const m = String(parsed.last2).match(/\d{2}/); if (m) parsed.last2 = m[0]; }
+    if (parsed.last3_back) { const m = String(parsed.last3_back).match(/\d{3}/); if (m) parsed.last3_back = m[0]; }
+    if (parsed.last3_front) { const m = String(parsed.last3_front).match(/\d{3}/); if (m) parsed.last3_front = m[0]; }
+
     if (!parsed.last2 || !/^\d{2}$/.test(parsed.last2)) throw new Error('Invalid last2: ' + parsed.last2);
     if (!parsed.last3_back || !/^\d{3}$/.test(parsed.last3_back)) throw new Error('Invalid last3_back: ' + parsed.last3_back);
     return { parsed, sourceModel };
