@@ -6766,7 +6766,7 @@ async function loadMyLotteryTickets() {
                     </div>
                     <div class="ticket-number-large">${sanitizeHTML(t.number)}</div>
                     <div class="ticket-meta-row">
-                        <span>${t.ticketType === 'six' ? `Prize ${_lotterySettings.prizeSix.toLocaleString()} pts` : t.ticketType === 'two' ? `Prize ${_lotterySettings.prizeTwo.toLocaleString()} pts` : `Prize ${_lotterySettings.prizeThree.toLocaleString()} pts`}</span>
+                        <span>${`Prize ${(t.ticketType === 'six' ? (t.prizeSixSnapshot || _lotterySettings.prizeSix) : t.ticketType === 'two' ? (t.prizeTwoSnapshot || _lotterySettings.prizeTwo) : (t.prizeThreeSnapshot || _lotterySettings.prizeThree)).toLocaleString()} pts`}</span>
                         <span>${t.isPrizeClaimed ? 'จ่ายแล้ว' : (isWin ? 'รอจ่าย' : 'Active')}</span>
                     </div>
                     ${isWin ? `<div class="ticket-prize-badge">+${Number(t.prizeAmount).toLocaleString()} Points</div>` : ''}

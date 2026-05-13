@@ -5314,7 +5314,8 @@ app.get('/api/lottery/my-tickets', async (req, res) => {
         assertLotteryUserRequest(req, lineUserId);
         const [tickets] = await db.query(
             `SELECT t.*, DATE_FORMAT(r.drawDate, '%Y-%m-%d') AS drawDate, r.status AS roundStatus,
-                    r.last2, r.last3_back, r.last3_back2, r.first_prize
+                    r.last2, r.last3_back, r.last3_back2, r.first_prize,
+                    r.prizeTwoSnapshot, r.prizeThreeSnapshot, r.prizeSixSnapshot
              FROM lottery_tickets t
              JOIN lottery_rounds r ON t.roundId = r.roundId
              WHERE t.lineUserId = ?
