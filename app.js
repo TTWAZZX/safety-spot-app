@@ -6896,9 +6896,13 @@ async function loadAdminLotteryDashboard() {
                 ? `<button class="btn btn-xs py-0 px-1 btn-outline-secondary" onclick="adminEditLotteryRound('${sanitizeHTML(r.roundId)}','${sanitizeHTML(r.drawDate)}')" title="แก้วันที่"><i class="fas fa-pen"></i></button>`
                 : '';
             const delBtn = `<button class="btn btn-xs py-0 px-1 btn-outline-danger" onclick="adminDeleteLotteryRound('${sanitizeHTML(r.roundId)}',${!!r.isTest},${Number(r.ticketCount||0)})" title="ลบงวด"><i class="fas fa-trash"></i></button>`;
-            const canReset = !['confirmed', 'completed'].includes(r.status);
+            const canReset = !['confirmed', 'completed', 'pending_confirm'].includes(r.status);
             const resetBtn = canReset
                 ? `<button class="btn btn-xs py-0 px-1 btn-outline-warning" onclick="adminResetLotteryRound('${sanitizeHTML(r.roundId)}','${sanitizeHTML(r.drawDate)}',${Number(r.ticketCount||0)})" title="รีเซตตั๋วทั้งหมด"><i class="fas fa-undo"></i></button>`
+                : '';
+            const canFullReset = ['confirmed', 'completed', 'pending_confirm'].includes(r.status);
+            const fullResetBtn = canFullReset
+                ? `<button class="btn btn-xs py-0 px-1 btn-outline-danger" onclick="adminFullResetLotteryRound('${sanitizeHTML(r.roundId)}','${sanitizeHTML(r.drawDate)}')" title="ย้อนผลและรีเซตทั้งงวด (คืนคะแนน)"><i class="fas fa-rotate-left"></i></button>`
                 : '';
             const testBtn = r.isTest
                 ? `<button class="btn btn-xs py-0 px-1 btn-outline-info" onclick="openLotteryModal('${sanitizeHTML(r.roundId)}')" title="ทดสอบซื้อตั๋ว"><i class="fas fa-flask"></i></button>`
@@ -6908,7 +6912,7 @@ async function loadAdminLotteryDashboard() {
                 <td>${r.last2 ? sanitizeHTML(r.last2) : '-'} / ${r.last3_back ? sanitizeHTML(r.last3_back) : '-'}</td>
                 <td><span class="badge bg-${color}">${label}</span>${testBadge}${autoBadge}</td>
                 <td>${r.totalWinners || 0}</td>
-                <td class="text-end" style="white-space:nowrap">${testBtn} ${editBtn} ${resetBtn} ${delBtn}</td>
+                <td class="text-end" style="white-space:nowrap">${testBtn} ${editBtn} ${resetBtn} ${fullResetBtn} ${delBtn}</td>
             </tr>`;
         });
 
@@ -7514,6 +7518,41 @@ async function adminResetLotteryRound(roundId, drawDate, ticketCount) {
             icon: 'success',
             title: 'รีเซตสำเร็จ',
             html: `ลบแล้ว: ตั๋ว <strong>${res.ticketCount}</strong> ใบ · โควต้ารายวัน <strong>${res.purchaseCount}</strong> รายการ`,
+            confirmButtonColor: '#06C755'
+        });
+        await loadAdminLotteryDashboard();
+        await loadAdminLotteryMonitor(true);
+    } catch (e) { Swal.fire('Error', e.message, 'error'); }
+}
+
+async function adminFullResetLotteryRound(roundId, drawDate) {
+    const { isConfirmed } = await Swal.fire({
+        icon: 'warning',
+        title: `ย้อนผลงวด ${sanitizeHTML(drawDate)}`,
+        html: `<p class="mb-2">การรีเซตนี้จะ:</p>
+               <ul class="text-start small mb-2">
+                 <li>คืนคะแนนและสถิติของผู้ชนะทุกคน</li>
+                 <li>รีเซตตั๋วทั้งหมด (isWinner = false)</li>
+                 <li>ลบ notification ผู้ชนะ</li>
+                 <li>ล้างผลหวยและเปลี่ยนสถานะเป็น <strong>closed</strong></li>
+               </ul>
+               <p class="text-muted small">ใช้เพื่อทดสอบซ้ำเท่านั้น</p>`,
+        showCancelButton: true,
+        confirmButtonText: 'ย้อนผลและรีเซต',
+        confirmButtonColor: '#dc2626',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!isConfirmed) return;
+    try {
+        Swal.fire({ title: 'กำลังรีเซต...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        const res = await callApi(`/api/admin/lottery/rounds/${encodeURIComponent(roundId)}/reset-round`, {
+            requesterId: AppState.lineProfile.userId
+        }, 'POST');
+        await Swal.fire({
+            icon: 'success',
+            title: 'รีเซตสำเร็จ',
+            html: `คืนคะแนน <strong>${res.data.reversedWinners}</strong> ผู้ชนะ · รีเซต <strong>${res.data.ticketsReset}</strong> ตั๋ว<br>
+                   งวด <strong>${sanitizeHTML(drawDate)}</strong> กลับเป็น <span class="badge bg-warning text-dark">closed</span>`,
             confirmButtonColor: '#06C755'
         });
         await loadAdminLotteryDashboard();

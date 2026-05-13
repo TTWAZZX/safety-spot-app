@@ -6418,6 +6418,86 @@ app.post('/api/admin/lottery/rounds/:roundId/reset-tickets', async (req, res) =>
     }
 });
 
+// POST /api/admin/lottery/rounds/:roundId/reset-round — Full reset: ย้อนคะแนน + clear ผล + status=closed
+app.post('/api/admin/lottery/rounds/:roundId/reset-round', async (req, res) => {
+    const { requesterId } = req.body;
+    const { roundId } = req.params;
+    let conn;
+    try {
+        const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
+        if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
+
+        const [[round]] = await db.query('SELECT * FROM lottery_rounds WHERE roundId=?', [roundId]);
+        if (!round) return res.status(404).json({ status: 'error', message: 'ไม่พบงวดนี้' });
+        if (!['completed', 'confirmed', 'pending_confirm'].includes(round.status))
+            return res.status(400).json({ status: 'error', message: `ไม่สามารถ reset งวดที่มีสถานะ '${round.status}' ได้ (ต้องเป็น completed/confirmed/pending_confirm)` });
+
+        conn = await db.getClient();
+        await conn.beginTransaction();
+
+        // หาตั๋วที่ถูกรางวัล เพื่อย้อนคะแนน
+        const [winners] = await conn.query(
+            `SELECT lineUserId, prizeAmount FROM lottery_tickets WHERE roundId=? AND isWinner=TRUE FOR UPDATE`,
+            [roundId]
+        );
+
+        // ย้อนคะแนน / winCount / totalWinnings
+        for (const w of winners) {
+            const prize = Number(w.prizeAmount) || 0;
+            if (prize > 0) {
+                await conn.query(
+                    `UPDATE users SET
+                        totalScore = GREATEST(0, totalScore - ?),
+                        lotteryWinCount = GREATEST(0, lotteryWinCount - 1),
+                        lotteryTotalWinnings = GREATEST(0, lotteryTotalWinnings - ?)
+                     WHERE lineUserId=?`,
+                    [prize, prize, w.lineUserId]
+                );
+            }
+        }
+
+        // Reset ตั๋วทั้งหมด
+        const [ticketReset] = await conn.query(
+            `UPDATE lottery_tickets SET isWinner=FALSE, isPrizeClaimed=FALSE, prizeAmount=0 WHERE roundId=?`,
+            [roundId]
+        );
+
+        // ลบ notification ที่เกี่ยวกับงวดนี้
+        await conn.query(
+            `DELETE FROM notifications WHERE type IN ('lottery_win','lottery_admin_alert') AND relatedItemId=?`,
+            [roundId]
+        );
+
+        // Clear ผลรางวัล + ย้อน status เป็น closed
+        await conn.query(
+            `UPDATE lottery_rounds
+             SET status='closed', source='manual', confirmedBy=NULL,
+                 first_prize=NULL, last2=NULL, last3_back=NULL, last3_back2=NULL,
+                 last3_front=NULL, last3_front2=NULL,
+                 prizeTwoSnapshot=NULL, prizeThreeSnapshot=NULL,
+                 priceTwoSnapshot=NULL, priceThreeSnapshot=NULL,
+                 prizeSixSnapshot=NULL, priceSixSnapshot=NULL
+             WHERE roundId=?`,
+            [roundId]
+        );
+
+        await conn.commit();
+        await logAdminAction(requesterId, 'LOTTERY_RESET_ROUND', 'round', roundId, roundId,
+            { reversedWinners: winners.length, ticketsReset: ticketReset.affectedRows });
+
+        res.json({ status: 'success', data: {
+            message: `Reset งวด ${roundId} เรียบร้อย`,
+            reversedWinners: winners.length,
+            ticketsReset: ticketReset.affectedRows
+        }});
+    } catch (e) {
+        if (conn) await conn.rollback();
+        res.status(500).json({ status: 'error', message: e.message });
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
 // GET /api/admin/lottery/preview-auto-rounds — Preview dates before auto-creating rounds
 app.get('/api/admin/lottery/preview-auto-rounds', async (req, res) => {
     const { requesterId, count = 4 } = req.query;
