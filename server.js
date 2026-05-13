@@ -626,8 +626,8 @@ app.get('/api/home/lottery-summary', async (req, res) => {
                 currentRound: round ? { ...round, isClosed: isLotteryRoundClosed(round), stats: roundStats } : null,
                 latestResult: latestResult || null,
                 user,
-                prices: { two: settings.priceTwo, three: settings.priceThree },
-                prizes: { two: settings.prizeTwo, three: settings.prizeThree },
+                prices: { two: settings.priceTwo, three: settings.priceThree, six: settings.priceSix },
+                prizes: { two: settings.prizeTwo, three: settings.prizeThree, six: settings.prizeSix },
                 dailyQuota: settings.dailyLimit
             }
         });
@@ -4103,6 +4103,13 @@ db.query("ALTER TABLE lottery_rounds ADD COLUMN prizeTwoSnapshot INT DEFAULT NUL
 db.query("ALTER TABLE lottery_rounds ADD COLUMN prizeThreeSnapshot INT DEFAULT NULL").catch(() => {});
 db.query("ALTER TABLE lottery_rounds ADD COLUMN priceTwoSnapshot INT DEFAULT NULL").catch(() => {});
 db.query("ALTER TABLE lottery_rounds ADD COLUMN priceThreeSnapshot INT DEFAULT NULL").catch(() => {});
+// เพิ่มรางวัลครบทุกประเภทหวยไทย
+db.query("ALTER TABLE lottery_rounds ADD COLUMN first_prize VARCHAR(6) DEFAULT NULL").catch(() => {});
+db.query("ALTER TABLE lottery_rounds ADD COLUMN last3_back2 VARCHAR(3) DEFAULT NULL").catch(() => {});
+db.query("ALTER TABLE lottery_rounds ADD COLUMN last3_front2 VARCHAR(3) DEFAULT NULL").catch(() => {});
+db.query("ALTER TABLE lottery_rounds ADD COLUMN prizeSixSnapshot INT DEFAULT NULL").catch(() => {});
+db.query("ALTER TABLE lottery_rounds ADD COLUMN priceSixSnapshot INT DEFAULT NULL").catch(() => {});
+db.query("ALTER TABLE lottery_tickets MODIFY number VARCHAR(6) NOT NULL").catch(() => {});
 
 db.query(`CREATE TABLE IF NOT EXISTS lottery_rounds (
   roundId       VARCHAR(50) PRIMARY KEY,
@@ -4197,7 +4204,9 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_settings (
 
 db.query(`INSERT IGNORE INTO lottery_settings (settingKey, settingValue) VALUES
   ('user_enabled', 'false'),
-  ('disabled_message', 'Safety Lottery is being prepared by the admin team.')`).catch(() => {});
+  ('disabled_message', 'Safety Lottery is being prepared by the admin team.'),
+  ('prize_six', '100000'),
+  ('price_six', '100')`).catch(() => {});
 
 db.query(`CREATE TABLE IF NOT EXISTS lottery_quiz_answers (
   id             INT AUTO_INCREMENT PRIMARY KEY,
@@ -4398,7 +4407,7 @@ const DEFAULT_LOTTERY_DISABLED_MESSAGE = 'ขณะนี้ Safety Lottery ก�
 async function getLotterySettings(conn = db) {
     const [rows] = await conn.query(
         `SELECT settingKey, settingValue FROM lottery_settings
-         WHERE settingKey IN ('user_enabled','disabled_message','prize_two','prize_three','price_two','price_three','daily_limit','maintenance_started_at')`
+         WHERE settingKey IN ('user_enabled','disabled_message','prize_two','prize_three','price_two','price_three','prize_six','price_six','daily_limit','maintenance_started_at')`
     );
     const map = Object.fromEntries(rows.map(r => [r.settingKey, r.settingValue]));
     return {
@@ -4408,6 +4417,8 @@ async function getLotterySettings(conn = db) {
         prizeThree: Number(map.prize_three) || 3000,
         priceTwo: Number(map.price_two) || 10,
         priceThree: Number(map.price_three) || 30,
+        prizeSix: Number(map.prize_six) || 100000,
+        priceSix: Number(map.price_six) || 100,
         dailyLimit: Number(map.daily_limit) || 5,
         maintenanceStartedAt: map.maintenance_started_at || null
     };
@@ -4420,6 +4431,8 @@ async function getLotteryRoundPrizeSnapshot(round, conn = db) {
         prizeThree: Number(round?.prizeThreeSnapshot) || settings.prizeThree,
         priceTwo: Number(round?.priceTwoSnapshot) || settings.priceTwo,
         priceThree: Number(round?.priceThreeSnapshot) || settings.priceThree,
+        prizeSix: Number(round?.prizeSixSnapshot) || settings.prizeSix,
+        priceSix: Number(round?.priceSixSnapshot) || settings.priceSix,
         source: (round?.prizeTwoSnapshot && round?.prizeThreeSnapshot) ? 'round_snapshot' : 'current_settings'
     };
 }
@@ -4472,11 +4485,12 @@ async function pushLineFlexMessage(lineUserId, flexMessage, logLabel = 'LINE Pus
 }
 
 async function sendLotteryWinNotification(lineUserId, ticketData) {
-    const isTwo       = ticketData.ticketType === 'two';
-    const isGold      = !!ticketData.isGoldTicket;
-    const typeBadgeBg = isTwo ? '#065F46' : '#7C2D12';
-    const typeLabel   = isTwo ? '2 ตัวท้าย' : '3 ตัวท้าย';
-    const typeCode    = isTwo ? '2D' : '3D';
+    const isSix  = ticketData.ticketType === 'six';
+    const isTwo  = ticketData.ticketType === 'two';
+    const isGold = !!ticketData.isGoldTicket;
+    const typeBadgeBg = isSix ? '#78350F' : isTwo ? '#065F46' : '#7C2D12';
+    const typeLabel   = isSix ? 'รางวัลที่ 1' : isTwo ? '2 ตัวท้าย' : '3 ตัวท้าย';
+    const typeCode    = isSix ? '6D' : isTwo ? '2D' : '3D';
     const goldSuffix  = isGold ? ' · Gold Ticket' : '';
 
     const flexMessage = {
@@ -4603,6 +4617,13 @@ function _buildLotteryResultFlex({ success, drawDateStr, result, reason }) {
                 {
                     type: 'box', layout: 'horizontal', margin: 'none',
                     contents: [
+                        { type: 'text', text: 'รางวัลที่ 1', size: 'sm', color: '#374151', flex: 1 },
+                        { type: 'text', text: result.first_prize || '-', size: 'xl', color: '#065F46', weight: 'bold', align: 'end' }
+                    ]
+                },
+                {
+                    type: 'box', layout: 'horizontal', margin: 'sm',
+                    contents: [
                         { type: 'text', text: '2 ตัวท้าย', size: 'sm', color: '#374151', flex: 1 },
                         { type: 'text', text: result.last2 || '-', size: 'xxl', color: '#065F46', weight: 'bold', align: 'end' }
                     ]
@@ -4610,15 +4631,15 @@ function _buildLotteryResultFlex({ success, drawDateStr, result, reason }) {
                 {
                     type: 'box', layout: 'horizontal', margin: 'sm',
                     contents: [
-                        { type: 'text', text: '3 ตัวหน้า', size: 'sm', color: '#374151', flex: 1 },
-                        { type: 'text', text: result.last3_front || '-', size: 'xl', color: '#1F2937', weight: 'bold', align: 'end' }
+                        { type: 'text', text: '3 ตัวหลัง', size: 'sm', color: '#374151', flex: 1 },
+                        { type: 'text', text: [result.last3_back, result.last3_back2].filter(Boolean).join(', ') || '-', size: 'xl', color: '#1F2937', weight: 'bold', align: 'end' }
                     ]
                 },
                 {
                     type: 'box', layout: 'horizontal', margin: 'sm',
                     contents: [
-                        { type: 'text', text: '3 ตัวหลัง', size: 'sm', color: '#374151', flex: 1 },
-                        { type: 'text', text: result.last3_back || '-', size: 'xl', color: '#1F2937', weight: 'bold', align: 'end' }
+                        { type: 'text', text: '3 ตัวหน้า', size: 'sm', color: '#374151', flex: 1 },
+                        { type: 'text', text: [result.last3_front, result.last3_front2].filter(Boolean).join(', ') || '-', size: 'xl', color: '#1F2937', weight: 'bold', align: 'end' }
                     ]
                 }
             ]
@@ -4765,9 +4786,12 @@ async function notifyLotteryAdminsForManualResult(roundId, reason) {
 // ======================================================
 // Sanitize a parsed lottery result object in-place; returns true if valid
 function _sanitizeLotteryParsed(parsed) {
-    if (parsed.last2)       { const m = String(parsed.last2).match(/\d{2}/);       if (m) parsed.last2       = m[0]; }
-    if (parsed.last3_back)  { const m = String(parsed.last3_back).match(/\d{3}/);  if (m) parsed.last3_back  = m[0]; }
-    if (parsed.last3_front) { const m = String(parsed.last3_front).match(/\d{3}/); if (m) parsed.last3_front = m[0]; }
+    if (parsed.last2)        { const m = String(parsed.last2).match(/\d{2}/);        if (m) parsed.last2        = m[0]; }
+    if (parsed.last3_back)   { const m = String(parsed.last3_back).match(/\d{3}/);   if (m) parsed.last3_back   = m[0]; }
+    if (parsed.last3_back2)  { const m = String(parsed.last3_back2).match(/\d{3}/);  if (m) parsed.last3_back2  = m[0]; else delete parsed.last3_back2; }
+    if (parsed.last3_front)  { const m = String(parsed.last3_front).match(/\d{3}/);  if (m) parsed.last3_front  = m[0]; }
+    if (parsed.last3_front2) { const m = String(parsed.last3_front2).match(/\d{3}/); if (m) parsed.last3_front2 = m[0]; else delete parsed.last3_front2; }
+    if (parsed.first_prize)  { const m = String(parsed.first_prize).match(/\d{6}/);  if (m) parsed.first_prize  = m[0]; else delete parsed.first_prize; }
     return /^\d{2}$/.test(parsed.last2 || '') && /^\d{3}$/.test(parsed.last3_back || '');
 }
 
@@ -4781,10 +4805,13 @@ async function _fetchLotteryFromGLO(drawDateStr) {
         contents: [{ parts: [{ text:
             `จากข้อมูลด้านล่างนี้ หาผลสลากกินแบ่งรัฐบาลไทยงวดวันที่ ${drawDateStr} เท่านั้น\n` +
             `ถ้าไม่พบผลสำหรับวันที่นี้ ให้ตอบ {"error":"not_found"}\n` +
-            `- last2: เลขท้าย 2 ตัว (2 หลัก ตัวเดียว)\n` +
-            `- last3_back: เลขท้าย 3 ตัวหลัง (3 หลัก ถ้ามีหลายรางวัลให้เอาตัวแรก)\n` +
-            `- last3_front: เลขท้าย 3 ตัวหน้า (3 หลัก ถ้ามีหลายรางวัลให้เอาตัวแรก)\n` +
-            `ตอบ JSON เท่านั้น: {"last2":"XX","last3_back":"XXX","last3_front":"XXX"}\n\nข้อมูล:\n${String(res.data).slice(0, 8000)}`
+            `- first_prize: รางวัลที่ 1 (6 หลักเต็ม)\n` +
+            `- last2: เลขท้าย 2 ตัว (2 หลัก มีรางวัลเดียว)\n` +
+            `- last3_back: เลขท้าย 3 ตัวหลัง รางวัลที่ 1 (3 หลัก)\n` +
+            `- last3_back2: เลขท้าย 3 ตัวหลัง รางวัลที่ 2 (3 หลัก ถ้ามี)\n` +
+            `- last3_front: เลขหน้า 3 ตัว รางวัลที่ 1 (3 หลัก ถ้ามี)\n` +
+            `- last3_front2: เลขหน้า 3 ตัว รางวัลที่ 2 (3 หลัก ถ้ามี)\n` +
+            `ตอบ JSON เท่านั้น: {"first_prize":"XXXXXX","last2":"XX","last3_back":"XXX","last3_back2":"XXX","last3_front":"XXX","last3_front2":"XXX"}\n\nข้อมูล:\n${String(res.data).slice(0, 8000)}`
         }]}],
         generationConfig: { responseMimeType: 'application/json' }
     };
@@ -4810,9 +4837,14 @@ async function _fetchLotteryFromGrounding(drawDateStr) {
     const payload = {
         contents: [{ parts: [{ text:
             `ค้นหาผลสลากกินแบ่งรัฐบาลไทย งวดประจำวันที่ ${thaiDate} (${drawDateStr}) จากแหล่งทางการ\n` +
-            `ต้องการเฉพาะ: เลขท้าย 2 ตัว, เลขท้าย 3 ตัวหน้า, เลขท้าย 3 ตัวหลัง\n` +
-            `ถ้ามีหลายรางวัลในประเภทเดียวกันให้เอาตัวแรก ห้ามใส่ลูกน้ำหรือหลายค่า\n` +
-            `ตอบ JSON เท่านั้น: {"last2":"XX","last3_back":"XXX","last3_front":"XXX"}`
+            `ต้องการข้อมูลครบทุกประเภทรางวัล:\n` +
+            `- first_prize: รางวัลที่ 1 เลข 6 หลักเต็ม\n` +
+            `- last2: เลขท้าย 2 ตัว (มี 1 รางวัล)\n` +
+            `- last3_back: เลขท้าย 3 ตัวหลัง ชุดที่ 1\n` +
+            `- last3_back2: เลขท้าย 3 ตัวหลัง ชุดที่ 2 (ถ้ามี)\n` +
+            `- last3_front: เลขหน้า 3 ตัว ชุดที่ 1 (ถ้ามี)\n` +
+            `- last3_front2: เลขหน้า 3 ตัว ชุดที่ 2 (ถ้ามี)\n` +
+            `ตอบ JSON เท่านั้น: {"first_prize":"XXXXXX","last2":"XX","last3_back":"XXX","last3_back2":"XXX","last3_front":"XXX","last3_front2":"XXX"}`
         }]}],
         tools: [{ google_search: {} }]
     };
@@ -4872,10 +4904,16 @@ async function fetchAndSaveLotteryResultsForRound(roundId, { requesterId = null,
     const sourceTag = warning ? ':ss' : ':cv';
     const source = (`${sourcePrefix}:${sourceModel || 'unknown'}${sourceTag}`).slice(0, 50);
     await db.query(
-        `UPDATE lottery_rounds SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source=?, confirmedBy=? WHERE roundId=?`,
-        [parsed.last2, parsed.last3_front || null, parsed.last3_back, source, requesterId, roundId]
+        `UPDATE lottery_rounds
+         SET first_prize=?, last2=?, last3_back=?, last3_back2=?, last3_front=?, last3_front2=?,
+             status='pending_confirm', source=?, confirmedBy=?
+         WHERE roundId=?`,
+        [parsed.first_prize || null, parsed.last2, parsed.last3_back, parsed.last3_back2 || null,
+         parsed.last3_front || null, parsed.last3_front2 || null, source, requesterId, roundId]
     );
-    return { roundId, drawDateStr: round.drawDateStr, last2: parsed.last2, last3_front: parsed.last3_front || null, last3_back: parsed.last3_back, source };
+    return { roundId, drawDateStr: round.drawDateStr, first_prize: parsed.first_prize || null,
+             last2: parsed.last2, last3_back: parsed.last3_back, last3_back2: parsed.last3_back2 || null,
+             last3_front: parsed.last3_front || null, last3_front2: parsed.last3_front2 || null, source };
 }
 
 async function fetchAndSaveLotteryResults(retryCount = 0) {
@@ -5163,11 +5201,11 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
         return res.status(err.statusCode || 403).json({ status: 'error', message: err.message, code: err.code });
     }
 
-    if (!['two', 'three'].includes(ticketType))
+    if (!['two', 'three', 'six'].includes(ticketType))
         return res.status(400).json({ status: 'error', message: 'ประเภทตั๋วไม่ถูกต้อง' });
 
     const numberText = String(number);
-    const requiredDigits = ticketType === 'two' ? 2 : 3;
+    const requiredDigits = ticketType === 'two' ? 2 : ticketType === 'three' ? 3 : 6;
     if (!new RegExp(`^\\d{${requiredDigits}}$`).test(numberText))
         return res.status(400).json({ status: 'error', message: `เลขต้องเป็นตัวเลข ${requiredDigits} หลัก` });
 
@@ -5178,7 +5216,7 @@ app.post('/api/lottery/buy-ticket', async (req, res) => {
     try {
         await conn.beginTransaction();
         const settings = await getLotterySettings(conn);
-        const price = ticketType === 'two' ? settings.priceTwo : settings.priceThree;
+        const price = ticketType === 'six' ? settings.priceSix : ticketType === 'two' ? settings.priceTwo : settings.priceThree;
         const dailyLimit = settings.dailyLimit;
 
         const [[user]] = await conn.query('SELECT coinBalance FROM users WHERE lineUserId = ? FOR UPDATE', [lineUserId]);
@@ -5443,16 +5481,19 @@ app.post('/api/lottery/claim-gold-ticket', async (req, res) => {
 
 // POST /api/admin/lottery/set-result — กรอกผลรางวัล manual
 app.post('/api/admin/lottery/set-result', async (req, res) => {
-    const { requesterId, roundId, last2, last3_front, last3_back } = req.body;
+    const { requesterId, roundId, first_prize, last2, last3_front, last3_front2, last3_back, last3_back2 } = req.body;
     try {
         const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
         if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
 
         if (!roundId || !last2 || !last3_back)
-            return res.status(400).json({ status: 'error', message: 'ข้อมูลไม่ครบ' });
+            return res.status(400).json({ status: 'error', message: 'ข้อมูลไม่ครบ (ต้องมีอย่างน้อย 2 ตัวท้าย และ 3 ตัวท้ายชุด 1)' });
         if (!/^\d{2}$/.test(last2)) return res.status(400).json({ status: 'error', message: 'รูปแบบ 2 ตัวท้ายไม่ถูกต้อง' });
-        if (!/^\d{3}$/.test(last3_back)) return res.status(400).json({ status: 'error', message: 'รูปแบบ 3 ตัวท้ายไม่ถูกต้อง' });
-        if (last3_front && !/^\d{3}$/.test(last3_front)) return res.status(400).json({ status: 'error', message: 'รูปแบบ 3 ตัวหน้าไม่ถูกต้อง' });
+        if (!/^\d{3}$/.test(last3_back)) return res.status(400).json({ status: 'error', message: 'รูปแบบ 3 ตัวท้ายชุด 1 ไม่ถูกต้อง' });
+        if (last3_back2 && !/^\d{3}$/.test(last3_back2)) return res.status(400).json({ status: 'error', message: 'รูปแบบ 3 ตัวท้ายชุด 2 ไม่ถูกต้อง' });
+        if (last3_front && !/^\d{3}$/.test(last3_front)) return res.status(400).json({ status: 'error', message: 'รูปแบบ 3 ตัวหน้าชุด 1 ไม่ถูกต้อง' });
+        if (last3_front2 && !/^\d{3}$/.test(last3_front2)) return res.status(400).json({ status: 'error', message: 'รูปแบบ 3 ตัวหน้าชุด 2 ไม่ถูกต้อง' });
+        if (first_prize && !/^\d{6}$/.test(first_prize)) return res.status(400).json({ status: 'error', message: 'รูปแบบรางวัลที่ 1 ไม่ถูกต้อง (ต้องเป็น 6 หลัก)' });
 
         const [[round]] = await db.query('SELECT status FROM lottery_rounds WHERE roundId=?', [roundId]);
         if (!round) return res.status(404).json({ status: 'error', message: 'ไม่พบงวดนี้' });
@@ -5465,14 +5506,16 @@ app.post('/api/admin/lottery/set-result', async (req, res) => {
 
         const [updateResult] = await db.query(
             `UPDATE lottery_rounds
-             SET last2=?, last3_front=?, last3_back=?, status='pending_confirm', source='manual', confirmedBy=?
+             SET first_prize=?, last2=?, last3_back=?, last3_back2=?, last3_front=?, last3_front2=?,
+                 status='pending_confirm', source='manual', confirmedBy=?
              WHERE roundId=? AND status IN ('open','closed','pending_manual','pending_confirm')`,
-            [last2, last3_front || null, last3_back, requesterId, roundId]
+            [first_prize || null, last2, last3_back, last3_back2 || null,
+             last3_front || null, last3_front2 || null, requesterId, roundId]
         );
         if (updateResult.affectedRows !== 1) {
             return res.status(409).json({ status: 'error', message: 'สถานะงวดเปลี่ยนไประหว่างบันทึก กรุณาโหลดใหม่' });
         }
-        await logAdminAction(requesterId, 'LOTTERY_SET_RESULT', 'round', roundId, roundId, { last2, last3_back });
+        await logAdminAction(requesterId, 'LOTTERY_SET_RESULT', 'round', roundId, roundId, { first_prize, last2, last3_back, last3_back2 });
         res.json({ status: 'success', data: { message: 'บันทึกผลรางวัลแล้ว รอยืนยัน' } });
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
@@ -5537,9 +5580,11 @@ app.post('/api/admin/lottery/confirm-result', async (req, res) => {
         const [updateResult] = await db.query(
             `UPDATE lottery_rounds
              SET status='confirmed', confirmedBy=?,
-                 prizeTwoSnapshot=?, prizeThreeSnapshot=?, priceTwoSnapshot=?, priceThreeSnapshot=?
+                 prizeTwoSnapshot=?, prizeThreeSnapshot=?, priceTwoSnapshot=?, priceThreeSnapshot=?,
+                 prizeSixSnapshot=?, priceSixSnapshot=?
              WHERE roundId=? AND status='pending_confirm'`,
-            [requesterId, settings.prizeTwo, settings.prizeThree, settings.priceTwo, settings.priceThree, roundId]
+            [requesterId, settings.prizeTwo, settings.prizeThree, settings.priceTwo, settings.priceThree,
+             settings.prizeSix, settings.priceSix, roundId]
         );
         if (updateResult.affectedRows !== 1) {
             return res.status(409).json({ status: 'error', message: 'สถานะงวดเปลี่ยนไประหว่างยืนยัน กรุณาโหลดใหม่' });
@@ -5567,24 +5612,33 @@ app.get('/api/admin/lottery/preview-winners', async (req, res) => {
         const [win2] = await db.query(
             `SELECT t.ticketId, t.ticketType, t.number, t.isGoldTicket,
                     u.fullName, u.employeeId, u.department
-             FROM lottery_tickets t
-             JOIN users u ON u.lineUserId=t.lineUserId
+             FROM lottery_tickets t JOIN users u ON u.lineUserId=t.lineUserId
              WHERE t.roundId=? AND t.ticketType='two' AND t.number=? AND t.isPrizeClaimed=FALSE`,
             [roundId, round.last2]);
 
+        // 3D: match ทั้งสองชุด
+        const back3Nums = [round.last3_back, round.last3_back2].filter(Boolean);
         const [win3] = await db.query(
             `SELECT t.ticketId, t.ticketType, t.number, t.isGoldTicket,
                     u.fullName, u.employeeId, u.department
-             FROM lottery_tickets t
-             JOIN users u ON u.lineUserId=t.lineUserId
-             WHERE t.roundId=? AND t.ticketType='three' AND t.number=? AND t.isPrizeClaimed=FALSE`,
-            [roundId, round.last3_back]);
+             FROM lottery_tickets t JOIN users u ON u.lineUserId=t.lineUserId
+             WHERE t.roundId=? AND t.ticketType='three' AND t.number IN (${back3Nums.map(() => '?').join(',')}) AND t.isPrizeClaimed=FALSE`,
+            [roundId, ...back3Nums]);
+
+        // 6D: รางวัลที่ 1
+        const [win6] = round.first_prize ? await db.query(
+            `SELECT t.ticketId, t.ticketType, t.number, t.isGoldTicket,
+                    u.fullName, u.employeeId, u.department
+             FROM lottery_tickets t JOIN users u ON u.lineUserId=t.lineUserId
+             WHERE t.roundId=? AND t.ticketType='six' AND t.number=? AND t.isPrizeClaimed=FALSE`,
+            [roundId, round.first_prize]) : [[]];
 
         const [[totals]] = await db.query(
             'SELECT COUNT(*) AS totalTickets, COUNT(DISTINCT lineUserId) AS totalPlayers FROM lottery_tickets WHERE roundId=?',
             [roundId]);
 
         const winners = [
+            ...win6.map(w => ({ ...w, prize: prizeSnapshot.prizeSix })),
             ...win2.map(w => ({ ...w, prize: prizeSnapshot.prizeTwo })),
             ...win3.map(w => ({ ...w, prize: prizeSnapshot.prizeThree }))
         ];
@@ -5594,8 +5648,10 @@ app.get('/api/admin/lottery/preview-winners', async (req, res) => {
             round: {
                 roundId: round.roundId,
                 drawDate: toLotteryDateString(round.drawDate),
+                first_prize: round.first_prize || null,
                 last2: round.last2,
-                last3_back: round.last3_back,
+                last3_back: round.last3_back, last3_back2: round.last3_back2 || null,
+                last3_front: round.last3_front || null, last3_front2: round.last3_front2 || null,
                 status: round.status,
                 isTest: !!round.isTest,
                 prizeSnapshot
@@ -5628,23 +5684,31 @@ app.post('/api/admin/lottery/process-prizes', async (req, res) => {
         if (!round.last2 || !round.last3_back)
             throw new Error('Lottery result is incomplete');
 
+        // หาผู้ถูกรางวัลที่ 1 (6 ตัว)
+        const [win6] = round.first_prize ? await conn.query(
+            `SELECT * FROM lottery_tickets WHERE roundId=? AND ticketType='six' AND number=? AND isPrizeClaimed=FALSE FOR UPDATE`,
+            [roundId, round.first_prize]) : [[]];
+
         // หาผู้ถูกรางวัล 2 ตัวท้าย
         const [win2] = await conn.query(
             `SELECT * FROM lottery_tickets WHERE roundId=? AND ticketType='two' AND number=? AND isPrizeClaimed=FALSE FOR UPDATE`,
             [roundId, round.last2]);
 
-        // หาผู้ถูกรางวัล 3 ตัวท้าย
+        // หาผู้ถูกรางวัล 3 ตัวท้าย (ทั้งสองชุด)
+        const back3Nums = [round.last3_back, round.last3_back2].filter(Boolean);
         const [win3] = await conn.query(
-            `SELECT * FROM lottery_tickets WHERE roundId=? AND ticketType='three' AND number=? AND isPrizeClaimed=FALSE FOR UPDATE`,
-            [roundId, round.last3_back]);
+            `SELECT * FROM lottery_tickets WHERE roundId=? AND ticketType='three' AND number IN (${back3Nums.map(() => '?').join(',')}) AND isPrizeClaimed=FALSE FOR UPDATE`,
+            [roundId, ...back3Nums]);
 
-        const allWinners = [...win2, ...win3];
+        const allWinners = [...win6, ...win2, ...win3];
         let totalPrizes = 0;
         let paidWinners = 0;
 
         const prizeSettings = await getLotteryRoundPrizeSnapshot(round, conn);
         for (const ticket of allWinners) {
-            const prize = ticket.ticketType === 'two' ? prizeSettings.prizeTwo : prizeSettings.prizeThree;
+            const prize = ticket.ticketType === 'six' ? prizeSettings.prizeSix
+                        : ticket.ticketType === 'two' ? prizeSettings.prizeTwo
+                        : prizeSettings.prizeThree;
             const [ticketUpdate] = await conn.query(
                 `UPDATE lottery_tickets SET isWinner=TRUE, prizeAmount=?, isPrizeClaimed=TRUE WHERE ticketId=? AND isPrizeClaimed=FALSE`,
                 [prize, ticket.ticketId]);
@@ -5760,7 +5824,7 @@ app.get('/api/admin/lottery/settings', async (req, res) => {
 
 // POST /api/admin/lottery/settings — Update feature settings (enable/disable, prizes, prices, limits)
 app.post('/api/admin/lottery/settings', async (req, res) => {
-    const { requesterId, userEnabled, disabledMessage, prizeTwo, prizeThree, priceTwo, priceThree, dailyLimit } = req.body;
+    const { requesterId, userEnabled, disabledMessage, prizeTwo, prizeThree, priceTwo, priceThree, prizeSix, priceSix, dailyLimit } = req.body;
     try {
         const [[admin]] = await db.query('SELECT 1 FROM admins WHERE lineUserId=?', [requesterId]);
         if (!admin) return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์' });
@@ -5782,10 +5846,12 @@ app.post('/api/admin/lottery/settings', async (req, res) => {
         if (wasEnabled !== isNowEnabled) {
             pairs.push(['maintenance_started_at', isNowEnabled ? '' : new Date().toISOString(), requesterId]);
         }
-        if (prizeTwo != null && Number(prizeTwo) > 0) pairs.push(['prize_two', String(Number(prizeTwo)), requesterId]);
+        if (prizeTwo   != null && Number(prizeTwo)   > 0) pairs.push(['prize_two',   String(Number(prizeTwo)),   requesterId]);
         if (prizeThree != null && Number(prizeThree) > 0) pairs.push(['prize_three', String(Number(prizeThree)), requesterId]);
-        if (priceTwo != null && Number(priceTwo) > 0) pairs.push(['price_two', String(Number(priceTwo)), requesterId]);
+        if (prizeSix   != null && Number(prizeSix)   > 0) pairs.push(['prize_six',   String(Number(prizeSix)),   requesterId]);
+        if (priceTwo   != null && Number(priceTwo)   > 0) pairs.push(['price_two',   String(Number(priceTwo)),   requesterId]);
         if (priceThree != null && Number(priceThree) > 0) pairs.push(['price_three', String(Number(priceThree)), requesterId]);
+        if (priceSix   != null && Number(priceSix)   > 0) pairs.push(['price_six',   String(Number(priceSix)),   requesterId]);
         if (dailyLimit != null && Number(dailyLimit) > 0) pairs.push(['daily_limit', String(Number(dailyLimit)), requesterId]);
 
         for (const [key, val, by] of pairs) {

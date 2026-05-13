@@ -1950,6 +1950,14 @@
                                                 <div class="lottery-type-prize">รางวัล 3,000 pts</div>
                                             </div>
                                         </div>
+                                        <div class="col-12">
+                                            <div class="lottery-type-card lottery-type-card-six" id="type-six-card" onclick="selectLotteryType('six')">
+                                                <div class="lottery-type-icon">⭐</div>
+                                                <div class="lottery-type-name">รางวัลที่ 1 — 6 ตัวตรง</div>
+                                                <div class="lottery-type-price">100 เหรียญ</div>
+                                                <div class="lottery-type-prize">รางวัล 100,000 pts</div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div class="lottery-number-input-area mb-3">
@@ -2252,20 +2260,39 @@
                             <div class="alert alert-light border small mb-3">
                                 ใช้ปุ่มดึงผลด้วย AI สำหรับงวดจริง หรือกรอกเองสำหรับงวดทดสอบ/กรณี AI ดึงไม่สำเร็จ แล้วตรวจสอบก่อนยืนยันทุกครั้ง
                             </div>
-                            <div class="row g-2 mb-3">
-                                <div class="col-4">
+                            <div class="row g-2 mb-2">
+                                <div class="col-12">
+                                    <label class="form-label small fw-bold">รางวัลที่ 1 (6 หลัก)</label>
+                                    <input type="text" class="form-control text-center fw-bold fs-5" id="admin-lottery-first-prize"
+                                           maxlength="6" placeholder="XXXXXX" inputmode="numeric">
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
                                     <label class="form-label small">2 ตัวท้าย</label>
                                     <input type="text" class="form-control text-center fw-bold" id="admin-lottery-last2"
                                            maxlength="2" placeholder="XX" inputmode="numeric">
                                 </div>
-                                <div class="col-4">
-                                    <label class="form-label small">3 ตัวหน้า</label>
+                                <div class="col-3">
+                                    <label class="form-label small">3 ตัวท้าย ชุด 1</label>
+                                    <input type="text" class="form-control text-center fw-bold" id="admin-lottery-last3b"
+                                           maxlength="3" placeholder="XXX" inputmode="numeric">
+                                </div>
+                                <div class="col-3">
+                                    <label class="form-label small">3 ตัวท้าย ชุด 2</label>
+                                    <input type="text" class="form-control text-center" id="admin-lottery-last3b2"
+                                           maxlength="3" placeholder="XXX" inputmode="numeric">
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">3 ตัวหน้า ชุด 1</label>
                                     <input type="text" class="form-control text-center" id="admin-lottery-last3f"
                                            maxlength="3" placeholder="XXX" inputmode="numeric">
                                 </div>
-                                <div class="col-4">
-                                    <label class="form-label small">3 ตัวท้าย</label>
-                                    <input type="text" class="form-control text-center fw-bold" id="admin-lottery-last3b"
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">3 ตัวหน้า ชุด 2</label>
+                                    <input type="text" class="form-control text-center" id="admin-lottery-last3f2"
                                            maxlength="3" placeholder="XXX" inputmode="numeric">
                                 </div>
                             </div>

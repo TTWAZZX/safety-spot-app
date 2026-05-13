@@ -3465,6 +3465,19 @@ body {
     background: linear-gradient(135deg, #fffbeb, #fef3c7);
     border-left-color: #f59e0b;
 }
+.lottery-ticket-six {
+    background: linear-gradient(135deg, #fefce8, #fef9c3);
+    border-left-color: #78350f;
+}
+.lottery-type-card-six {
+    border-color: #78350f;
+    background: linear-gradient(135deg, #fefce8, #fffbeb);
+}
+.lottery-type-card-six.active {
+    border-color: #78350f;
+    background: #fef9c3;
+    box-shadow: 0 0 0 3px rgba(120,53,15,0.15);
+}
 .lottery-ticket-card.ticket-winner {
     animation: ticketGlow 2s ease-in-out infinite;
 }
@@ -3557,12 +3570,18 @@ body {
     margin: 10px 0;
 }
 .lottery-result-num-block { text-align: center; }
+.lottery-result-num-block-wide { flex: 0 0 100%; }
 .lottery-result-number-large {
     font-size: 2.5rem;
     font-weight: 900;
     letter-spacing: 6px;
     color: #1a1a2e;
     line-height: 1.1;
+}
+.lottery-result-number-six {
+    font-size: 2rem;
+    letter-spacing: 4px;
+    color: #78350f;
 }
 .lottery-result-stats {
     display: flex;
