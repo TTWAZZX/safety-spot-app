@@ -7493,23 +7493,19 @@ async function adminResetLotteryRound(roundId, drawDate, ticketCount) {
         icon: 'warning',
         title: `รีเซตตั๋วงวด ${sanitizeHTML(drawDate)}`,
         html: `<p>ตั๋วทั้งหมด <strong class="text-danger">${ticketCount} ใบ</strong> จะถูกลบ<br>
-               ผู้ใช้ทุกคนจะสามารถซื้อใหม่ได้ทันที</p>
-               <p class="text-muted small mb-1">พิมพ์ <strong>RESET</strong> เพื่อยืนยัน</p>
-               <input id="swal-reset-confirm" class="swal2-input" placeholder="RESET" autocomplete="off">`,
+               ผู้ใช้ทุกคนจะสามารถซื้อใหม่ได้ทันที</p>`,
+        input: 'text',
+        inputPlaceholder: 'พิมพ์ RESET เพื่อยืนยัน',
+        inputAttributes: { autocomplete: 'off', autocorrect: 'off', autocapitalize: 'characters' },
         showCancelButton: true,
         confirmButtonText: 'รีเซตตั๋ว',
         confirmButtonColor: '#d97706',
         cancelButtonText: 'ยกเลิก',
-        preConfirm: () => {
-            const val = document.getElementById('swal-reset-confirm')?.value?.trim();
-            if (val !== 'RESET') {
-                Swal.showValidationMessage('พิมพ์ RESET ให้ถูกต้องก่อน');
-                return false;
-            }
-            return val;
+        inputValidator: (val) => {
+            if (!val || val.trim() !== 'RESET') return 'พิมพ์ RESET ให้ถูกต้องก่อน';
         }
     });
-    if (!isConfirmed) return;
+    if (!isConfirmed || typed !== 'RESET') return;
     try {
         const res = await callApi(`/api/admin/lottery/rounds/${encodeURIComponent(roundId)}/reset-tickets`, {
             requesterId: AppState.lineProfile.userId
@@ -7551,7 +7547,7 @@ async function adminFullResetLotteryRound(roundId, drawDate) {
         await Swal.fire({
             icon: 'success',
             title: 'รีเซตสำเร็จ',
-            html: `คืนคะแนน <strong>${res.data.reversedWinners}</strong> ผู้ชนะ · รีเซต <strong>${res.data.ticketsReset}</strong> ตั๋ว<br>
+            html: `คืนคะแนน <strong>${res.reversedWinners}</strong> ผู้ชนะ · รีเซต <strong>${res.ticketsReset}</strong> ตั๋ว<br>
                    งวด <strong>${sanitizeHTML(drawDate)}</strong> กลับเป็น <span class="badge bg-warning text-dark">closed</span>`,
             confirmButtonColor: '#06C755'
         });
