@@ -6523,6 +6523,19 @@ app.post('/api/admin/lottery/broadcast-new-round', async (req, res) => {
                                         { type: 'text', text: '3 ตัวท้าย', size: 'sm', color: '#374151', flex: 1, margin: 'sm' },
                                         { type: 'text', text: `${settings.priceThree} เหรียญ / ${settings.prizeThree.toLocaleString()} pts`, size: 'sm', color: '#111827', weight: 'bold', align: 'end' }
                                     ]
+                                },
+                                {
+                                    type: 'box', layout: 'horizontal', margin: 'sm',
+                                    contents: [
+                                        {
+                                            type: 'box', layout: 'vertical', flex: 0,
+                                            backgroundColor: '#78350F', cornerRadius: '4px',
+                                            paddingTop: '2px', paddingBottom: '2px', paddingStart: '6px', paddingEnd: '6px',
+                                            contents: [{ type: 'text', text: '6D', color: '#FFFFFF', size: 'xs', weight: 'bold' }]
+                                        },
+                                        { type: 'text', text: 'รางวัลที่ 1 (6 หลักตรง)', size: 'sm', color: '#374151', flex: 1, margin: 'sm' },
+                                        { type: 'text', text: `${settings.priceSix} เหรียญ / ${settings.prizeSix.toLocaleString()} pts`, size: 'sm', color: '#111827', weight: 'bold', align: 'end' }
+                                    ]
                                 }
                             ]
                         },

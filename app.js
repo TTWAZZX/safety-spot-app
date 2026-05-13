@@ -6054,26 +6054,47 @@ function showLotteryRules(options = {}) {
     const prizeTwo = _lotterySettings.prizeTwo.toLocaleString();
     const prizeThree = _lotterySettings.prizeThree.toLocaleString();
     const dailyLimit = _lotterySettings.dailyLimit.toLocaleString();
+    const priceSix = _lotterySettings.priceSix.toLocaleString();
+    const prizeSix = _lotterySettings.prizeSix.toLocaleString();
     triggerHaptic('light');
     return Swal.fire({
         title: '<i class="fas fa-ticket-alt text-success me-2"></i>กติกา Safety Lottery',
         html: `<div class="text-start small">
             <p class="mb-2 fw-semibold">วิธีเล่น:</p>
             <ol class="mb-3 ps-3">
-                <li>เลือกประเภทตั๋ว: 2 ตัวท้าย (${priceTwo} เหรียญ) หรือ 3 ตัวท้าย (${priceThree} เหรียญ)</li>
+                <li>เลือกประเภทตั๋ว (ดูตารางรางวัลด้านล่าง)</li>
                 <li>กรอกเลขที่ต้องการ หรือกด 🎲 สุ่ม</li>
                 <li>ตอบคำถาม Safety ให้ถูกต้อง เพื่อยืนยันการซื้อ (+2 เหรียญ bonus)</li>
                 <li>ตรวจผลรางวัลในงวดวันที่ 1 และ 16 ของทุกเดือน</li>
             </ol>
-            <p class="mb-2 fw-semibold">รางวัล:</p>
-            <ul class="mb-3 ps-3">
-                <li>2 ตัวท้ายถูก = ${prizeTwo} คะแนน</li>
-                <li>3 ตัวท้ายถูก = ${prizeThree} คะแนน</li>
-            </ul>
+            <p class="mb-2 fw-semibold">ประเภทตั๋วและรางวัล:</p>
+            <table class="table table-sm table-bordered mb-3" style="font-size:0.8rem;">
+                <thead class="table-light"><tr><th>ประเภท</th><th>ราคา</th><th>รางวัล</th><th>เงื่อนไข</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td>🟢 2 ตัวท้าย</td>
+                        <td>${priceTwo} เหรียญ</td>
+                        <td class="fw-semibold text-success">${prizeTwo} pts</td>
+                        <td>ตรงกับเลขท้าย 2 ตัวของหวยไทย</td>
+                    </tr>
+                    <tr>
+                        <td>🔴 3 ตัวท้าย</td>
+                        <td>${priceThree} เหรียญ</td>
+                        <td class="fw-semibold text-danger">${prizeThree} pts</td>
+                        <td>ตรงกับเลขท้าย 3 ตัว <strong>ชุดใดชุดหนึ่ง</strong> ก็ได้</td>
+                    </tr>
+                    <tr class="table-warning">
+                        <td>⭐ รางวัลที่ 1</td>
+                        <td>${priceSix} เหรียญ</td>
+                        <td class="fw-semibold text-warning">${prizeSix} pts</td>
+                        <td>ตรงกับ <strong>เลข 6 หลักเต็ม</strong> รางวัลที่ 1</td>
+                    </tr>
+                </tbody>
+            </table>
             <p class="mb-2 fw-semibold">Gold Ticket ฟรี:</p>
             <ul class="mb-3 ps-3">
                 <li>แผนกไม่มีรายงานอุบัติเหตุในช่วง 30 วันที่ผ่านมา</li>
-                <li>รับได้ 1 ตั๋วต่อ 1 งวด</li>
+                <li>รับได้ 1 ตั๋วต่อ 1 งวด (ประเภท 3 ตัวท้าย)</li>
             </ul>
             <p class="mb-2 fw-semibold">🔮 ท่านอาจารย์จอห์นนี่:</p>
             <ul class="mb-3 ps-3">
@@ -6093,8 +6114,9 @@ function showLotteryRules(options = {}) {
             </div>
             <p class="mb-0 fw-semibold">ข้อกำหนด:</p>
             <ul class="mb-0 ps-3">
-                <li>ซื้อได้ไม่เกิน ${dailyLimit} ใบ/วัน</li>
+                <li>ซื้อได้ไม่เกิน ${dailyLimit} ใบ/วัน (รวมทุกประเภท)</li>
                 <li>คะแนนรางวัลจะเข้าบัญชีทันทีหลังประมวลผล</li>
+                <li>ผลหวยอ้างอิงจากสลากกินแบ่งรัฐบาลไทยเท่านั้น</li>
                 <li>การตัดสินใจของทีมบริหารถือเป็นที่สิ้นสุด</li>
             </ul>
         </div>`,
