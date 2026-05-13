@@ -1933,31 +1933,26 @@
                                         </div>
                                     </div>
 
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-6">
-                                            <div class="lottery-type-card active" id="type-two-card" onclick="selectLotteryType('two')">
-                                                <div class="lottery-type-icon">🟢</div>
-                                                <div class="lottery-type-name">2 ตัวท้าย</div>
-                                                <div class="lottery-type-price">10 เหรียญ</div>
-                                                <div class="lottery-type-prize">รางวัล 500 pts</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-6">
-                                            <div class="lottery-type-card" id="type-three-card" onclick="selectLotteryType('three')">
-                                                <div class="lottery-type-icon">🔴</div>
-                                                <div class="lottery-type-name">3 ตัวท้าย</div>
-                                                <div class="lottery-type-price">30 เหรียญ</div>
-                                                <div class="lottery-type-prize">รางวัล 3,000 pts</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-12">
-                                            <div class="lottery-type-card lottery-type-card-six" id="type-six-card" onclick="selectLotteryType('six')">
-                                                <div class="lottery-type-icon">⭐</div>
-                                                <div class="lottery-type-name">รางวัลที่ 1 — 6 ตัวตรง</div>
-                                                <div class="lottery-type-price">100 เหรียญ</div>
-                                                <div class="lottery-type-prize">รางวัล 100,000 pts</div>
-                                            </div>
-                                        </div>
+                                    <div class="lottery-type-tabs mb-3">
+                                        <button class="lottery-tab active" id="type-two-card" onclick="selectLotteryType('two')">
+                                            <div class="lottery-tab-icon">🟢</div>
+                                            <div class="lottery-tab-name">2 ตัวท้าย</div>
+                                            <div class="lottery-type-price">10 เหรียญ</div>
+                                            <div class="lottery-type-prize">รางวัล 500 pts</div>
+                                        </button>
+                                        <button class="lottery-tab" id="type-three-card" onclick="selectLotteryType('three')">
+                                            <div class="lottery-tab-icon">🔴</div>
+                                            <div class="lottery-tab-name">3 ตัวท้าย</div>
+                                            <div class="lottery-type-price">30 เหรียญ</div>
+                                            <div class="lottery-type-prize">รางวัล 3,000 pts</div>
+                                        </button>
+                                        <button class="lottery-tab lottery-tab-six" id="type-six-card" onclick="selectLotteryType('six')">
+                                            <div class="lottery-tab-icon">⭐</div>
+                                            <div class="lottery-tab-name">รางวัลที่ 1</div>
+                                            <div class="lottery-tab-sub">6 ตัวตรง</div>
+                                            <div class="lottery-type-price">100 เหรียญ</div>
+                                            <div class="lottery-type-prize">รางวัล 100,000 pts</div>
+                                        </button>
                                     </div>
 
                                     <div class="lottery-number-input-area mb-3">

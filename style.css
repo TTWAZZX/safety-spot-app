@@ -3569,6 +3569,45 @@ body {
     flex-wrap: wrap;
     margin: 10px 0;
 }
+/* Ticket type tab selector */
+.lottery-type-tabs {
+    display: flex;
+    border: 1.5px solid #dee2e6;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #f8f9fa;
+}
+.lottery-tab {
+    flex: 1;
+    border: none;
+    border-right: 1.5px solid #dee2e6;
+    background: transparent;
+    padding: 10px 4px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.18s;
+    position: relative;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.lottery-tab:last-child { border-right: none; }
+.lottery-tab.active { background: #e8faf0; }
+.lottery-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 14px; right: 14px;
+    height: 3px;
+    background: #06C755;
+    border-radius: 3px 3px 0 0;
+}
+.lottery-tab.lottery-tab-six.active { background: #fef9c3; }
+.lottery-tab.lottery-tab-six.active::after { background: #78350f; }
+.lottery-tab-icon { font-size: 1.5rem; line-height: 1; margin-bottom: 2px; }
+.lottery-tab-name { font-weight: 700; font-size: 0.82rem; color: #212529; line-height: 1.2; }
+.lottery-tab-sub { font-size: 0.68rem; color: #6c757d; margin-bottom: 1px; }
+.lottery-tab .lottery-type-price { font-size: 0.75rem; color: #f59e0b; font-weight: 600; margin-top: 3px; }
+.lottery-tab .lottery-type-prize { font-size: 0.68rem; color: #6c757d; }
+
 .lottery-result-num-block { text-align: center; }
 .lottery-result-num-block-wide { flex: 0 0 100%; }
 .lottery-result-number-large {
