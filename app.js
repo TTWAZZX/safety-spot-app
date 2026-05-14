@@ -8640,7 +8640,12 @@ async function submitDreamInterpret() {
         _dreamTodayCount = Number(res.todayCount || _dreamTodayCount + 1);
         _dreamSubmitting = false;
         updateDreamCostUi();
-        updateDreamStreakBar(Number(res.dreamStreak || 0), true);
+        updateDreamStatsPanel(
+            Number(res.dreamStreak || 0), true,
+            Number(res.totalInterpretations ?? -1),
+            Number(res.streakCoinsEarned ?? 0),
+            res.nextMilestone || null
+        );
         if (res.streakMilestone) {
             const bonusCoins = res.streakMilestone >= 30 ? 50 : res.streakMilestone >= 14 ? 20 : res.streakMilestone >= 7 ? 10 : 5;
             setTimeout(() => {
