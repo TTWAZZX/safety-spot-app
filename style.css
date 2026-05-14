@@ -3913,20 +3913,108 @@ body {
     background: linear-gradient(135deg, rgba(108,52,131,0.6) 0%, rgba(44,14,78,0.8) 100%);
     border-bottom: none;
 }
-.dream-streak-bar {
+/* Premium Dream Stats Panel */
+.dream-stats-panel {
+    padding: 12px 18px 10px;
+    border-bottom: 1px solid rgba(196,156,211,0.15);
+    background: linear-gradient(180deg, rgba(108,52,131,0.35) 0%, rgba(20,5,45,0.2) 100%);
+}
+.dream-stats-row {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.dream-stat-card {
+    flex: 1;
+    text-align: center;
+    min-width: 0;
+    padding: 0 4px;
+}
+.dream-stat-icon-wrap {
+    font-size: 1.1rem;
+    line-height: 1;
+    margin-bottom: 3px;
+}
+.dream-stat-number {
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #f4d03f;
+    line-height: 1.05;
+    letter-spacing: -0.5px;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 14px rgba(244,208,63,0.45);
+}
+.dream-stat-desc {
+    font-size: 0.58rem;
+    color: rgba(196,156,211,0.65);
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+    text-transform: uppercase;
+}
+.dream-stat-divider {
+    width: 1px;
+    height: 38px;
+    background: linear-gradient(180deg,
+        transparent 0%, rgba(196,156,211,0.25) 30%,
+        rgba(196,156,211,0.25) 70%, transparent 100%);
+    flex-shrink: 0;
+}
+.dream-milestone-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.dream-milestone-track {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 99px;
+    overflow: hidden;
+}
+.dream-milestone-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #c39bd3, #f4d03f);
+    border-radius: 99px;
+    transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 0 6px rgba(244,208,63,0.55);
+}
+.dream-milestone-text {
+    font-size: 0.63rem;
+    font-weight: 600;
+    color: rgba(240,230,255,0.72);
+    white-space: nowrap;
+    flex-shrink: 0;
+    max-width: 52%;
+}
+.dream-stat-orbit {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 7px 16px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    border-bottom: 1px solid rgba(196,156,211,0.15);
-    background: linear-gradient(90deg, #6c3483, #f4d03f, #c39bd3, #f4d03f, #6c3483);
-    background-size: 300% 100%;
-    color: #1a0a2e;
-    animation: dreamStreakShimmer 2.5s linear infinite, dreamStreakGlow 2s ease-in-out infinite;
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 4px;
+}
+.dream-stat-orbit-num {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #f4d03f;
+    text-shadow: 0 0 12px rgba(244,208,63,0.5);
+    z-index: 2;
+    line-height: 1;
+}
+.dream-stat-orbit-star {
+    position: absolute;
+    font-size: 0.55rem;
+    top: 50%; left: 50%;
+    margin: -6px 0 0 -6px;
+    animation: dreamOrbitMini 4s linear infinite;
+    animation-delay: calc(var(--i) * -1.333s);
+}
+@keyframes dreamOrbitMini {
+    from { transform: rotate(0deg) translateX(22px) rotate(0deg); }
+    to   { transform: rotate(360deg) translateX(22px) rotate(-360deg); }
 }
 .dream-header-icon {
     font-size: 2.2rem;

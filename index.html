@@ -2048,10 +2048,40 @@
                     <div style="width:32px"></div>
                 </div>
 
-                <!-- Streak Bar — always visible -->
-                <div id="dream-streak-bar" class="dream-streak-bar">
-                    <span id="dream-streak-icon">💫</span>
-                    <span id="dream-streak-label">กำลังโหลด...</span>
+                <!-- Premium Stats Panel — always visible -->
+                <div id="dream-stats-panel" class="dream-stats-panel">
+                    <div class="dream-stats-row">
+                        <!-- Streak — mini orbital ring -->
+                        <div class="dream-stat-card">
+                            <div class="dream-stat-orbit">
+                                <div class="dream-stat-orbit-num" id="dsp-streak">—</div>
+                                <span class="dream-stat-orbit-star" style="--i:0">⭐</span>
+                                <span class="dream-stat-orbit-star" style="--i:1">✨</span>
+                                <span class="dream-stat-orbit-star" style="--i:2">⭐</span>
+                            </div>
+                            <div class="dream-stat-desc">วันติดต่อกัน</div>
+                        </div>
+                        <div class="dream-stat-divider"></div>
+                        <!-- Total prophecies — scroll -->
+                        <div class="dream-stat-card">
+                            <div class="dream-stat-icon-wrap">📜</div>
+                            <div class="dream-stat-number" id="dsp-total">—</div>
+                            <div class="dream-stat-desc">พยากรณ์ทั้งหมด</div>
+                        </div>
+                        <div class="dream-stat-divider"></div>
+                        <!-- Streak coins — crystal -->
+                        <div class="dream-stat-card">
+                            <div class="dream-stat-icon-wrap">💎</div>
+                            <div class="dream-stat-number" id="dsp-coins">—</div>
+                            <div class="dream-stat-desc">คริสตัลสะสม</div>
+                        </div>
+                    </div>
+                    <div class="dream-milestone-row d-none" id="dsp-milestone-row">
+                        <div class="dream-milestone-track">
+                            <div class="dream-milestone-fill" id="dsp-milestone-fill" style="width:0%"></div>
+                        </div>
+                        <div class="dream-milestone-text" id="dsp-milestone-text"></div>
+                    </div>
                 </div>
 
                 <div class="modal-body dream-modal-body p-0">

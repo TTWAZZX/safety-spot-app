@@ -7176,6 +7176,19 @@ function validateDreamItemPayload({ dreamId, category, itemName, itemIcon, numbe
     };
 }
 
+// คำนวณ streak stats สำหรับ dream panel
+function _calcDreamStreakStats(streak) {
+    const milestones = [[3,5],[7,10],[14,20],[30,50],[60,50],[100,50]];
+    const passed = milestones.filter(([m]) => streak >= m);
+    const coinsEarned = passed.reduce((s,[,b]) => s + b, 0);
+    const nextEntry = milestones.find(([m]) => streak < m);
+    const prevDays = passed.length ? passed[passed.length - 1][0] : 0;
+    const nextMilestone = nextEntry
+        ? { days: nextEntry[0], bonus: nextEntry[1], daysLeft: nextEntry[0] - streak, prevDays }
+        : null;
+    return { coinsEarned, nextMilestone };
+}
+
 // GET /api/lottery/dream-items — รายการสัญลักษณ์ (ใช้ schema จริง: dreamId, itemIcon, number2d, number3d)
 app.get('/api/lottery/dream-items', async (req, res) => {
     try {
@@ -7219,6 +7232,13 @@ app.get('/api/lottery/dream-today', async (req, res) => {
         const lastDate = userRow?.lastDreamDate ? String(userRow.lastDreamDate).slice(0, 10) : null;
         const currentStreak = Number(userRow?.dreamStreak || 0);
         const streakActive = lastDate === today || lastDate === yesterday;
+        const activeStreak = streakActive ? currentStreak : 0;
+
+        const [[totalRow]] = await db.query(
+            'SELECT COUNT(*) AS total FROM lottery_dream_logs WHERE lineUserId=?', [lineUserId]
+        );
+        const { coinsEarned: streakCoinsEarned, nextMilestone } = _calcDreamStreakStats(activeStreak);
+
         res.json({
             status: 'success',
             data: {
@@ -7226,8 +7246,11 @@ app.get('/api/lottery/dream-today', async (req, res) => {
                 todayCount,
                 nextCost: todayCount > 0 ? DREAM_EXTRA_INTERPRET_COST : 0,
                 log: log || null,
-                dreamStreak: streakActive ? currentStreak : 0,
-                doneToday: lastDate === today
+                dreamStreak: activeStreak,
+                doneToday: lastDate === today,
+                totalInterpretations: Number(totalRow?.total || 0),
+                streakCoinsEarned,
+                nextMilestone
             }
         });
     } catch (e) { res.status(e.statusCode || 500).json({ status: 'error', message: e.message, code: e.code }); }

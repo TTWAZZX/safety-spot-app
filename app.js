@@ -8224,8 +8224,13 @@ async function openDreamModal() {
         _dreamLatestLog = res.log || null;
         updateDreamCostUi();
         updateDreamInsightCard();
-        updateDreamStreakBar(Number(res.dreamStreak || 0), !!res.doneToday);
-    } catch (_) { updateDreamStreakBar(0, false); }
+        updateDreamStatsPanel(
+            Number(res.dreamStreak || 0), !!res.doneToday,
+            Number(res.totalInterpretations ?? -1),
+            Number(res.streakCoinsEarned ?? 0),
+            res.nextMilestone || null
+        );
+    } catch (_) { updateDreamStatsPanel(0, false, -1, 0, null); }
 
     if (!_dreamItems) {
         try {
@@ -8237,19 +8242,33 @@ async function openDreamModal() {
     resetDreamInputState({ clearResult: true });
 }
 
-function updateDreamStreakBar(streak, doneToday) {
-    const icon = document.getElementById('dream-streak-icon');
-    const label = document.getElementById('dream-streak-label');
-    if (!icon || !label) return;
-    if (doneToday && streak > 0) {
-        icon.textContent = '💫';
-        label.textContent = `ขอพยากรณ์วันนี้แล้ว · ${streak} วัน ต่อเนื่อง`;
-    } else if (streak > 0) {
-        icon.textContent = '💫';
-        label.textContent = `${streak} วัน ต่อเนื่อง · ขอพยากรณ์วันนี้เพื่อรักษา streak!`;
+function updateDreamStatsPanel(streak, doneToday, totalInterps, streakCoins, nextMilestone) {
+    const elStreak = document.getElementById('dsp-streak');
+    const elTotal  = document.getElementById('dsp-total');
+    const elCoins  = document.getElementById('dsp-coins');
+    const elRow    = document.getElementById('dsp-milestone-row');
+    const elFill   = document.getElementById('dsp-milestone-fill');
+    const elText   = document.getElementById('dsp-milestone-text');
+    if (!elStreak) return;
+
+    elStreak.textContent = streak > 0 ? streak.toLocaleString() : '0';
+    elTotal.textContent  = totalInterps >= 0 ? totalInterps.toLocaleString() : '—';
+    elCoins.textContent  = streakCoins >= 0 ? streakCoins.toLocaleString() : '0';
+
+    if (!elRow) return;
+    if (nextMilestone) {
+        const { days, bonus, daysLeft, prevDays = 0 } = nextMilestone;
+        const range = days - prevDays;
+        const pct = range > 0 ? Math.max(0, Math.min(100, ((streak - prevDays) / range) * 100)) : 0;
+        elFill.style.width = pct + '%';
+        elText.textContent = `${doneToday ? '✅' : '⏳'} อีก ${daysLeft} วัน → +${bonus} 🪙`;
+        elRow.classList.remove('d-none');
+    } else if (streak >= 100) {
+        elFill.style.width = '100%';
+        elText.textContent = '🏆 Master Oracle · ผ่านครบทุก milestone';
+        elRow.classList.remove('d-none');
     } else {
-        icon.textContent = '💫';
-        label.textContent = 'ขอพยากรณ์ทุกวันรับโบนัสเหรียญพิเศษ · เริ่มต้นวันนี้!';
+        elRow.classList.add('d-none');
     }
 }
 
