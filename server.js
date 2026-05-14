@@ -7226,10 +7226,11 @@ app.get('/api/lottery/dream-today', async (req, res) => {
         const todayCount = Number(usage?.todayCount || 0);
         if (log) log.result = normalizeDreamResult(parseDreamResult(log.result));
         const [[userRow]] = await db.query(
-            'SELECT dreamStreak, lastDreamDate FROM users WHERE lineUserId=?', [lineUserId]
+            `SELECT dreamStreak, DATE_FORMAT(lastDreamDate, '%Y-%m-%d') AS lastDreamDate
+             FROM users WHERE lineUserId=?`, [lineUserId]
         );
         const yesterday = getBangkokDateString(new Date(Date.now() - 86400000));
-        const lastDate = userRow?.lastDreamDate ? String(userRow.lastDreamDate).slice(0, 10) : null;
+        const lastDate = userRow?.lastDreamDate || null;
         const currentStreak = Number(userRow?.dreamStreak || 0);
         const streakActive = lastDate === today || lastDate === yesterday;
         const activeStreak = streakActive ? currentStreak : 0;
@@ -7629,10 +7630,11 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
         let streakMilestone = null;
         try {
             const [[streakRow]] = await db.query(
-                'SELECT dreamStreak, lastDreamDate FROM users WHERE lineUserId=?', [lineUserId]
+                `SELECT dreamStreak, DATE_FORMAT(lastDreamDate, '%Y-%m-%d') AS lastDreamDate
+                 FROM users WHERE lineUserId=?`, [lineUserId]
             );
             const yesterday = getBangkokDateString(new Date(Date.now() - 86400000));
-            const lastDate = streakRow?.lastDreamDate ? String(streakRow.lastDreamDate).slice(0, 10) : null;
+            const lastDate = streakRow?.lastDreamDate || null;
             if (todayDreamCount === 0) {
                 dreamStreak = lastDate === today
                     ? Number(streakRow.dreamStreak || 1)
