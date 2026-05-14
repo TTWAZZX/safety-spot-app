@@ -7627,13 +7627,13 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
         // Dream Streak — อัปเดตเฉพาะครั้งแรกของวัน (todayDreamCount === 0)
         let dreamStreak = 0;
         let streakMilestone = null;
-        if (todayDreamCount === 0) {
-            try {
-                const [[streakRow]] = await db.query(
-                    'SELECT dreamStreak, lastDreamDate FROM users WHERE lineUserId=?', [lineUserId]
-                );
-                const yesterday = getBangkokDateString(new Date(Date.now() - 86400000));
-                const lastDate = streakRow?.lastDreamDate ? String(streakRow.lastDreamDate).slice(0, 10) : null;
+        try {
+            const [[streakRow]] = await db.query(
+                'SELECT dreamStreak, lastDreamDate FROM users WHERE lineUserId=?', [lineUserId]
+            );
+            const yesterday = getBangkokDateString(new Date(Date.now() - 86400000));
+            const lastDate = streakRow?.lastDreamDate ? String(streakRow.lastDreamDate).slice(0, 10) : null;
+            if (todayDreamCount === 0) {
                 dreamStreak = lastDate === today
                     ? Number(streakRow.dreamStreak || 1)
                     : lastDate === yesterday
@@ -7656,10 +7656,17 @@ ${hintFromTable ? `ข้อมูลเพิ่มเติมเกี่ย�
                         triggeringUserId: lineUserId
                     });
                 }
-            } catch (_) { /* streak update is non-critical */ }
-        }
+            } else {
+                // ครั้งที่ 2+ ของวัน — อ่าน streak ปัจจุบันโดยไม่อัปเดต
+                const streakActive = lastDate === today || lastDate === yesterday;
+                dreamStreak = streakActive ? Number(streakRow?.dreamStreak || 0) : 0;
+            }
+        } catch (_) { /* streak update is non-critical */ }
+        const { coinsEarned: streakCoinsEarnedInterpret, nextMilestone: nextMilestoneInterpret } = _calcDreamStreakStats(dreamStreak);
         result.dreamStreak = dreamStreak;
         result.streakMilestone = streakMilestone;
+        result.streakCoinsEarned = streakCoinsEarnedInterpret;
+        result.nextMilestone = nextMilestoneInterpret;
 
         createNotification({
             recipientUserId: lineUserId,
