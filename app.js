@@ -731,14 +731,12 @@ async function loadHomeLotterySummary() {
             const winnerHtml = winners > 0
                 ? `<span class="text-success small fw-semibold"><i class="fas fa-trophy me-1"></i>${winners} ราย ถูกรางวัล</span>`
                 : `<span class="text-muted small"><i class="fas fa-minus me-1"></i>ไม่มีผู้ถูกรางวัล</span>`;
+            const ticketCount = Number(latest.totalTicketsSold || 0).toLocaleString('th-TH');
             latestResultHtml = `
                 <div class="mt-2 pt-2 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <div>
-                        <div class="text-muted small mb-1"><i class="fas fa-calendar-check me-1"></i>ผลงวด ${sanitizeHTML(lDate)}</div>
-                        <div class="d-flex gap-2">
-                            <span class="badge bg-dark fw-normal">2D: ${sanitizeHTML(latest.last2 || '--')}</span>
-                            <span class="badge bg-dark fw-normal">3D: ${sanitizeHTML(latest.last3_back || '---')}</span>
-                        </div>
+                        <div class="text-muted small mb-1"><i class="fas fa-calendar-check me-1"></i>งวด ${sanitizeHTML(lDate)}</div>
+                        <div class="text-muted small"><i class="fas fa-ticket-alt me-1"></i>ซื้อตั๋วรวม ${ticketCount} ใบ</div>
                     </div>
                     ${winnerHtml}
                 </div>`;
