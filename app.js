@@ -3945,7 +3945,7 @@ async function adminGenerateKYTQuestions() {
     const { value: count, isConfirmed } = await Swal.fire({
         title: 'สร้างคำถาม KYT ด้วย AI',
         html: `<div class="text-start">
-            <p class="text-muted small mb-2">AI จะสร้างคำถามสไตล์เดิม — ภาษาไทย โรงงาน ตัวเลือก A-F มีทั้งคำตอบที่ถูกต้องและตลกขบขัน</p>
+            <p class="text-muted small mb-2">AI จะสร้างคำถามสไตล์เดิม — ภาษาไทย โรงงาน ตัวเลือก A–F บังคับ (อาจมี G–H เพิ่มสำหรับคำถามยาก) มีทั้งคำตอบที่ถูกต้องและตลกขบขัน</p>
             <label class="form-label fw-bold">จำนวนที่ต้องการสร้าง</label>
             <input type="number" id="kyt-gen-count" class="form-control" value="5" min="1" max="20">
             <small class="text-muted">สูงสุด 20 ข้อต่อครั้ง</small>
@@ -3983,11 +3983,23 @@ async function adminGenerateKYTQuestions() {
     }
 }
 
+let _kytFilter = 'all';
+
+function filterKytQuestions(filter) {
+    _kytFilter = filter;
+    $('#kyt-filter-tabs button').removeClass('btn-success btn-primary btn-secondary').addClass('btn-outline-secondary').removeClass('btn-outline-primary');
+    const $btn = $(`#kyt-filter-tabs button[data-filter="${filter}"]`).removeClass('btn-outline-secondary btn-outline-primary');
+    if (filter === 'ai') $btn.addClass('btn-primary');
+    else $btn.addClass('btn-success');
+    renderFilteredQuestions(AppState._cachedQuestions || [], $('#question-search-input').val() || '');
+}
+
 // 1. ฟังก์ชันเปิด Modal หลัก (เรียกใช้ loadAdminQuestions)
 function handleManageQuestions() {
     if (!AppState.allModals['admin-questions']) {
         AppState.allModals['admin-questions'] = new bootstrap.Modal(document.getElementById('admin-questions-modal'));
     }
+    _kytFilter = 'all';
     AppState.allModals['admin-questions'].show();
     $('#question-search-input').val('');
     loadAdminQuestions();
@@ -3997,9 +4009,10 @@ function handleManageQuestions() {
 function renderFilteredQuestions(questions, query) {
     const list = $('#questions-list-admin');
     list.empty();
-    const filtered = query
-        ? questions.filter(q => q.questionText.toLowerCase().includes(query.toLowerCase()))
-        : questions;
+    let filtered = questions;
+    if (_kytFilter === 'ai') filtered = filtered.filter(q => q.isAiGenerated);
+    else if (_kytFilter === 'human') filtered = filtered.filter(q => !q.isAiGenerated);
+    if (query) filtered = filtered.filter(q => q.questionText.toLowerCase().includes(query.toLowerCase()));
     if (filtered.length === 0) {
         list.html('<div class="col-12 text-center text-muted mt-5">ไม่พบคำถามที่ค้นหา</div>');
         return;
@@ -4015,15 +4028,20 @@ async function loadAdminQuestions() {
     try {
         const questions = await callApi('/api/admin/questions');
         AppState._cachedQuestions = questions;
-        list.empty();
 
-        if (questions.length === 0) {
-            list.html('<div class="col-12 text-center text-muted mt-5">ยังไม่มีคำถามในระบบ</div>');
-            return;
-        }
-
-        const query = $('#question-search-input').val() || '';
-        renderFilteredQuestions(questions, query);
+        const total = questions.length;
+        const active = questions.filter(q => q.isActive).length;
+        const inactive = total - active;
+        const aiCount = questions.filter(q => q.isAiGenerated).length;
+        const humanCount = total - aiCount;
+        $('#kyt-stats-bar').html(
+            `<span class="badge bg-secondary">${total} ข้อทั้งหมด</span>` +
+            `<span class="badge bg-success">${active} ใช้งาน</span>` +
+            (inactive > 0 ? `<span class="badge bg-light text-dark border">${inactive} ปิด</span>` : '') +
+            (aiCount > 0 ? `<span class="badge bg-primary">${aiCount} 🤖 AI</span>` : '') +
+            `<span class="badge bg-light text-dark border">${humanCount} ✏️ มนุษย์</span>`
+        );
+        filterKytQuestions(_kytFilter);
 
         // bind search
         $('#question-search-input').off('input.qsearch').on('input.qsearch', function() {
@@ -4040,6 +4058,7 @@ function renderQuestionCard(list, q) {
     const statusBadge = isActive
         ? '<span class="badge bg-success">ใช้งาน</span>'
         : '<span class="badge bg-secondary">ปิด</span>';
+    const aiBadge = q.isAiGenerated ? '<span class="badge bg-primary ms-1">🤖 AI</span>' : '';
     const statusBtnClass = isActive ? 'btn-outline-secondary' : 'btn-outline-success';
     const statusBtnText = isActive ? 'ปิด' : 'เปิด';
     const qData = encodeURIComponent(JSON.stringify(q));
@@ -4051,7 +4070,7 @@ function renderQuestionCard(list, q) {
         <div class="card h-100 shadow-sm border-0">
             <div class="card-body position-relative">
                 <div class="d-flex justify-content-between mb-2">
-                    ${statusBadge}
+                    <span>${statusBadge}${aiBadge}</span>
                     <small class="text-muted"><i class="fas fa-star text-warning"></i> ${q.scoreReward} คะแนน</small>
                 </div>
                 <div class="d-flex gap-3">

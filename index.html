@@ -1285,7 +1285,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body bg-light">
-                    <div class="d-flex gap-2 mb-3 flex-wrap">
+                    <div class="d-flex gap-2 mb-2 flex-wrap">
                         <button id="add-question-btn" class="btn btn-success shadow-sm">
                             <i class="fas fa-plus"></i> เพิ่มคำถามใหม่
                         </button>
@@ -1293,6 +1293,12 @@
                             <i class="fas fa-wand-magic-sparkles"></i> สร้างด้วย AI
                         </button>
                         <input type="text" id="question-search-input" class="form-control" placeholder="ค้นหาคำถาม...">
+                    </div>
+                    <div id="kyt-stats-bar" class="d-flex gap-2 flex-wrap align-items-center mb-2 small"></div>
+                    <div id="kyt-filter-tabs" class="d-flex gap-2 mb-3">
+                        <button class="btn btn-sm btn-success" data-filter="all" onclick="filterKytQuestions('all')">ทั้งหมด</button>
+                        <button class="btn btn-sm btn-outline-secondary" data-filter="human" onclick="filterKytQuestions('human')">✏️ มนุษย์</button>
+                        <button class="btn btn-sm btn-outline-primary" data-filter="ai" onclick="filterKytQuestions('ai')">🤖 AI</button>
                     </div>
                     <div id="questions-list-admin" class="row g-3"></div>
                 </div>

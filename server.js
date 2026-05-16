@@ -103,6 +103,10 @@ db.query("ALTER TABLE submissions ADD COLUMN reviewedAt DATETIME DEFAULT NULL")
   .catch(() => {});
 db.query("ALTER TABLE user_cards ADD COLUMN createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
   .catch(() => {});
+db.query("ALTER TABLE kyt_questions ADD COLUMN createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+  .catch(() => {});
+db.query("ALTER TABLE kyt_questions ADD COLUMN isAiGenerated BOOLEAN DEFAULT FALSE")
+  .catch(() => {});
 db.query(`
   CREATE TABLE IF NOT EXISTS user_card_locks (
     lineUserId  VARCHAR(60) NOT NULL,
@@ -1610,8 +1614,8 @@ app.post('/api/admin/questions/generate', isAdmin, async (req, res) => {
 **สไตล์ที่ต้องการ:**
 - ภาษาไทยเป็นกันเอง เข้าใจง่าย เหมาะกับพนักงานโรงงานทุกระดับ
 - คำถามเป็นสถานการณ์จริงในโรงงาน เช่น "หากเกิด X ต้องทำอย่างไร?", "สัญลักษณ์ X หมายถึง?", "PPE ที่ถูกต้องสำหรับงาน X คืออะไร?"
-- ตัวเลือกต้องมี 6 ตัวเลือก (A–F) เสมอ — A–D บังคับ, E–F บังคับ
-- optionG และ optionH ให้เป็น null เสมอ (ไม่ใช้)
+- ตัวเลือก A–F บังคับ (6 ช้อยขั้นต่ำ) — เพิ่ม G หรือ H ได้ถ้าต้องการทำให้คำถามยากขึ้น (7–8 ช้อย)
+- optionG, optionH: ไม่บังคับ — ใส่เฉพาะคำถามที่ต้องการเพิ่มความซับซ้อน (ถ้าไม่ใช้ให้เป็น null)
 - ตัวเลือกถูก: เป็นขั้นตอนความปลอดภัยที่ถูกต้องตามกฎหมายไทยหรือมาตรฐาน
 - ตัวเลือกผิด (3–5 ข้อ): ผสมระหว่าง (1) คำตอบผิดแต่ฟังดูสมเหตุสมผล และ (2) คำตอบผิดที่ตลกขบขัน เช่น "โพสต์รูปลง Social", "วิ่งหนีออกจากโรงงาน", "โทรถาม Google", "กินยาแก้ปวดก่อน"
 - ห้ามซ้ำกับคำถามที่มีอยู่แล้ว
@@ -1650,10 +1654,10 @@ app.post('/api/admin/questions/generate', isAdmin, async (req, res) => {
         for (const q of questions) {
             if (!q.questionText || !q.optionA || !q.optionB || !q.optionC || !q.optionD || !q.optionE || !q.optionF || !q.correctOption) continue;
             const [r] = await db.query(
-                `INSERT INTO kyt_questions (questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, scoreReward, isActive)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                `INSERT INTO kyt_questions (questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, scoreReward, isActive, isAiGenerated)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, TRUE)`,
                 [q.questionText, q.optionA, q.optionB, q.optionC || null, q.optionD || null,
-                 q.optionE || null, q.optionF || null, null, null,
+                 q.optionE || null, q.optionF || null, q.optionG || null, q.optionH || null,
                  q.correctOption.toUpperCase(), q.scoreReward || 10]
             );
             inserted.push({ questionId: r.insertId, questionText: q.questionText });

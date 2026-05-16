@@ -401,10 +401,20 @@ createdAt    TIMESTAMP
 - ⚠️ `.col-6` reference ใน JS ถูกแก้เป็น `.col-12` แล้ว — ถ้า revert layout ต้องแก้ด้วย
 - Reset ทุก state (selected, confirm area, icons) ตอนโหลดคำถามใหม่
 
+### Admin KYT Question Management (Admin Modal)
+- **Stats bar** (`#kyt-stats-bar`): แสดงนับ ทั้งหมด / ใช้งาน / ปิด / 🤖 AI / ✏️ มนุษย์ — อัปเดตทุกครั้งที่ `loadAdminQuestions()`
+- **Filter tabs** (`#kyt-filter-tabs`): ทั้งหมด / ✏️ มนุษย์ / 🤖 AI — `filterKytQuestions(filter)` อัปเดต `_kytFilter` + re-render; `_kytFilter` reset เป็น `'all'` ทุกครั้งที่เปิด modal
+- **AI badge** บน card: `🤖 AI` badge สีน้ำเงินข้างสถานะ — แสดงเฉพาะถ้า `q.isAiGenerated`
+- **`kyt_questions` schema patches (idempotent at server start):**
+  - `createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP`
+  - `isAiGenerated BOOLEAN DEFAULT FALSE`
+  - ⚠️ Production: รัน 2 ALTER TABLE นี้ก่อน (หรือรอ server restart — patches เป็น auto)
+
 ### Admin AI Generate KYT Questions
 - **Endpoint**: `POST /api/admin/questions/generate` (ใช้ `isAdmin` middleware)
 - รับ `count` (1-20), ดึง 60 คำถามล่าสุดมาใส่ prompt กัน AI สร้างซ้ำ
-- สร้าง A-F options (G, H = null) สไตล์เดิม: ภาษาไทยเป็นกันเอง, ตัวเลือกผิดผสมทั้งสมจริงและขบขัน
+- ตัวเลือก A–F บังคับ; G–H ไม่บังคับ (AI เลือกเพิ่มสำหรับคำถามยาก); INSERT ใช้ `q.optionG || null`, `q.optionH || null`
+- INSERT ตั้ง `isAiGenerated = TRUE` ทุก row
 - ใช้ `LOTTERY_GEMINI_MODELS` fallback เหมือนระบบอื่น
 - **Frontend**: `adminGenerateKYTQuestions()` — Swal count input → loading → success preview → reload list
 - ปุ่ม "สร้างด้วย AI" ใน `#admin-questions-modal` header bar ข้าง "+ เพิ่มคำถามใหม่"
