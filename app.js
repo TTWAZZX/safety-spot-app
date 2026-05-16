@@ -3782,12 +3782,11 @@ async function loadGamePage() {
                 }
             });
             
-            if(q.image) {
-                $('#question-image').attr('src', q.image).show();
-                $('#no-image-icon').hide();
+            if (q.image) {
+                $('#question-image').attr('src', q.image);
+                $('#question-image-container').show();
             } else {
-                $('#question-image').hide();
-                $('#no-image-icon').show(); // โชว์ไอคอนแทนที่โล่งๆ
+                $('#question-image-container').hide();
             }
             
             // Reset ปุ่ม
