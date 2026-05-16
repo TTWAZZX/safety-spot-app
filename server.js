@@ -100,6 +100,15 @@ db.query("ALTER TABLE users ADD COLUMN department VARCHAR(100) NOT NULL DEFAULT 
 db.query("ALTER TABLE submissions ADD COLUMN reviewedAt DATETIME DEFAULT NULL")
   .catch(() => {});
 db.query(`
+  CREATE TABLE IF NOT EXISTS user_card_locks (
+    lineUserId  VARCHAR(60) NOT NULL,
+    cardId      VARCHAR(60) NOT NULL,
+    lockedAt    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (lineUserId, cardId)
+  )
+`).catch(() => {});
+
+db.query(`
   CREATE TABLE IF NOT EXISTS audit_logs (
     logId       INT AUTO_INCREMENT PRIMARY KEY,
     adminId     VARCHAR(100) NOT NULL,
@@ -2620,20 +2629,61 @@ app.get('/api/user/cards', async (req, res) => {
     try {
         const [allCards] = await db.query("SELECT * FROM safety_cards ORDER BY rarity DESC, cardName ASC");
         const [userCards] = await db.query("SELECT cardId, COUNT(*) as count FROM user_cards WHERE lineUserId = ? GROUP BY cardId", [lineUserId]);
+        const [lockedCards] = lineUserId
+            ? await db.query("SELECT cardId FROM user_card_locks WHERE lineUserId = ?", [lineUserId])
+            : [[]];
 
         const ownedMap = {};
         userCards.forEach(c => ownedMap[c.cardId] = c.count);
+        const lockedSet = new Set(lockedCards.map(r => r.cardId));
 
         const result = allCards.map(c => ({
             ...c,
             isOwned: !!ownedMap[c.cardId],
-            count: ownedMap[c.cardId] || 0
+            count: ownedMap[c.cardId] || 0,
+            isLocked: lockedSet.has(c.cardId)
         }));
 
         res.json({ status: "success", data: result });
     } catch (err) {
         res.status(500).json({ status: "error", message: err.message });
     }
+});
+
+// GET /api/user/gacha-history — ประวัติการดึงการ์ด 50 รายการล่าสุด
+app.get('/api/user/gacha-history', async (req, res) => {
+    const { lineUserId } = req.query;
+    if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
+    try {
+        const [rows] = await db.query(`
+            SELECT uc.cardId, sc.cardName, sc.rarity, sc.imageUrl,
+                   DATE_FORMAT(CONVERT_TZ(uc.createdAt,'+00:00','+07:00'), '%Y-%m-%d %H:%i') AS pulledAt
+            FROM user_cards uc
+            JOIN safety_cards sc ON uc.cardId = sc.cardId
+            WHERE uc.lineUserId = ?
+            ORDER BY uc.createdAt DESC
+            LIMIT 50
+        `, [lineUserId]);
+        res.json({ status: 'success', data: rows });
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/game/toggle-card-lock — ล็อค/ปลดล็อคการ์ด
+app.post('/api/game/toggle-card-lock', async (req, res) => {
+    const { lineUserId, cardId } = req.body;
+    if (!lineUserId || !cardId) return res.status(400).json({ status: 'error', message: 'lineUserId and cardId required' });
+    try {
+        const [[existing]] = await db.query(
+            'SELECT 1 FROM user_card_locks WHERE lineUserId=? AND cardId=?', [lineUserId, cardId]
+        );
+        if (existing) {
+            await db.query('DELETE FROM user_card_locks WHERE lineUserId=? AND cardId=?', [lineUserId, cardId]);
+            res.json({ status: 'success', data: { isLocked: false } });
+        } else {
+            await db.query('INSERT INTO user_card_locks (lineUserId, cardId) VALUES (?,?)', [lineUserId, cardId]);
+            res.json({ status: 'success', data: { isLocked: true } });
+        }
+    } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
 // ======================================================
@@ -3227,6 +3277,14 @@ app.post('/api/game/recycle-cards', async (req, res) => {
         const totalCount = cardsToRecycle.reduce((sum, item) => sum + item.count, 0);
         if (totalCount !== 5) throw new Error("ต้องเลือกการ์ดมาย่อยให้ครบ 5 ใบพอดีครับ");
 
+        // ตรวจสอบการ์ดที่ถูกล็อค
+        const recycleCardIds = cardsToRecycle.map(c => c.cardId);
+        const [lockedRows] = await conn.query(
+            `SELECT cardId FROM user_card_locks WHERE lineUserId=? AND cardId IN (${recycleCardIds.map(() => '?').join(',')})`,
+            [lineUserId, ...recycleCardIds]
+        );
+        if (lockedRows.length > 0) throw new Error(`ไม่สามารถย่อยการ์ดที่ล็อคไว้ได้ — กรุณาปลดล็อคก่อน`);
+
         // 2. ลบการ์ดออกจากตาราง (วนลูปย่อยทีละชนิด)
         for (const item of cardsToRecycle) {
             // เช็คก่อนว่ามีพอให้ลบไหม
@@ -3245,8 +3303,25 @@ app.post('/api/game/recycle-cards', async (req, res) => {
             );
         }
 
-        // 3. สุ่มรางวัล (Lucky Coin Box: 100 - 300 Coins)
-        const rewardCoins = Math.floor(Math.random() * (300 - 100 + 1)) + 100;
+        // 3. คำนวณรางวัลตาม rarity ของการ์ดที่ recycle
+        const RECYCLE_RATES = { C: 20, R: 45, SR: 90, UR: 180 };
+        const cardIds = cardsToRecycle.map(c => c.cardId);
+        const [cardRows] = await conn.query(
+            `SELECT cardId, rarity FROM safety_cards WHERE cardId IN (${cardIds.map(() => '?').join(',')})`,
+            cardIds
+        );
+        const rarityMap = Object.fromEntries(cardRows.map(r => [r.cardId, r.rarity]));
+        let baseReward = 0;
+        const rarityBreakdown = [];
+        for (const item of cardsToRecycle) {
+            const rarity = rarityMap[item.cardId] || 'C';
+            const perCard = RECYCLE_RATES[rarity] || 20;
+            baseReward += perCard * item.count;
+            rarityBreakdown.push({ cardId: item.cardId, rarity, perCard, count: item.count });
+        }
+        // ±15% variance เพื่อความสนุก
+        const variance = 1 + (Math.random() * 0.3 - 0.15);
+        const rewardCoins = Math.max(20, Math.round(baseReward * variance));
 
         // 4. ให้รางวัล
         await conn.query(
@@ -3265,7 +3340,7 @@ app.post('/api/game/recycle-cards', async (req, res) => {
         const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
 
         await conn.commit();
-        res.json({ status: "success", data: { rewardCoins, newCoinBalance: user.coinBalance } });
+        res.json({ status: "success", data: { rewardCoins, newCoinBalance: user.coinBalance, rarityBreakdown } });
 
     } catch (e) {
         await conn.rollback();

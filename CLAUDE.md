@@ -198,6 +198,17 @@ fireConfetti('big')      // 3 bursts
 - Dedup ด้วย `localStorage.getItem('streak_milestone_N_shown')`
 - แสดง Swal popup + confetti streak
 
+### Safety Gacha (Safety Cards)
+- **Pull**: `POST /api/game/gacha-pull` — cost 100 coins; weights: UR 5%, SR 15%, R 30%, C 50%; cashback: C +20, R +40, SR +80, UR +100
+- **Recycle**: `POST /api/game/recycle-cards` — ต้องส่งการ์ดรวม 5 ใบพอดี; รางวัล **scale ตาม rarity** (C=20/ใบ, R=45/ใบ, SR=90/ใบ, UR=180/ใบ) ±15% variance; response ส่ง `rarityBreakdown` กลับมาด้วย; **บล็อก locked cards** ที่ server ด้วย (ถ้า cardId ใด locked → reject ทั้ง batch)
+- **Album**: `GET /api/user/cards` — cards + isOwned + count + **`isLocked`**; กดการ์ดใดก็ได้เพื่อดู info popup (`showCardInfo(el)`) — แสดง image, rarity badge, ownedCount, description, และปุ่ม lock/unlock
+- **Lock System**: `POST /api/game/toggle-card-lock` — toggle lock/unlock ด้วย cardId; table `user_card_locks (lineUserId, cardId, PRIMARY KEY)`; การ์ดที่ lock → แสดง 🔒 badge บนอัลบั้ม; recycle modal ซ่อน locked cards (แสดงจำนวนที่ซ่อนไว้ที่ footer)
+- **Pull History tab**: `GET /api/user/gacha-history` — 50 รายการล่าสุด จาก `user_cards` JOIN `safety_cards`; อัลบั้มมี 2 tab: อัลบั้ม / ประวัติการดึง (`switchAlbumTab(tab)`, `loadGachaHistory()`)
+- **Frontend functions**: `pullGacha()`, `openRecycleModal()`, `confirmRecycle()`, `openCardAlbum()`, `renderAlbumGrid()`, `showCardInfo(el)`, `toggleCardLock(cardId, btn)`, `switchAlbumTab(tab)`, `loadGachaHistory()`
+- **CSS**: `.album-card-tap` (scale 0.94 on active), `.card-info-popup` (rounded Swal popup)
+- **⚠️ Recycle rates hardcoded** ใน server.js constant `RECYCLE_RATES` — ปรับ coin ต่อใบได้ที่นั่น
+- **⚠️ Card ID** ใช้ `"CARD_" + Date.now()` (admin create) — ไม่ใช่ UUID, ชนกันได้ถ้า create พร้อมกัน
+
 ### Social Feed
 - `GET /api/home/activity-feed` (public) — cross-system activity feed เช่น reports, KYT, cards, hunter, lottery
 - `loadSocialFeed()` — cache feed items and render 5 items per page in `#home-social-feed`
@@ -442,6 +453,14 @@ createdAt    TIMESTAMP
 | L-7 | Reset-tickets Swal: custom HTML input ถูก Bootstrap modal `aria-hidden` block → กรอก RESET ไม่ได้ | เปลี่ยนเป็น Swal built-in `input: 'text'` + `inputValidator` |
 | L-8 | `adminFullResetLotteryRound`: `res.data.reversedWinners` → undefined (`callApi` unwrap แล้ว) | แก้เป็น `res.reversedWinners`, `res.ticketsReset` |
 | L-9 | Frontend `closeAt` ยังใช้ `drawDate T00:00:00 - 60s` (logic เก่า) → diff ติดลบตลอด → แสดง "ปิดรับแล้ว" ทันทีแม้จะเปิดอยู่ | เปลี่ยนให้ใช้ `res.closesAt` จาก server (server ส่ง `getLotteryCloseAt(...).toISOString()`); fallback `T14:00:00+07:00` |
+
+### รอบที่ 7 — Safety Gacha Improvements
+| ID | ปัญหา | วิธีแก้ |
+|----|-------|---------|
+| G-1 | Recycle รางวัลเท่ากันทุก rarity → UR ไม่มีประโยชน์เก็บ | เปลี่ยนเป็น `RECYCLE_RATES = {C:20, R:45, SR:90, UR:180}` ±15% variance; response ส่ง `rarityBreakdown` กลับ frontend |
+| G-2 | ไม่มีวิธีป้องกันการ์ดดีจาก recycle โดยไม่ตั้งใจ | Lock system: table `user_card_locks`, `POST /api/game/toggle-card-lock`, server บล็อก locked cards ใน recycle; 🔒 badge ใน album grid; recycle modal ซ่อน locked cards |
+| G-3 | อัลบั้มไม่มีประวัติการดึง | Tab สองอัน (อัลบั้ม/ประวัติ), `GET /api/user/gacha-history` ดึงจาก `user_cards.createdAt`; ไม่ต้องสร้างตารางใหม่ |
+| G-4 | กดการ์ดในอัลบั้มไม่แสดงข้อมูลรายละเอียด | `showCardInfo(el)` — Swal popup พร้อม image, rarity badge, ownedCount, description, lock button |
 
 ## AppState (Global State)
 ```javascript

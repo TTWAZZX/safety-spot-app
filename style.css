@@ -3135,6 +3135,16 @@ body {
     border-bottom-color: #bbf7d0;
     color: #166534;
 }
+.album-card-tap {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.album-card-tap:active {
+    transform: scale(0.94);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15) !important;
+}
+.card-info-popup {
+    border-radius: 20px !important;
+}
 .lottery-countdown-digits {
     font-family: 'SF Mono', 'Fira Code', monospace, sans-serif;
     font-size: 1rem;

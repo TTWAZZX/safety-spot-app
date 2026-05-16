@@ -4451,17 +4451,26 @@ function renderAlbumGrid(cards, query) {
             if (c.rarity === 'UR') { borderColor = '#ffc107'; bgBadge = 'bg-warning text-dark'; }
             const imgFilter = c.isOwned ? '' : 'filter: grayscale(100%); opacity: 0.5;';
             const countBadge = c.count > 1 ? `<span class="position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger border border-white">+${c.count}</span>` : '';
+            const cardDataAttr = encodeURIComponent(JSON.stringify({
+                cardId: c.cardId, cardName: c.cardName, rarity: c.rarity,
+                description: c.description || '', imageUrl: c.imageUrl || '',
+                isOwned: c.isOwned, count: c.count || 0, isLocked: !!c.isLocked
+            }));
+            const lockBadge = c.isLocked ? `<span class="position-absolute top-0 start-0 translate-middle badge rounded-pill bg-dark border border-white" style="font-size:0.65rem;">🔒</span>` : '';
             container.append(`
                 <div class="col-4 col-sm-3 mb-2">
-                    <div class="card h-100 border-0 shadow-sm position-relative" style="overflow: visible;">
+                    <div class="card h-100 border-0 shadow-sm position-relative album-card-tap"
+                         style="overflow:visible;cursor:pointer;" data-card="${cardDataAttr}"
+                         onclick="showCardInfo(this)">
                         ${countBadge}
+                        ${lockBadge}
                         <div class="card-body p-2 text-center d-flex flex-column align-items-center">
                             <div class="rounded-3 mb-2 d-flex align-items-center justify-content-center"
                                  style="width:100%;aspect-ratio:1/1;border:2px solid ${borderColor};background:#fff;overflow:hidden;">
                                 <img src="${getFullImageUrl(c.imageUrl)}" class="img-fluid" style="${imgFilter}" onerror="this.src='https://placehold.co/100?text=?'">
                             </div>
                             <span class="badge ${bgBadge} mb-1" style="font-size:0.6rem;">${c.rarity}</span>
-                            <small class="d-block text-truncate w-100 fw-bold" style="font-size:0.7rem;">${c.cardName}</small>
+                            <small class="d-block text-truncate w-100 fw-bold" style="font-size:0.7rem;">${sanitizeHTML(c.cardName)}</small>
                         </div>
                     </div>
                 </div>
@@ -4474,6 +4483,95 @@ function renderAlbumGrid(cards, query) {
     const progress = cards.length > 0 ? Math.round((ownedCount / cards.length) * 100) : 0;
     $('#album-progress-text').text(`${ownedCount}/${cards.length}`);
     $('#album-progress-bar').css('width', `${progress}%`);
+}
+
+function switchAlbumTab(tab) {
+    const isAlbum = tab === 'album';
+    $('#album-tab-panel').toggleClass('d-none', !isAlbum);
+    $('#history-tab-panel').toggleClass('d-none', isAlbum);
+    $('#tab-btn-album').toggleClass('btn-primary', isAlbum).toggleClass('btn-outline-primary', !isAlbum);
+    $('#tab-btn-history').toggleClass('btn-primary', !isAlbum).toggleClass('btn-outline-primary', isAlbum);
+    if (!isAlbum) loadGachaHistory();
+}
+
+async function loadGachaHistory() {
+    const container = $('#gacha-history-list');
+    container.html('<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>');
+    try {
+        const rows = await callApi('/api/user/gacha-history', { lineUserId: AppState.lineProfile.userId });
+        if (!rows || rows.length === 0) {
+            container.html('<div class="text-center text-muted py-5"><i class="fas fa-ghost fa-2x mb-2 d-block"></i>ยังไม่มีประวัติการดึง</div>');
+            return;
+        }
+        const RARITY_COLOR = { C: '#6c757d', R: '#0dcaf0', SR: '#d63384', UR: '#ffc107' };
+        const RARITY_LABEL = { C: 'Common', R: 'Rare', SR: 'Super Rare', UR: 'Ultra Rare' };
+        const html = rows.map(r => `
+            <div class="d-flex align-items-center gap-3 bg-white rounded-3 p-2 mb-2 shadow-sm">
+                <img src="${getFullImageUrl(r.imageUrl)}" style="width:48px;height:48px;object-fit:contain;border-radius:10px;border:2px solid ${RARITY_COLOR[r.rarity] || '#dee2e6'};"
+                     onerror="this.src='https://placehold.co/48?text=?'">
+                <div class="flex-fill">
+                    <div class="fw-bold small">${sanitizeHTML(r.cardName)}</div>
+                    <span class="badge rounded-pill" style="background:${RARITY_COLOR[r.rarity]};color:${r.rarity==='UR'?'#000':'#fff'};font-size:0.6rem;">
+                        ${r.rarity} — ${RARITY_LABEL[r.rarity]}
+                    </span>
+                </div>
+                <small class="text-muted" style="font-size:0.65rem;white-space:nowrap;">${sanitizeHTML(r.pulledAt)}</small>
+            </div>`).join('');
+        container.html(`<p class="text-muted small mb-2">50 รายการล่าสุด</p>${html}`);
+    } catch (e) {
+        container.html(`<div class="text-center text-danger py-4">${sanitizeHTML(e.message)}</div>`);
+    }
+}
+
+function showCardInfo(el) {
+    let c;
+    try { c = JSON.parse(decodeURIComponent(el.dataset.card)); } catch (_) { return; }
+    const RARITY_LABEL = { C: 'Common', R: 'Rare', SR: 'Super Rare', UR: 'Ultra Rare' };
+    const RARITY_COLOR = { C: '#6c757d', R: '#0dcaf0', SR: '#d63384', UR: '#ffc107' };
+    const ownedBadge = c.isOwned
+        ? `<span class="badge bg-success">มีอยู่ ${c.count} ใบ</span>`
+        : `<span class="badge bg-secondary">ยังไม่มี</span>`;
+    const imgStyle = c.isOwned ? '' : 'filter:grayscale(100%);opacity:0.5;';
+    const lockBtn = c.isOwned ? `
+        <button id="swal-lock-btn" class="btn btn-sm mt-2 ${c.isLocked ? 'btn-warning' : 'btn-outline-secondary'}"
+                onclick="toggleCardLock('${sanitizeHTML(c.cardId)}', this)">
+            ${c.isLocked ? '🔒 ล็อคอยู่ — แตะเพื่อปลดล็อค' : '🔓 แตะเพื่อล็อคการ์ดนี้'}
+        </button>` : '';
+    Swal.fire({
+        html: `
+            <div class="text-center">
+                <img src="${getFullImageUrl(c.imageUrl)}" style="width:120px;height:120px;object-fit:contain;border-radius:12px;${imgStyle}"
+                     onerror="this.src='https://placehold.co/120?text=?'" class="mb-3">
+                <div class="fw-bold fs-6 mb-1">${sanitizeHTML(c.cardName)}</div>
+                <div class="mb-2">
+                    <span class="badge rounded-pill px-3 py-1 fw-bold" style="background:${RARITY_COLOR[c.rarity]};color:${c.rarity==='UR'?'#000':'#fff'};">
+                        ${c.rarity} — ${RARITY_LABEL[c.rarity]}
+                    </span>
+                </div>
+                <div class="mb-2">${ownedBadge}</div>
+                ${lockBtn}
+                ${c.description ? `<p class="text-muted small text-start mt-3 px-1" style="line-height:1.6;">${sanitizeHTML(c.description)}</p>` : ''}
+            </div>`,
+        showConfirmButton: false,
+        showCloseButton: true,
+        background: '#fff',
+        width: 320,
+        customClass: { popup: 'card-info-popup' }
+    });
+}
+
+async function toggleCardLock(cardId, btn) {
+    try {
+        const res = await callApi('/api/game/toggle-card-lock', {
+            lineUserId: AppState.lineProfile.userId, cardId
+        }, 'POST');
+        const locked = res.isLocked;
+        btn.className = `btn btn-sm mt-2 ${locked ? 'btn-warning' : 'btn-outline-secondary'}`;
+        btn.textContent = locked ? '🔒 ล็อคอยู่ — แตะเพื่อปลดล็อค' : '🔓 แตะเพื่อล็อคการ์ดนี้';
+        showToast(locked ? '🔒 ล็อคการ์ดแล้ว' : '🔓 ปลดล็อคการ์ดแล้ว', 'info');
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
 }
 
 async function openCardAlbum() {
@@ -4897,19 +4995,26 @@ async function openRecycleModal() {
         // ดึงการ์ดทั้งหมด
         const cards = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
         
-        // กรองเอาเฉพาะที่มีซ้ำ (count > 1)
+        // กรองเอาเฉพาะที่มีซ้ำ (count > 1) และยังไม่ได้ล็อก
         const duplicates = cards.filter(c => c.count > 1);
-        
+        const recyclable = duplicates.filter(c => !c.isLocked);
+        const lockedDupes = duplicates.filter(c => c.isLocked);
+
         list.empty();
-        
+
         if (duplicates.length === 0) {
             list.html('<div class="text-center text-muted py-4"><i class="fas fa-box-open fa-3x mb-2"></i><br>ไม่มีการ์ดซ้ำให้ย่อย</div>');
             return;
         }
 
-        duplicates.forEach(c => {
+        if (recyclable.length === 0) {
+            list.html('<div class="text-center text-muted py-4"><i class="fas fa-lock fa-3x mb-2"></i><br>การ์ดซ้ำทั้งหมดถูกล็อกไว้<br><small>ปลดล็อกจากอัลบั้มก่อนย่อย</small></div>');
+            return;
+        }
+
+        recyclable.forEach(c => {
             const spareCount = c.count - 1; // จำนวนที่ย่อยได้ (ต้องเหลือไว้ 1 ใบ)
-            
+
             list.append(`
                 <div class="list-group-item d-flex align-items-center justify-content-between p-3 border-0 shadow-sm mb-2 rounded">
                     <div class="d-flex align-items-center">
@@ -4920,15 +5025,19 @@ async function openRecycleModal() {
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-sm btn-outline-secondary rounded-circle" style="width:32px; height:32px;" 
+                        <button class="btn btn-sm btn-outline-secondary rounded-circle" style="width:32px; height:32px;"
                                 onclick="adjustRecycle('${c.cardId}', -1, ${spareCount})"><i class="fas fa-minus"></i></button>
                         <span class="fw-bold" id="qty-${c.cardId}" style="width: 20px; text-align: center;">0</span>
-                        <button class="btn btn-sm btn-outline-success rounded-circle" style="width:32px; height:32px;" 
+                        <button class="btn btn-sm btn-outline-success rounded-circle" style="width:32px; height:32px;"
                                 onclick="adjustRecycle('${c.cardId}', 1, ${spareCount})"><i class="fas fa-plus"></i></button>
                     </div>
                 </div>
             `);
         });
+
+        if (lockedDupes.length > 0) {
+            list.append(`<p class="text-center text-muted small mt-2 mb-0">🔒 ซ่อน ${lockedDupes.length} รายการที่ล็อกไว้</p>`);
+        }
 
     } catch (e) {
         list.html(`<p class="text-danger text-center">Error: ${e.message}</p>`);
@@ -4994,7 +5103,23 @@ async function confirmRecycle() {
         if(AppState.currentUser) AppState.currentUser.coinBalance = res.newCoinBalance;
 
         triggerHaptic('heavy');
-        Swal.fire('สำเร็จ!', `คุณได้รับ +${res.rewardCoins} เหรียญ`, 'success');
+        const RARITY_LABEL = { C: 'Common', R: 'Rare', SR: 'Super Rare', UR: 'Ultra Rare' };
+        const RARITY_COLOR = { C: '#6c757d', R: '#0dcaf0', SR: '#d63384', UR: '#ffc107' };
+        const breakdownHtml = (res.rarityBreakdown || []).map(b =>
+            `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                <span style="color:${RARITY_COLOR[b.rarity]};font-weight:700;">${b.rarity}</span>
+                <span class="text-muted small">${RARITY_LABEL[b.rarity]} ×${b.count}</span>
+                <span class="fw-bold">+${b.perCard * b.count} 🪙</span>
+             </div>`
+        ).join('');
+        Swal.fire({
+            title: '🔥 หลอมรวมสำเร็จ!',
+            html: `${breakdownHtml}
+                   <div class="mt-3 fs-5 fw-bold text-success">รวมได้ +${res.rewardCoins} เหรียญ</div>
+                   <div class="text-muted small">รวม bonus ±15% ตาม rarity</div>`,
+            icon: 'success',
+            confirmButtonColor: '#06C755'
+        });
 
     } catch (e) {
         Swal.fire('Error', e.message, 'error');
