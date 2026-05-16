@@ -4629,13 +4629,16 @@ async function openCardExchangeModal() {
         const cards = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
         // เก็บเฉพาะการ์ดที่ผู้ใช้มีและยังไม่แลก (ไม่ล็อก)
         _exchangeCards = cards.filter(c => c.isOwned && !c.isExchanged && !c.isLocked);
-        const totalExchangeable = cards.filter(c => !c.isExchanged).length;
         const totalExchanged = cards.filter(c => c.isExchanged).length;
 
         // progress bar
         $('#exchange-progress-text').text(`${totalExchanged} / ${cards.length}`);
         const pct = cards.length > 0 ? Math.round((totalExchanged / cards.length) * 100) : 0;
         $('#exchange-progress-bar').css('width', pct + '%');
+
+        // reset filter tab visual state
+        $('#exchange-filter-tabs .exchange-filter-btn').removeClass('active btn-warning').addClass('btn-outline-secondary');
+        $('#exchange-filter-tabs .exchange-filter-btn[data-rarity="all"]').removeClass('btn-outline-secondary').addClass('btn-warning active');
 
         // filter tabs
         $('#exchange-filter-tabs .exchange-filter-btn').off('click').on('click', function () {

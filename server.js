@@ -2719,7 +2719,7 @@ app.post('/api/game/exchange-cards-for-score', async (req, res) => {
         // ดึงข้อมูลการ์ดทั้งหมดที่ขอแลก
         const placeholders = cardIds.map(() => '?').join(',');
         const [[...cards]] = await conn.query(
-            `SELECT cardId, rarity FROM safety_cards WHERE cardId IN (${placeholders})`, cardIds
+            `SELECT cardId, rarity, cardName FROM safety_cards WHERE cardId IN (${placeholders})`, cardIds
         );
         if (cards.length !== cardIds.length)
             throw new Error('พบการ์ดที่ไม่ถูกต้องในรายการ');
@@ -2764,18 +2764,12 @@ app.post('/api/game/exchange-cards-for-score', async (req, res) => {
             exchangeRows.push([lineUserId, cardId, score]);
         }
 
-        // ลบการ์ด 1 ใบต่อ cardId จาก user_cards
+        // ลบการ์ด 1 ใบต่อ cardId จาก user_cards (table เก็บ 1 row/ใบ ไม่มีคอลัมน์ count)
         for (const cardId of cardIds) {
-            const [[uc]] = await conn.query(
-                'SELECT id, count FROM user_cards WHERE lineUserId=? AND cardId=? LIMIT 1',
+            await conn.query(
+                'DELETE FROM user_cards WHERE lineUserId=? AND cardId=? LIMIT 1',
                 [lineUserId, cardId]
             );
-            if (!uc) throw new Error(`ไม่พบการ์ด ${cardId} ใน inventory`);
-            if (uc.count > 1) {
-                await conn.query('UPDATE user_cards SET count=count-1 WHERE id=?', [uc.id]);
-            } else {
-                await conn.query('DELETE FROM user_cards WHERE id=?', [uc.id]);
-            }
         }
 
         // บันทึก exchange log (bulk insert)
