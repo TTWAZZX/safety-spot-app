@@ -205,7 +205,8 @@ fireConfetti('big')      // 3 bursts
 - แสดง Swal popup + confetti streak
 
 ### Safety Gacha (Safety Cards)
-- **Pull**: `POST /api/game/gacha-pull` — cost 100 coins; weights: UR 5%, SR 15%, R 30%, C 50%; cashback: C +20, R +40, SR +80, UR +100
+- **Pull**: `POST /api/game/gacha-pull` — cost 100 coins; weights/cashback อ่านจาก `game_settings` table (default: UR 5%, SR 15%, R 30%, C 50%; cashback: C +20, R +40, SR +80, UR +100); cache 60 วินาที via `getGachaRates()`
+- **Admin Gacha Settings**: `GET/PUT /api/admin/gacha-settings` — ตั้งค่าอัตรา 4 rarity + bonus coins; PUT validate sum=100% + all values isFinite; ปุ่ม "ตั้งค่าอัตราการ์ด" ใน `#admin-cards-modal`; `adminManageGachaSettings()` — Swal form พร้อม live sum validator; `game_settings` table (key-value, CREATE IF NOT EXISTS at server start)
 - **Recycle**: `POST /api/game/recycle-cards` — ต้องส่งการ์ดรวม 5 ใบพอดี; รางวัล **scale ตาม rarity** (C=20/ใบ, R=45/ใบ, SR=90/ใบ, UR=180/ใบ) ±15% variance; response ส่ง `rarityBreakdown` กลับมาด้วย; **บล็อก locked cards** ที่ server ด้วย (ถ้า cardId ใด locked → reject ทั้ง batch)
 - **Album**: `GET /api/user/cards` — cards + isOwned + count + `isLocked` + `isExchanged` + `scoreGiven` + `exchangedAt`; กดการ์ดใดก็ได้เพื่อดู info popup (`showCardInfo(el)`)
 - **Lock System**: `POST /api/game/toggle-card-lock` — toggle lock/unlock; table `user_card_locks (lineUserId, cardId, PRIMARY KEY)`; 🔒 badge บนอัลบั้ม; recycle modal ซ่อน locked cards
@@ -408,7 +409,7 @@ createdAt    TIMESTAMP
 - **`kyt_questions` schema patches (idempotent at server start):**
   - `createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP`
   - `isAiGenerated BOOLEAN DEFAULT FALSE`
-  - ⚠️ Production: รัน 2 ALTER TABLE นี้ก่อน (หรือรอ server restart — patches เป็น auto)
+  - ⚠️ Production: patches apply อัตโนมัติตอน server restart — ไม่ต้องรัน SQL เอง
 
 ### Admin AI Generate KYT Questions
 - **Endpoint**: `POST /api/admin/questions/generate` (ใช้ `isAdmin` middleware)

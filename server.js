@@ -172,6 +172,14 @@ db.query(`
   )
 `).catch(() => {});
 
+db.query(`
+  CREATE TABLE IF NOT EXISTS game_settings (
+    settingKey   VARCHAR(100) PRIMARY KEY,
+    settingValue TEXT,
+    updatedAt    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )
+`).catch(() => {});
+
 // -------------------------
 //   Admin Audit Log Helper
 // -------------------------
@@ -1729,6 +1737,50 @@ app.delete('/api/admin/cards/:id', isAdmin, async (req, res) => {
 });
 
 // ======================================================
+// PART 3.8 — ADMIN: Gacha Settings
+// ======================================================
+
+app.get('/api/admin/gacha-settings', isAdmin, async (req, res) => {
+    try {
+        const rates = await getGachaRates();
+        res.json({ status: 'success', data: rates });
+    } catch (e) {
+        res.status(500).json({ status: 'error', message: e.message });
+    }
+});
+
+app.put('/api/admin/gacha-settings', isAdmin, async (req, res) => {
+    try {
+        const { ur, sr, r, c, bonus_ur, bonus_sr, bonus_r, bonus_c } = req.body;
+        const allVals = [ur, sr, r, c, bonus_ur, bonus_sr, bonus_r, bonus_c];
+        if (allVals.some(v => !isFinite(Number(v)))) {
+            return res.status(400).json({ status: 'error', message: 'ค่าทุกช่องต้องเป็นตัวเลข' });
+        }
+        const [nur, nsr, nr, nc] = [Number(ur), Number(sr), Number(r), Number(c)];
+        const total = nur + nsr + nr + nc;
+        if (Math.abs(total - 100) > 0.01) {
+            return res.status(400).json({ status: 'error', message: `ผลรวมอัตราต้องเท่ากับ 100% (ตอนนี้ ${total.toFixed(1)}%)` });
+        }
+        const settings = [
+            ['gacha_rate_ur', ur], ['gacha_rate_sr', sr], ['gacha_rate_r', r], ['gacha_rate_c', c],
+            ['gacha_bonus_ur', bonus_ur], ['gacha_bonus_sr', bonus_sr], ['gacha_bonus_r', bonus_r], ['gacha_bonus_c', bonus_c],
+        ];
+        for (const [key, val] of settings) {
+            await db.query(
+                "INSERT INTO game_settings (settingKey, settingValue) VALUES (?, ?) ON DUPLICATE KEY UPDATE settingValue = ?",
+                [key, val, val]
+            );
+        }
+        _gachaRatesCache = null;
+        await logAdminAction(req.body.requesterId, 'UPDATE_GACHA_SETTINGS', 'settings', 'gacha_rates', 'Gacha Rates',
+            { ur, sr, r, c, bonus_ur, bonus_sr, bonus_r, bonus_c });
+        res.json({ status: 'success', data: { message: 'บันทึกอัตราการ์ดสำเร็จ' } });
+    } catch (e) {
+        res.status(500).json({ status: 'error', message: e.message });
+    }
+});
+
+// ======================================================
 // PART 4 — ADMIN PANEL / NOTIFICATIONS / SERVER START
 // ======================================================
 
@@ -2628,19 +2680,36 @@ app.post('/api/game/restore-streak', async (req, res) => {
     } finally { conn.release(); }
 });
 
+// Gacha rates in-memory cache (invalidated when admin saves settings)
+let _gachaRatesCache = null;
+let _gachaRatesCacheTime = 0;
+const GACHA_RATES_CACHE_TTL = 60000;
+
+async function getGachaRates() {
+    if (_gachaRatesCache && Date.now() - _gachaRatesCacheTime < GACHA_RATES_CACHE_TTL) return _gachaRatesCache;
+    const [rows] = await db.query("SELECT settingKey, settingValue FROM game_settings WHERE settingKey LIKE 'gacha_%'");
+    const m = {};
+    rows.forEach(r => { m[r.settingKey] = parseFloat(r.settingValue); });
+    const safe = (key, def) => { const v = m[key]; return (v !== undefined && isFinite(v)) ? v : def; };
+    _gachaRatesCache = {
+        ur:       safe('gacha_rate_ur',   5),
+        sr:       safe('gacha_rate_sr',  15),
+        r:        safe('gacha_rate_r',   30),
+        c:        safe('gacha_rate_c',   50),
+        bonus_ur: safe('gacha_bonus_ur', 100),
+        bonus_sr: safe('gacha_bonus_sr',  80),
+        bonus_r:  safe('gacha_bonus_r',   40),
+        bonus_c:  safe('gacha_bonus_c',   20),
+    };
+    _gachaRatesCacheTime = Date.now();
+    return _gachaRatesCache;
+}
+
 // --- API: หมุนกาชา (ฉบับอัปเดต: มี Bonus Coin Cashback) ---
 app.post('/api/game/gacha-pull', async (req, res) => {
     const { lineUserId } = req.body;
     const GACHA_COST = 100; // ค่าหมุน 100 เหรียญ
     const conn = await db.getClient();
-
-    // ⭐ กำหนดเรทเงินคืนตามระดับ (Cashback)
-    const BONUS_RATES = {
-        'C': 20,    // ปลอบใจ
-        'R': 40,   // คืนทุน 10%
-        'SR': 80,  // คืนทุน 50%
-        'UR': 100  // กำไร! (ได้การ์ดแถมได้เงินเพิ่ม)
-    };
 
     try {
         await conn.beginTransaction();
@@ -2649,13 +2718,15 @@ app.post('/api/game/gacha-pull', async (req, res) => {
         const [[user]] = await conn.query("SELECT coinBalance FROM users WHERE lineUserId = ?", [lineUserId]);
         if (user.coinBalance < GACHA_COST) throw new Error("เหรียญไม่พอครับ (ต้องการ 100 เหรียญ)");
 
-        // 2. สุ่มการ์ด (แยกตาม Rarity)
+        // 2. สุ่มการ์ด — อัตราและโบนัสจาก DB (admin ปรับได้)
+        const rates = await getGachaRates();
+        const BONUS_RATES = { C: rates.bonus_c, R: rates.bonus_r, SR: rates.bonus_sr, UR: rates.bonus_ur };
         const rand = Math.random() * 100;
-        let rarityPool = ['C']; 
-        if (rand < 5) rarityPool = ['UR'];        // 5%
-        else if (rand < 20) rarityPool = ['SR'];  // 15%
-        else if (rand < 50) rarityPool = ['R'];   // 30%
-        else rarityPool = ['C'];                  // 50%
+        let rarityPool;
+        if (rand < rates.ur) rarityPool = ['UR'];
+        else if (rand < rates.ur + rates.sr) rarityPool = ['SR'];
+        else if (rand < rates.ur + rates.sr + rates.r) rarityPool = ['R'];
+        else rarityPool = ['C'];
 
         const [cards] = await conn.query("SELECT * FROM safety_cards WHERE rarity IN (?) ORDER BY RAND() LIMIT 1", [rarityPool]);
         

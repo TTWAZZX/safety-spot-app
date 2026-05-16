@@ -5000,6 +5000,83 @@ function renderFilteredCards(cards, query) {
     });
 }
 
+async function adminManageGachaSettings() {
+    let rates;
+    try {
+        rates = await callApi('/api/admin/gacha-settings', {}, 'GET');
+    } catch (e) {
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+        return;
+    }
+
+    const { value: vals, isConfirmed } = await Swal.fire({
+        title: '⚙️ ตั้งค่าอัตราการ์ด',
+        width: 520,
+        html: `
+        <div class="text-start">
+            <p class="text-muted small mb-3">ผลรวมอัตราดึงต้องเท่ากับ <strong>100%</strong> พอดี</p>
+            <div class="mb-3 p-3 border rounded bg-white">
+                <h6 class="fw-bold mb-2">อัตราดึง (รวม 100%)</h6>
+                <div class="row g-2">
+                    <div class="col-6"><label class="form-label small fw-bold text-danger">⚡ UR (%)</label><input id="gs-ur" type="number" class="form-control" value="${rates.ur}" min="0" max="100" step="0.1"></div>
+                    <div class="col-6"><label class="form-label small fw-bold text-warning">🌟 SR (%)</label><input id="gs-sr" type="number" class="form-control" value="${rates.sr}" min="0" max="100" step="0.1"></div>
+                    <div class="col-6"><label class="form-label small fw-bold text-primary">💎 R (%)</label><input id="gs-r" type="number" class="form-control" value="${rates.r}" min="0" max="100" step="0.1"></div>
+                    <div class="col-6"><label class="form-label small fw-bold text-secondary">🃏 C (%)</label><input id="gs-c" type="number" class="form-control" value="${rates.c}" min="0" max="100" step="0.1"></div>
+                </div>
+                <div id="gs-sum" class="text-center mt-2 fw-bold small"></div>
+            </div>
+            <div class="p-3 border rounded bg-white">
+                <h6 class="fw-bold mb-2">เหรียญโบนัสเมื่อดึงได้</h6>
+                <div class="row g-2">
+                    <div class="col-6"><label class="form-label small text-danger">⚡ UR bonus 🪙</label><input id="gs-bur" type="number" class="form-control" value="${rates.bonus_ur}" min="0"></div>
+                    <div class="col-6"><label class="form-label small text-warning">🌟 SR bonus 🪙</label><input id="gs-bsr" type="number" class="form-control" value="${rates.bonus_sr}" min="0"></div>
+                    <div class="col-6"><label class="form-label small text-primary">💎 R bonus 🪙</label><input id="gs-br" type="number" class="form-control" value="${rates.bonus_r}" min="0"></div>
+                    <div class="col-6"><label class="form-label small text-secondary">🃏 C bonus 🪙</label><input id="gs-bc" type="number" class="form-control" value="${rates.bonus_c}" min="0"></div>
+                </div>
+            </div>
+        </div>`,
+        didOpen: () => {
+            const updateSum = () => {
+                const sum = ['gs-ur', 'gs-sr', 'gs-r', 'gs-c'].reduce((s, id) => s + (parseFloat(document.getElementById(id).value) || 0), 0);
+                const el = document.getElementById('gs-sum');
+                el.textContent = `รวม: ${sum.toFixed(1)}%`;
+                el.className = `text-center mt-2 fw-bold small ${Math.abs(sum - 100) < 0.01 ? 'text-success' : 'text-danger'}`;
+            };
+            ['gs-ur', 'gs-sr', 'gs-r', 'gs-c'].forEach(id => document.getElementById(id).addEventListener('input', updateSum));
+            updateSum();
+        },
+        preConfirm: () => {
+            const ur = parseFloat(document.getElementById('gs-ur').value) || 0;
+            const sr = parseFloat(document.getElementById('gs-sr').value) || 0;
+            const r  = parseFloat(document.getElementById('gs-r').value)  || 0;
+            const c  = parseFloat(document.getElementById('gs-c').value)  || 0;
+            if (Math.abs(ur + sr + r + c - 100) > 0.01) {
+                Swal.showValidationMessage(`ผลรวมต้องเท่ากับ 100% (ตอนนี้ ${(ur+sr+r+c).toFixed(1)}%)`);
+                return false;
+            }
+            return {
+                ur, sr, r, c,
+                bonus_ur: parseFloat(document.getElementById('gs-bur').value) || 0,
+                bonus_sr: parseFloat(document.getElementById('gs-bsr').value) || 0,
+                bonus_r:  parseFloat(document.getElementById('gs-br').value)  || 0,
+                bonus_c:  parseFloat(document.getElementById('gs-bc').value)  || 0,
+            };
+        },
+        confirmButtonText: 'บันทึก',
+        confirmButtonColor: '#06C755',
+        cancelButtonText: 'ยกเลิก',
+        showCancelButton: true,
+    });
+
+    if (!isConfirmed || !vals) return;
+    try {
+        await callApi('/api/admin/gacha-settings', vals, 'PUT');
+        Swal.fire({ icon: 'success', title: 'บันทึกสำเร็จ', html: `UR ${vals.ur}% / SR ${vals.sr}% / R ${vals.r}% / C ${vals.c}%`, timer: 2000, showConfirmButton: false });
+    } catch (e) {
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
+
 async function handleManageCards() {
     const list = $('#cards-list-admin');
     list.html('<div class="col-12 text-center my-5"><div class="spinner-border text-success"></div></div>');

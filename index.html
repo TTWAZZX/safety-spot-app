@@ -1455,9 +1455,12 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body bg-light">
-                    <div class="d-flex gap-2 mb-3">
+                    <div class="d-flex gap-2 mb-3 flex-wrap">
                         <button id="add-card-btn" class="btn btn-success shadow-sm">
                             <i class="fas fa-plus"></i> เพิ่มการ์ดใหม่
+                        </button>
+                        <button class="btn btn-outline-warning shadow-sm" onclick="adminManageGachaSettings()">
+                            <i class="fas fa-sliders"></i> ตั้งค่าอัตราการ์ด
                         </button>
                         <input type="text" id="card-search-input" class="form-control" placeholder="ค้นหาการ์ด...">
                     </div>
