@@ -3530,6 +3530,10 @@ body {
 .lottery-ticket-card.ticket-winner {
     animation: ticketGlow 2s ease-in-out infinite;
 }
+.lottery-ticket-card.ticket-expired {
+    opacity: 0.6;
+    filter: grayscale(30%);
+}
 @keyframes ticketGlow {
     0%, 100% { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
     50%       { box-shadow: 0 4px 20px rgba(245,158,11,0.5); }

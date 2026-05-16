@@ -7341,21 +7341,28 @@ async function loadMyLotteryTickets() {
 
             g.tickets.forEach(t => {
                 const isWin = t.isWinner;
+                const isCompleted = g.roundStatus === 'completed';
                 const typeIcon = t.isGoldTicket
                     ? '<i class="fas fa-crown text-warning"></i>'
                     : (t.ticketType === 'six' ? '<i class="fas fa-star text-warning"></i>' : t.ticketType === 'two' ? '<i class="fas fa-circle text-success"></i>' : '<i class="fas fa-circle text-danger"></i>');
                 const typeLabel = t.isGoldTicket ? 'Gold Ticket 3 ตัวท้าย' : (t.ticketType === 'six' ? 'รางวัลที่ 1 (6 ตัวตรง)' : t.ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย');
                 const ticketClass = t.isGoldTicket ? 'lottery-ticket-gold' : (t.ticketType === 'six' ? 'lottery-ticket-six' : t.ticketType === 'two' ? 'lottery-ticket-green' : 'lottery-ticket-red');
+                const resultBadge = isWin
+                    ? '<span class="badge bg-warning text-dark"><i class="fas fa-trophy me-1"></i>ถูกรางวัล</span>'
+                    : isCompleted
+                        ? '<span class="badge bg-secondary"><i class="fas fa-times me-1"></i>ไม่ถูกรางวัล</span>'
+                        : '<span class="badge bg-info text-dark"><i class="fas fa-clock me-1"></i>รอผล</span>';
+                const metaRight = t.isPrizeClaimed ? 'จ่ายแล้ว' : isWin ? 'รอจ่าย' : isCompleted ? 'จบแล้ว' : 'Active';
 
-                html += `<div class="lottery-ticket-card ${ticketClass} ${isWin ? 'ticket-winner' : ''}">
+                html += `<div class="lottery-ticket-card ${ticketClass} ${isWin ? 'ticket-winner' : ''} ${!isWin && isCompleted ? 'ticket-expired' : ''}">
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="ticket-type-sm">${typeIcon} ${typeLabel}</span>
-                        ${isWin ? '<span class="badge bg-warning text-dark">ถูกรางวัล</span>' : '<span class="badge bg-light text-muted border">รอ/ไม่ถูกรางวัล</span>'}
+                        ${resultBadge}
                     </div>
                     <div class="ticket-number-large">${sanitizeHTML(t.number)}</div>
                     <div class="ticket-meta-row">
                         <span>${`Prize ${(t.ticketType === 'six' ? (t.prizeSixSnapshot || _lotterySettings.prizeSix) : t.ticketType === 'two' ? (t.prizeTwoSnapshot || _lotterySettings.prizeTwo) : (t.prizeThreeSnapshot || _lotterySettings.prizeThree)).toLocaleString()} pts`}</span>
-                        <span>${t.isPrizeClaimed ? 'จ่ายแล้ว' : (isWin ? 'รอจ่าย' : 'Active')}</span>
+                        <span>${metaRight}</span>
                     </div>
                     ${isWin ? `<div class="ticket-prize-badge">+${Number(t.prizeAmount).toLocaleString()} Points</div>` : ''}
                 </div>`;
