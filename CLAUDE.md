@@ -210,7 +210,9 @@ fireConfetti('big')      // 3 bursts
 - User endpoints validate `requesterId`/`lineUserId` for Lottery user-owned data
 - `/api/lottery/current-round` hides test rounds from normal users; admin (requesterId in admins table) sees test rounds via `includeTestRounds` flag
 - `lottery_rounds.isTest` supports admin-only test rounds
-- **ปิดรับตั๋ว**: `getLotteryCloseAt(drawDate)` คืน `drawDate T14:00:00+07:00` — ปิดรับ 14:00 น. ของวันออกรางวัล (ซื้อได้ถึง 13:59 น.)
+- **ปิดรับตั๋ว**: `getLotteryCloseAt(drawDate)` คืน `drawDate T14:00:00+07:00` — ปิดรับ 14:00 น. ของวันออกรางวัล (ซื้อได้ถึง 13:59 น.) — แก้เพียงจุดเดียวนี้ถ้าอยากเปลี่ยนเวลา
+- **Live Countdown**: `#lottery-countdown-bar` แสดง `⏱ ปิดรับใน HH:MM:SS` real-time ด้วย `setInterval` 1 วินาที; ใช้ `res.closesAt` (ISO string) จาก server — ไม่ hardcode เวลาใน frontend; เมื่อ countdown ถึง 0 → เปลี่ยนเป็น "ปิดรับแล้ว" อัตโนมัติ; clear interval เมื่อปิด modal (`hidden.bs.modal`)
+- **CSS**: `.lottery-countdown-digits` — monospace bold สีเขียวเข้ม ให้ตัวเลขดู premium
 - **Lottery type selector**: เปลี่ยนจาก card grid เป็น tab-style bar (`.lottery-type-tabs` / `.lottery-tab`) — IDs เดิมไม่เปลี่ยน ไม่มี JS changes
 - Admin result tab supports:
   - manual result entry
@@ -439,6 +441,7 @@ createdAt    TIMESTAMP
 | L-6 | Lottery ปิดรับตั๋ว 23:59 วันก่อนออกรางวัล → user ซื้อวันออกรางวัลไม่ได้ | `getLotteryCloseAt` เปลี่ยนเป็น `drawDate T14:00:00+07:00` |
 | L-7 | Reset-tickets Swal: custom HTML input ถูก Bootstrap modal `aria-hidden` block → กรอก RESET ไม่ได้ | เปลี่ยนเป็น Swal built-in `input: 'text'` + `inputValidator` |
 | L-8 | `adminFullResetLotteryRound`: `res.data.reversedWinners` → undefined (`callApi` unwrap แล้ว) | แก้เป็น `res.reversedWinners`, `res.ticketsReset` |
+| L-9 | Frontend `closeAt` ยังใช้ `drawDate T00:00:00 - 60s` (logic เก่า) → diff ติดลบตลอด → แสดง "ปิดรับแล้ว" ทันทีแม้จะเปิดอยู่ | เปลี่ยนให้ใช้ `res.closesAt` จาก server (server ส่ง `getLotteryCloseAt(...).toISOString()`); fallback `T14:00:00+07:00` |
 
 ## AppState (Global State)
 ```javascript
