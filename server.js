@@ -623,7 +623,7 @@ app.get('/api/home/lottery-summary', async (req, res) => {
             status: "success",
             data: {
                 enabled: true,
-                currentRound: round ? { ...round, isClosed: isLotteryRoundClosed(round), stats: roundStats } : null,
+                currentRound: round ? { ...round, isClosed: isLotteryRoundClosed(round), closesAt: getLotteryCloseAt(round.drawDate).toISOString(), stats: roundStats } : null,
                 latestResult: latestResult || null,
                 user,
                 prices: { two: settings.priceTwo, three: settings.priceThree, six: settings.priceSix },

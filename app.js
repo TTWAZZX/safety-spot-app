@@ -6232,7 +6232,9 @@ async function loadLotteryCurrentRound(forceRoundId = null) {
             $('#btn-lottery-buy').prop('disabled', true)
                 .html('<i class="fas fa-lock me-2"></i>ปิดรับแล้ว');
         } else {
-            const closeAt = new Date(res.drawDate + 'T00:00:00+07:00').getTime() - 60 * 1000;
+            const closeAt = res.closesAt
+                ? new Date(res.closesAt).getTime()
+                : new Date(res.drawDate + 'T14:00:00+07:00').getTime();
             function updateLotteryCountdown() {
                 const now = Date.now();
                 const diff = closeAt - now;
@@ -6244,11 +6246,11 @@ async function loadLotteryCurrentRound(forceRoundId = null) {
                     return;
                 }
                 const totalSec = Math.floor(diff / 1000);
-                const h = Math.floor(totalSec / 3600);
-                const m = Math.floor((totalSec % 3600) / 60);
-                const s = totalSec % 60;
+                const h = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+                const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+                const s = String(totalSec % 60).padStart(2, '0');
                 $('#lottery-countdown-bar').attr('class', 'lottery-countdown-bar lottery-countdown-active')
-                    .html(`<i class="fas fa-clock me-1"></i>ปิดรับใน ${h} ชม. ${m} นาที ${s} วินาที`);
+                    .html(`<i class="fas fa-stopwatch me-1"></i>ปิดรับใน <span class="lottery-countdown-digits">${h}:${m}:${s}</span>`);
             }
             clearInterval(_lotteryCountdownInterval);
             updateLotteryCountdown();

@@ -3135,6 +3135,13 @@ body {
     border-bottom-color: #bbf7d0;
     color: #166534;
 }
+.lottery-countdown-digits {
+    font-family: 'SF Mono', 'Fira Code', monospace, sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: #15803d;
+}
 .lottery-countdown-bar.lottery-countdown-closed {
     background: #f1f5f9;
     border-bottom-color: #cbd5e1;
