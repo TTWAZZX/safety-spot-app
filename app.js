@@ -716,9 +716,33 @@ async function loadHomeLotterySummary() {
         const todayCount = Number(user.todayCount || 0);
         const coinBalance = Number(user.coinBalance || 0).toLocaleString();
         const goldReady = user.goldEligibility && user.goldEligibility.eligible;
-        const latestText = latest
-            ? `ผลล่าสุด ${sanitizeHTML(latest.last2 || '--')} / ${sanitizeHTML(latest.last3_back || '---')}`
-            : 'ยังไม่มีผลย้อนหลัง';
+        const participantCount = Number(round?.stats?.participantCount || 0);
+        const roundSubText = round
+            ? `ผู้เข้าร่วม ${participantCount.toLocaleString()} คน · ตั๋วรวม ${ticketsSold} ใบ`
+            : 'ยังไม่มีงวดที่เปิดรับ';
+
+        let latestResultHtml = '';
+        if (latest) {
+            const lDateStr = latest.drawDate ? latest.drawDate.slice(0, 10) : '';
+            const lDate = lDateStr
+                ? new Date(lDateStr + 'T12:00:00+07:00').toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' })
+                : '-';
+            const winners = Number(latest.totalWinners || 0);
+            const winnerHtml = winners > 0
+                ? `<span class="text-success small fw-semibold"><i class="fas fa-trophy me-1"></i>${winners} ราย ถูกรางวัล</span>`
+                : `<span class="text-muted small"><i class="fas fa-minus me-1"></i>ไม่มีผู้ถูกรางวัล</span>`;
+            latestResultHtml = `
+                <div class="mt-2 pt-2 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div>
+                        <div class="text-muted small mb-1"><i class="fas fa-calendar-check me-1"></i>ผลงวด ${sanitizeHTML(lDate)}</div>
+                        <div class="d-flex gap-2">
+                            <span class="badge bg-dark fw-normal">2D: ${sanitizeHTML(latest.last2 || '--')}</span>
+                            <span class="badge bg-dark fw-normal">3D: ${sanitizeHTML(latest.last3_back || '---')}</span>
+                        </div>
+                    </div>
+                    ${winnerHtml}
+                </div>`;
+        }
 
         container.html(`
             <div class="home-lottery-card" onclick="openLotteryModal()">
@@ -726,7 +750,7 @@ async function loadHomeLotterySummary() {
                     <div>
                         <div class="home-lottery-kicker"><i class="fas fa-ticket-alt me-1"></i>Safety Lottery</div>
                         <div class="home-lottery-title">งวด ${sanitizeHTML(drawDate)}</div>
-                        <div class="home-lottery-sub">${sanitizeHTML(latestText)}</div>
+                        <div class="home-lottery-sub">${sanitizeHTML(roundSubText)}</div>
                     </div>
                     <span class="badge ${statusClass}">${statusText}</span>
                 </div>
@@ -736,10 +760,11 @@ async function loadHomeLotterySummary() {
                     <div><strong>${coinBalance}</strong><span>เหรียญ</span></div>
                     <div><strong>${ticketsSold}</strong><span>ตั๋วในงวด</span></div>
                 </div>
+                ${latestResultHtml}
                 <div class="d-flex align-items-center justify-content-between mt-3">
                     <span class="small ${goldReady ? 'text-warning fw-bold' : 'text-muted'}">
                         <i class="fas ${goldReady ? 'fa-crown' : 'fa-shield-alt'} me-1"></i>
-                        ${goldReady ? 'มีสิทธิ์ Gold Ticket' : `2D ${Number(res.prices?.two || 10)} เหรียญ • 3D ${Number(res.prices?.three || 30)} เหรียญ`}
+                        ${goldReady ? 'มีสิทธิ์ Gold Ticket' : `2D ${Number(res.prices?.two || 10)} เหรียญ · 3D ${Number(res.prices?.three || 30)} เหรียญ`}
                     </span>
                     <button type="button" class="btn btn-sm btn-success fw-bold" onclick="event.stopPropagation();openLotteryModal();">
                         เข้า Lottery
@@ -7318,7 +7343,9 @@ async function loadMyLotteryTickets() {
 
             g.tickets.forEach(t => {
                 const isWin = t.isWinner;
-                const typeIcon = t.isGoldTicket ? '🏆' : (t.ticketType === 'six' ? '⭐' : t.ticketType === 'two' ? '🟢' : '🔴');
+                const typeIcon = t.isGoldTicket
+                    ? '<i class="fas fa-crown text-warning"></i>'
+                    : (t.ticketType === 'six' ? '<i class="fas fa-star text-warning"></i>' : t.ticketType === 'two' ? '<i class="fas fa-circle text-success"></i>' : '<i class="fas fa-circle text-danger"></i>');
                 const typeLabel = t.isGoldTicket ? 'Gold Ticket 3 ตัวท้าย' : (t.ticketType === 'six' ? 'รางวัลที่ 1 (6 ตัวตรง)' : t.ticketType === 'two' ? '2 ตัวท้าย' : '3 ตัวท้าย');
                 const ticketClass = t.isGoldTicket ? 'lottery-ticket-gold' : (t.ticketType === 'six' ? 'lottery-ticket-six' : t.ticketType === 'two' ? 'lottery-ticket-green' : 'lottery-ticket-red');
 
@@ -7361,30 +7388,37 @@ async function loadLotteryResults() {
         rounds.forEach((r, idx) => {
             const d = new Date(r.drawDate + 'T00:00:00+07:00').toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
             const isFirst = idx === 0;
-            const myBadge = r.myCount > 0
-                ? (r.myWins > 0
-                    ? `<span class="badge bg-warning text-dark"><i class="fas fa-trophy me-1"></i>คุณถูก +${Number(r.myPrize).toLocaleString()} pts</span>`
-                    : `<span class="badge bg-light text-muted border">คุณเล่น ${r.myCount} ใบ — ไม่ถูก</span>`)
-                : '';
+            let myBadge = '';
+            if (r.myCount > 0) {
+                myBadge = r.myWins > 0
+                    ? `<span class="badge bg-warning text-dark"><i class="fas fa-trophy me-1"></i>ถูกรางวัล +${Number(r.myPrize).toLocaleString()} pts</span>`
+                    : `<span class="badge bg-light text-muted border"><i class="fas fa-circle-xmark me-1"></i>เล่น ${r.myCount} ใบ — ไม่ถูก</span>`;
+            } else {
+                myBadge = `<span class="badge bg-light text-muted border"><i class="fas fa-minus me-1"></i>ไม่ได้ซื้องวดนี้</span>`;
+            }
+            const totalWinners = Number(r.totalWinners || 0);
+            const winnerStat = totalWinners > 0
+                ? `<span class="text-success fw-semibold"><i class="fas fa-trophy me-1"></i>${totalWinners} ราย ถูกรางวัล</span>`
+                : `<span class="text-muted"><i class="fas fa-minus me-1"></i>ไม่มีผู้ถูกรางวัล</span>`;
             html += `<div class="lottery-result-card mb-3 ${isFirst ? 'lottery-result-latest' : ''}">
                 <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
                     <div>
-                        <div class="fw-bold">${isFirst ? '🏆 ' : ''}งวด ${sanitizeHTML(d)}</div>
-                        ${myBadge ? `<div class="mt-1">${myBadge}</div>` : ''}
+                        <div class="fw-bold">${isFirst ? '<i class="fas fa-star text-warning me-1"></i>' : ''}งวด ${sanitizeHTML(d)}</div>
+                        <div class="mt-1">${myBadge}</div>
                     </div>
                     <span class="badge bg-success flex-shrink-0">ออกรางวัลแล้ว</span>
                 </div>
                 <div class="lottery-result-numbers-row">
                     ${r.first_prize ? `<div class="lottery-result-num-block lottery-result-num-block-wide">
-                        <div class="lottery-result-label">รางวัลที่ 1 ⭐</div>
+                        <div class="lottery-result-label"><i class="fas fa-star text-warning me-1"></i>รางวัลที่ 1</div>
                         <div class="lottery-result-number-large lottery-result-number-six ${isFirst ? 'slot-reveal' : ''}">${sanitizeHTML(r.first_prize)}</div>
                     </div>` : ''}
                     <div class="lottery-result-num-block">
-                        <div class="lottery-result-label">2 ตัวท้าย 🟢</div>
+                        <div class="lottery-result-label">2 ตัวท้าย</div>
                         <div class="lottery-result-number-large ${isFirst ? 'slot-reveal' : ''}">${sanitizeHTML(r.last2 || '--')}</div>
                     </div>
                     <div class="lottery-result-num-block">
-                        <div class="lottery-result-label">3 ตัวท้าย 🔴</div>
+                        <div class="lottery-result-label">3 ตัวท้าย</div>
                         <div class="lottery-result-number-large ${isFirst ? 'slot-reveal' : ''}">${sanitizeHTML([r.last3_back, r.last3_back2].filter(Boolean).join(', ') || '---')}</div>
                     </div>
                     ${(r.last3_front || r.last3_front2) ? `<div class="lottery-result-num-block">
@@ -7392,10 +7426,9 @@ async function loadLotteryResults() {
                         <div class="lottery-result-number-large ${isFirst ? 'slot-reveal' : ''}">${sanitizeHTML([r.last3_front, r.last3_front2].filter(Boolean).join(', '))}</div>
                     </div>` : ''}
                 </div>
-                <div class="lottery-result-stats mt-2 pt-2 border-top">
-                    <span><i class="fas fa-ticket me-1 text-muted"></i>${Number(r.totalTicketsSold || 0).toLocaleString()} ใบ</span>
-                    <span class="text-success fw-semibold"><i class="fas fa-trophy me-1"></i>${r.totalWinners || 0} รางวัล</span>
-                    <span class="text-warning fw-semibold"><i class="fas fa-coins me-1"></i>${Number(r.totalPrizesPaid || 0).toLocaleString()} pts</span>
+                <div class="lottery-result-stats mt-2 pt-2 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <span class="text-muted small"><i class="fas fa-ticket me-1"></i>${Number(r.totalTicketsSold || 0).toLocaleString()} ใบ · <i class="fas fa-coins text-warning me-1"></i>${Number(r.totalPrizesPaid || 0).toLocaleString()} pts</span>
+                    ${winnerStat}
                 </div>
             </div>`;
         });

@@ -4587,6 +4587,25 @@ db.query(`CREATE TABLE IF NOT EXISTS lottery_results_history (
 // ======================================================
 // LOTTERY HELPER — LINE Push Flex Message
 // ======================================================
+
+const SAFETY_QUOTES = [
+    'ความปลอดภัยไม่ใช่กฎ — มันคือวัฒนธรรมขององค์กร',
+    'อุบัติเหตุทุกครั้งป้องกันได้ หากเราไม่ประมาท',
+    'PPE คือเกราะป้องกันชีวิต ใส่ทุกครั้งก่อนเริ่มงาน',
+    'ตรวจสอบก่อนทำงาน — ป้องกันได้ดีกว่ารักษา',
+    'รายงานความเสี่ยงวันนี้ เพื่อป้องกันอุบัติเหตุพรุ่งนี้',
+    'ทำงานช้าลงนิด ปลอดภัยขึ้นมาก',
+    'Housekeeping ดี สภาพแวดล้อมดี อุบัติเหตุน้อยลง',
+    'LOTO ทุกครั้งก่อนซ่อมบำรุง — ชีวิตไม่มีอะไหล่สำรอง',
+    'ความเสี่ยงที่มองเห็นและรายงาน คือความเสี่ยงที่หยุดได้',
+    'ทำงานอย่างปลอดภัย กลับบ้านอย่างมีความสุข',
+    'Near Miss ทุกครั้งคือบทเรียน รายงานก่อนกลายเป็นอุบัติเหตุ',
+    'ทุกงานมีความเสี่ยง — การประเมินก่อนลงมือทำคือกุญแจสำคัญ',
+    'ความปลอดภัยเริ่มต้นจากตัวเราก่อนคนอื่น',
+    'KYT ทุกวัน ช่วยลดความเสี่ยงได้จริง',
+    'สิ่งแวดล้อมปลอดภัย พนักงานมีคุณภาพชีวิตที่ดีขึ้น',
+];
+
 const LOTTERY_GEMINI_MODELS = [
     'gemini-2.5-flash',       // primary
     'gemini-2.5-flash-lite',  // fallback 1
@@ -6108,6 +6127,36 @@ app.post('/api/admin/lottery/process-prizes', async (req, res) => {
 
         await logAdminAction(requesterId, 'LOTTERY_PROCESS_PRIZES', 'round', roundId, roundId,
             { winners: paidWinners, totalPrizes });
+
+        // Fire-and-forget: in-app notification สำหรับผู้ไม่ถูกรางวัล (1 คน 1 notif)
+        const drawDateStr = toLotteryDateString(round.drawDate);
+        const winnerIds = new Set(pendingPushes.map(p => p.lineUserId));
+        (async () => {
+            try {
+                const [nonWinners] = await db.query(
+                    `SELECT DISTINCT lineUserId FROM lottery_tickets WHERE roundId=? AND isWinner=FALSE`,
+                    [roundId]
+                );
+                const eligible = nonWinners.filter(r => !winnerIds.has(r.lineUserId));
+                if (!eligible.length) return;
+                const rows = eligible.map(({ lineUserId }) => {
+                    const quote = SAFETY_QUOTES[Math.floor(Math.random() * SAFETY_QUOTES.length)];
+                    return [
+                        'NOTIF' + uuidv4(),
+                        lineUserId,
+                        `Safety Lottery งวด ${drawDateStr} — ไม่ถูกรางวัลครั้งนี้ "${quote}"`,
+                        'lottery_result',
+                        roundId
+                    ];
+                });
+                await db.query(
+                    `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId) VALUES ?`,
+                    [rows]
+                );
+            } catch (e) {
+                console.error('non-winner notifications failed:', e.message);
+            }
+        })();
 
         for (const push of pendingPushes) {
             emitActivityEvent({

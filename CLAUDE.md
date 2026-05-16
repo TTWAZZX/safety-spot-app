@@ -226,6 +226,10 @@ fireConfetti('big')      // 3 bursts
 - `formatTimeAgo(dateStr)` — Thai time labels (เมื่อกี้ / X นาที / X ชั่วโมง / X วัน)
 
 ### Safety Lottery Current Notes
+- **Monitor dropdown**: `onchange` และ refresh button ใช้ `loadAdminLotteryMonitor(true)` — keepSelection=true เสมอ ป้องกัน snap กลับงวดปัจจุบัน
+- **Non-winner notification**: `POST /api/admin/lottery/process-prizes` ส่ง in-app notification `type='lottery_result'` ให้ทุก user ที่ซื้อตั๋วแต่ไม่ถูก (fire-and-forget หลัง commit); ข้อความมี random safety quote จาก `SAFETY_QUOTES` array (15 ข้อ, module level)
+- **Home Lottery card**: แสดง result strip ผลงวดล่าสุด — งวดวันที่, badge 2D/3D, จำนวนผู้ถูก (หรือ "ไม่มีผู้ถูกรางวัล"); ใช้ข้อมูลจาก `res.latestResult` ที่ `/api/home/lottery-summary` คืนมาอยู่แล้ว
+- **Result History tab** (`#tab-results`, `loadLotteryResults()`): แสดงผลย้อนหลัง 20 งวด พร้อม personal status ของ user (ถูก/ไม่ถูก/ไม่ได้ซื้อ) ใช้ไอคอนแทน emoji ทั้งหมด — `fa-trophy`, `fa-circle-xmark`, `fa-minus`, `fa-star`
 - User rules modal can be reopened from the Lottery modal header
 - Lottery modal content uses rounded clipping to avoid square white corners on mobile
 - User endpoints validate `requesterId`/`lineUserId` for Lottery user-owned data
