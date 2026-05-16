@@ -30,7 +30,8 @@ LINE LIFF (frontend) → callApi() → Express REST API → MySQL (Aiven)
 - **Host:** Aiven Cloud MySQL 8.0
 - **Connection:** ผ่าน `DATABASE_URL` env variable
 - **Pool:** `db.getClient()` สำหรับ transaction, `db.query()` สำหรับ query ธรรมดา
-- **Tables:** 19 ตาราง + `audit_logs`, `lottery_dream_logs`, `safety_dream_items` (สร้างอัตโนมัติตอน server start)
+- **Tables:** 19 ตาราง + `audit_logs`, `lottery_dream_logs`, `safety_dream_items`, `user_card_score_exchanges` (สร้างอัตโนมัติตอน server start)
+- **Schema patches (idempotent ALTER TABLE ตอน server start):** `user_cards.createdAt` (TIMESTAMP), `users.department` (VARCHAR 100), `submissions.reviewedAt` (TIMESTAMP), `lottery_dream_logs.result`/`dreamItemId`/`isFavorite`/`sharedAt`
 
 ## Environment Variables (.env)
 ```
@@ -100,6 +101,11 @@ new bootstrap.Modal(document.getElementById('modal-id')).show(); // modal อื
 bootstrap.Modal.getInstance(document.getElementById('modal-id'))?.hide();
 AppState.allModals['key'].hide();
 ```
+
+**Fullscreen modals** (ใช้ class `modal-fullscreen`):
+- `#recycle-modal` — Recycle House
+- `#quiz-modal` — Daily Safety Quiz
+- `#card-exchange-modal` — Score Exchange
 
 ### Upload Image
 ```javascript
@@ -469,9 +475,21 @@ createdAt    TIMESTAMP
 | ID | ปัญหา/ฟีเจอร์ | วิธีแก้ |
 |----|--------------|---------|
 | G-5 | ไม่มีช่องทางแปลงการ์ดเป็นคะแนนระบบหลัก | `POST /api/game/exchange-cards-for-score` + table `user_card_score_exchanges`; แลกได้ 1 ครั้ง/การ์ด/user; C=4, R=10, SR=30, UR=100 คะแนน |
-| G-6 | Exchange modal ต้องการ UX enterprise | `#card-exchange-modal` — progress bar, filter tab (C/R/SR/UR), checkbox row พร้อม lift animation, score counter roll, stagger success screen + confetti |
-| G-7 | Album ต้องแสดงสถานะ "แลกแล้ว" | `fa-check-circle` สีทอง badge มุมขวาล่าง + card info popup strip สีทอง พร้อม date |
+| G-6 | Exchange modal ต้องการ UX enterprise | `#card-exchange-modal` — `modal-fullscreen`; progress bar, filter tab (C/R/SR/UR), checkbox row พร้อม lift animation, score counter roll, stagger success screen + confetti |
+| G-7 | Album ต้องแสดงสถานะ "แลกแล้ว" | `fa-check-circle` สีทอง badge มุมขวาล่าง + card info popup strip สีทอง พร้อม date; ภาพไม่ grayscale (isExchanged = isOwned) |
 | G-8 | แลกจาก card popup ได้ทีละ 1 ใบ | `exchangeSingleCard(cardId, rarity, cardName)` — Swal confirm → call API → toast + confetti |
+
+### รอบที่ 9 — Production Bug Fixes (Gacha/Exchange/UI)
+| ID | ปัญหา | วิธีแก้ |
+|----|-------|---------|
+| P-1 | `GET /api/user/gacha-history` → 500: `Unknown column 'uc.createdAt'` — production `user_cards` ไม่มีคอลัมน์นี้ | เพิ่ม `ALTER TABLE user_cards ADD COLUMN createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP` (idempotent) ตอน server start |
+| P-2 | `DELETE FROM user_cards WHERE id=? LIMIT 1` ใน recycle — production ไม่มีคอลัมน์ `id` | เปลี่ยนเป็น `DELETE FROM user_cards WHERE lineUserId=? AND cardId=? LIMIT 1` ต่อ 1 การ์ด |
+| P-3 | Exchange notification ส่ง `relatedItemId = null` → activity-feed JOIN safety_cards ได้ null | เปลี่ยนเป็น `cardIds[0] || null` เพื่อให้ JOIN ได้ชื่อการ์ดแรก |
+| P-4 | `#recycle-modal` แสดงเป็น popup (ไม่ fullscreen) | เปลี่ยน class เป็น `modal-fullscreen` |
+| P-5 | `#quiz-modal` แสดงเป็น popup (ไม่ fullscreen) | เปลี่ยน class เป็น `modal-fullscreen` |
+| P-6 | Quiz แสดง "ไม่มีรูปภาพประกอบ" เมื่อคำถามไม่มีรูป | แทน placeholder ด้วย `<div id="question-image-container" style="display:none">` — JS: show เฉพาะถ้า `q.image` มีค่า, ซ่อนถ้าไม่มี |
+| P-7 | `user_cards` production ไม่มีคอลัมน์ `count` → recycle loop พัง | แก้ logic เป็น `DELETE LIMIT 1` per copy (ไม่ใช้ count) |
+| P-8 | `card_exchange` type ไม่อยู่ใน safety-pulse WHERE clause → ไม่ขึ้น activity feed | เพิ่ม `'card_exchange'` ใน `WHERE n.type IN (...)` ของ `/api/home/activity-feed` |
 
 ## AppState (Global State)
 ```javascript

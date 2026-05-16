@@ -2794,7 +2794,7 @@ app.post('/api/game/exchange-cards-for-score', async (req, res) => {
         await conn.query(
             `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
              VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-            ['NOTIF' + uuidv4(), lineUserId, notifMsg, 'card_exchange', null, lineUserId]
+            ['NOTIF' + uuidv4(), lineUserId, notifMsg, 'card_exchange', cardIds[0] || null, lineUserId]
         );
 
         await conn.commit();
