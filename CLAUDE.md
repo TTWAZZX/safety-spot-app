@@ -201,12 +201,15 @@ fireConfetti('big')      // 3 bursts
 ### Safety Gacha (Safety Cards)
 - **Pull**: `POST /api/game/gacha-pull` — cost 100 coins; weights: UR 5%, SR 15%, R 30%, C 50%; cashback: C +20, R +40, SR +80, UR +100
 - **Recycle**: `POST /api/game/recycle-cards` — ต้องส่งการ์ดรวม 5 ใบพอดี; รางวัล **scale ตาม rarity** (C=20/ใบ, R=45/ใบ, SR=90/ใบ, UR=180/ใบ) ±15% variance; response ส่ง `rarityBreakdown` กลับมาด้วย; **บล็อก locked cards** ที่ server ด้วย (ถ้า cardId ใด locked → reject ทั้ง batch)
-- **Album**: `GET /api/user/cards` — cards + isOwned + count + **`isLocked`**; กดการ์ดใดก็ได้เพื่อดู info popup (`showCardInfo(el)`) — แสดง image, rarity badge, ownedCount, description, และปุ่ม lock/unlock
-- **Lock System**: `POST /api/game/toggle-card-lock` — toggle lock/unlock ด้วย cardId; table `user_card_locks (lineUserId, cardId, PRIMARY KEY)`; การ์ดที่ lock → แสดง 🔒 badge บนอัลบั้ม; recycle modal ซ่อน locked cards (แสดงจำนวนที่ซ่อนไว้ที่ footer)
-- **Pull History tab**: `GET /api/user/gacha-history` — 50 รายการล่าสุด จาก `user_cards` JOIN `safety_cards`; อัลบั้มมี 2 tab: อัลบั้ม / ประวัติการดึง (`switchAlbumTab(tab)`, `loadGachaHistory()`)
-- **Frontend functions**: `pullGacha()`, `openRecycleModal()`, `confirmRecycle()`, `openCardAlbum()`, `renderAlbumGrid()`, `showCardInfo(el)`, `toggleCardLock(cardId, btn)`, `switchAlbumTab(tab)`, `loadGachaHistory()`
-- **CSS**: `.album-card-tap` (scale 0.94 on active), `.card-info-popup` (rounded Swal popup)
-- **⚠️ Recycle rates hardcoded** ใน server.js constant `RECYCLE_RATES` — ปรับ coin ต่อใบได้ที่นั่น
+- **Album**: `GET /api/user/cards` — cards + isOwned + count + `isLocked` + `isExchanged` + `scoreGiven` + `exchangedAt`; กดการ์ดใดก็ได้เพื่อดู info popup (`showCardInfo(el)`)
+- **Lock System**: `POST /api/game/toggle-card-lock` — toggle lock/unlock; table `user_card_locks (lineUserId, cardId, PRIMARY KEY)`; 🔒 badge บนอัลบั้ม; recycle modal ซ่อน locked cards
+- **Score Exchange**: `POST /api/game/exchange-cards-for-score` — รับ `{lineUserId, cardIds[]}` แลกได้ **1 ครั้ง/การ์ด/user ตลอดชีวิต**; table `user_card_score_exchanges (lineUserId, cardId, scoreGiven, exchangedAt, PRIMARY KEY)`; บันทึก notification; response: `{totalScore, newTotalScore, breakdown[]}`
+- **Score Exchange rates** (hardcoded ใน `EXCHANGE_SCORE_RATES`): C=4, R=10, SR=30, UR=100 คะแนน — ปรับได้ที่ top-level constant ใน server.js และ app.js
+- **Score Exchange UI**: บน album — `fa-check-circle` สีทอง มุมขวาล่าง; ใน card popup — ปุ่ม gradient เขียว (ยังไม่แลก) หรือ strip สีทอง (แลกแล้ว); modal `#card-exchange-modal` — filter tab + checkbox + score counter + stagger success animation + confetti
+- **Pull History tab**: `GET /api/user/gacha-history` — 50 รายการล่าสุด; อัลบั้มมี 2 tab (`switchAlbumTab(tab)`, `loadGachaHistory()`)
+- **Frontend functions**: `pullGacha()`, `openRecycleModal()`, `confirmRecycle()`, `openCardAlbum()`, `renderAlbumGrid()`, `showCardInfo(el)`, `toggleCardLock()`, `switchAlbumTab()`, `loadGachaHistory()`, `openCardExchangeModal()`, `toggleExchangeSelect()`, `confirmCardExchange()`, `exchangeSingleCard()`
+- **CSS**: `.album-card-tap`, `.card-info-popup`, `.exchange-card-row`, `.exchange-card-selected`, `@keyframes exchangeRowIn`
+- **⚠️ Recycle rates**: `RECYCLE_RATES` ใน server.js (local const ใน endpoint) — ปรับที่นั่น
 - **⚠️ Card ID** ใช้ `"CARD_" + Date.now()` (admin create) — ไม่ใช่ UUID, ชนกันได้ถ้า create พร้อมกัน
 
 ### Social Feed
@@ -461,6 +464,14 @@ createdAt    TIMESTAMP
 | G-2 | ไม่มีวิธีป้องกันการ์ดดีจาก recycle โดยไม่ตั้งใจ | Lock system: table `user_card_locks`, `POST /api/game/toggle-card-lock`, server บล็อก locked cards ใน recycle; 🔒 badge ใน album grid; recycle modal ซ่อน locked cards |
 | G-3 | อัลบั้มไม่มีประวัติการดึง | Tab สองอัน (อัลบั้ม/ประวัติ), `GET /api/user/gacha-history` ดึงจาก `user_cards.createdAt`; ไม่ต้องสร้างตารางใหม่ |
 | G-4 | กดการ์ดในอัลบั้มไม่แสดงข้อมูลรายละเอียด | `showCardInfo(el)` — Swal popup พร้อม image, rarity badge, ownedCount, description, lock button |
+
+### รอบที่ 8 — Score Exchange Feature
+| ID | ปัญหา/ฟีเจอร์ | วิธีแก้ |
+|----|--------------|---------|
+| G-5 | ไม่มีช่องทางแปลงการ์ดเป็นคะแนนระบบหลัก | `POST /api/game/exchange-cards-for-score` + table `user_card_score_exchanges`; แลกได้ 1 ครั้ง/การ์ด/user; C=4, R=10, SR=30, UR=100 คะแนน |
+| G-6 | Exchange modal ต้องการ UX enterprise | `#card-exchange-modal` — progress bar, filter tab (C/R/SR/UR), checkbox row พร้อม lift animation, score counter roll, stagger success screen + confetti |
+| G-7 | Album ต้องแสดงสถานะ "แลกแล้ว" | `fa-check-circle` สีทอง badge มุมขวาล่าง + card info popup strip สีทอง พร้อม date |
+| G-8 | แลกจาก card popup ได้ทีละ 1 ใบ | `exchangeSingleCard(cardId, rarity, cardName)` — Swal confirm → call API → toast + confetti |
 
 ## AppState (Global State)
 ```javascript

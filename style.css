@@ -3162,6 +3162,25 @@ body {
     border-bottom-color: #bfdbfe;
     color: #1d4ed8;
 }
+
+/* ===== SCORE EXCHANGE ===== */
+.exchange-card-row {
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.exchange-card-selected {
+    background: #f0fdf4 !important;
+}
+@keyframes exchangeRowIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.exchange-filter-btn {
+    font-size: 0.78rem;
+    padding: 4px 12px;
+    transition: all 0.15s;
+}
+
 .lottery-no-round-state {
     display: flex;
     flex-direction: column;

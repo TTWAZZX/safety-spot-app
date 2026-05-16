@@ -17,6 +17,8 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const EXCHANGE_SCORE_RATES = { C: 4, R: 10, SR: 30, UR: 100 };
 const cron = require('node-cron'); // เพิ่มบรรทัดนี้ต่อจาก require อื่นๆ
 
 // Render terminates HTTPS and forwards the real client IP via X-Forwarded-For.
@@ -104,6 +106,16 @@ db.query(`
     lineUserId  VARCHAR(60) NOT NULL,
     cardId      VARCHAR(60) NOT NULL,
     lockedAt    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (lineUserId, cardId)
+  )
+`).catch(() => {});
+
+db.query(`
+  CREATE TABLE IF NOT EXISTS user_card_score_exchanges (
+    lineUserId  VARCHAR(60) NOT NULL,
+    cardId      VARCHAR(60) NOT NULL,
+    scoreGiven  INT         NOT NULL,
+    exchangedAt TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (lineUserId, cardId)
   )
 `).catch(() => {});
@@ -2632,16 +2644,24 @@ app.get('/api/user/cards', async (req, res) => {
         const [lockedCards] = lineUserId
             ? await db.query("SELECT cardId FROM user_card_locks WHERE lineUserId = ?", [lineUserId])
             : [[]];
+        const [exchanged] = lineUserId
+            ? await db.query("SELECT cardId, scoreGiven, DATE_FORMAT(exchangedAt,'%Y-%m-%d') AS exchangedAt FROM user_card_score_exchanges WHERE lineUserId = ?", [lineUserId])
+            : [[]];
 
         const ownedMap = {};
         userCards.forEach(c => ownedMap[c.cardId] = c.count);
         const lockedSet = new Set(lockedCards.map(r => r.cardId));
+        const exchangeMap = {};
+        exchanged.forEach(r => exchangeMap[r.cardId] = { scoreGiven: r.scoreGiven, exchangedAt: r.exchangedAt });
 
         const result = allCards.map(c => ({
             ...c,
             isOwned: !!ownedMap[c.cardId],
             count: ownedMap[c.cardId] || 0,
-            isLocked: lockedSet.has(c.cardId)
+            isLocked: lockedSet.has(c.cardId),
+            isExchanged: !!exchangeMap[c.cardId],
+            scoreGiven: exchangeMap[c.cardId]?.scoreGiven || null,
+            exchangedAt: exchangeMap[c.cardId]?.exchangedAt || null
         }));
 
         res.json({ status: "success", data: result });
@@ -2684,6 +2704,110 @@ app.post('/api/game/toggle-card-lock', async (req, res) => {
             res.json({ status: 'success', data: { isLocked: true } });
         }
     } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
+});
+
+// POST /api/game/exchange-cards-for-score — แลกการ์ดเป็นคะแนน (1 ครั้ง/การ์ด/user)
+app.post('/api/game/exchange-cards-for-score', async (req, res) => {
+    const { lineUserId, cardIds } = req.body;
+    if (!lineUserId || !Array.isArray(cardIds) || cardIds.length === 0)
+        return res.status(400).json({ status: 'error', message: 'lineUserId and cardIds[] required' });
+
+    const conn = await db.getClient();
+    try {
+        await conn.beginTransaction();
+
+        // ดึงข้อมูลการ์ดทั้งหมดที่ขอแลก
+        const placeholders = cardIds.map(() => '?').join(',');
+        const [[...cards]] = await conn.query(
+            `SELECT cardId, rarity FROM safety_cards WHERE cardId IN (${placeholders})`, cardIds
+        );
+        if (cards.length !== cardIds.length)
+            throw new Error('พบการ์ดที่ไม่ถูกต้องในรายการ');
+
+        // เช็คว่าแลกไปแล้วหรือยัง
+        const [[...alreadyExchanged]] = await conn.query(
+            `SELECT cardId FROM user_card_score_exchanges WHERE lineUserId=? AND cardId IN (${placeholders})`,
+            [lineUserId, ...cardIds]
+        );
+        if (alreadyExchanged.length > 0)
+            throw new Error('มีการ์ดบางใบแลกคะแนนไปแล้ว');
+
+        // เช็คว่า locked ไหม
+        const [[...lockedCards]] = await conn.query(
+            `SELECT cardId FROM user_card_locks WHERE lineUserId=? AND cardId IN (${placeholders})`,
+            [lineUserId, ...cardIds]
+        );
+        if (lockedCards.length > 0)
+            throw new Error('มีการ์ดบางใบถูกล็อกไว้ ปลดล็อกก่อนแลก');
+
+        // เช็คว่า user มีการ์ดพวกนี้จริง
+        const [[...ownedCards]] = await conn.query(
+            `SELECT cardId FROM user_cards WHERE lineUserId=? AND cardId IN (${placeholders})`,
+            [lineUserId, ...cardIds]
+        );
+        const ownedSet = new Set(ownedCards.map(r => r.cardId));
+        const notOwned = cardIds.filter(id => !ownedSet.has(id));
+        if (notOwned.length > 0)
+            throw new Error('มีการ์ดบางใบที่คุณไม่มี');
+
+        // คำนวณคะแนนรวมและ breakdown
+        const cardMap = {};
+        cards.forEach(c => cardMap[c.cardId] = c.rarity);
+        let totalScore = 0;
+        const breakdown = [];
+        const exchangeRows = [];
+        for (const cardId of cardIds) {
+            const rarity = cardMap[cardId];
+            const score = EXCHANGE_SCORE_RATES[rarity] || 4;
+            totalScore += score;
+            breakdown.push({ cardId, rarity, score });
+            exchangeRows.push([lineUserId, cardId, score]);
+        }
+
+        // ลบการ์ด 1 ใบต่อ cardId จาก user_cards
+        for (const cardId of cardIds) {
+            const [[uc]] = await conn.query(
+                'SELECT id, count FROM user_cards WHERE lineUserId=? AND cardId=? LIMIT 1',
+                [lineUserId, cardId]
+            );
+            if (!uc) throw new Error(`ไม่พบการ์ด ${cardId} ใน inventory`);
+            if (uc.count > 1) {
+                await conn.query('UPDATE user_cards SET count=count-1 WHERE id=?', [uc.id]);
+            } else {
+                await conn.query('DELETE FROM user_cards WHERE id=?', [uc.id]);
+            }
+        }
+
+        // บันทึก exchange log (bulk insert)
+        await conn.query(
+            `INSERT INTO user_card_score_exchanges (lineUserId, cardId, scoreGiven) VALUES ${exchangeRows.map(() => '(?,?,?)').join(',')}`,
+            exchangeRows.flat()
+        );
+
+        // เพิ่มคะแนนระบบหลัก
+        const [[userRow]] = await conn.query('SELECT totalScore FROM users WHERE lineUserId=?', [lineUserId]);
+        const newScore = (userRow?.totalScore || 0) + totalScore;
+        await conn.query('UPDATE users SET totalScore=? WHERE lineUserId=?', [newScore, lineUserId]);
+
+        // สร้าง notification
+        const notifMsg = cardIds.length === 1
+            ? `แลกการ์ด "${cards[0]?.cardName || cardIds[0]}" (${cardMap[cardIds[0]]}) ได้รับ +${totalScore} คะแนน`
+            : `แลกการ์ด ${cardIds.length} ใบ ได้รับ +${totalScore} คะแนน`;
+        await conn.query(
+            `INSERT INTO notifications (notificationId, recipientUserId, message, type, relatedItemId, triggeringUserId, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+            ['NOTIF' + uuidv4(), lineUserId, notifMsg, 'card_exchange', null, lineUserId]
+        );
+
+        await conn.commit();
+
+        res.json({ status: 'success', data: { totalScore, newTotalScore: newScore, breakdown } });
+    } catch (e) {
+        await conn.rollback();
+        res.status(400).json({ status: 'error', message: e.message });
+    } finally {
+        conn.release();
+    }
 });
 
 // ======================================================
@@ -3305,6 +3429,7 @@ app.post('/api/game/recycle-cards', async (req, res) => {
 
         // 3. คำนวณรางวัลตาม rarity ของการ์ดที่ recycle
         const RECYCLE_RATES = { C: 20, R: 45, SR: 90, UR: 180 };
+        const EXCHANGE_SCORE_RATES = { C: 4, R: 10, SR: 30, UR: 100 };
         const cardIds = cardsToRecycle.map(c => c.cardId);
         const [cardRows] = await conn.query(
             `SELECT cardId, rarity FROM safety_cards WHERE cardId IN (${cardIds.map(() => '?').join(',')})`,

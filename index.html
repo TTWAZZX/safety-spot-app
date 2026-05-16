@@ -388,6 +388,20 @@
                             <i class="fas fa-chevron-right text-white-50"></i>
                         </div>
 
+                        <!-- SCORE EXCHANGE (เต็มแถว) -->
+                        <div class="bento-card span-2 flex-row justify-content-between align-items-center px-3" style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);cursor:pointer;" onclick="openCardExchangeModal()">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-warning bg-opacity-25 rounded-circle p-2 me-3">
+                                    <i class="fas fa-star fs-4 text-warning"></i>
+                                </div>
+                                <div>
+                                    <div class="bento-title text-white">Score Exchange</div>
+                                    <div class="bento-sub text-white-50">แลกการ์ดเป็นคะแนน — 1 ครั้ง/ใบ ตลอดชีวิต</div>
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right text-white-50"></i>
+                        </div>
+
                     </div>
                 </section>
 
@@ -1554,6 +1568,66 @@
                         <i class="fas fa-fire me-2"></i> เดินเครื่องจักร (ย่อยการ์ด)
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARD SCORE EXCHANGE MODAL -->
+    <div class="modal fade" id="card-exchange-modal">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg overflow-hidden">
+
+                <div class="modal-header border-0 text-white" style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);">
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0">
+                            <i class="fas fa-star me-2 text-warning"></i>Score Exchange
+                        </h5>
+                        <small class="text-white-50">แลกได้ 1 ครั้งต่อการ์ด 1 ประเภท ตลอดชีวิต</small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <!-- Progress bar -->
+                <div class="px-3 pt-3 pb-1" style="background:#16213e;">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-white-50 fw-semibold">การ์ดที่แลกแล้ว</small>
+                        <small class="text-warning fw-bold" id="exchange-progress-text">0 / 0</small>
+                    </div>
+                    <div class="progress" style="height:6px;border-radius:4px;background:rgba(255,255,255,0.1);">
+                        <div id="exchange-progress-bar" class="progress-bar bg-warning" style="width:0%;border-radius:4px;"></div>
+                    </div>
+                </div>
+
+                <!-- Filter tabs -->
+                <div class="px-3 py-2" style="background:#16213e;">
+                    <div class="d-flex gap-1" id="exchange-filter-tabs">
+                        <button class="btn btn-sm btn-warning rounded-pill exchange-filter-btn active" data-rarity="all">ทั้งหมด</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill exchange-filter-btn" data-rarity="C">C</button>
+                        <button class="btn btn-sm btn-outline-info rounded-pill exchange-filter-btn" data-rarity="R">R</button>
+                        <button class="btn btn-sm btn-outline-danger rounded-pill exchange-filter-btn" data-rarity="SR">SR</button>
+                        <button class="btn btn-sm btn-outline-warning rounded-pill exchange-filter-btn" data-rarity="UR">UR</button>
+                    </div>
+                </div>
+
+                <div class="modal-body bg-light p-0">
+                    <div id="exchange-list" class="p-3"></div>
+                </div>
+
+                <div class="modal-footer border-0 bg-white flex-column gap-2 pt-2 pb-3">
+                    <div class="w-100 d-flex justify-content-between align-items-center px-1">
+                        <span class="text-muted small">เลือก <span id="exchange-selected-count" class="fw-bold text-dark">0</span> ใบ</span>
+                        <span class="fw-bold fs-5" style="color:#1a1a2e;">
+                            <i class="fas fa-star text-warning me-1"></i>
+                            <span id="exchange-total-score">0</span> คะแนน
+                        </span>
+                    </div>
+                    <button id="btn-confirm-exchange" class="btn w-100 py-2 rounded-pill fw-bold text-white"
+                            style="background:linear-gradient(135deg,#1a1a2e,#16213e);opacity:0.5;" disabled
+                            onclick="confirmCardExchange()">
+                        <i class="fas fa-star me-2 text-warning"></i>ยืนยันแลกคะแนน
+                    </button>
+                </div>
+
             </div>
         </div>
     </div>

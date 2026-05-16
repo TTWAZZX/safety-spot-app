@@ -4454,9 +4454,11 @@ function renderAlbumGrid(cards, query) {
             const cardDataAttr = encodeURIComponent(JSON.stringify({
                 cardId: c.cardId, cardName: c.cardName, rarity: c.rarity,
                 description: c.description || '', imageUrl: c.imageUrl || '',
-                isOwned: c.isOwned, count: c.count || 0, isLocked: !!c.isLocked
+                isOwned: c.isOwned, count: c.count || 0, isLocked: !!c.isLocked,
+                isExchanged: !!c.isExchanged, scoreGiven: c.scoreGiven || null, exchangedAt: c.exchangedAt || null
             }));
             const lockBadge = c.isLocked ? `<span class="position-absolute top-0 start-0 translate-middle badge rounded-pill bg-dark border border-white" style="font-size:0.65rem;">🔒</span>` : '';
+            const exchangeBadge = c.isExchanged ? `<span class="position-absolute bottom-0 end-0 translate-middle-x" style="transform:translate(30%,30%);"><i class="fas fa-check-circle" style="color:#d4af37;font-size:0.9rem;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));"></i></span>` : '';
             container.append(`
                 <div class="col-4 col-sm-3 mb-2">
                     <div class="card h-100 border-0 shadow-sm position-relative album-card-tap"
@@ -4464,6 +4466,7 @@ function renderAlbumGrid(cards, query) {
                          onclick="showCardInfo(this)">
                         ${countBadge}
                         ${lockBadge}
+                        ${exchangeBadge}
                         <div class="card-body p-2 text-center d-flex flex-column align-items-center">
                             <div class="rounded-3 mb-2 d-flex align-items-center justify-content-center"
                                  style="width:100%;aspect-ratio:1/1;border:2px solid ${borderColor};background:#fff;overflow:hidden;">
@@ -4528,15 +4531,46 @@ function showCardInfo(el) {
     try { c = JSON.parse(decodeURIComponent(el.dataset.card)); } catch (_) { return; }
     const RARITY_LABEL = { C: 'Common', R: 'Rare', SR: 'Super Rare', UR: 'Ultra Rare' };
     const RARITY_COLOR = { C: '#6c757d', R: '#0dcaf0', SR: '#d63384', UR: '#ffc107' };
+    const EXCHANGE_SCORE_RATES = { C: 4, R: 10, SR: 30, UR: 100 };
     const ownedBadge = c.isOwned
         ? `<span class="badge bg-success">มีอยู่ ${c.count} ใบ</span>`
         : `<span class="badge bg-secondary">ยังไม่มี</span>`;
-    const imgStyle = c.isOwned ? '' : 'filter:grayscale(100%);opacity:0.5;';
+    const imgStyle = (c.isOwned || c.isExchanged) ? '' : 'filter:grayscale(100%);opacity:0.5;';
     const lockBtn = c.isOwned ? `
         <button id="swal-lock-btn" class="btn btn-sm mt-2 ${c.isLocked ? 'btn-warning' : 'btn-outline-secondary'}"
                 onclick="toggleCardLock('${sanitizeHTML(c.cardId)}', this)">
             ${c.isLocked ? '🔒 ล็อคอยู่ — แตะเพื่อปลดล็อค' : '🔓 แตะเพื่อล็อคการ์ดนี้'}
         </button>` : '';
+
+    let exchangeSection = '';
+    if (c.isExchanged) {
+        const dateStr = c.exchangedAt ? c.exchangedAt.split('-').reverse().join('/') : '';
+        exchangeSection = `
+            <div class="mt-2 mx-1 px-3 py-2 rounded-3 d-flex align-items-center gap-2"
+                 style="background:linear-gradient(135deg,#d4af37,#f5d97e);color:#5a3e00;">
+                <i class="fas fa-check-circle fs-5"></i>
+                <div class="text-start">
+                    <div class="fw-bold" style="font-size:0.85rem;">แลกแล้ว +${c.scoreGiven} คะแนน</div>
+                    ${dateStr ? `<div style="font-size:0.7rem;opacity:0.75;">${dateStr}</div>` : ''}
+                </div>
+            </div>`;
+    } else if (c.isOwned) {
+        const score = EXCHANGE_SCORE_RATES[c.rarity] || 4;
+        if (c.isLocked) {
+            exchangeSection = `
+                <button class="btn mt-2 w-100 fw-bold rounded-3 btn-outline-secondary" disabled>
+                    <i class="fas fa-lock me-2"></i>ปลดล็อกก่อนแลกคะแนน
+                </button>`;
+        } else {
+            exchangeSection = `
+                <button class="btn mt-2 w-100 fw-bold text-white rounded-3"
+                        style="background:linear-gradient(135deg,#15803d,#16a34a);"
+                        onclick="exchangeSingleCard('${sanitizeHTML(c.cardId)}','${c.rarity}','${sanitizeHTML(c.cardName)}')">
+                    <i class="fas fa-star me-2 text-warning"></i>แลก +${score} คะแนน
+                </button>`;
+        }
+    }
+
     Swal.fire({
         html: `
             <div class="text-center">
@@ -4550,6 +4584,7 @@ function showCardInfo(el) {
                 </div>
                 <div class="mb-2">${ownedBadge}</div>
                 ${lockBtn}
+                ${exchangeSection}
                 ${c.description ? `<p class="text-muted small text-start mt-3 px-1" style="line-height:1.6;">${sanitizeHTML(c.description)}</p>` : ''}
             </div>`,
         showConfirmButton: false,
@@ -4569,6 +4604,243 @@ async function toggleCardLock(cardId, btn) {
         btn.className = `btn btn-sm mt-2 ${locked ? 'btn-warning' : 'btn-outline-secondary'}`;
         btn.textContent = locked ? '🔒 ล็อคอยู่ — แตะเพื่อปลดล็อค' : '🔓 แตะเพื่อล็อคการ์ดนี้';
         showToast(locked ? '🔒 ล็อคการ์ดแล้ว' : '🔓 ปลดล็อคการ์ดแล้ว', 'info');
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+// =====================================================================
+// SCORE EXCHANGE
+// =====================================================================
+const EXCHANGE_SCORE_RATES = { C: 4, R: 10, SR: 30, UR: 100 };
+let _exchangeCards = [];
+let _exchangeSelected = {};
+let _exchangeFilterRarity = 'all';
+
+async function openCardExchangeModal() {
+    _exchangeSelected = {};
+    _exchangeFilterRarity = 'all';
+    const modal = new bootstrap.Modal(document.getElementById('card-exchange-modal'));
+    modal.show();
+    $('#exchange-list').html('<div class="text-center py-5"><div class="spinner-border text-warning"></div></div>');
+    _updateExchangeFooter();
+
+    try {
+        const cards = await callApi('/api/user/cards', { lineUserId: AppState.lineProfile.userId });
+        // เก็บเฉพาะการ์ดที่ผู้ใช้มีและยังไม่แลก (ไม่ล็อก)
+        _exchangeCards = cards.filter(c => c.isOwned && !c.isExchanged && !c.isLocked);
+        const totalExchangeable = cards.filter(c => !c.isExchanged).length;
+        const totalExchanged = cards.filter(c => c.isExchanged).length;
+
+        // progress bar
+        $('#exchange-progress-text').text(`${totalExchanged} / ${cards.length}`);
+        const pct = cards.length > 0 ? Math.round((totalExchanged / cards.length) * 100) : 0;
+        $('#exchange-progress-bar').css('width', pct + '%');
+
+        // filter tabs
+        $('#exchange-filter-tabs .exchange-filter-btn').off('click').on('click', function () {
+            $('#exchange-filter-tabs .exchange-filter-btn').removeClass('active btn-warning').addClass('btn-outline-secondary');
+            $(this).removeClass('btn-outline-secondary btn-outline-info btn-outline-danger btn-outline-warning').addClass('btn-warning active');
+            _exchangeFilterRarity = $(this).data('rarity');
+            _renderExchangeList();
+        });
+
+        _renderExchangeList();
+    } catch (e) {
+        $('#exchange-list').html(`<p class="text-danger text-center py-4">${e.message}</p>`);
+    }
+}
+
+function _renderExchangeList() {
+    const list = $('#exchange-list');
+    const filtered = _exchangeFilterRarity === 'all'
+        ? _exchangeCards
+        : _exchangeCards.filter(c => c.rarity === _exchangeFilterRarity);
+
+    if (filtered.length === 0) {
+        list.html(`<div class="text-center text-muted py-5">
+            <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+            <p class="mb-0 fw-semibold">${_exchangeFilterRarity === 'all' ? 'แลกครบทุกใบแล้ว!' : `ไม่มีการ์ด ${_exchangeFilterRarity} ที่แลกได้`}</p>
+        </div>`);
+        return;
+    }
+
+    const RARITY_COLOR = { C: '#6c757d', R: '#0dcaf0', SR: '#d63384', UR: '#ffc107' };
+    list.empty();
+    filtered.forEach(c => {
+        const score = EXCHANGE_SCORE_RATES[c.rarity] || 4;
+        const isSelected = !!_exchangeSelected[c.cardId];
+        list.append(`
+            <div class="exchange-card-row d-flex align-items-center p-3 mb-2 rounded-3 shadow-sm bg-white ${isSelected ? 'exchange-card-selected' : ''}"
+                 id="excrow-${c.cardId}"
+                 onclick="toggleExchangeSelect('${sanitizeHTML(c.cardId)}', ${score})"
+                 style="cursor:pointer;transition:all 0.18s ease;border:2px solid ${isSelected ? '#15803d' : 'transparent'};">
+                <div class="flex-shrink-0 me-3 position-relative">
+                    <img src="${getFullImageUrl(c.imageUrl)}" class="rounded-2"
+                         style="width:48px;height:48px;object-fit:cover;"
+                         onerror="this.src='https://placehold.co/48?text=?'">
+                    <span class="position-absolute top-0 end-0 translate-middle badge rounded-pill"
+                          style="font-size:0.55rem;background:${RARITY_COLOR[c.rarity]};color:${c.rarity==='UR'?'#000':'#fff'};">${c.rarity}</span>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="fw-bold mb-0" style="font-size:0.9rem;">${sanitizeHTML(c.cardName)}</div>
+                    <small class="text-muted">${c.count > 1 ? `มี ${c.count} ใบ` : 'มี 1 ใบ'}</small>
+                </div>
+                <div class="d-flex align-items-center gap-2 ms-2">
+                    <span class="fw-bold" style="color:#15803d;font-size:0.9rem;">+${score}</span>
+                    <div class="exchange-checkbox rounded-circle d-flex align-items-center justify-content-center"
+                         style="width:26px;height:26px;border:2px solid ${isSelected ? '#15803d' : '#dee2e6'};background:${isSelected ? '#15803d' : '#fff'};transition:all 0.15s;">
+                        ${isSelected ? '<i class="fas fa-check text-white" style="font-size:0.7rem;"></i>' : ''}
+                    </div>
+                </div>
+            </div>
+        `);
+    });
+}
+
+function toggleExchangeSelect(cardId, score) {
+    if (_exchangeSelected[cardId]) {
+        delete _exchangeSelected[cardId];
+    } else {
+        _exchangeSelected[cardId] = score;
+    }
+    const row = document.getElementById(`excrow-${cardId}`);
+    if (row) {
+        const selected = !!_exchangeSelected[cardId];
+        row.style.border = `2px solid ${selected ? '#15803d' : 'transparent'}`;
+        row.classList.toggle('exchange-card-selected', selected);
+        // lift animation
+        row.style.transform = selected ? 'translateY(-3px)' : 'translateY(0)';
+        row.style.boxShadow = selected ? '0 6px 20px rgba(21,128,61,0.2)' : '';
+        const cb = row.querySelector('.exchange-checkbox');
+        if (cb) {
+            cb.style.background = selected ? '#15803d' : '#fff';
+            cb.style.borderColor = selected ? '#15803d' : '#dee2e6';
+            cb.innerHTML = selected ? '<i class="fas fa-check text-white" style="font-size:0.7rem;"></i>' : '';
+        }
+    }
+    _updateExchangeFooter();
+}
+
+function _updateExchangeFooter() {
+    const ids = Object.keys(_exchangeSelected);
+    const total = Object.values(_exchangeSelected).reduce((a, b) => a + b, 0);
+    const count = ids.length;
+    $('#exchange-selected-count').text(count);
+
+    // animate score counter
+    const scoreEl = document.getElementById('exchange-total-score');
+    if (scoreEl) {
+        scoreEl.style.transition = 'transform 0.1s ease';
+        scoreEl.style.transform = 'scale(1.3)';
+        scoreEl.textContent = total;
+        setTimeout(() => { scoreEl.style.transform = 'scale(1)'; }, 100);
+    }
+
+    const btn = document.getElementById('btn-confirm-exchange');
+    if (btn) {
+        btn.disabled = count === 0;
+        btn.style.opacity = count > 0 ? '1' : '0.5';
+    }
+}
+
+async function confirmCardExchange() {
+    const cardIds = Object.keys(_exchangeSelected);
+    if (cardIds.length === 0) return;
+    const total = Object.values(_exchangeSelected).reduce((a, b) => a + b, 0);
+
+    const btn = document.getElementById('btn-confirm-exchange');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังแลก...'; }
+
+    try {
+        const res = await callApi('/api/game/exchange-cards-for-score', {
+            lineUserId: AppState.lineProfile.userId, cardIds
+        }, 'POST');
+
+        // ปิด modal
+        bootstrap.Modal.getInstance(document.getElementById('card-exchange-modal'))?.hide();
+
+        // สร้าง breakdown HTML พร้อม stagger animation
+        const RARITY_COLOR = { C: '#6c757d', R: '#0dcaf0', SR: '#d63384', UR: '#ffc107' };
+        const rarityOrder = ['UR', 'SR', 'R', 'C'];
+        const grouped = {};
+        (res.breakdown || []).forEach(b => {
+            if (!grouped[b.rarity]) grouped[b.rarity] = { count: 0, total: 0 };
+            grouped[b.rarity].count++;
+            grouped[b.rarity].total += b.score;
+        });
+        const rows = rarityOrder.filter(r => grouped[r]).map((r, i) => `
+            <div class="d-flex justify-content-between align-items-center py-2 px-3 mb-1 rounded-2 exchange-success-row"
+                 style="background:rgba(0,0,0,0.04);animation:exchangeRowIn 0.35s ease both;animation-delay:${i * 0.1}s;">
+                <span class="badge rounded-pill px-2" style="background:${RARITY_COLOR[r]};color:${r==='UR'?'#000':'#fff'};">${r}</span>
+                <span class="text-muted small">× ${grouped[r].count} ใบ</span>
+                <span class="fw-bold" style="color:#15803d;">+${grouped[r].total} คะแนน</span>
+            </div>`).join('');
+
+        await Swal.fire({
+            html: `
+                <div class="text-center">
+                    <div class="mb-3" style="animation:exchangeRowIn 0.3s ease both;">
+                        <i class="fas fa-check-circle fa-3x" style="color:#15803d;"></i>
+                    </div>
+                    <h5 class="fw-bold mb-3" style="animation:exchangeRowIn 0.3s ease 0.05s both;">แลกสำเร็จ!</h5>
+                    <div class="mb-3">${rows}</div>
+                    <hr class="my-2">
+                    <div class="d-flex justify-content-between px-3 fw-bold fs-6" style="animation:exchangeRowIn 0.3s ease ${(Object.keys(grouped).length * 0.1) + 0.15}s both;">
+                        <span>รวมทั้งหมด</span>
+                        <span style="color:#15803d;"><i class="fas fa-star text-warning me-1"></i>${res.totalScore} คะแนน</span>
+                    </div>
+                    <div class="text-muted small mt-2" style="animation:exchangeRowIn 0.3s ease ${(Object.keys(grouped).length * 0.1) + 0.25}s both;">
+                        คะแนนรวมของคุณ: <span class="fw-bold text-dark">${(res.newTotalScore || 0).toLocaleString()}</span>
+                    </div>
+                </div>`,
+            showConfirmButton: true,
+            confirmButtonText: 'รับทราบ',
+            confirmButtonColor: '#15803d',
+            background: '#fff',
+            width: 340,
+            customClass: { popup: 'card-info-popup' },
+            didOpen: () => {
+                setTimeout(() => fireConfetti && fireConfetti('default'), 300);
+            }
+        });
+
+        // อัปเดต score ใน UI หลัก
+        if (AppState.currentUser) {
+            AppState.currentUser.totalScore = res.newTotalScore || AppState.currentUser.totalScore;
+            updateUserInfoUI(AppState.currentUser);
+        }
+    } catch (e) {
+        showToast(e.message, 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-star me-2 text-warning"></i>ยืนยันแลกคะแนน'; }
+    }
+}
+
+async function exchangeSingleCard(cardId, rarity, cardName) {
+    const score = EXCHANGE_SCORE_RATES[rarity] || 4;
+    const { isConfirmed } = await Swal.fire({
+        title: 'ยืนยันการแลก',
+        html: `แลก <b>${sanitizeHTML(cardName)}</b> (${rarity})<br>เพื่อรับ <b class="text-success">+${score} คะแนน</b>?<br><small class="text-muted">ไม่สามารถแลกการ์ดนี้ได้อีก</small>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#15803d',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'แลกเลย',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!isConfirmed) return;
+
+    try {
+        const res = await callApi('/api/game/exchange-cards-for-score', {
+            lineUserId: AppState.lineProfile.userId, cardIds: [cardId]
+        }, 'POST');
+        Swal.close();
+        showToast(`แลกสำเร็จ! ได้รับ +${res.totalScore} คะแนน`, 'success');
+        if (AppState.currentUser) {
+            AppState.currentUser.totalScore = res.newTotalScore || AppState.currentUser.totalScore;
+            updateUserInfoUI(AppState.currentUser);
+        }
+        fireConfetti && fireConfetti('default');
     } catch (e) {
         showToast(e.message, 'error');
     }
