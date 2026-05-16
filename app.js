@@ -4449,7 +4449,7 @@ function renderAlbumGrid(cards, query) {
             if (c.rarity === 'R') { borderColor = '#0dcaf0'; bgBadge = 'bg-info'; }
             if (c.rarity === 'SR') { borderColor = '#d63384'; bgBadge = 'bg-danger'; }
             if (c.rarity === 'UR') { borderColor = '#ffc107'; bgBadge = 'bg-warning text-dark'; }
-            const imgFilter = c.isOwned ? '' : 'filter: grayscale(100%); opacity: 0.5;';
+            const imgFilter = (c.isOwned || c.isExchanged) ? '' : 'filter: grayscale(100%); opacity: 0.5;';
             const countBadge = c.count > 1 ? `<span class="position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger border border-white">+${c.count}</span>` : '';
             const cardDataAttr = encodeURIComponent(JSON.stringify({
                 cardId: c.cardId, cardName: c.cardName, rarity: c.rarity,
