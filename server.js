@@ -1648,7 +1648,7 @@ app.post('/api/admin/questions/generate', isAdmin, async (req, res) => {
 
         const inserted = [];
         for (const q of questions) {
-            if (!q.questionText || !q.optionA || !q.optionB || !q.correctOption) continue;
+            if (!q.questionText || !q.optionA || !q.optionB || !q.optionC || !q.optionD || !q.optionE || !q.optionF || !q.correctOption) continue;
             const [r] = await db.query(
                 `INSERT INTO kyt_questions (questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, scoreReward, isActive)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
