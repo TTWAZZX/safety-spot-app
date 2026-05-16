@@ -1596,6 +1596,78 @@ app.post('/api/admin/questions/toggle', isAdmin, async (req, res) => {
     }
 });
 
+// 5. AI สร้างคำถาม KYT
+app.post('/api/admin/questions/generate', isAdmin, async (req, res) => {
+    const count = Math.min(Math.max(parseInt(req.body.count) || 5, 1), 20);
+    try {
+        const [existing] = await db.query('SELECT questionText FROM kyt_questions ORDER BY questionId DESC LIMIT 60');
+        const existingTexts = existing.map(r => r.questionText).slice(0, 10).join('\n- ');
+
+        const prompt = `คุณคือผู้เชี่ยวชาญด้านความปลอดภัย อาชีวอนามัย และสิ่งแวดล้อม (จป.วิชาชีพ) ในโรงงานอุตสาหกรรมประเทศไทย
+
+สร้างคำถามความปลอดภัยในโรงงานจำนวน ${count} ข้อ โดยให้ตรงสไตล์ดังนี้:
+
+**สไตล์ที่ต้องการ:**
+- ภาษาไทยเป็นกันเอง เข้าใจง่าย เหมาะกับพนักงานโรงงานทุกระดับ
+- คำถามเป็นสถานการณ์จริงในโรงงาน เช่น "หากเกิด X ต้องทำอย่างไร?", "สัญลักษณ์ X หมายถึง?", "PPE ที่ถูกต้องสำหรับงาน X คืออะไร?"
+- ตัวเลือกต้องมี 6 ตัวเลือก (A–F) เสมอ — A–D บังคับ, E–F บังคับ
+- optionG และ optionH ให้เป็น null เสมอ (ไม่ใช้)
+- ตัวเลือกถูก: เป็นขั้นตอนความปลอดภัยที่ถูกต้องตามกฎหมายไทยหรือมาตรฐาน
+- ตัวเลือกผิด (3–5 ข้อ): ผสมระหว่าง (1) คำตอบผิดแต่ฟังดูสมเหตุสมผล และ (2) คำตอบผิดที่ตลกขบขัน เช่น "โพสต์รูปลง Social", "วิ่งหนีออกจากโรงงาน", "โทรถาม Google", "กินยาแก้ปวดก่อน"
+- ห้ามซ้ำกับคำถามที่มีอยู่แล้ว
+
+**หัวข้อที่ยังไม่มีหรือควรเพิ่ม:** PPE, สารเคมี, ไฟไหม้, การทำงานบนที่สูง, เครื่องจักร, ไฟฟ้า, LOTO, confined space, ergonomics, first aid
+
+**คำถามที่มีอยู่แล้ว (ห้ามซ้ำ):**
+- ${existingTexts}
+
+ตอบ JSON array เท่านั้น ห้ามมีข้อความอื่นนอก JSON:
+[{"questionText":"...","optionA":"...","optionB":"...","optionC":"...","optionD":"...","optionE":"...","optionF":"...","optionG":null,"optionH":null,"correctOption":"A","scoreReward":10}]`;
+
+        let questions = null;
+        let lastErr = null;
+        for (const model of LOTTERY_GEMINI_MODELS) {
+            try {
+                const geminiRes = await callGeminiGenerate(
+                    model,
+                    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.85, maxOutputTokens: 4000, responseMimeType: 'application/json' } },
+                    { timeout: 40000, context: 'kyt-question-generate' }
+                );
+                const rawText = geminiRes.data.candidates[0].content.parts[0].text;
+                questions = parseGeminiJson(rawText, 'array');
+                break;
+            } catch (aiErr) {
+                lastErr = aiErr;
+                console.warn(`KYT generate Gemini model failed: ${model}`, aiErr.response?.status || aiErr.message);
+            }
+        }
+
+        if (!questions || questions.length === 0) {
+            return res.status(500).json({ status: 'error', message: lastErr?.message || 'AI ไม่สามารถสร้างคำถามได้ ลองใหม่อีกครั้ง' });
+        }
+
+        const inserted = [];
+        for (const q of questions) {
+            if (!q.questionText || !q.optionA || !q.optionB || !q.correctOption) continue;
+            const [r] = await db.query(
+                `INSERT INTO kyt_questions (questionText, optionA, optionB, optionC, optionD, optionE, optionF, optionG, optionH, correctOption, scoreReward, isActive)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                [q.questionText, q.optionA, q.optionB, q.optionC || null, q.optionD || null,
+                 q.optionE || null, q.optionF || null, null, null,
+                 q.correctOption.toUpperCase(), q.scoreReward || 10]
+            );
+            inserted.push({ questionId: r.insertId, questionText: q.questionText });
+        }
+
+        await logAdminAction(req.body.requesterId, 'KYT_AI_GENERATE_QUESTIONS', 'question', 'batch', 'AI Generated',
+            { count: inserted.length });
+
+        res.json({ status: 'success', data: { inserted: inserted.length, preview: inserted.slice(0, 3) } });
+    } catch (e) {
+        res.status(500).json({ status: 'error', message: e.message });
+    }
+});
+
 // ======================================================
 // PART 3.7 — ADMIN: Manage Safety Cards
 // ======================================================

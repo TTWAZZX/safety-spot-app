@@ -441,18 +441,20 @@
                                         </div>
                                     </div>
                                     
-                                    <div class="row g-2">
-                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="A"><span class="choice-badge flex-shrink-0">A</span><span id="option-a" class="ms-2 text-start small lh-sm">...</span></button></div>
-                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="B"><span class="choice-badge flex-shrink-0">B</span><span id="option-b" class="ms-2 text-start small lh-sm">...</span></button></div>
-                                        
-                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="C"><span class="choice-badge flex-shrink-0">C</span><span id="option-c" class="ms-2 text-start small lh-sm">...</span></button></div>
-                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="D"><span class="choice-badge flex-shrink-0">D</span><span id="option-d" class="ms-2 text-start small lh-sm">...</span></button></div>
-                                        
-                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="E"><span class="choice-badge flex-shrink-0">E</span><span id="option-e" class="ms-2 text-start small lh-sm">...</span></button></div>
-                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="F"><span class="choice-badge flex-shrink-0">F</span><span id="option-f" class="ms-2 text-start small lh-sm">...</span></button></div>
-                                        
-                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="G"><span class="choice-badge flex-shrink-0">G</span><span id="option-g" class="ms-2 text-start small lh-sm">...</span></button></div>
-                                        <div class="col-6"><button class="answer-btn shadow-sm w-100 h-100 py-2" data-choice="H"><span class="choice-badge flex-shrink-0">H</span><span id="option-h" class="ms-2 text-start small lh-sm">...</span></button></div>
+                                    <div class="row g-2" id="quiz-options-grid">
+                                        <div class="col-12"><button class="answer-btn shadow-sm w-100 py-3" data-choice="A"><span class="choice-badge flex-shrink-0">A</span><span id="option-a" class="ms-2 text-start small lh-sm flex-grow-1">...</span><i class="fas fa-check-circle answer-selected-icon ms-auto text-success" style="display:none;font-size:1.1rem;"></i></button></div>
+                                        <div class="col-12"><button class="answer-btn shadow-sm w-100 py-3" data-choice="B"><span class="choice-badge flex-shrink-0">B</span><span id="option-b" class="ms-2 text-start small lh-sm flex-grow-1">...</span><i class="fas fa-check-circle answer-selected-icon ms-auto text-success" style="display:none;font-size:1.1rem;"></i></button></div>
+                                        <div class="col-12"><button class="answer-btn shadow-sm w-100 py-3" data-choice="C"><span class="choice-badge flex-shrink-0">C</span><span id="option-c" class="ms-2 text-start small lh-sm flex-grow-1">...</span><i class="fas fa-check-circle answer-selected-icon ms-auto text-success" style="display:none;font-size:1.1rem;"></i></button></div>
+                                        <div class="col-12"><button class="answer-btn shadow-sm w-100 py-3" data-choice="D"><span class="choice-badge flex-shrink-0">D</span><span id="option-d" class="ms-2 text-start small lh-sm flex-grow-1">...</span><i class="fas fa-check-circle answer-selected-icon ms-auto text-success" style="display:none;font-size:1.1rem;"></i></button></div>
+                                        <div class="col-12"><button class="answer-btn shadow-sm w-100 py-3" data-choice="E"><span class="choice-badge flex-shrink-0">E</span><span id="option-e" class="ms-2 text-start small lh-sm flex-grow-1">...</span><i class="fas fa-check-circle answer-selected-icon ms-auto text-success" style="display:none;font-size:1.1rem;"></i></button></div>
+                                        <div class="col-12"><button class="answer-btn shadow-sm w-100 py-3" data-choice="F"><span class="choice-badge flex-shrink-0">F</span><span id="option-f" class="ms-2 text-start small lh-sm flex-grow-1">...</span><i class="fas fa-check-circle answer-selected-icon ms-auto text-success" style="display:none;font-size:1.1rem;"></i></button></div>
+                                        <div class="col-12"><button class="answer-btn shadow-sm w-100 py-3" data-choice="G"><span class="choice-badge flex-shrink-0">G</span><span id="option-g" class="ms-2 text-start small lh-sm flex-grow-1">...</span><i class="fas fa-check-circle answer-selected-icon ms-auto text-success" style="display:none;font-size:1.1rem;"></i></button></div>
+                                        <div class="col-12"><button class="answer-btn shadow-sm w-100 py-3" data-choice="H"><span class="choice-badge flex-shrink-0">H</span><span id="option-h" class="ms-2 text-start small lh-sm flex-grow-1">...</span><i class="fas fa-check-circle answer-selected-icon ms-auto text-success" style="display:none;font-size:1.1rem;"></i></button></div>
+                                    </div>
+                                    <div id="quiz-confirm-area" class="mt-3" style="display:none;">
+                                        <button id="quiz-confirm-btn" class="btn btn-success w-100 py-3 fw-bold rounded-3" style="font-size:1rem;">
+                                            <i class="fas fa-check me-2"></i>ยืนยันคำตอบ
+                                        </button>
                                     </div>
                                 </div>
 
@@ -1283,9 +1285,12 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body bg-light">
-                    <div class="d-flex gap-2 mb-3">
+                    <div class="d-flex gap-2 mb-3 flex-wrap">
                         <button id="add-question-btn" class="btn btn-success shadow-sm">
                             <i class="fas fa-plus"></i> เพิ่มคำถามใหม่
+                        </button>
+                        <button class="btn btn-outline-primary shadow-sm" onclick="adminGenerateKYTQuestions()">
+                            <i class="fas fa-wand-magic-sparkles"></i> สร้างด้วย AI
                         </button>
                         <input type="text" id="question-search-input" class="form-control" placeholder="ค้นหาคำถาม...">
                     </div>

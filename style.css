@@ -531,6 +531,19 @@ body {
     color: white;
 }
 
+/* สถานะเลือกแล้ว ก่อนกดยืนยัน */
+.answer-btn.selected {
+    border-color: var(--line-green) !important;
+    background-color: #f0fdf4 !important;
+    color: #0d6832 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(6, 199, 85, 0.2);
+}
+.answer-btn.selected .choice-badge {
+    background-color: var(--line-green);
+    color: white;
+}
+
 /* Styling สำหรับปุ่มคำตอบใน Modal */
 .answer-btn {
     border: 2px solid #e9ecef;

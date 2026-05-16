@@ -3773,7 +3773,7 @@ async function loadGamePage() {
             ['a','b','c','d','e','f','g','h'].forEach(function(letter) {
                 const text = q.options[letter.toUpperCase()];
                 const span = $('#option-' + letter);
-                const col  = span.closest('.col-6');
+                const col  = span.closest('.col-12');
                 if (text) {
                     span.text(text);
                     col.show();
@@ -3789,8 +3789,12 @@ async function loadGamePage() {
                 $('#question-image-container').hide();
             }
             
-            // Reset ปุ่ม
-            $('.answer-btn').removeClass('correct wrong').prop('disabled', false);
+            // Reset ปุ่ม + confirm area
+            $('.answer-btn').removeClass('correct wrong selected').prop('disabled', false);
+            $('.answer-selected-icon').hide();
+            $('#quiz-confirm-area').hide();
+            $('#quiz-confirm-btn').prop('disabled', false).html('<i class="fas fa-check me-2"></i>ยืนยันคำตอบ');
+            $('#game-content').data('selected-choice', null);
             $('#game-content').fadeIn();
         }
     } catch (e) {
@@ -3798,17 +3802,35 @@ async function loadGamePage() {
     }
 }
 
-// --- แก้ไข Event Listener ตอบคำถาม (รองรับระบบกู้คืน Streak) ---
-$(document).on('click', '.answer-btn', async function() {
-
-    // 1. สั่นเบาๆ เมื่อนิ้วแตะปุ่ม
+// --- Quiz: Step 1 — เลือกข้อ (ยังไม่ส่ง) ---
+$(document).on('click', '.answer-btn', function() {
+    if ($(this).prop('disabled')) return;
     triggerHaptic('light');
 
     const btn = $(this);
-    const choice = btn.data('choice');
+    // clear previous selection
+    $('.answer-btn').removeClass('selected');
+    $('.answer-selected-icon').hide();
+    // highlight selected
+    btn.addClass('selected');
+    btn.find('.answer-selected-icon').show();
+    // store choice
+    $('#game-content').data('selected-choice', btn.data('choice'));
+    // show confirm
+    $('#quiz-confirm-area').slideDown(120);
+});
+
+// --- Quiz: Step 2 — ยืนยันและส่งคำตอบ ---
+$(document).on('click', '#quiz-confirm-btn', async function() {
+    const choice = $('#game-content').data('selected-choice');
+    if (!choice) return;
     const qid = $('#game-content').data('qid');
 
-    $('.answer-btn').prop('disabled', true); // ล็อกปุ่มกันกดซ้ำ
+    $('.answer-btn').prop('disabled', true);
+    $('#quiz-confirm-area').hide();
+    $('#quiz-confirm-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>กำลังตรวจ...');
+
+    const btn = $(`.answer-btn[data-choice="${choice}"]`);
 
     try {
         // ⭐ เปลี่ยน Endpoint เป็น v2 เพื่อรับค่า recoverableStreak
@@ -3894,7 +3916,9 @@ $(document).on('click', '.answer-btn', async function() {
 
     } catch (e) {
         Swal.fire('แจ้งเตือน', e.message, 'warning');
-        $('.answer-btn').prop('disabled', false); // ปลดล็อกปุ่มถ้า Error
+        $('.answer-btn').prop('disabled', false);
+        $('#quiz-confirm-btn').prop('disabled', false).html('<i class="fas fa-check me-2"></i>ยืนยันคำตอบ');
+        $('#quiz-confirm-area').show();
     }
 });
 
@@ -3916,6 +3940,48 @@ function closeQuizAndReload() {
 // ==========================================
 // --- ADMIN: QUESTION MANAGEMENT (FIXED V.2) ---
 // ==========================================
+
+async function adminGenerateKYTQuestions() {
+    const { value: count, isConfirmed } = await Swal.fire({
+        title: 'สร้างคำถาม KYT ด้วย AI',
+        html: `<div class="text-start">
+            <p class="text-muted small mb-2">AI จะสร้างคำถามสไตล์เดิม — ภาษาไทย โรงงาน ตัวเลือก A-F มีทั้งคำตอบที่ถูกต้องและตลกขบขัน</p>
+            <label class="form-label fw-bold">จำนวนที่ต้องการสร้าง</label>
+            <input type="number" id="kyt-gen-count" class="form-control" value="5" min="1" max="20">
+            <small class="text-muted">สูงสุด 20 ข้อต่อครั้ง</small>
+        </div>`,
+        confirmButtonText: 'สร้างเลย',
+        confirmButtonColor: '#0d6efd',
+        cancelButtonText: 'ยกเลิก',
+        showCancelButton: true,
+        preConfirm: () => {
+            const v = parseInt(document.getElementById('kyt-gen-count').value) || 5;
+            return Math.min(Math.max(v, 1), 20);
+        }
+    });
+    if (!isConfirmed) return;
+
+    Swal.fire({
+        title: 'AI กำลังสร้างคำถาม...',
+        html: '<p class="text-muted">กรุณารอสักครู่ อาจใช้เวลา 15-30 วินาที</p>',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
+    try {
+        const res = await callApi('/api/admin/questions/generate', { count }, 'POST');
+        Swal.fire({
+            icon: 'success',
+            title: `สร้างสำเร็จ ${res.inserted} ข้อ`,
+            html: res.preview.map(q => `<p class="text-start small mb-1 text-muted">• ${sanitizeHTML(q.questionText)}</p>`).join('') +
+                  (res.inserted > 3 ? `<p class="small text-muted">...และอีก ${res.inserted - 3} ข้อ</p>` : ''),
+            confirmButtonColor: '#06C755'
+        });
+        loadAdminQuestions();
+    } catch (e) {
+        Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+    }
+}
 
 // 1. ฟังก์ชันเปิด Modal หลัก (เรียกใช้ loadAdminQuestions)
 function handleManageQuestions() {

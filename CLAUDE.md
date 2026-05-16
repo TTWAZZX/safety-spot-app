@@ -391,6 +391,24 @@ createdAt    TIMESTAMP
 - ⚠️ Column จริงคือ `h.selectedAnswer` — ต้อง `h.selectedAnswer AS selectedOption`
 - อย่าใช้ `h.selectedOption` — ไม่มีคอลัมน์นี้ใน `user_game_history`
 
+## KYT Quiz — UI & Admin
+
+### Quiz Answer Layout
+- **Single-column** (`col-12`) — ไม่ใช้ `col-6` อีกต่อไป; แต่ละตัวเลือกเต็มความกว้าง อ่านง่ายบนมือถือ
+- **Two-step flow**: กดตัวเลือก → highlight เขียว + checkmark icon ขวา + ปุ่ม "ยืนยันคำตอบ" เลื่อนขึ้น → กดยืนยันจึงส่ง
+- CSS class `.answer-btn.selected` — border เขียว + bg `#f0fdf4` + choice-badge เขียว
+- `#quiz-confirm-area` (hidden by default) ห่อปุ่ม `#quiz-confirm-btn`
+- ⚠️ `.col-6` reference ใน JS ถูกแก้เป็น `.col-12` แล้ว — ถ้า revert layout ต้องแก้ด้วย
+- Reset ทุก state (selected, confirm area, icons) ตอนโหลดคำถามใหม่
+
+### Admin AI Generate KYT Questions
+- **Endpoint**: `POST /api/admin/questions/generate` (ใช้ `isAdmin` middleware)
+- รับ `count` (1-20), ดึง 60 คำถามล่าสุดมาใส่ prompt กัน AI สร้างซ้ำ
+- สร้าง A-F options (G, H = null) สไตล์เดิม: ภาษาไทยเป็นกันเอง, ตัวเลือกผิดผสมทั้งสมจริงและขบขัน
+- ใช้ `LOTTERY_GEMINI_MODELS` fallback เหมือนระบบอื่น
+- **Frontend**: `adminGenerateKYTQuestions()` — Swal count input → loading → success preview → reload list
+- ปุ่ม "สร้างด้วย AI" ใน `#admin-questions-modal` header bar ข้าง "+ เพิ่มคำถามใหม่"
+
 ## Fixed Bugs Log
 
 ### รอบที่ 1 — Backend Audit (server.js)
