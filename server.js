@@ -4996,8 +4996,7 @@ function toLotteryDateString(value) {
 }
 
 function getLotteryCloseAt(drawDate) {
-    const drawStart = new Date(`${toLotteryDateString(drawDate)}T00:00:00+07:00`);
-    return new Date(drawStart.getTime() - 60 * 1000);
+    return new Date(`${toLotteryDateString(drawDate)}T14:00:00+07:00`);
 }
 
 function isLotteryRoundClosed(round) {
