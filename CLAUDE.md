@@ -18,13 +18,13 @@ LINE LIFF (frontend) → callApi() → Express REST API → MySQL (Aiven)
 ## Key Files
 | File | หน้าที่ |
 |------|---------|
-| `server.js` | Express backend ~6130 บรรทัด — API ทั้งหมด |
+| `server.js` | Express backend ~7700 บรรทัด — API ทั้งหมด |
 | `db.js` | MySQL connection pool — export `query()` และ `getClient()` |
 | `schema.sql` | Full schema สำหรับ fresh install (DROP + CREATE) |
 | `migration.sql` | ALTER statements สำหรับ patch production ที่มีข้อมูลแล้ว |
-| `app.js` | Frontend SPA logic ~7970 บรรทัด |
+| `app.js` | Frontend SPA logic ~8300 บรรทัด |
 | `index.html` | HTML template |
-| `style.css` | Custom styles (Bootstrap 5 overrides, LINE green theme) ~3900 บรรทัด |
+| `style.css` | Custom styles (Bootstrap 5 overrides, LINE green theme) ~4020 บรรทัด |
 
 ## Database
 - **Host:** Aiven Cloud MySQL 8.0
@@ -210,6 +210,8 @@ fireConfetti('big')      // 3 bursts
 - User endpoints validate `requesterId`/`lineUserId` for Lottery user-owned data
 - `/api/lottery/current-round` hides test rounds from normal users; admin (requesterId in admins table) sees test rounds via `includeTestRounds` flag
 - `lottery_rounds.isTest` supports admin-only test rounds
+- **ปิดรับตั๋ว**: `getLotteryCloseAt(drawDate)` คืน `drawDate T14:00:00+07:00` — ปิดรับ 14:00 น. ของวันออกรางวัล (ซื้อได้ถึง 13:59 น.)
+- **Lottery type selector**: เปลี่ยนจาก card grid เป็น tab-style bar (`.lottery-type-tabs` / `.lottery-tab`) — IDs เดิมไม่เปลี่ยน ไม่มี JS changes
 - Admin result tab supports:
   - manual result entry
   - `POST /api/admin/lottery/fetch-result` for AI result fetch on real rounds
@@ -220,15 +222,17 @@ fireConfetti('big')      // 3 bursts
 - Result confirmation is state-guarded: completed rounds cannot be edited/reconfirmed, and confirm only works from `pending_confirm`
 - Confirmed rounds snapshot prize/price settings into `lottery_rounds` so later admin setting changes do not change an already confirmed payout
 - Reset tickets is transaction-safe: it unlinks quiz answers, removes gold-ticket claims before tickets, and recalculates affected users' daily quota from remaining tickets today
+- **Full Round Reset** (`POST /api/admin/lottery/rounds/:roundId/reset-round`): ย้อนผลงวด — คืน score/coins ผู้ชนะ, ลบ prize records, set `status='closed'`, clear result fields; ใช้ได้กับ `confirmed`/`completed`/`pending_confirm`; frontend: `adminFullResetLotteryRound(roundId, drawDate)` → ปุ่ม 🔄↩️ ในแถวงวด
 
 ### Safety Lottery — Round Management (Admin)
 - **สร้างงวด**: Manual จาก admin panel หรือ auto-cron 08:00 BKK สร้างงวดล่วงหน้า 3 วันก่อน 1/16 ของเดือน
 - **งวดทดสอบ** (`isTest=true`): มองเห็นเฉพาะ admin เท่านั้น ปุ่ม 🧪 เปิด lottery modal โดยตรง
 - **แก้งวด**: ปุ่ม ✏️ แก้วันที่ได้เฉพาะ `status=open`
-- **รีเซตตั๋ว**: ปุ่ม 🔄 ลบ tickets + คืน daily quota + คืน quiz answer links → ต้องพิมพ์ `RESET` ยืนยัน; บล็อก `confirmed`/`completed`
+- **รีเซตตั๋ว**: ปุ่ม 🔄 ลบ tickets + คืน daily quota + คืน quiz answer links → ต้องพิมพ์ `RESET` ยืนยัน (Swal `input: 'text'` + `inputValidator`); บล็อก `confirmed`/`completed`
   - ⚠️ `lottery_daily_purchases` ไม่มีคอลัมน์ `roundId` — ลบด้วย `lineUserId IN (affected users)`
   - ⚠️ `lottery_quiz_answers` ไม่มีคอลัมน์ `roundId` — reset ด้วย `usedForTicketId IN (ticketIds)`
   - ⚠️ `lottery_gold_ticket_claims` มี FK → `lottery_tickets.ticketId` — ต้องลบก่อน delete tickets
+- **ย้อนผล (Full Reset)**: ปุ่ม 🔄↩️ — ใช้ได้กับ `confirmed`/`pending_confirm`/`completed` → คืน score/coins ผู้ชนะ, set `status='closed'`; frontend: `adminFullResetLotteryRound(roundId, drawDate)`
 - **ลบงวด**: ปุ่ม 🗑️ ลบได้เฉพาะงวด test หรืองวดที่ยังไม่มีตั๋ว
 
 ### Safety Dream Numbers — ท่านอาจารย์จอห์นนี่
@@ -238,6 +242,55 @@ fireConfetti('big')      // 3 bursts
 - **ปุ่ม "ใช้เลขนี้"**: ปิด dream modal → เปิด lottery modal → set เลขในช่อง + switch type อัตโนมัติ
 - **AI**: Gemini `gemini-2.5-flash` → fallback models → static fallback ถ้า AI ล่ม
 - **`LOTTERY_GEMINI_MODELS`** declared at line ~4169 — ใช้ร่วมกับ generate-questions และ fetch-result
+
+#### Dream Stats Panel (Premium)
+แสดงด้านบนสุดของ dream modal — 3 stat cards + milestone progress bar:
+| Element ID | ข้อมูล |
+|-----------|--------|
+| `dsp-streak` | วันติดต่อกัน (จาก `dreamStreak` ใน users) — แสดงในวงแหวนดาว orbit animation |
+| `dsp-total` | พยากรณ์ทั้งหมด (`COUNT(*)` จาก `lottery_dream_logs`) |
+| `dsp-coins` | เหรียญจาก streak milestone สะสม (คำนวณจาก `_calcDreamStreakStats`) |
+| `dsp-milestone-row` | Progress bar ไปยัง milestone ถัดไป (ซ่อนถ้าผ่าน 100 วันแล้ว) |
+| `dsp-milestone-fill` | Fill bar สีม่วง→ทอง gradient |
+| `dsp-milestone-text` | "⏳ อีก N วัน → +X 🪙" หรือ "🏆 Master Oracle" |
+
+**Streak Milestone Bonuses** (เหรียญบวกเข้า `coinBalance` ทันทีเมื่อถึง milestone):
+```
+3 วัน → +5 🪙 | 7 วัน → +10 🪙 | 14 วัน → +20 🪙
+30 วัน → +50 🪙 | 60 วัน → +50 🪙 | 100 วัน → +50 🪙
+```
+
+**`_calcDreamStreakStats(streak)`** (server.js helper):
+```javascript
+// คืน { coinsEarned, nextMilestone: { days, bonus, daysLeft, prevDays } | null }
+const milestones = [[3,5],[7,10],[14,20],[30,50],[60,50],[100,50]];
+```
+
+**`updateDreamStatsPanel(streak, doneToday, totalInterps, streakCoins, nextMilestone)`** (app.js):
+- เรียก 2 จุด: ใน `loadDreamToday` (GET response) และใน interpret result handler (POST response)
+- catch block → `updateDreamStatsPanel(0, false, -1, 0, null)`
+
+**API `/api/lottery/dream-today` response fields เพิ่มเติม:**
+```javascript
+dreamStreak, doneToday,         // streak ที่ active (0 ถ้าขาดเกิน 1 วัน)
+totalInterpretations,           // COUNT(*) lottery_dream_logs ทั้งหมดของ user
+streakCoinsEarned,              // รวม bonus จาก milestones ที่ผ่านแล้ว
+nextMilestone                   // { days, bonus, daysLeft, prevDays } | null
+```
+
+**API `/api/lottery/dream/interpret` response fields เพิ่มเติม:**
+- ทั้ง todayDreamCount===0 และ >0 ส่ง `dreamStreak`, `streakCoinsEarned`, `nextMilestone` กลับเสมอ
+
+**⚠️ DATE_FORMAT required**: query `lastDreamDate` ต้องใช้ `DATE_FORMAT(lastDreamDate, '%Y-%m-%d') AS lastDreamDate` เสมอ เพราะ mysql2 อาจ return DATE column เป็น JS Date object ทำให้ string comparison กับ `getBangkokDateString()` พัง
+
+**CSS orbit animation** (`.dream-stat-orbit`):
+```css
+/* Mini orbital ring 56×56px, radius 22px — 3 ดาว --i:0,1,2 */
+@keyframes dreamOrbitMini {
+    from { transform: rotate(0deg) translateX(22px) rotate(0deg); }
+    to   { transform: rotate(360deg) translateX(22px) rotate(-360deg); }
+}
+```
 
 #### Tables — safety_dream_items (schema จริง)
 ```sql
@@ -289,7 +342,7 @@ createdAt    TIMESTAMP
 
 **⚠️ Swal preConfirm pattern**: admin form functions ต้อง capture `{ value: vals, isConfirmed }` จาก `Swal.fire()` — ห้ามเรียก `_dreamFormValues()` หลัง Swal ปิด เพราะ DOM elements ถูกทำลายแล้ว
 
-**Module-level vars (dream)**: `_dreamItems`, `_dreamSelectedItemId`, `_dreamResult`, `_adminDreamItemsCache`
+**Module-level vars (dream)**: `_dreamItems`, `_dreamSelectedItemIds` (array), `_dreamResult`, `_adminDreamItemsCache`, `_dreamSubmitting`, `_dreamTodayCount`
 
 ### Department Leaderboard (Public)
 - `GET /api/department-leaderboard` (public) — top 10 แผนก by avgScore
@@ -376,6 +429,16 @@ createdAt    TIMESTAMP
 | D-5 | Dream shortcut button อยู่ใน `#lottery-form-content` → ซ่อนเมื่อไม่มีงวด | ย้ายออกมาอยู่นอก div เพื่อแสดงเสมอ |
 | D-6 | **CRITICAL**: `adminEditDreamItem`/`adminAddDreamItem` เรียก `_dreamFormValues()` หลัง `Swal.fire()` resolve → DOM ถูกทำลายแล้ว → ส่งค่าว่างไป overwrite DB | เปลี่ยนเป็น `const { value: vals, isConfirmed } = await Swal.fire({..., preConfirm: () => _dreamFormValues()})` |
 | D-7 | Admin mutation functions reset `_dreamItems` แต่ไม่ reset `_adminDreamItemsCache` → edit form อาจใช้ข้อมูลเก่า | เพิ่ม `_adminDreamItemsCache = null` ในทุก mutation |
+
+### รอบที่ 6 — Dream Stats Panel & Lottery Fixes
+| ID | ปัญหา | วิธีแก้ |
+|----|-------|---------|
+| DS-1 | `updateDreamStreakBar` ยังถูกเรียกใน interpret result handler → `is not defined` error | เปลี่ยนเป็น `updateDreamStatsPanel(streak, true, totalInterps, coins, milestone)` |
+| DS-2 | Interpret endpoint (todayDreamCount > 0): `let dreamStreak = 0` ไม่อัปเดต → ส่ง 0 กลับเสมอ | ย้าย SELECT + else branch ออกนอก `if (todayDreamCount === 0)` ให้อ่านจาก DB เสมอ |
+| DS-3 | `lastDreamDate` comparison พัง: mysql2 อาจ return DATE เป็น JS Date object → `String(date).slice(0,10)` ได้ `"Wed May 14"` ≠ `"2026-05-14"` → streak = 0 เสมอ | เปลี่ยน SELECT เป็น `DATE_FORMAT(lastDreamDate, '%Y-%m-%d') AS lastDreamDate` ทั้ง dream-today GET และ interpret POST |
+| L-6 | Lottery ปิดรับตั๋ว 23:59 วันก่อนออกรางวัล → user ซื้อวันออกรางวัลไม่ได้ | `getLotteryCloseAt` เปลี่ยนเป็น `drawDate T14:00:00+07:00` |
+| L-7 | Reset-tickets Swal: custom HTML input ถูก Bootstrap modal `aria-hidden` block → กรอก RESET ไม่ได้ | เปลี่ยนเป็น Swal built-in `input: 'text'` + `inputValidator` |
+| L-8 | `adminFullResetLotteryRound`: `res.data.reversedWinners` → undefined (`callApi` unwrap แล้ว) | แก้เป็น `res.reversedWinners`, `res.ticketsReset` |
 
 ## AppState (Global State)
 ```javascript
