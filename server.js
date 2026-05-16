@@ -2676,12 +2676,11 @@ app.get('/api/user/gacha-history', async (req, res) => {
     if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
     try {
         const [rows] = await db.query(`
-            SELECT uc.cardId, sc.cardName, sc.rarity, sc.imageUrl,
-                   DATE_FORMAT(CONVERT_TZ(uc.createdAt,'+00:00','+07:00'), '%Y-%m-%d %H:%i') AS pulledAt
+            SELECT uc.cardId, sc.cardName, sc.rarity, sc.imageUrl
             FROM user_cards uc
             JOIN safety_cards sc ON uc.cardId = sc.cardId
             WHERE uc.lineUserId = ?
-            ORDER BY uc.createdAt DESC
+            ORDER BY uc.id DESC
             LIMIT 50
         `, [lineUserId]);
         res.json({ status: 'success', data: rows });
