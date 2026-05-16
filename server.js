@@ -753,23 +753,25 @@ app.get('/api/home/activity-feed', async (req, res) => {
              FROM notifications n
              JOIN users u ON n.recipientUserId = u.lineUserId
              LEFT JOIN safety_cards c ON n.relatedItemId = c.cardId
-             WHERE n.type IN ('game_gacha','exchange')
+             WHERE n.type IN ('game_gacha','exchange','card_exchange')
              ORDER BY n.createdAt DESC
              LIMIT ?`,
             [perSourceLimit]
         );
         sources.push(...notificationRows.map(r => ({
-            eventType: r.type === 'exchange' ? 'coins_exchanged' : 'card_pulled',
+            eventType: r.type === 'exchange' ? 'coins_exchanged' : r.type === 'card_exchange' ? 'card_exchanged' : 'card_pulled',
             actorUserId: r.actorUserId,
             actorName: r.actorName,
             actorPictureUrl: r.actorPictureUrl,
             department: r.department,
-            entityType: r.type === 'exchange' ? 'exchange' : 'card',
+            entityType: r.type === 'card_exchange' ? 'card_exchange' : r.type === 'exchange' ? 'exchange' : 'card',
             entityId: r.relatedItemId || r.notificationId,
-            title: r.type === 'exchange' ? 'แลกเหรียญ/คะแนน' : 'ได้รับ Safety Card',
-            message: r.type === 'exchange'
+            title: r.type === 'exchange' ? 'แลกเหรียญ/คะแนน' : r.type === 'card_exchange' ? 'แลกการ์ดเป็นคะแนน' : 'ได้รับ Safety Card',
+            message: r.type === 'card_exchange'
                 ? r.message
-                : (r.cardName ? `${r.cardName} ระดับ ${r.rarity || '-'}` : r.message),
+                : r.type === 'exchange'
+                    ? r.message
+                    : (r.cardName ? `${r.cardName} ระดับ ${r.rarity || '-'}` : r.message),
             createdAt: r.createdAt
         })));
 
