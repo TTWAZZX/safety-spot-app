@@ -4518,6 +4518,7 @@ async function loadGachaHistory() {
                         ${r.rarity} — ${RARITY_LABEL[r.rarity]}
                     </span>
                 </div>
+                ${r.pulledAt ? `<small class="text-muted" style="font-size:0.65rem;white-space:nowrap;">${sanitizeHTML(r.pulledAt)}</small>` : ''}
             </div>`).join('');
         container.html(`<p class="text-muted small mb-2">50 รายการล่าสุด</p>${html}`);
     } catch (e) {

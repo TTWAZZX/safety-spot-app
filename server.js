@@ -101,6 +101,8 @@ db.query("ALTER TABLE users ADD COLUMN department VARCHAR(100) NOT NULL DEFAULT 
   .catch(() => {}); // ignore if column already exists
 db.query("ALTER TABLE submissions ADD COLUMN reviewedAt DATETIME DEFAULT NULL")
   .catch(() => {});
+db.query("ALTER TABLE user_cards ADD COLUMN createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+  .catch(() => {});
 db.query(`
   CREATE TABLE IF NOT EXISTS user_card_locks (
     lineUserId  VARCHAR(60) NOT NULL,
@@ -2678,11 +2680,12 @@ app.get('/api/user/gacha-history', async (req, res) => {
     if (!lineUserId) return res.status(400).json({ status: 'error', message: 'lineUserId required' });
     try {
         const [rows] = await db.query(`
-            SELECT uc.cardId, sc.cardName, sc.rarity, sc.imageUrl
+            SELECT uc.cardId, sc.cardName, sc.rarity, sc.imageUrl,
+                   DATE_FORMAT(CONVERT_TZ(uc.createdAt,'+00:00','+07:00'), '%d/%m/%y %H:%i') AS pulledAt
             FROM user_cards uc
             JOIN safety_cards sc ON uc.cardId = sc.cardId
             WHERE uc.lineUserId = ?
-            ORDER BY uc.id DESC
+            ORDER BY uc.createdAt DESC
             LIMIT 50
         `, [lineUserId]);
         res.json({ status: 'success', data: rows });
